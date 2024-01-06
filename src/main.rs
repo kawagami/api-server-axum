@@ -29,6 +29,7 @@ async fn main() {
 
     // Create a regular axum app.
     let app = Router::new()
+        .route("/test", get(handler_test))
         .route("/slow", get(|| sleep(Duration::from_secs(5))))
         .route("/forever", get(std::future::pending::<()>))
         .layer((
@@ -70,4 +71,8 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
+}
+
+async fn handler_test() -> String {
+    format!("handler_test")
 }
