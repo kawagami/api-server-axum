@@ -1,16 +1,13 @@
-//! Run with
-//!
-//! ```not_rust
-//! cargo run -p example-graceful-shutdown
-//! kill or ctrl-c
-//! ```
-
 use std::time::Duration;
 
-use axum::{routing::get, Router};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+};
 use tokio::net::TcpListener;
 use tokio::signal;
-use tokio::time::sleep;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -30,8 +27,7 @@ async fn main() {
     // Create a regular axum app.
     let app = Router::new()
         .route("/test", get(handler_test))
-        .route("/slow", get(|| sleep(Duration::from_secs(5))))
-        .route("/forever", get(std::future::pending::<()>))
+        .fallback(fallback)
         .layer((
             TraceLayer::new_for_http(),
             // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
@@ -75,4 +71,8 @@ async fn shutdown_signal() {
 
 async fn handler_test() -> String {
     format!("handler_test")
+}
+
+async fn fallback() -> Response {
+    (StatusCode::NOT_FOUND, "Not Found").into_response()
 }
