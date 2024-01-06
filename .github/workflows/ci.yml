@@ -37,4 +37,5 @@ jobs:
           script: |
             sh down.sh
             docker pull kawagami77/api-server:axum
+            docker image prune --force
             sh up.sh
