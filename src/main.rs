@@ -12,6 +12,8 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod api;
+
 #[tokio::main]
 async fn main() {
     // Enable tracing.
@@ -26,7 +28,8 @@ async fn main() {
 
     // Create a regular axum app.
     let app = Router::new()
-        .route("/test", get(handler_test))
+        .route("/", get(handler_root))
+        .nest("/api", api::routes())
         .fallback(fallback)
         .layer((
             TraceLayer::new_for_http(),
@@ -69,8 +72,8 @@ async fn shutdown_signal() {
     }
 }
 
-async fn handler_test() -> String {
-    format!("handler_test")
+async fn handler_root() -> String {
+    format!("this is api server")
 }
 
 async fn fallback() -> Response {
