@@ -1,8 +1,6 @@
 use axum::{routing::get, Router};
 
-use crate::state::AppState;
-
-pub fn routes() -> Router<AppState> {
+pub fn routes() -> Router {
     Router::new().route("/test", get(test))
 }
 

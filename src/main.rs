@@ -1,8 +1,4 @@
-mod api;
-mod state;
-
-use api::get_connection;
-use state::AppState;
+use std::time::Duration;
 
 use axum::{
     http::StatusCode,
@@ -10,12 +6,13 @@ use axum::{
     routing::get,
     Router,
 };
-use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+mod api;
 
 #[tokio::main]
 async fn main() {
@@ -29,17 +26,10 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer().without_time())
         .init();
 
-    dotenvy::dotenv().ok();
-    let db_connection_str = std::env::var("DATABASE_URL").expect("DATABASE_URL not found");
-
-    let state = AppState {
-        connection: get_connection(db_connection_str).await,
-    };
-
     // Create a regular axum app.
     let app = Router::new()
         .route("/", get(handler_root))
-        .nest("/api", api::routes(state).await)
+        .nest("/api", api::routes())
         .fallback(fallback)
         .layer((
             TraceLayer::new_for_http(),
