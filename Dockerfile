@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY src/ src/
 COPY Cargo.toml .
-# COPY .env .
+COPY .env .
 
 RUN cargo build --release
 
@@ -15,6 +15,6 @@ RUN strip -s /app/target/release/template_axum
 FROM ubuntu:22.04
 
 COPY --from=builder /app/target/release/template_axum /app/template_axum
-# COPY --from=builder /app/.env /app/.env
+COPY --from=builder /app/.env /app/.env
 
 CMD ["/app/template_axum"]
