@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY src/ src/
 COPY Cargo.toml .
+COPY migrations/ migrations/
 # COPY .env .
 
 RUN cargo build --release
