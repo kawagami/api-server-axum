@@ -1,21 +1,21 @@
-FROM rust:1.74.0-slim-bookworm AS builder
-
-RUN rustup target add x86_64-unknown-linux-musl
+FROM rust:1.75-slim-bookworm AS builder
 
 WORKDIR /app
 
 COPY src/ src/
 COPY Cargo.toml .
+COPY migrations/ migrations/
+# COPY .env .
 
-RUN cargo build --target x86_64-unknown-linux-musl --release
+RUN cargo build --release
 
-RUN strip -s /app/target/x86_64-unknown-linux-musl/release/template_axum
+# 漸少 image size
+RUN strip -s /app/target/release/template_axum
 
-# 修復 scratch 找不到檔案的問題
-# https://kerkour.com/rust-small-docker-image#from-scratch
-# 以上網址有說原因
-FROM scratch
+# 好像 sqlx 有用到不能用 scratch 的依賴
+FROM ubuntu:22.04
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/template_axum /app/template_axum
+COPY --from=builder /app/target/release/template_axum /app/template_axum
+# COPY --from=builder /app/.env /app/.env
 
 CMD ["/app/template_axum"]

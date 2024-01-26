@@ -1,47 +1,38 @@
-use std::time::Duration;
+mod routes;
 
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    routing::get,
-    Router,
-};
-use tokio::net::TcpListener;
-use tokio::signal;
-use tower_http::timeout::TimeoutLayer;
-use tower_http::trace::TraceLayer;
+use sqlx::postgres::PgPoolOptions;
+use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod api;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
-    // Enable tracing.
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "example_graceful_shutdown=debug,tower_http=debug,axum=trace".into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "example_tokio_postgres=debug".into()),
         )
-        .with(tracing_subscriber::fmt::layer().without_time())
+        .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Create a regular axum app.
-    let app = Router::new()
-        .route("/", get(handler_root))
-        .nest("/api", api::routes())
-        .fallback(fallback)
-        .layer((
-            TraceLayer::new_for_http(),
-            // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
-            // requests don't hang forever.
-            TimeoutLayer::new(Duration::from_secs(10)),
-        ));
+    dotenvy::dotenv().ok();
 
-    // Create a `TcpListener` using tokio.
+    let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
+
+    // set up connection pool
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .acquire_timeout(Duration::from_secs(3))
+        .connect(&db_connection_str)
+        .await
+        .expect("can't connect to database");
+
+    let app = routes::app(pool).await;
+
+    // run it with hyper
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
-
-    // Run the server with graceful shutdown
+    tracing::debug!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
@@ -72,10 +63,17 @@ async fn shutdown_signal() {
     }
 }
 
-async fn handler_root() -> String {
-    format!("this is api server")
-}
+// async fn create_table(State(pool): State<PgPool>) -> Result<String, (StatusCode, String)> {
+//     let result = sqlx::query(
+//         r#"
+//         CREATE TABLE IF NOT EXISTS ticket (
+//         id bigserial,
+//         name text
+//         );"#,
+//     )
+//     .execute(&pool)
+//     .await
+//     .map_err(|err: sqlx::Error| (StatusCode::IM_A_TEAPOT, err.to_string()));
 
-async fn fallback() -> Response {
-    (StatusCode::NOT_FOUND, "Not Found").into_response()
-}
+//     Ok(format!("{:?}", result))
+// }
