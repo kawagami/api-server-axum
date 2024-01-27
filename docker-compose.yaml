@@ -5,7 +5,7 @@ services:
     ports:
       - "3000:3000"
   # database:
-  #   image: postgres:16.0-alpine3.18
+  #   image: postgres:16-alpine
   #   environment:
   #     - POSTGRES_USER=kawa
   #     - POSTGRES_PASSWORD=kawa
