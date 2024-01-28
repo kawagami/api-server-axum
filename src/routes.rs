@@ -1,3 +1,4 @@
+mod hackmd_note_lists;
 mod products;
 mod root;
 
@@ -21,5 +22,7 @@ pub async fn app(pool: Pool<Postgres>) -> Router {
                 .patch(products::update_product)
                 .delete(products::delete_product),
         )
+        .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
+        .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
         .with_state(pool)
 }
