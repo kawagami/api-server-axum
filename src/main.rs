@@ -1,10 +1,15 @@
 mod routes;
+mod state;
 
 use sqlx::postgres::PgPoolOptions;
 use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 #[tokio::main]
 async fn main() {
@@ -27,8 +32,14 @@ async fn main() {
         .connect(&db_connection_str)
         .await
         .expect("can't connect to database");
+    let state = state::AppState {
+        pool,
+        some_data: HashMap::new(),
+    };
 
-    let app = routes::app(pool).await;
+    let shared_state: state::SharedState = Arc::new(RwLock::new(state));
+
+    let app = routes::app(shared_state).await;
 
     // run it with hyper
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -62,18 +73,3 @@ async fn shutdown_signal() {
         _ = terminate => {},
     }
 }
-
-// async fn create_table(State(pool): State<PgPool>) -> Result<String, (StatusCode, String)> {
-//     let result = sqlx::query(
-//         r#"
-//         CREATE TABLE IF NOT EXISTS ticket (
-//         id bigserial,
-//         name text
-//         );"#,
-//     )
-//     .execute(&pool)
-//     .await
-//     .map_err(|err: sqlx::Error| (StatusCode::IM_A_TEAPOT, err.to_string()));
-
-//     Ok(format!("{:?}", result))
-// }

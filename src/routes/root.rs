@@ -4,14 +4,21 @@ use axum::{
     http::{request::Parts, StatusCode},
     response::IntoResponse,
 };
+use axum_macros::debug_handler;
 use sqlx::postgres::PgPool;
 
+use crate::state::SharedState;
+
 // we can extract the connection pool with `State`
+
+#[debug_handler]
 pub async fn using_connection_pool_extractor(
-    State(pool): State<PgPool>,
+    State(state): State<SharedState>,
 ) -> Result<String, impl IntoResponse> {
+    let pool = &state.read().unwrap().pool.clone();
+
     sqlx::query_scalar("select 'hello world from pg'")
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(internal_error)
 }
@@ -37,7 +44,7 @@ where
     }
 }
 
-pub async fn using_connection_extractor(
+pub async fn _using_connection_extractor(
     DatabaseConnection(mut conn): DatabaseConnection,
 ) -> Result<String, (StatusCode, String)> {
     sqlx::query_scalar("select 'hello world from pg'")

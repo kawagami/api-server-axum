@@ -6,18 +6,13 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::PgPool;
 
-// async fn create_table(State(pool): State<PgPool>) -> Result<String, (StatusCode, String)> {
-//     let _ = sqlx::query_file!("migrations/create_products_table.sql")
-//         .fetch_one(&pool)
-//         .await
-//         .map_err(|err: sqlx::Error| (StatusCode::IM_A_TEAPOT, err.to_string()));
+use crate::state::SharedState;
 
-//     Ok(format!("{:?}", "success"))
-// }
-
-pub async fn create_table(State(pool): State<PgPool>) -> Result<String, (StatusCode, String)> {
+pub async fn create_table(
+    State(state): State<SharedState>,
+) -> Result<String, (StatusCode, String)> {
+    let pool = &state.read().unwrap().pool.clone();
     let query = r#"
         CREATE TABLE IF NOT EXISTS products(
             product_id serial PRIMARY KEY,
@@ -31,7 +26,7 @@ pub async fn create_table(State(pool): State<PgPool>) -> Result<String, (StatusC
         );
     "#;
     let _row = sqlx::query_as(query)
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
@@ -69,9 +64,10 @@ impl fmt::Display for Product {
 }
 
 pub async fn insert_one_product(
-    State(pool): State<PgPool>,
+    State(state): State<SharedState>,
     Json(product): Json<Product>,
 ) -> Result<String, (StatusCode, String)> {
+    let pool = &state.read().unwrap().pool.clone();
     let row =
         sqlx::query_as::<_, Product>("INSERT INTO products (product_name, description, price, stock_quantity, category_id) VALUES ($1, $2, $3, $4, $5) RETURNING *")
             .bind(product.product_name)
@@ -79,7 +75,7 @@ pub async fn insert_one_product(
             .bind(product.price)
             .bind(product.stock_quantity)
             .bind(product.category_id)
-            .fetch_one(&pool)
+            .fetch_one(pool)
             .await
             .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
@@ -87,13 +83,14 @@ pub async fn insert_one_product(
 }
 
 pub async fn get_product(
-    State(pool): State<PgPool>,
+    State(state): State<SharedState>,
     Path(product_id): Path<i32>,
 ) -> Result<Json<Product>, (StatusCode, String)> {
+    let pool = &state.read().unwrap().pool.clone();
     let query = "select * from products where product_id = $1";
     let result = sqlx::query_as::<_, Product>(query)
         .bind(product_id)
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
@@ -110,15 +107,16 @@ pub struct UpdateProduct {
 }
 
 pub async fn update_product(
-    State(pool): State<PgPool>,
+    State(state): State<SharedState>,
     Path(product_id): Path<i32>,
     Json(update_product): Json<UpdateProduct>,
 ) -> Result<Json<Product>, (StatusCode, String)> {
+    let pool = &state.read().unwrap().pool.clone();
     // 取得舊設定
     let query = "select * from products where product_id = $1";
     let mut original_product = sqlx::query_as::<_, Product>(query)
         .bind(product_id)
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
@@ -165,7 +163,7 @@ pub async fn update_product(
         .bind(original_product.stock_quantity)
         .bind(original_product.category_id)
         .bind(product_id)
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
@@ -173,13 +171,14 @@ pub async fn update_product(
 }
 
 pub async fn delete_product(
-    State(pool): State<PgPool>,
+    State(state): State<SharedState>,
     Path(product_id): Path<i32>,
 ) -> Result<String, (StatusCode, String)> {
+    let pool = &state.read().unwrap().pool.clone();
     let query = "DELETE FROM products WHERE product_id = $1";
     let _result = sqlx::query(query)
         .bind(product_id)
-        .execute(&pool)
+        .execute(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 

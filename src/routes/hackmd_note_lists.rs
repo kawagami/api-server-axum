@@ -3,7 +3,9 @@ use axum::{
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{types::chrono::NaiveDateTime, PgPool};
+use sqlx::types::chrono::NaiveDateTime;
+
+use crate::state::SharedState;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct HackmdNoteList {
@@ -48,13 +50,14 @@ struct LastChangeUser {
 }
 
 pub async fn get_note_list(
-    State(pool): State<PgPool>,
+    State(state): State<SharedState>,
     Path(id): Path<i32>,
 ) -> Result<Json<HackmdNoteList>, (StatusCode, String)> {
+    let pool = &state.read().unwrap().pool.clone();
     let query = "select * from hackmd_note_lists where id = $1";
     let result = sqlx::query_as::<_, HackmdNoteList>(query)
         .bind(id)
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
@@ -62,11 +65,12 @@ pub async fn get_note_list(
 }
 
 pub async fn get_all_note_lists(
-    State(pool): State<PgPool>,
+    State(state): State<SharedState>,
 ) -> Result<Json<Vec<HackmdNoteList>>, (StatusCode, String)> {
+    let pool = &state.read().unwrap().pool.clone();
     let query = "select * from hackmd_note_lists";
     let records = sqlx::query_as::<_, HackmdNoteList>(query)
-        .fetch_all(&pool)
+        .fetch_all(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
