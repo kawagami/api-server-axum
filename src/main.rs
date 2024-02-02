@@ -1,15 +1,10 @@
 mod routes;
 mod state;
 
-use sqlx::postgres::PgPoolOptions;
 use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::sync::{Arc, RwLock};
 
 #[tokio::main]
 async fn main() {
@@ -23,22 +18,8 @@ async fn main() {
 
     dotenvy::dotenv().ok();
 
-    let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
-
-    // set up connection pool
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .acquire_timeout(Duration::from_secs(3))
-        .connect(&db_connection_str)
-        .await
-        .expect("can't connect to database");
-    let state = state::AppState {
-        pool,
-        some_data: HashMap::new(),
-    };
-
+    let state = state::AppState::new().await;
     let shared_state: state::SharedState = Arc::new(RwLock::new(state));
-
     let app = routes::app(shared_state).await;
 
     // run it with hyper
