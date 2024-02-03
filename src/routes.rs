@@ -27,6 +27,7 @@ pub async fn app(state: SharedState) -> Router {
         .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
         .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
         .route("/blogs/:id", get(blogs::get_blog))
+        .route("/blogs", get(blogs::get_blogs))
         .route(
             "/handle_state/insert_one",
             post(handle_state::insert_one_data),

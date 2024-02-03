@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
@@ -36,7 +38,7 @@ pub async fn get_blog(
 ) -> Result<Json<Blog>, (StatusCode, String)> {
     let pool = &state.read().unwrap().pool.clone();
     let query = r#"
-            SELECT
+        SELECT
             b.id AS id,
             b."name" AS name,
             b.short_content AS short_content,
@@ -88,4 +90,71 @@ fn handle_blog(rows: Vec<PgRow>) -> Blog {
         created_at,
         updated_at,
     }
+}
+
+pub async fn get_blogs(
+    State(state): State<SharedState>,
+) -> Result<Json<Vec<Blog>>, (StatusCode, String)> {
+    let pool = &state.read().unwrap().pool.clone();
+    let query = r#"
+        SELECT
+            b.id AS id,
+            b."name" AS name,
+            b.short_content AS short_content,
+            bca.content AS content,
+            bci.url AS url,
+            b.created_at AS created_at,
+            b.updated_at AS updated_at
+        FROM
+            blogs b
+            LEFT JOIN blog_components bc ON b.id = bc.blog_id
+            LEFT JOIN blog_component_articles bca ON bca.component_id = bc.id
+            LEFT JOIN blog_component_images bci ON bci.component_id = bc.id
+    "#;
+    let rows = sqlx::query(query)
+        .fetch_all(pool)
+        .await
+        .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
+
+    if rows.is_empty() {
+        return Err((StatusCode::UNPROCESSABLE_ENTITY, "空的".to_string()));
+    }
+
+    let mut processing: HashMap<i64, Blog> = HashMap::default();
+
+    for row in rows {
+        let id: i64 = row.get("id");
+
+        if processing.contains_key(&id) {
+            let blog = processing
+                .get_mut(&id)
+                .expect("取得 HashMap 中的 blog 失敗");
+            blog.components.push(BlogComponent {
+                content: row.get("content"),
+                url: row.get("url"),
+            });
+        } else {
+            let name: String = row.get("name");
+            let short_content: String = row.get("short_content");
+            let components: Vec<BlogComponent> = vec![BlogComponent {
+                content: row.get("content"),
+                url: row.get("url"),
+            }];
+            let created_at: NaiveDateTime = row.get("created_at");
+            let updated_at: NaiveDateTime = row.get("updated_at");
+            let _ = processing.insert(
+                id,
+                Blog {
+                    id,
+                    name,
+                    short_content,
+                    components,
+                    created_at,
+                    updated_at,
+                },
+            );
+        }
+    }
+
+    Ok(Json(processing.into_values().collect::<Vec<Blog>>()))
 }
