@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Serialize;
-use sqlx::{types::chrono::NaiveDateTime, Row};
+use sqlx::{postgres::PgRow, types::chrono::NaiveDateTime, Row};
 
 use crate::state::SharedState;
 
@@ -61,6 +61,11 @@ pub async fn get_blog(
     if rows.is_empty() {
         return Err((StatusCode::UNPROCESSABLE_ENTITY, "空的".to_string()));
     }
+
+    Ok(Json(handle_blog(rows)))
+}
+
+fn handle_blog(rows: Vec<PgRow>) -> Blog {
     let id: i64 = rows[0].get("id");
     let name: String = rows[0].get("name");
     let short_content: String = rows[0].get("short_content");
@@ -75,12 +80,12 @@ pub async fn get_blog(
         });
     }
 
-    Ok(Json(Blog {
+    Blog {
         id,
         name,
         short_content,
         components,
         created_at,
         updated_at,
-    }))
+    }
 }
