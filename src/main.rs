@@ -1,3 +1,4 @@
+mod errors;
 mod routes;
 mod state;
 
@@ -9,10 +10,10 @@ use std::sync::{Arc, RwLock};
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "example_tokio_postgres=debug".into()),
-        )
+        // .with(
+        //     tracing_subscriber::EnvFilter::try_from_default_env()
+        //         .unwrap_or_else(|_| "example_tokio_postgres=debug".into()),
+        // )
         .with(tracing_subscriber::fmt::layer())
         .init();
 

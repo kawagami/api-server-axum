@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::state::SharedState;
+use crate::{errors::AppError, state::SharedState};
 
 pub async fn create_table(
     State(state): State<SharedState>,
@@ -85,14 +85,14 @@ pub async fn insert_one_product(
 pub async fn get_product(
     State(state): State<SharedState>,
     Path(product_id): Path<i32>,
-) -> Result<Json<Product>, (StatusCode, String)> {
+) -> Result<Json<Product>, AppError> {
     let pool = &state.read().unwrap().pool.clone();
     let query = "select * from products where product_id = $1";
     let result = sqlx::query_as::<_, Product>(query)
         .bind(product_id)
         .fetch_one(pool)
         .await
-        .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
+        .map_err(AppError::SqlxInputError)?;
 
     Ok(Json(result))
 }

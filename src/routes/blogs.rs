@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-use axum::{
-    extract::{Json, Path, State},
-    http::StatusCode,
-};
+use anyhow::anyhow;
+use axum::extract::{Json, Path, State};
+use axum_macros::debug_handler;
 use serde::Serialize;
 use sqlx::{postgres::PgRow, types::chrono::NaiveDateTime, Row};
 
-use crate::state::SharedState;
+use crate::{errors::AppError, state::SharedState};
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct Blog {
@@ -32,10 +31,11 @@ pub struct BlogComponent {
     url: Option<String>,
 }
 
+#[debug_handler]
 pub async fn get_blog(
     State(state): State<SharedState>,
     Path(id): Path<i32>,
-) -> Result<Json<Blog>, (StatusCode, String)> {
+) -> Result<Json<Blog>, AppError> {
     let pool = &state.read().unwrap().pool.clone();
     let query = r#"
         SELECT
@@ -54,14 +54,10 @@ pub async fn get_blog(
         WHERE
             b.id = $1;
     "#;
-    let rows = sqlx::query(query)
-        .bind(id)
-        .fetch_all(pool)
-        .await
-        .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
+    let rows = sqlx::query(query).bind(id).fetch_all(pool).await?;
 
     if rows.is_empty() {
-        return Err((StatusCode::UNPROCESSABLE_ENTITY, "空的".to_string()));
+        return Err(AppError::from(anyhow!("沒東西")));
     }
 
     Ok(Json(handle_blog(rows)))
@@ -92,9 +88,7 @@ fn handle_blog(rows: Vec<PgRow>) -> Blog {
     }
 }
 
-pub async fn get_blogs(
-    State(state): State<SharedState>,
-) -> Result<Json<Vec<Blog>>, (StatusCode, String)> {
+pub async fn get_blogs(State(state): State<SharedState>) -> Result<Json<Vec<Blog>>, AppError> {
     let pool = &state.read().unwrap().pool.clone();
     let query = r#"
         SELECT
@@ -111,13 +105,10 @@ pub async fn get_blogs(
             LEFT JOIN blog_component_articles bca ON bca.component_id = bc.id
             LEFT JOIN blog_component_images bci ON bci.component_id = bc.id
     "#;
-    let rows = sqlx::query(query)
-        .fetch_all(pool)
-        .await
-        .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
+    let rows = sqlx::query(query).fetch_all(pool).await?;
 
     if rows.is_empty() {
-        return Err((StatusCode::UNPROCESSABLE_ENTITY, "空的".to_string()));
+        return Err(AppError::from(anyhow!("沒東西")));
     }
 
     let mut processing: HashMap<i64, Blog> = HashMap::default();

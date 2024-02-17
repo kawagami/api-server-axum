@@ -19,3 +19,5 @@ dotenvy = "0.15.7"
 serde = { version = "1.0.195", features = ["derive"] }
 chrono = { version = "0.4.33", features = ["serde"] }
 axum-macros = "0.4.1"
+anyhow = "1.0.79"
+thiserror = "1.0.56"
