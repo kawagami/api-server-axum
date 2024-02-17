@@ -7,13 +7,20 @@ mod root;
 use std::sync::Arc;
 
 use axum::{
+    http::{header::CONTENT_TYPE, Method},
     routing::{get, post},
     Router,
 };
+use tower_http::cors::CorsLayer;
 
 use crate::state::SharedState;
 
 pub async fn app(state: SharedState) -> Router {
+    let origins = [
+        "http://localhost:5173".parse().unwrap(),
+        "https://sg-vite.kawa.homes".parse().unwrap(),
+    ];
+
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
         .route("/create_table", get(products::create_table))
@@ -33,5 +40,17 @@ pub async fn app(state: SharedState) -> Router {
             post(handle_state::insert_one_data),
         )
         .route("/handle_state/read_state", get(handle_state::read_state))
+        .layer(
+            // see https://docs.rs/tower-http/latest/tower_http/cors/index.html
+            // for more details
+            //
+            // pay attention that for some request types like posting content-type: application/json
+            // it is required to add ".allow_headers([http::header::CONTENT_TYPE])"
+            // or see this issue https://github.com/tokio-rs/axum/issues/849
+            CorsLayer::new()
+                .allow_methods([Method::GET])
+                .allow_origin(origins)
+                .allow_headers([CONTENT_TYPE]),
+        )
         .with_state(Arc::clone(&state))
 }
