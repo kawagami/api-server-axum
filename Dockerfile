@@ -15,6 +15,7 @@ RUN strip -s /app/target/release/template_axum
 FROM gcr.io/distroless/cc-debian12
 
 COPY --from=builder /app/target/release/template_axum /app/template_axum
-# COPY --from=builder /app/.env /app/.env
+# 將 404 的圖片作為預設圖片放進去
+COPY --from=builder /app/assets/ /app/assets/
 
 CMD ["/app/template_axum"]
