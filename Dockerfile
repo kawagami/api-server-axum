@@ -4,7 +4,8 @@ WORKDIR /app
 
 COPY src/ src/
 COPY Cargo.toml .
-# COPY .env .
+# 加入靜態檔案位置 build 不然在 assets 應該會噴錯誤
+COPY assets/ assets/
 
 RUN cargo build --release
 

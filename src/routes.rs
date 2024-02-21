@@ -1,6 +1,7 @@
 mod blogs;
 mod hackmd_note_lists;
 mod handle_state;
+mod images;
 mod products;
 mod root;
 
@@ -11,7 +12,10 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use tower_http::cors::CorsLayer;
+use tower_http::{
+    cors::CorsLayer,
+    services::{ServeDir, ServeFile},
+};
 
 use crate::state::SharedState;
 
@@ -40,6 +44,10 @@ pub async fn app(state: SharedState) -> Router {
             post(handle_state::insert_one_data),
         )
         .route("/handle_state/read_state", get(handle_state::read_state))
+        .nest_service(
+            "/assets",
+            ServeDir::new("assets").not_found_service(ServeFile::new("assets/image404.png")),
+        )
         .layer(
             // see https://docs.rs/tower-http/latest/tower_http/cors/index.html
             // for more details
