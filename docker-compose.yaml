@@ -4,6 +4,10 @@ services:
     image: kawagami77/api-server:axum
     ports:
       - "3000:3000"
+    container_name: api-server-axum
+    working_dir: /app
+    volumes:
+      - .env:/app/.env
   # database:
   #   image: postgres:16-alpine
   #   environment:
