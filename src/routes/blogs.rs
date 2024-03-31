@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use axum::{
     extract::{Json, Path, State},
@@ -120,7 +120,7 @@ pub async fn get_blogs(
         return Err((StatusCode::UNPROCESSABLE_ENTITY, "空的".to_string()));
     }
 
-    let mut processing: HashMap<i64, Blog> = HashMap::default();
+    let mut processing: BTreeMap<i64, Blog> = BTreeMap::default();
 
     for row in rows {
         let id: i64 = row.get("id");
@@ -128,7 +128,7 @@ pub async fn get_blogs(
         if processing.contains_key(&id) {
             let blog = processing
                 .get_mut(&id)
-                .expect("取得 HashMap 中的 blog 失敗");
+                .expect("取得 BTreeMap 中的 blog 失敗");
             blog.components.push(BlogComponent {
                 content: row.get("content"),
                 url: row.get("url"),
@@ -156,5 +156,7 @@ pub async fn get_blogs(
         }
     }
 
-    Ok(Json(processing.into_values().collect::<Vec<Blog>>()))
+    let asc_data = processing.into_values().collect::<Vec<Blog>>();
+
+    Ok(Json(asc_data))
 }
