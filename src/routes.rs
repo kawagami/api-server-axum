@@ -1,5 +1,6 @@
 mod blogs;
 mod hackmd_note_lists;
+mod hackmd_note_list_tags;
 mod handle_state;
 mod images;
 mod products;
@@ -37,6 +38,7 @@ pub async fn app(state: SharedState) -> Router {
         )
         .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
         .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
+        .route("/note_list_tags", get(hackmd_note_list_tags::get_all_note_list_tags))
         .route("/blogs/:id", get(blogs::get_blog))
         .route("/blogs", get(blogs::get_blogs))
         .route(
