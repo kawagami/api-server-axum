@@ -7,6 +7,9 @@ COPY Cargo.toml .
 # 加入靜態檔案位置 build 不然在 assets 應該會噴錯誤
 COPY assets/ assets/
 
+# 安裝 pkg-config 和其他必要的包
+RUN apt-get update && apt-get install -y pkg-config libssl-dev
+
 RUN cargo build --release
 
 # 漸少 image size
