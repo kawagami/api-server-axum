@@ -1,5 +1,6 @@
 mod routes;
 mod state;
+mod errors;
 
 use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

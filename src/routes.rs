@@ -1,6 +1,7 @@
 mod blogs;
-mod hackmd_note_lists;
+mod firebase;
 mod hackmd_note_list_tags;
+mod hackmd_note_lists;
 mod handle_state;
 mod images;
 mod products;
@@ -38,7 +39,10 @@ pub async fn app(state: SharedState) -> Router {
         )
         .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
         .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
-        .route("/note_list_tags", get(hackmd_note_list_tags::get_all_note_list_tags))
+        .route(
+            "/note_list_tags",
+            get(hackmd_note_list_tags::get_all_note_list_tags),
+        )
         .route("/blogs/:id", get(blogs::get_blog))
         .route("/blogs", get(blogs::get_blogs))
         .route(
@@ -46,6 +50,7 @@ pub async fn app(state: SharedState) -> Router {
             post(handle_state::insert_one_data),
         )
         .route("/handle_state/read_state", get(handle_state::read_state))
+        .route("/firebase/upload", post(firebase::upload))
         .nest_service(
             "/assets",
             ServeDir::new("assets").not_found_service(ServeFile::new("assets/image404.png")),
