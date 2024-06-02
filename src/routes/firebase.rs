@@ -33,8 +33,8 @@ pub async fn upload(mut multipart: Multipart) -> Result<Json<Response>, UploadEr
 
         // Send the file as a POST request to http://firebase:5000/upload
         let res = client
-            // .post("http://firebase:5000/upload")
-            .post("http://host.docker.internal:5000/upload")
+            .post("http://firebase:5000/upload")
+            // .post("http://host.docker.internal:5000/upload")
             .multipart(form)
             .send()
             .await
