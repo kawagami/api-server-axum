@@ -2,10 +2,8 @@ mod blogs;
 mod firebase;
 mod hackmd_note_list_tags;
 mod hackmd_note_lists;
-mod handle_state;
-mod images;
-mod products;
 mod root;
+mod ws;
 
 use std::sync::Arc;
 
@@ -29,14 +27,6 @@ pub async fn app(state: SharedState) -> Router {
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
-        .route("/create_table", get(products::create_table))
-        .route("/products", post(products::insert_one_product))
-        .route(
-            "/products/:id",
-            get(products::get_product)
-                .patch(products::update_product)
-                .delete(products::delete_product),
-        )
         .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
         .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
         .route(
@@ -45,12 +35,8 @@ pub async fn app(state: SharedState) -> Router {
         )
         .route("/blogs/:id", get(blogs::get_blog))
         .route("/blogs", get(blogs::get_blogs))
-        .route(
-            "/handle_state/insert_one",
-            post(handle_state::insert_one_data),
-        )
-        .route("/handle_state/read_state", get(handle_state::read_state))
         .route("/firebase/upload", post(firebase::upload))
+        .route("/ws", get(ws::websocket_handler))
         .nest_service(
             "/assets",
             ServeDir::new("assets").not_found_service(ServeFile::new("assets/image404.png")),
