@@ -58,28 +58,6 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // By splitting, we can send and receive at the same time.
     let (mut sender, mut receiver) = stream.split();
 
-    // Username gets set in the receive loop, if it's valid.
-    let mut username = String::new();
-    // Loop until a text message is found.
-    while let Some(Ok(message)) = receiver.next().await {
-        if let Message::Text(name) = message {
-            // If username that is sent by client is not taken, fill username string.
-            check_username(&state, &mut username, &name).await;
-
-            // If not empty we want to quit the loop else we want to quit function.
-            if !username.is_empty() {
-                break;
-            } else {
-                // Only send our client that username is taken.
-                let _ = sender
-                    .send(Message::Text(String::from("Username already taken.")))
-                    .await;
-
-                return;
-            }
-        }
-    }
-
     // We subscribe *before* sending the "joined" message, so that we will also
     // display it to our client.
     let mut rx = state.lock().await.tx.subscribe();
@@ -134,16 +112,6 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
 
     // // Remove username from map so new clients can take it again.
     // state.user_set.lock().await.remove(&username);
-}
-
-async fn check_username(state: &Arc<Mutex<AppState>>, string: &mut String, name: &str) {
-    let user_set = &mut state.lock().await.user_set;
-
-    if !user_set.contains(name) {
-        // user_set.insert(name.to_owned());
-
-        string.push_str(name);
-    }
 }
 
 async fn remove_user_set(state: Arc<Mutex<AppState>>, token: &str) {
