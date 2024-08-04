@@ -1,14 +1,15 @@
+use crate::state::AppState;
 use axum::{extract::State, http::StatusCode, response::IntoResponse};
-
-use crate::state::SharedState;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // we can extract the connection pool with `State`
 
 // #[debug_handler]
 pub async fn using_connection_pool_extractor(
-    State(state): State<SharedState>,
+    State(state): State<Arc<Mutex<AppState>>>,
 ) -> Result<String, impl IntoResponse> {
-    let pool = &state.read().unwrap().pool.clone();
+    let pool = &state.lock().await.pool;
 
     sqlx::query_scalar("select 'hello world from pg'")
         .fetch_one(pool)

@@ -5,25 +5,23 @@ mod hackmd_note_lists;
 mod root;
 mod ws;
 
-use std::sync::Arc;
-
+use crate::state::AppState;
 use axum::{
     http::{header::CONTENT_TYPE, Method},
     routing::{get, post},
     Router,
 };
-use tower_http::{
-    cors::CorsLayer,
-    services::{ServeDir, ServeFile},
-};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tower_http::cors::CorsLayer;
 
-use crate::state::SharedState;
-
-pub async fn app(state: SharedState) -> Router {
+pub async fn app() -> Router {
     let origins = [
         "http://localhost:5173".parse().unwrap(),
         "https://sg-vite.kawa.homes".parse().unwrap(),
     ];
+
+    let state = AppState::new().await;
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
@@ -37,10 +35,6 @@ pub async fn app(state: SharedState) -> Router {
         .route("/blogs", get(blogs::get_blogs))
         .route("/firebase/upload", post(firebase::upload))
         .route("/ws", get(ws::websocket_handler))
-        .nest_service(
-            "/assets",
-            ServeDir::new("assets").not_found_service(ServeFile::new("assets/image404.png")),
-        )
         .layer(
             // see https://docs.rs/tower-http/latest/tower_http/cors/index.html
             // for more details
@@ -53,5 +47,5 @@ pub async fn app(state: SharedState) -> Router {
                 .allow_origin(origins)
                 .allow_headers([CONTENT_TYPE]),
         )
-        .with_state(Arc::clone(&state))
+        .with_state(Arc::new(Mutex::new(state)))
 }

@@ -1,10 +1,11 @@
+use crate::state::AppState;
 use axum::{
     extract::{Json, State},
     http::StatusCode,
 };
 use serde::Serialize;
-
-use crate::state::SharedState;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct Tag {
@@ -13,9 +14,9 @@ pub struct Tag {
 }
 
 pub async fn get_all_note_list_tags(
-    State(state): State<SharedState>,
+    State(state): State<Arc<Mutex<AppState>>>,
 ) -> Result<Json<Vec<Tag>>, (StatusCode, String)> {
-    let pool = &state.read().unwrap().pool.clone();
+    let pool = &state.lock().await.pool;
     let query = r#"
             SELECT id, name FROM hackmd_tags
         "#;

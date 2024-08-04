@@ -1,11 +1,9 @@
+mod errors;
 mod routes;
 mod state;
-mod errors;
 
 use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use std::sync::{Arc, RwLock};
 
 #[tokio::main]
 async fn main() {
@@ -19,9 +17,7 @@ async fn main() {
 
     dotenvy::dotenv().ok();
 
-    let state = state::AppState::new().await;
-    let shared_state: state::SharedState = Arc::new(RwLock::new(state));
-    let app = routes::app(shared_state).await;
+    let app = routes::app().await;
 
     // run it with hyper
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();

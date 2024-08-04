@@ -1,13 +1,12 @@
-use std::collections::HashSet;
-
+use crate::state::AppState;
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::NaiveDateTime;
-
-use crate::state::SharedState;
+use std::{collections::HashSet, sync::Arc};
+use tokio::sync::Mutex;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct HackmdNoteList {
@@ -76,10 +75,10 @@ pub struct HackmdNoteListAndCategories {
 }
 
 pub async fn get_note_list(
-    State(state): State<SharedState>,
+    State(state): State<Arc<Mutex<AppState>>>,
     Path(id): Path<i32>,
 ) -> Result<Json<HackmdNoteList>, (StatusCode, String)> {
-    let pool = &state.read().unwrap().pool.clone();
+    let pool = &state.lock().await.pool;
     let query = "select * from hackmd_note_lists where id = $1";
     let result = sqlx::query_as::<_, HackmdNoteList>(query)
         .bind(id)
@@ -91,9 +90,9 @@ pub async fn get_note_list(
 }
 
 pub async fn get_all_note_lists(
-    State(state): State<SharedState>,
+    State(state): State<Arc<Mutex<AppState>>>,
 ) -> Result<Json<Vec<HackmdNoteListAndCategories>>, (StatusCode, String)> {
-    let pool = &state.read().unwrap().pool.clone();
+    let pool = &state.lock().await.pool;
     let query = r#"
             SELECT
                 nl.id,
