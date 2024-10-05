@@ -9,13 +9,32 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use hyper::StatusCode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
 pub struct QueryParams {
     pub token: String,
+}
+
+#[derive(Serialize)]
+pub struct SendJson {
+    pub content: String,
+    pub from: String,
+    pub to: To,
+}
+
+#[derive(Deserialize)]
+pub struct ReceiveJson {
+    pub content: String,
+    pub to: To,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum To {
+    All,
+    Private,
 }
 
 pub async fn websocket_handler(
@@ -65,14 +84,37 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // Now send the "joined" message to all subscribers.
     let msg = format!("{token} joined.");
     tracing::debug!("{msg}");
-    let _ = state.lock().await.tx.send(msg);
+
+    // 加入 ws 時發出的訊息
+    let raw_join_msg = SendJson {
+        content: msg,
+        from: token.clone(),
+        to: To::All,
+    };
+    let join_msg = serde_json::to_string(&raw_join_msg).expect("send_task 解析 send_msg 失敗");
+    let _ = state.lock().await.tx.send(join_msg);
+
+    let send_from = token.clone();
 
     // Spawn the first task that will receive broadcast messages and send text
     // messages over the websocket to our client.
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
+            // handle msg
+            let data_msg: ReceiveJson =
+                serde_json::from_str(&msg).expect("send_task 解析 data_msg 失敗");
+
+            let raw_send_msg = SendJson {
+                content: data_msg.content,
+                from: send_from.to_owned(),
+                to: To::All,
+            };
+
+            let send_msg =
+                serde_json::to_string(&raw_send_msg).expect("send_task 解析 send_msg 失敗");
+
             // In any websocket error, break loop.
-            if sender.send(Message::Text(msg)).await.is_err() {
+            if sender.send(Message::Text(send_msg)).await.is_err() {
                 break;
             }
         }
@@ -81,13 +123,44 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // Clone things we want to pass (move) to the receiving task.
     let tx = state.lock().await.tx.clone();
     let name = token.clone();
+    let cp_state = Arc::clone(&state);
 
     // Spawn a task that takes messages from the websocket, prepends the user
     // name, and sends them to all broadcast subscribers.
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(text))) = receiver.next().await {
+            // handle msg
+            let data_msg: ReceiveJson =
+                serde_json::from_str(&text).expect("recv_task 解析 data_msg 失敗");
+
+            // // 將收到的 content 全頻道返回
+            // let raw_send_msg = SendJson {
+            //     content: data_msg.content,
+            //     from: name.to_owned(),
+            //     to: To::All,
+            // };
+
+            // 依照 data_msg.content input 的 ID 取資料庫的資料
+            let response_content = get_hackmd_note_lists_info(
+                cp_state.clone(),
+                data_msg.content.parse::<i64>().expect("轉換 i64 fail"),
+            )
+            .await;
+
+            // 組合要發送的訊息
+            let raw_send_msg = SendJson {
+                content: response_content,
+                from: name.to_owned(),
+                to: To::All,
+            };
+
+            let send_msg =
+                serde_json::to_string(&raw_send_msg).expect("recv_task 解析 send_msg 失敗");
+
             // Add username before message.
-            let _ = tx.send(format!("{name}: {text}"));
+            let _ = tx.send(send_msg);
+            // let sql_name = get_blogs_info(Arc::clone(&cp_state)).await;
+            // let _ = tx.send(format!("{name}: {sql_name}"));
         }
     });
 
@@ -124,4 +197,16 @@ async fn remove_user_set(state: Arc<Mutex<AppState>>, token: &str) {
 
     let msg = format!("hashset remove {token}.");
     tracing::debug!("{msg}");
+}
+
+async fn get_hackmd_note_lists_info(state: Arc<Mutex<AppState>>, id: i64) -> String {
+    // 獲取對 AppState 的鎖
+    let pool = &state.lock().await.pool;
+    let row: (String,) = sqlx::query_as("SELECT title FROM hackmd_note_lists WHERE id=$1")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+
+    row.0
 }
