@@ -35,6 +35,7 @@ pub async fn app() -> Router {
         .route("/blogs", get(blogs::get_blogs))
         .route("/firebase/upload", post(firebase::upload))
         .route("/ws", get(ws::websocket_handler))
+        .route("/ws/messages", get(ws::ws_message))
         .layer(
             // see https://docs.rs/tower-http/latest/tower_http/cors/index.html
             // for more details

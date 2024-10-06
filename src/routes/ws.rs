@@ -1,4 +1,5 @@
 use crate::state::AppState;
+use crate::structs::ws::WsMessage;
 use axum::extract::State;
 use axum::{
     extract::{
@@ -6,6 +7,7 @@ use axum::{
         Query,
     },
     response::IntoResponse,
+    Json,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use hyper::StatusCode;
@@ -93,6 +95,11 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     };
     let join_msg = serde_json::to_string(&raw_join_msg).expect("send_task 解析 send_msg 失敗");
     let _ = state.lock().await.tx.send(join_msg);
+    // let messages = state.lock().await.fixed_message_container.get_all();
+    // for ws_message in messages {
+    //     let _ = state.lock().await.tx.send(ws_message.message.clone());
+    // }
+    // let _ = state.lock().await.tx.
 
     let send_from = token.clone();
 
@@ -129,6 +136,8 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // name, and sends them to all broadcast subscribers.
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(text))) = receiver.next().await {
+            let from_name = name.to_owned();
+
             // handle msg
             let data_msg: ReceiveJson =
                 serde_json::from_str(&text).expect("recv_task 解析 data_msg 失敗");
@@ -141,16 +150,27 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
             // };
 
             // 依照 data_msg.content input 的 ID 取資料庫的資料
-            let response_content = get_hackmd_note_lists_info(
-                cp_state.clone(),
-                data_msg.content.parse::<i64>().expect("轉換 i64 fail"),
-            )
-            .await;
+            // let response_content = get_hackmd_note_lists_info(
+            //     cp_state.clone(),
+            //     data_msg.content.parse::<i64>().expect("轉換 i64 fail"),
+            // )
+            // .await;
+
+            // 將歷史訊息放入 FixedMessageContainer
+            let ws_message = WsMessage {
+                message: data_msg.content.clone(),
+                from: from_name.clone(),
+            };
+            cp_state
+                .lock()
+                .await
+                .fixed_message_container
+                .add(ws_message);
 
             // 組合要發送的訊息
             let raw_send_msg = SendJson {
-                content: response_content,
-                from: name.to_owned(),
+                content: data_msg.content,
+                from: from_name.clone(),
                 to: To::All,
             };
 
@@ -159,6 +179,10 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
 
             // Add username before message.
             let _ = tx.send(send_msg);
+            tracing::debug!(
+                "{:?}",
+                cp_state.lock().await.fixed_message_container.get_all()
+            );
             // let sql_name = get_blogs_info(Arc::clone(&cp_state)).await;
             // let _ = tx.send(format!("{name}: {sql_name}"));
         }
@@ -199,14 +223,27 @@ async fn remove_user_set(state: Arc<Mutex<AppState>>, token: &str) {
     tracing::debug!("{msg}");
 }
 
-async fn get_hackmd_note_lists_info(state: Arc<Mutex<AppState>>, id: i64) -> String {
-    // 獲取對 AppState 的鎖
-    let pool = &state.lock().await.pool;
-    let row: (String,) = sqlx::query_as("SELECT title FROM hackmd_note_lists WHERE id=$1")
-        .bind(id)
-        .fetch_one(pool)
-        .await
-        .unwrap();
+// async fn get_hackmd_note_lists_info(state: Arc<Mutex<AppState>>, id: i64) -> String {
+//     // 獲取對 AppState 的鎖
+//     let pool = &state.lock().await.pool;
+//     let row: (String,) = sqlx::query_as("SELECT title FROM hackmd_note_lists WHERE id=$1")
+//         .bind(id)
+//         .fetch_one(pool)
+//         .await
+//         .unwrap();
 
-    row.0
+//     row.0
+// }
+
+pub async fn ws_message(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<WsMessage>> {
+    // 使用 let 綁定鎖定的值，使其在這個範疇內保持有效
+    let state_guard = state.lock().await;
+
+    // 使用已解鎖的固定訊息容器
+    let data = state_guard.fixed_message_container.get_all();
+
+    // 將借用的 Vec<&WsMessage> 轉換為 Vec<WsMessage>
+    let owned: Vec<WsMessage> = data.into_iter().cloned().collect();
+
+    Json(owned)
 }

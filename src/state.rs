@@ -2,10 +2,13 @@ use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::{collections::HashSet, time::Duration};
 use tokio::sync::broadcast;
 
+use crate::structs::ws::FixedMessageContainer;
+
 pub struct AppState {
     pub pool: Pool<Postgres>,
     pub tx: broadcast::Sender<String>,
     pub user_set: HashSet<String>,
+    pub fixed_message_container: FixedMessageContainer,
 }
 
 impl AppState {
@@ -22,6 +25,13 @@ impl AppState {
             .await
             .expect("can't connect to database");
 
-        Self { pool, tx, user_set }
+        let fixed_message_container = FixedMessageContainer::new(10);
+
+        Self {
+            pool,
+            tx,
+            user_set,
+            fixed_message_container,
+        }
     }
 }
