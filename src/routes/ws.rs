@@ -30,6 +30,7 @@ pub struct SendJson {
 #[derive(Deserialize)]
 pub struct ReceiveJson {
     pub content: String,
+    pub from: String,
     pub to: To,
 }
 
@@ -101,8 +102,6 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // }
     // let _ = state.lock().await.tx.
 
-    let send_from = token.clone();
-
     // Spawn the first task that will receive broadcast messages and send text
     // messages over the websocket to our client.
     let mut send_task = tokio::spawn(async move {
@@ -113,7 +112,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
 
             let raw_send_msg = SendJson {
                 content: data_msg.content,
-                from: send_from.to_owned(),
+                from: data_msg.from,
                 to: To::All,
             };
 
@@ -129,15 +128,12 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
 
     // Clone things we want to pass (move) to the receiving task.
     let tx = state.lock().await.tx.clone();
-    let name = token.clone();
     let cp_state = Arc::clone(&state);
 
     // Spawn a task that takes messages from the websocket, prepends the user
     // name, and sends them to all broadcast subscribers.
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(text))) = receiver.next().await {
-            let from_name = name.to_owned();
-
             // handle msg
             let data_msg: ReceiveJson =
                 serde_json::from_str(&text).expect("recv_task 解析 data_msg 失敗");
@@ -159,7 +155,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
             // 將歷史訊息放入 FixedMessageContainer
             let ws_message = WsMessage {
                 message: data_msg.content.clone(),
-                from: from_name.clone(),
+                from: data_msg.from.clone(),
             };
             cp_state
                 .lock()
@@ -170,7 +166,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
             // 組合要發送的訊息
             let raw_send_msg = SendJson {
                 content: data_msg.content,
-                from: from_name.clone(),
+                from: data_msg.from,
                 to: To::All,
             };
 
@@ -202,10 +198,17 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
         },
     };
 
-    // Send "user left" message (similar to "joined" above).
+    // 組合離開的訊息
     let msg = format!("{token} left.");
+    let raw_send_msg = SendJson {
+        content: msg.clone(),
+        from: token,
+        to: To::All,
+    };
+
+    let send_exit_msg = serde_json::to_string(&raw_send_msg).expect("組合 send_exit_msg 失敗");
     tracing::debug!("{msg}");
-    let _ = state.lock().await.tx.send(msg);
+    let _ = state.lock().await.tx.send(send_exit_msg);
 
     // // Remove username from map so new clients can take it again.
     // state.user_set.lock().await.remove(&username);
