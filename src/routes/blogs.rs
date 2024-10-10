@@ -59,6 +59,7 @@ pub async fn get_blog(
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
+    // 取特定資料不應該有空的狀況
     if rows.is_empty() {
         return Err((StatusCode::UNPROCESSABLE_ENTITY, "空的".to_string()));
     }
@@ -115,10 +116,7 @@ pub async fn get_blogs(
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 
-    if rows.is_empty() {
-        return Err((StatusCode::UNPROCESSABLE_ENTITY, "空的".to_string()));
-    }
-
+    // 取 blogs 有可能是沒資料的
     let mut processing: BTreeMap<i64, Blog> = BTreeMap::default();
 
     for row in rows {
