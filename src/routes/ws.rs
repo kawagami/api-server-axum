@@ -95,7 +95,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
 
     // server 端的 send task
     // 運用 subscribe 之後的 rx
-    // 將要傳遞的訊息發送給訂閱者
+    // 將要傳遞的訊息使用 split 出來的 sender 發送給這個訂閱者
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
             let data_msg: ReceiveJson =
@@ -110,20 +110,23 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 serde_json::to_string(&raw_send_msg).expect("send_task 解析 send_msg 失敗")
             };
 
-            if let To::All = data_msg.to {
-                // 發送給所有用戶
-                let send_msg = to_send_msg(To::All);
-                if sender.send(Message::Text(send_msg)).await.is_err() {
-                    break;
-                }
-            } else if let To::Private(ref target_user) = data_msg.to {
-                // 發送給特定用戶
-                let send_msg = to_send_msg(To::Private(target_user.clone()));
-
-                // 如果目標用戶是自己，也發送訊息
-                if target_user == &token_clone || data_msg.from == token_clone {
-                    if sender.send(Message::Text(send_msg.clone())).await.is_err() {
+            match &data_msg.to {
+                To::All => {
+                    // 發送給所有用戶
+                    let send_msg = to_send_msg(To::All);
+                    if sender.send(Message::Text(send_msg)).await.is_err() {
                         break;
+                    }
+                }
+                To::Private(target_user) => {
+                    // 發送給特定用戶
+                    let send_msg = to_send_msg(To::Private(target_user.clone()));
+
+                    // 如果目標用戶是自己，也發送訊息
+                    if target_user == &token_clone || data_msg.from == token_clone {
+                        if sender.send(Message::Text(send_msg)).await.is_err() {
+                            break;
+                        }
                     }
                 }
             }
