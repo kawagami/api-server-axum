@@ -26,6 +26,13 @@ pub struct SendJson {
     pub to: To,
 }
 
+impl SendJson {
+    pub fn new_jsonstring(content: String, from: String, to: To) -> String {
+        let send_json = SendJson { content, from, to };
+        serde_json::to_string(&send_json).expect("send_task 解析 send_msg 失敗")
+    }
+}
+
 #[derive(Deserialize)]
 pub struct ReceiveJson {
     pub content: String,
@@ -82,12 +89,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     tracing::debug!("{msg}");
 
     // 加入 ws 時發出的訊息
-    let raw_join_msg = SendJson {
-        content: msg,
-        from: token.clone(),
-        to: To::All,
-    };
-    let join_msg = serde_json::to_string(&raw_join_msg).expect("send_task 解析 send_msg 失敗");
+    let join_msg = SendJson::new_jsonstring(msg, token.clone(), To::All);
     let _ = state.lock().await.tx.send(join_msg);
 
     // clone 要 move 至不同部分的資料
@@ -101,26 +103,26 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
             let data_msg: ReceiveJson =
                 serde_json::from_str(&msg).expect("send_task 解析 data_msg 失敗");
 
-            let to_send_msg = |to: To| {
-                let raw_send_msg = SendJson {
-                    content: data_msg.content.clone(),
-                    from: data_msg.from.clone(),
-                    to,
-                };
-                serde_json::to_string(&raw_send_msg).expect("send_task 解析 send_msg 失敗")
-            };
-
             match &data_msg.to {
                 To::All => {
                     // 發送給所有用戶
-                    let send_msg = to_send_msg(To::All);
+                    let send_msg = SendJson::new_jsonstring(
+                        data_msg.content.clone(),
+                        data_msg.from.clone(),
+                        To::All,
+                    );
+
                     if sender.send(Message::Text(send_msg)).await.is_err() {
                         break;
                     }
                 }
                 To::Private(target_user) => {
                     // 發送給特定用戶
-                    let send_msg = to_send_msg(To::Private(target_user.clone()));
+                    let send_msg = SendJson::new_jsonstring(
+                        data_msg.content.clone(),
+                        data_msg.from.clone(),
+                        To::Private(target_user.clone()),
+                    );
 
                     // 如果目標用戶是自己，也發送訊息
                     if target_user == &token_clone || data_msg.from == token_clone {
@@ -156,15 +158,11 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 .fixed_message_container
                 .add(ws_message);
 
-            // 組合要發送的訊息
-            let raw_send_msg = SendJson {
-                content: data_msg.content.clone(),
-                from: data_msg.from.clone(),
-                to: data_msg.to.clone(),
-            };
-
-            let send_msg =
-                serde_json::to_string(&raw_send_msg).expect("recv_task 解析 send_msg 失敗");
+            let send_msg = SendJson::new_jsonstring(
+                data_msg.content.clone(),
+                data_msg.from.clone(),
+                data_msg.to.clone(),
+            );
 
             let _ = cp_state.lock().await.tx.send(send_msg);
         }
@@ -186,14 +184,8 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
 
     // 組合離開的訊息
     let msg = format!("{token} left.");
-    let raw_send_msg = SendJson {
-        content: msg.clone(),
-        from: token,
-        to: To::All,
-    };
 
-    let send_exit_msg = serde_json::to_string(&raw_send_msg).expect("組合 send_exit_msg 失敗");
-    tracing::debug!("{msg}");
+    let send_exit_msg = SendJson::new_jsonstring(msg, token, To::All);
     let _ = state.lock().await.tx.send(send_exit_msg);
 }
 
