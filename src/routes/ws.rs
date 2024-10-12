@@ -52,8 +52,8 @@ pub async fn websocket_handler(
 }
 
 async fn is_valid_token(token: &str, state: &Arc<Mutex<AppState>>) -> bool {
-    // 在这里检查 token 的规则
-    // 例如，检查 token 是否为特定格式或值
+    // 在這裡檢查 token 的規則
+    // 例如，檢查 token 是否為特定格式或值
     let user_set = &mut state.lock().await.user_set;
 
     if user_set.contains(token) {
@@ -93,42 +93,35 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // clone 要 move 至不同部分的資料
     let token_clone = token.clone();
 
-    // Spawn the first task that will receive broadcast messages and send text
-    // messages over the websocket to our client.
+    // server 端的 send task
+    // 運用 subscribe 之後的 rx
+    // 將要傳遞的訊息發送給訂閱者
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
             let data_msg: ReceiveJson =
                 serde_json::from_str(&msg).expect("send_task 解析 data_msg 失敗");
 
-            if let To::All = data_msg.to {
-                // 处理发给所有用户的消息
+            let to_send_msg = |to: To| {
                 let raw_send_msg = SendJson {
                     content: data_msg.content.clone(),
                     from: data_msg.from.clone(),
-                    to: To::All,
+                    to,
                 };
-                let send_msg =
-                    serde_json::to_string(&raw_send_msg).expect("send_task 解析 send_msg 失敗");
+                serde_json::to_string(&raw_send_msg).expect("send_task 解析 send_msg 失敗")
+            };
 
-                // 发送给所有用户
+            if let To::All = data_msg.to {
+                // 發送給所有用戶
+                let send_msg = to_send_msg(To::All);
                 if sender.send(Message::Text(send_msg)).await.is_err() {
                     break;
                 }
             } else if let To::Private(ref target_user) = data_msg.to {
-                // 处理发给特定用户的消息
-                let raw_send_msg = SendJson {
-                    content: data_msg.content.clone(),
-                    from: data_msg.from.clone(),
-                    to: To::Private(target_user.clone()),
-                };
-                let send_msg =
-                    serde_json::to_string(&raw_send_msg).expect("send_task 解析 send_msg 失敗");
+                // 發送給特定用戶
+                let send_msg = to_send_msg(To::Private(target_user.clone()));
 
-                // 如果目标用户是自己，也发送消息
+                // 如果目標用戶是自己，也發送訊息
                 if target_user == &token_clone || data_msg.from == token_clone {
-                    let debug_msg = format!("data_msg.from => {}", data_msg.from);
-                    tracing::debug!("{debug_msg}");
-
                     if sender.send(Message::Text(send_msg.clone())).await.is_err() {
                         break;
                     }
@@ -140,13 +133,16 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // Clone things we want to pass (move) to the receiving task.
     let cp_state = state.clone();
 
+    // server 端的 recv task
+    // 接收 client sent 的資料
+    // 在這邊控制要怎麼處理
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(text))) = receiver.next().await {
             // 解析接收到的消息
             let data_msg: ReceiveJson =
                 serde_json::from_str(&text).expect("recv_task 解析 data_msg 失敗");
 
-            // 将消息存入历史记录
+            // 將訊息存入歷史記錄
             let ws_message = WsMessage {
                 message: data_msg.content.clone(),
                 from: data_msg.from.clone(),
@@ -157,7 +153,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 .fixed_message_container
                 .add(ws_message);
 
-            // 构造发送的消息
+            // 組合要發送的訊息
             let raw_send_msg = SendJson {
                 content: data_msg.content.clone(),
                 from: data_msg.from.clone(),
