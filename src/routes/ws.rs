@@ -1,5 +1,5 @@
 use crate::state::AppState;
-use crate::structs::ws::WsMessage;
+use crate::structs::ws::{ChatMessage, ChatMessageType, To};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -10,55 +10,13 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use hyper::StatusCode;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
 pub struct QueryParams {
     pub token: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ChatMessage {
-    pub message_type: ChatMessageType,
-    pub content: String,
-    pub from: String,
-    pub to: To,
-}
-
-impl ChatMessage {
-    pub fn new_jsonstring(
-        message_type: ChatMessageType,
-        content: String,
-        from: String,
-        to: To,
-    ) -> String {
-        let send_json = ChatMessage {
-            message_type,
-            content,
-            from,
-            to,
-        };
-        serde_json::to_string(&send_json).expect("產生 json string 失敗")
-    }
-    pub fn decode(raw_json_string: &str) -> ChatMessage {
-        serde_json::from_str(&raw_json_string).expect("decode raw json string 失敗")
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum ChatMessageType {
-    Message,
-    Join,
-    Leave,
-    Info,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub enum To {
-    All,
-    Private(String), // 這裡的 String 表示特定使用者的 token 或 username
 }
 
 pub async fn websocket_handler(
@@ -172,15 +130,11 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
             let data_msg = ChatMessage::decode(&text);
 
             // 將訊息存入歷史記錄
-            let ws_message = WsMessage {
-                message: data_msg.content.clone(),
-                from: data_msg.from.clone(),
-            };
             cp_state
                 .lock()
                 .await
                 .fixed_message_container
-                .add(ws_message);
+                .add(data_msg.clone());
 
             let send_msg = ChatMessage::new_jsonstring(
                 data_msg.message_type,
@@ -233,15 +187,15 @@ async fn remove_user_set(state: Arc<Mutex<AppState>>, token: &str) {
     tracing::debug!("{msg}");
 }
 
-pub async fn ws_message(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<WsMessage>> {
+pub async fn ws_message(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<ChatMessage>> {
     // 使用 let 綁定鎖定的值，使其在這個範疇內保持有效
     let state_guard = state.lock().await;
 
     // 使用已解鎖的固定訊息容器
     let data = state_guard.fixed_message_container.get_all();
 
-    // 將借用的 Vec<&WsMessage> 轉換為 Vec<WsMessage>
-    let owned: Vec<WsMessage> = data.into_iter().cloned().collect();
+    // 將借用的 Vec<&ChatMessage> 轉換為 Vec<ChatMessage>
+    let owned: Vec<ChatMessage> = data.into_iter().cloned().collect();
 
     Json(owned)
 }
