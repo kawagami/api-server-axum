@@ -7,7 +7,8 @@ mod ws;
 
 use crate::state::AppState;
 use axum::{
-    http::{header::CONTENT_TYPE, Method},
+    http::{header::CONTENT_TYPE, Method, StatusCode},
+    response::IntoResponse,
     routing::{get, post},
     Router,
 };
@@ -49,4 +50,9 @@ pub async fn app() -> Router {
                 .allow_headers([CONTENT_TYPE]),
         )
         .with_state(Arc::new(Mutex::new(state)))
+        .fallback(handler_404)
+}
+
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "nothing to see here")
 }
