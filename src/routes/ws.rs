@@ -19,25 +19,21 @@ pub struct QueryParams {
     pub token: String,
 }
 
-#[derive(Serialize)]
-pub struct SendJson {
+#[derive(Serialize, Deserialize)]
+pub struct ChatMessage {
     pub content: String,
     pub from: String,
     pub to: To,
 }
 
-impl SendJson {
+impl ChatMessage {
     pub fn new_jsonstring(content: String, from: String, to: To) -> String {
-        let send_json = SendJson { content, from, to };
-        serde_json::to_string(&send_json).expect("send_task 解析 send_msg 失敗")
+        let send_json = ChatMessage { content, from, to };
+        serde_json::to_string(&send_json).expect("產生 json string 失敗")
     }
-}
-
-#[derive(Deserialize)]
-pub struct ReceiveJson {
-    pub content: String,
-    pub from: String,
-    pub to: To,
+    pub fn decode(raw_json_string: &str) -> ChatMessage {
+        serde_json::from_str(&raw_json_string).expect("decode raw json string 失敗")
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -89,7 +85,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     tracing::debug!("{msg}");
 
     // 加入 ws 時發出的訊息
-    let join_msg = SendJson::new_jsonstring(msg, token.clone(), To::All);
+    let join_msg = ChatMessage::new_jsonstring(msg, token.clone(), To::All);
     let _ = state.lock().await.tx.send(join_msg);
 
     // clone 要 move 至不同部分的資料
@@ -100,13 +96,12 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // 將要傳遞的訊息使用 split 出來的 sender 發送給這個訂閱者
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
-            let data_msg: ReceiveJson =
-                serde_json::from_str(&msg).expect("send_task 解析 data_msg 失敗");
+            let data_msg = ChatMessage::decode(&msg);
 
             match &data_msg.to {
                 To::All => {
                     // 發送給所有用戶
-                    let send_msg = SendJson::new_jsonstring(
+                    let send_msg = ChatMessage::new_jsonstring(
                         data_msg.content.clone(),
                         data_msg.from.clone(),
                         To::All,
@@ -118,7 +113,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 }
                 To::Private(target_user) => {
                     // 發送給特定用戶
-                    let send_msg = SendJson::new_jsonstring(
+                    let send_msg = ChatMessage::new_jsonstring(
                         data_msg.content.clone(),
                         data_msg.from.clone(),
                         To::Private(target_user.clone()),
@@ -144,8 +139,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(text))) = receiver.next().await {
             // 解析接收到的消息
-            let data_msg: ReceiveJson =
-                serde_json::from_str(&text).expect("recv_task 解析 data_msg 失敗");
+            let data_msg = ChatMessage::decode(&text);
 
             // 將訊息存入歷史記錄
             let ws_message = WsMessage {
@@ -158,7 +152,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 .fixed_message_container
                 .add(ws_message);
 
-            let send_msg = SendJson::new_jsonstring(
+            let send_msg = ChatMessage::new_jsonstring(
                 data_msg.content.clone(),
                 data_msg.from.clone(),
                 data_msg.to.clone(),
@@ -185,7 +179,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // 組合離開的訊息
     let msg = format!("{token} left.");
 
-    let send_exit_msg = SendJson::new_jsonstring(msg, token, To::All);
+    let send_exit_msg = ChatMessage::new_jsonstring(msg, token, To::All);
     let _ = state.lock().await.tx.send(send_exit_msg);
 }
 
