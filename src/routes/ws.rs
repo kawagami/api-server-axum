@@ -21,19 +21,38 @@ pub struct QueryParams {
 
 #[derive(Serialize, Deserialize)]
 pub struct ChatMessage {
+    pub message_type: ChatMessageType,
     pub content: String,
     pub from: String,
     pub to: To,
 }
 
 impl ChatMessage {
-    pub fn new_jsonstring(content: String, from: String, to: To) -> String {
-        let send_json = ChatMessage { content, from, to };
+    pub fn new_jsonstring(
+        message_type: ChatMessageType,
+        content: String,
+        from: String,
+        to: To,
+    ) -> String {
+        let send_json = ChatMessage {
+            message_type,
+            content,
+            from,
+            to,
+        };
         serde_json::to_string(&send_json).expect("產生 json string 失敗")
     }
     pub fn decode(raw_json_string: &str) -> ChatMessage {
         serde_json::from_str(&raw_json_string).expect("decode raw json string 失敗")
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum ChatMessageType {
+    Message,
+    Join,
+    Leave,
+    Info,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -80,12 +99,21 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     // display it to our client.
     let mut rx = state.lock().await.tx.subscribe();
 
-    // Now send the "joined" message to all subscribers.
-    let msg = format!("{token} joined.");
-    tracing::debug!("{msg}");
-
     // 加入 ws 時發出的訊息
-    let join_msg = ChatMessage::new_jsonstring(msg, token.clone(), To::All);
+    let join_users_set = state
+        .lock()
+        .await
+        .user_set
+        .iter()
+        .cloned()
+        .collect::<Vec<String>>()
+        .join(",");
+    let join_msg = ChatMessage::new_jsonstring(
+        ChatMessageType::Join,
+        join_users_set,
+        token.clone(),
+        To::All,
+    );
     let _ = state.lock().await.tx.send(join_msg);
 
     // clone 要 move 至不同部分的資料
@@ -102,8 +130,9 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 To::All => {
                     // 發送給所有用戶
                     let send_msg = ChatMessage::new_jsonstring(
-                        data_msg.content.clone(),
-                        data_msg.from.clone(),
+                        data_msg.message_type,
+                        data_msg.content,
+                        data_msg.from,
                         To::All,
                     );
 
@@ -114,7 +143,8 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 To::Private(target_user) => {
                     // 發送給特定用戶
                     let send_msg = ChatMessage::new_jsonstring(
-                        data_msg.content.clone(),
+                        data_msg.message_type,
+                        data_msg.content,
                         data_msg.from.clone(),
                         To::Private(target_user.clone()),
                     );
@@ -153,9 +183,10 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 .add(ws_message);
 
             let send_msg = ChatMessage::new_jsonstring(
-                data_msg.content.clone(),
-                data_msg.from.clone(),
-                data_msg.to.clone(),
+                data_msg.message_type,
+                data_msg.content,
+                data_msg.from,
+                data_msg.to,
             );
 
             let _ = cp_state.lock().await.tx.send(send_msg);
@@ -177,9 +208,16 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     };
 
     // 組合離開的訊息
-    let msg = format!("{token} left.");
-
-    let send_exit_msg = ChatMessage::new_jsonstring(msg, token, To::All);
+    let leave_users_set = state
+        .lock()
+        .await
+        .user_set
+        .iter()
+        .cloned()
+        .collect::<Vec<String>>()
+        .join(",");
+    let send_exit_msg =
+        ChatMessage::new_jsonstring(ChatMessageType::Leave, leave_users_set, token, To::All);
     let _ = state.lock().await.tx.send(send_exit_msg);
 }
 
