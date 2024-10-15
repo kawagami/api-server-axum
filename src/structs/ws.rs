@@ -36,12 +36,14 @@ pub enum ChatMessageType {
     Join,
     Leave,
     Info,
+    PING,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum To {
     All,
     Private(String), // 這裡的 String 表示特定使用者的 token 或 username
+    Myself,
 }
 
 #[derive(Serialize)]

@@ -114,6 +114,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                         }
                     }
                 }
+                To::Myself => {}
             }
         }
     });
