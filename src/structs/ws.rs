@@ -1,6 +1,14 @@
-use std::collections::VecDeque;
-
 use serde::{Deserialize, Serialize};
+
+// #[serde_with::serde_as]
+#[derive(Serialize, sqlx::FromRow)]
+pub struct DbChatMessage {
+    pub id: i32,
+    pub message_type: String,
+    pub to_type: String,
+    pub user_name: String,
+    pub message: String,
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
@@ -39,38 +47,9 @@ pub enum ChatMessageType {
     PING,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum To {
     All,
     Private(String), // 這裡的 String 表示特定使用者的 token 或 username
     Myself,
-}
-
-#[derive(Serialize)]
-pub struct FixedMessageContainer {
-    pub buffer: VecDeque<ChatMessage>,
-    pub capacity: usize,
-}
-
-impl FixedMessageContainer {
-    // 初始化一個固定大小的緩衝區
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            buffer: VecDeque::with_capacity(capacity),
-            capacity,
-        }
-    }
-
-    // 向緩衝區添加元素
-    pub fn add(&mut self, item: ChatMessage) {
-        if self.buffer.len() == self.capacity {
-            self.buffer.pop_front(); // 移除最舊的元素
-        }
-        self.buffer.push_back(item); // 添加新元素
-    }
-
-    // 返回緩衝區中的所有元素
-    pub fn get_all(&self) -> Vec<&ChatMessage> {
-        self.buffer.iter().collect()
-    }
 }

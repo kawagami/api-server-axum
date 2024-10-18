@@ -1,5 +1,5 @@
 use crate::state::AppState;
-use crate::structs::ws::{ChatMessage, ChatMessageType, To};
+use crate::structs::ws::{ChatMessage, ChatMessageType, DbChatMessage, To};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -131,11 +131,15 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
             let data_msg = ChatMessage::decode(&text);
 
             // 將訊息存入歷史記錄
-            cp_state
-                .lock()
-                .await
-                .fixed_message_container
-                .add(data_msg.clone());
+            if data_msg.to == To::All {
+                let str = "INSERT INTO chat_messages(message_type, to_type, user_name, message) VALUES ('Message', 'All', $1, $2) RETURNING id";
+                let _: (i32,) = sqlx::query_as(str)
+                    .bind(&data_msg.from)
+                    .bind(&data_msg.content)
+                    .fetch_one(&cp_state.lock().await.pool)
+                    .await
+                    .unwrap();
+            }
 
             let send_msg = ChatMessage::new_jsonstring(
                 data_msg.message_type,
@@ -189,14 +193,36 @@ async fn remove_user_set(state: Arc<Mutex<AppState>>, token: &str) {
 }
 
 pub async fn ws_message(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<ChatMessage>> {
-    // 使用 let 綁定鎖定的值，使其在這個範疇內保持有效
-    let state_guard = state.lock().await;
+    let messages = sqlx::query_as::<_, DbChatMessage>(
+        r#"
+            SELECT
+                id,
+                message_type,
+                to_type,
+                user_name,
+                message
+            FROM
+                chat_messages
+            ORDER BY
+                id DESC
+            LIMIT
+                10
+        "#,
+    )
+    .fetch_all(&state.lock().await.pool)
+    .await
+    .unwrap();
 
-    // 使用已解鎖的固定訊息容器
-    let data = state_guard.fixed_message_container.get_all();
+    // 將 Vec<DbChatMessage> 轉換為 Vec<ChatMessage>
+    let chat_messages: Vec<ChatMessage> = messages
+        .into_iter()
+        .map(|db_msg| ChatMessage {
+            message_type: ChatMessageType::Message,
+            content: db_msg.message,
+            from: db_msg.user_name,
+            to: To::All,
+        })
+        .collect();
 
-    // 將借用的 Vec<&ChatMessage> 轉換為 Vec<ChatMessage>
-    let owned: Vec<ChatMessage> = data.into_iter().cloned().collect();
-
-    Json(owned)
+    Json(chat_messages)
 }
