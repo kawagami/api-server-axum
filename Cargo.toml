@@ -11,7 +11,7 @@ hyper = { version = "1.0", features = [] }
 hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
 tokio = { version = "1.0", features = ["full"] }
 tower = { version = "0.4", features = ["util"] }
-tower-http = { version = "0.5", features = ["fs", "timeout", "trace", "cors"] }
+tower-http = { version = "0.5", features = ["fs", "timeout", "trace", "cors", "limit"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "any", "postgres", "chrono"] }

@@ -7,6 +7,7 @@ mod ws;
 
 use crate::{auth, state::AppState};
 use axum::{
+    extract::DefaultBodyLimit,
     http::{header::CONTENT_TYPE, Method, StatusCode},
     middleware,
     response::IntoResponse,
@@ -16,12 +17,10 @@ use axum::{
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
+use tower_http::limit::RequestBodyLimitLayer;
 
 pub async fn app() -> Router {
-    let origins = [
-        "http://localhost:5173".parse().unwrap(),
-        "https://sg-vite.kawa.homes".parse().unwrap(),
-    ];
+    let origins = ["https://sg-vite.kawa.homes".parse().unwrap()];
 
     let state = AppState::new().await;
 
@@ -42,6 +41,8 @@ pub async fn app() -> Router {
         )
         .route("/ws", get(ws::websocket_handler))
         .route("/ws/messages", get(ws::ws_message))
+        .layer(DefaultBodyLimit::disable())
+        .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
             // see https://docs.rs/tower-http/latest/tower_http/cors/index.html
             // for more details
