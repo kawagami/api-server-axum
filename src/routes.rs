@@ -5,9 +5,10 @@ mod hackmd_note_lists;
 mod root;
 mod ws;
 
-use crate::state::AppState;
+use crate::{auth, state::AppState};
 use axum::{
     http::{header::CONTENT_TYPE, Method, StatusCode},
+    middleware,
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -34,7 +35,11 @@ pub async fn app() -> Router {
         )
         .route("/blogs/:id", get(blogs::get_blog))
         .route("/blogs", get(blogs::get_blogs))
-        .route("/firebase/upload", post(firebase::upload))
+        .route("/jwt", get(auth::sign_in))
+        .route(
+            "/firebase/upload",
+            post(firebase::upload).layer(middleware::from_fn(auth::authorize)),
+        )
         .route("/ws", get(ws::websocket_handler))
         .route("/ws/messages", get(ws::ws_message))
         .layer(
