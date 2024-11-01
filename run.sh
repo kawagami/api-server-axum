@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cargo watch -x run
+code . && cargo watch -x run
