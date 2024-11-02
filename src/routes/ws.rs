@@ -5,11 +5,11 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
     },
+    http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
-use hyper::StatusCode;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -38,7 +38,7 @@ async fn is_valid_token(token: &str, state: &AppStateV2) -> bool {
         tracing::debug!("{}", "token 已經存在");
         return false;
     }
-    let _ = state.add_user(token.to_string());
+    let _ = state.add_user(token.to_string()).await;
 
     tracing::debug!("{:?}", user_set);
     true
