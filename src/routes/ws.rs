@@ -165,7 +165,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
 }
 
 async fn remove_user_set(state: AppStateV2, token: &str) {
-    let _ = state.remove_user(token);
+    let _ = state.remove_user(token).await;
 
     let msg = format!("hashset remove {token}.");
     tracing::debug!("{msg}");
