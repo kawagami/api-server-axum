@@ -5,7 +5,7 @@ mod hackmd_note_lists;
 mod root;
 mod ws;
 
-use crate::{auth, state::AppState};
+use crate::{auth, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header::CONTENT_TYPE, Method, StatusCode},
@@ -14,15 +14,13 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 
 pub async fn app() -> Router {
     let origins = ["https://sg-vite.kawa.homes".parse().unwrap()];
 
-    let state = AppState::new().await;
+    let state2 = AppStateV2::new().await;
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
@@ -55,7 +53,7 @@ pub async fn app() -> Router {
                 .allow_origin(origins)
                 .allow_headers([CONTENT_TYPE]),
         )
-        .with_state(Arc::new(Mutex::new(state)))
+        .with_state(state2)
         .fallback(handler_404)
 }
 

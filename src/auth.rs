@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::state::AppStateV2;
 use axum::{
     body::Body,
     extract::{Json, Request, State},
@@ -12,8 +12,6 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 #[derive(Serialize, Deserialize)]
 pub struct Cliams {
@@ -134,7 +132,7 @@ pub struct SignInData {
 }
 
 pub async fn sign_in(
-    State(_state): State<Arc<Mutex<AppState>>>,
+    State(_state): State<AppStateV2>,
     Json(user_data): Json<SignInData>,
 ) -> Result<Json<String>, StatusCode> {
     // 1. Retrieve user from the database

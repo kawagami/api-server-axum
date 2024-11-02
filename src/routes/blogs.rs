@@ -1,12 +1,11 @@
-use crate::state::AppState;
+use crate::state::AppStateV2;
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
 };
 use serde::Serialize;
 use sqlx::{postgres::PgRow, types::chrono::NaiveDateTime, Row};
-use std::{collections::BTreeMap, sync::Arc};
-use tokio::sync::Mutex;
+use std::collections::BTreeMap;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct Blog {
@@ -32,10 +31,10 @@ pub struct BlogComponent {
 }
 
 pub async fn get_blog(
-    State(state): State<Arc<Mutex<AppState>>>,
+    State(state): State<AppStateV2>,
     Path(id): Path<i32>,
 ) -> Result<Json<Blog>, (StatusCode, String)> {
-    let pool = &state.lock().await.pool;
+    let pool = &state.get_pool().await;
     let query = r#"
         SELECT
             b.id AS id,
@@ -93,9 +92,9 @@ fn handle_blog(rows: Vec<PgRow>) -> Blog {
 }
 
 pub async fn get_blogs(
-    State(state): State<Arc<Mutex<AppState>>>,
+    State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<Blog>>, (StatusCode, String)> {
-    let pool = &state.lock().await.pool;
+    let pool = &state.get_pool().await;
     let query = r#"
         SELECT
             b.id AS id,

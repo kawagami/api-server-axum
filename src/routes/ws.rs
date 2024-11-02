@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::state::AppStateV2;
 use crate::structs::ws::{ChatMessage, ChatMessageType, DbChatMessage, To};
 use axum::{
     extract::{
@@ -11,8 +11,6 @@ use axum::{
 use futures::{sink::SinkExt, stream::StreamExt};
 use hyper::StatusCode;
 use serde::Deserialize;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
 pub struct QueryParams {
@@ -22,7 +20,7 @@ pub struct QueryParams {
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<QueryParams>,
-    State(state): State<Arc<Mutex<AppState>>>,
+    State(state): State<AppStateV2>,
 ) -> impl IntoResponse {
     if is_valid_token(&params.token, &state).await {
         ws.on_upgrade(|socket| websocket(socket, state, params.token))
@@ -31,16 +29,16 @@ pub async fn websocket_handler(
     }
 }
 
-async fn is_valid_token(token: &str, state: &Arc<Mutex<AppState>>) -> bool {
+async fn is_valid_token(token: &str, state: &AppStateV2) -> bool {
     // 在這裡檢查 token 的規則
     // 例如，檢查 token 是否為特定格式或值
-    let user_set = &mut state.lock().await.user_set;
+    let user_set = state.get_all_users().await;
 
-    if user_set.contains(token) {
+    if state.contains_user(token).await {
         tracing::debug!("{}", "token 已經存在");
         return false;
     }
-    user_set.insert(token.to_string());
+    let _ = state.add_user(token.to_string());
 
     tracing::debug!("{:?}", user_set);
     true
@@ -49,30 +47,23 @@ async fn is_valid_token(token: &str, state: &Arc<Mutex<AppState>>) -> bool {
 // This function deals with a single websocket connection, i.e., a single
 // connected client / user, for which we will spawn two independent tasks (for
 // receiving / sending chat messages).
-async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String) {
+async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
     // By splitting, we can send and receive at the same time.
     let (mut sender, mut receiver) = stream.split();
 
     // We subscribe *before* sending the "joined" message, so that we will also
     // display it to our client.
-    let mut rx = state.lock().await.tx.subscribe();
+    let mut rx = state.get_tx().await.subscribe();
 
     // 加入 ws 時發出的訊息
-    let join_users_set = state
-        .lock()
-        .await
-        .user_set
-        .iter()
-        .cloned()
-        .collect::<Vec<String>>()
-        .join(",");
+    let join_users_set = state.get_all_users().await.join(",");
     let join_msg = ChatMessage::new_jsonstring(
         ChatMessageType::Join,
         join_users_set,
         token.clone(),
         To::All,
     );
-    let _ = state.lock().await.tx.send(join_msg);
+    let _ = state.get_tx().await.send(join_msg);
 
     // clone 要 move 至不同部分的資料
     let token_clone = token.clone();
@@ -136,7 +127,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 let _: (i32,) = sqlx::query_as(str)
                     .bind(&data_msg.from)
                     .bind(&data_msg.content)
-                    .fetch_one(&cp_state.lock().await.pool)
+                    .fetch_one(&cp_state.get_pool().await)
                     .await
                     .unwrap();
             }
@@ -148,7 +139,7 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
                 data_msg.to,
             );
 
-            let _ = cp_state.lock().await.tx.send(send_msg);
+            let _ = cp_state.get_tx().await.send(send_msg);
         }
     });
 
@@ -167,32 +158,20 @@ async fn websocket(stream: WebSocket, state: Arc<Mutex<AppState>>, token: String
     };
 
     // 組合離開的訊息
-    let leave_users_set = state
-        .lock()
-        .await
-        .user_set
-        .iter()
-        .cloned()
-        .collect::<Vec<String>>()
-        .join(",");
+    let leave_users_set = state.get_all_users().await.join(",");
     let send_exit_msg =
         ChatMessage::new_jsonstring(ChatMessageType::Leave, leave_users_set, token, To::All);
-    let _ = state.lock().await.tx.send(send_exit_msg);
+    let _ = state.get_tx().await.send(send_exit_msg);
 }
 
-async fn remove_user_set(state: Arc<Mutex<AppState>>, token: &str) {
-    // 獲取對 AppState 的鎖
-    let mut app_state = state.lock().await;
-    let user_set = &mut app_state.user_set;
-
-    // 移除 token
-    user_set.remove(token);
+async fn remove_user_set(state: AppStateV2, token: &str) {
+    let _ = state.remove_user(token);
 
     let msg = format!("hashset remove {token}.");
     tracing::debug!("{msg}");
 }
 
-pub async fn ws_message(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<ChatMessage>> {
+pub async fn ws_message(State(state): State<AppStateV2>) -> Json<Vec<ChatMessage>> {
     let messages = sqlx::query_as::<_, DbChatMessage>(
         r#"
             SELECT
@@ -209,7 +188,7 @@ pub async fn ws_message(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<C
                 10
         "#,
     )
-    .fetch_all(&state.lock().await.pool)
+    .fetch_all(&state.get_pool().await)
     .await
     .unwrap();
 
