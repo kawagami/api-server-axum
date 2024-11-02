@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-// #[serde_with::serde_as]
+// 從 DB 取原始資料用的結構
 #[derive(Serialize, sqlx::FromRow)]
 pub struct DbChatMessage {
     pub id: i32,
