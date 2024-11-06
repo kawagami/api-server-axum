@@ -1,4 +1,4 @@
-use crate::errors::AppError;
+use crate::errors::UploadError;
 use axum::{extract::Multipart, Json};
 use reqwest::{multipart, Client};
 use serde::{Deserialize, Serialize};
@@ -8,13 +8,13 @@ pub struct Response {
     image_url: String,
 }
 
-pub async fn upload(mut multipart: Multipart) -> Result<Json<Response>, AppError> {
+pub async fn upload(mut multipart: Multipart) -> Result<Json<Response>, UploadError> {
     let client = Client::new();
 
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|_| AppError::GetNextFieldFail)?
+        .map_err(|_| UploadError::GetNextFieldFail)?
     {
         // let name = field.name().unwrap().to_string();
         let file_name = field.file_name().unwrap().to_string();
@@ -22,7 +22,7 @@ pub async fn upload(mut multipart: Multipart) -> Result<Json<Response>, AppError
         let data = field
             .bytes()
             .await
-            .map_err(|_| AppError::ReadBytesFail)?;
+            .map_err(|_| UploadError::ReadBytesFail)?;
 
         // Create a form part with the received file
         let part = multipart::Part::bytes(data.to_vec())
@@ -39,19 +39,19 @@ pub async fn upload(mut multipart: Multipart) -> Result<Json<Response>, AppError
             .multipart(form)
             .send()
             .await
-            .map_err(|_| AppError::ConnectFail)?;
+            .map_err(|_| UploadError::ConnectFail)?;
 
         // Check the response status and body if needed
         if res.status().is_success() {
             let upload_response = res
                 .json::<Response>()
                 .await
-                .map_err(|_| AppError::InvalidJson)?;
+                .map_err(|_| UploadError::InvalidJson)?;
             return Ok(Json(Response {
                 image_url: upload_response.image_url,
             }));
         }
     }
 
-    Err(AppError::NotThing)
+    Err(UploadError::NotThing)
 }

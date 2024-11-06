@@ -4,7 +4,7 @@ use axum::{
 };
 
 #[derive(Debug)]
-pub enum AppError {
+pub enum UploadError {
     ConnectFail,
     GetNextFieldFail,
     NotThing,
@@ -12,16 +12,16 @@ pub enum AppError {
     InvalidJson,
 }
 
-impl IntoResponse for AppError {
+impl IntoResponse for UploadError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            AppError::ConnectFail => (StatusCode::INTERNAL_SERVER_ERROR, "圖片 server 連接失敗"),
-            AppError::GetNextFieldFail => {
+            UploadError::ConnectFail => (StatusCode::INTERNAL_SERVER_ERROR, "圖片 server 連接失敗"),
+            UploadError::GetNextFieldFail => {
                 (StatusCode::BAD_REQUEST, "multipart next_field await 失敗")
             }
-            AppError::NotThing => (StatusCode::BAD_REQUEST, "multipart next_field 沒東西"),
-            AppError::ReadBytesFail => (StatusCode::BAD_REQUEST, "field bytes 時失敗"),
-            AppError::InvalidJson => (StatusCode::BAD_REQUEST, "無效的 json 格式"),
+            UploadError::NotThing => (StatusCode::BAD_REQUEST, "multipart next_field 沒東西"),
+            UploadError::ReadBytesFail => (StatusCode::BAD_REQUEST, "field bytes 時失敗"),
+            UploadError::InvalidJson => (StatusCode::BAD_REQUEST, "無效的 json 格式"),
         };
         (status, error_message).into_response()
     }
