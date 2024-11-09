@@ -10,6 +10,7 @@ pub enum AppError {
     NotThing,
     ReadBytesFail,
     InvalidJson,
+    GetDbDataFail,
 }
 
 impl IntoResponse for AppError {
@@ -22,6 +23,10 @@ impl IntoResponse for AppError {
             AppError::NotThing => (StatusCode::BAD_REQUEST, "multipart next_field 沒東西"),
             AppError::ReadBytesFail => (StatusCode::BAD_REQUEST, "field bytes 時失敗"),
             AppError::InvalidJson => (StatusCode::BAD_REQUEST, "無效的 json 格式"),
+            AppError::GetDbDataFail => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "取得 firebase_images 失敗",
+            ),
         };
         (status, error_message).into_response()
     }

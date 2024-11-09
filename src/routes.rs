@@ -11,7 +11,7 @@ use axum::{
     http::{header::CONTENT_TYPE, Method, StatusCode},
     middleware,
     response::IntoResponse,
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use tower_http::cors::CorsLayer;
@@ -34,8 +34,10 @@ pub async fn app() -> Router {
         .route("/blogs", get(blogs::get_blogs))
         .route("/jwt", get(auth::sign_in))
         .route(
-            "/firebase/upload",
-            post(firebase::upload).layer(middleware::from_fn(auth::authorize)),
+            "/firebase",
+            get(firebase::images)
+                .post(firebase::upload)
+                .layer(middleware::from_fn(auth::authorize)),
         )
         .route("/ws", get(ws::websocket_handler))
         .route("/ws/messages", get(ws::ws_message))
