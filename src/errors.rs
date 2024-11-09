@@ -26,3 +26,10 @@ impl IntoResponse for AppError {
         (status, error_message).into_response()
     }
 }
+
+pub fn internal_error<E>(err: E) -> (StatusCode, String)
+where
+    E: std::error::Error,
+{
+    (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+}
