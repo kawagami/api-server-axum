@@ -137,7 +137,10 @@ pub async fn images(
     )
     .fetch_all(&pool)
     .await
-    .map_err(|_| AppError::GetDbDataFail)?;
+    .map_err(|err| {
+        tracing::debug!("{}", err);
+        AppError::GetDbDataFail
+    })?;
 
     // 使用 iter().map() 來簡化 for 迴圈
     let response: Vec<ResponseFirebaseImage> = images
