@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker-compose up -d
+code . && cargo watch -x run
