@@ -24,6 +24,7 @@ pub async fn app() -> Router {
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
+        .route("/test", get(root::for_test))
         .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
         .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
         .route(

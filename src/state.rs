@@ -1,18 +1,21 @@
+use axum::response::Json;
+use bb8::Pool as RedisPool;
+use bb8_redis::RedisConnectionManager;
+use redis::{AsyncCommands, RedisError};
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 
 pub struct AppState {
     pub pool: Pool<Postgres>,
     pub tx: broadcast::Sender<String>,
-    pub user_set: HashSet<String>,
+    pub redis_pool: RedisPool<RedisConnectionManager>,
 }
 
 impl AppState {
     pub async fn new() -> Self {
         let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
         let (tx, _rx) = broadcast::channel(64);
-        let user_set = HashSet::new();
 
         // set up connection pool
         let pool = PgPoolOptions::new()
@@ -22,7 +25,24 @@ impl AppState {
             .await
             .expect("can't connect to database");
 
-        Self { pool, tx, user_set }
+        // redis
+        let manager = RedisConnectionManager::new(format!("redis://{}:6379", "host.docker.internal")).unwrap();
+        let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
+        {
+            // ping the database before starting
+            let mut conn = redis_pool.get().await.unwrap();
+            conn.set::<&str, &str, ()>("foo", "bar").await.unwrap();
+            let result: String = conn.get("foo").await.unwrap();
+            assert_eq!(result, "bar");
+            conn.expire::<&str, ()>("foo", 10).await.unwrap();
+        }
+        tracing::debug!("successfully connected to redis and pinged it");
+
+        Self {
+            pool,
+            tx,
+            redis_pool,
+        }
     }
 }
 
@@ -46,27 +66,60 @@ impl AppStateV2 {
         app_state.tx.clone()
     }
 
-    // 檢查用戶是否存在於 `user_set` 中
-    pub async fn contains_user(&self, user: &str) -> bool {
+    // 取 Redis pool
+    pub async fn get_redis_pool(&self) -> RedisPool<RedisConnectionManager> {
         let app_state = self.0.lock().await;
-        app_state.user_set.contains(user)
+        app_state.redis_pool.clone()
     }
 
-    // 取得所有 `user_set` 中的用戶名稱
-    pub async fn get_all_users(&self) -> Vec<String> {
-        let app_state = self.0.lock().await;
-        app_state.user_set.iter().cloned().collect()
+    pub async fn redis_zadd(&self, key: &str, member: &str) -> Result<(), RedisError> {
+        let redis_pool = self.get_redis_pool().await;
+        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
+        let score = chrono::Utc::now().timestamp_millis();
+
+        conn.zadd(key, member, score).await
     }
 
-    // 新增用戶至 `user_set`
-    pub async fn add_user(&self, user: String) {
-        let mut app_state = self.0.lock().await;
-        app_state.user_set.insert(user);
+    pub async fn redis_zrem(&self, key: &str, members: &str) -> Result<(), RedisError> {
+        let redis_pool = self.get_redis_pool().await;
+        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
+
+        conn.zrem(key, members).await
     }
 
-    // 從 `user_set` 中刪除用戶
-    pub async fn remove_user(&self, user: &str) {
-        let mut app_state = self.0.lock().await;
-        app_state.user_set.remove(user);
+    pub async fn redis_zrange(&self, key: &str) -> Result<Json<Vec<String>>, RedisError> {
+        let redis_pool = self.get_redis_pool().await;
+        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
+
+        let result: Vec<String> = conn.zrange(key, 0, -1).await.expect("zrange fail");
+        Ok(Json(result))
     }
+
+    pub async fn redis_zrevrange(&self, key: &str) -> Result<Json<Vec<String>>, RedisError> {
+        let redis_pool = self.get_redis_pool().await;
+        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
+
+        let result: Vec<String> = conn.zrevrange(key, 0, -1).await.expect("zrevrange fail");
+        Ok(Json(result))
+    }
+
+    pub async fn check_member_exists(&self, key: &str, member: &str) -> Result<bool, RedisError> {
+        let redis_pool = self.get_redis_pool().await;
+        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
+
+        // 使用 zscore 檢查 member 是否存在
+        let score: Option<i64> = conn.zscore(key, member).await?;
+        Ok(score.is_some()) // 如果 score 為 Some，表示 member 存在；否則為 None，表示不存在
+    }
+
+    // 設定 Redis 資料的過期時間（以秒為單位）
+    // pub async fn expire_redis_key(&self, key: &str, seconds: usize) -> Result<(), RedisError> {
+    //     let app_state = self.0.lock().await;
+    //     let mut conn = app_state
+    //         .redis_pool
+    //         .get()
+    //         .await
+    //         .expect("get redis_pool fail");
+    //     conn.expire(key, seconds as i64).await
+    // }
 }

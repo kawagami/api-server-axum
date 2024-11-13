@@ -30,17 +30,15 @@ pub async fn websocket_handler(
 }
 
 async fn is_valid_token(token: &str, state: &AppStateV2) -> bool {
-    // 在這裡檢查 token 的規則
-    // 例如，檢查 token 是否為特定格式或值
-    let user_set = state.get_all_users().await;
-
-    if state.contains_user(token).await {
+    if state
+        .check_member_exists("online_members", token)
+        .await
+        .unwrap()
+    {
         tracing::debug!("{}", "token 已經存在");
         return false;
     }
-    let _ = state.add_user(token.to_string()).await;
-
-    tracing::debug!("{:?}", user_set);
+    let _ = state.redis_zadd("online_members", token).await;
     true
 }
 
@@ -56,7 +54,12 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
     let mut rx = state.get_tx().await.subscribe();
 
     // 加入 ws 時發出的訊息
-    let join_users_set = state.get_all_users().await.join(",");
+    let join_users_set = state
+        .redis_zrange("online_members")
+        .await
+        .unwrap()
+        .0
+        .join(",");
     let join_msg = ChatMessage::new_jsonstring(
         ChatMessageType::Join,
         join_users_set,
@@ -158,17 +161,19 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
     };
 
     // 組合離開的訊息
-    let leave_users_set = state.get_all_users().await.join(",");
+    let leave_users_set = state
+        .redis_zrange("online_members")
+        .await
+        .unwrap()
+        .0
+        .join(",");
     let send_exit_msg =
         ChatMessage::new_jsonstring(ChatMessageType::Leave, leave_users_set, token, To::All);
     let _ = state.get_tx().await.send(send_exit_msg);
 }
 
 async fn remove_user_set(state: AppStateV2, token: &str) {
-    let _ = state.remove_user(token).await;
-
-    let msg = format!("hashset remove {token}.");
-    tracing::debug!("{msg}");
+    let _ = state.redis_zrem("online_members", token).await;
 }
 
 pub async fn ws_message(State(state): State<AppStateV2>) -> Json<Vec<ChatMessage>> {

@@ -25,3 +25,7 @@ futures = "0.3.30"
 reqwest = { version = "0.12", features = ["multipart", "json"] }
 jsonwebtoken = "9.3.0"
 bcrypt = "0.15.1"
+bb8 = "0.8.5"
+bb8-redis = "0.17.0"
+redis = "0.27.2"
+rand = "0.8"
