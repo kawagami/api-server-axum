@@ -99,14 +99,13 @@ pub async fn get_all_note_lists(
                 nl."publishLink",
                 nl."lastChangedAt",
                 nl."readPermission",
-                (
-                    SELECT string_agg(t.name, ',') 
-                    FROM hackmd_note_list_tag nlt
-                    JOIN hackmd_tags t ON nlt.tag_id = t.id
-                    WHERE nlt.note_list_id = nl.id
-                ) AS tags
+                STRING_AGG(t.name, ',') AS tags
             FROM
                 hackmd_note_lists nl
+            LEFT JOIN hackmd_note_list_tag nlt ON nlt.note_list_id = nl.id
+            LEFT JOIN hackmd_tags t ON nlt.tag_id = t.id
+            GROUP BY
+                nl.id, nl.title, nl."publishLink", nl."lastChangedAt", nl."readPermission"
             ORDER BY
                 nl."lastChangedAt" DESC;
         "#;
