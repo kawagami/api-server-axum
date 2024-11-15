@@ -70,7 +70,7 @@ pub struct HackmdNoteListAndCategories {
     publish_link: String,
     last_changed_at: i64,
     read_permission: String,
-    categories: HashSet<Option<String>>,
+    categories: HashSet<String>,
 }
 
 pub async fn get_note_list(
@@ -109,7 +109,7 @@ pub async fn get_all_note_lists(
             ORDER BY
                 nl."lastChangedAt" DESC;
         "#;
-    let records = sqlx::query_as::<_, HackmdNoteListAndTagString>(query)
+    let records: Vec<HackmdNoteListAndTagString> = sqlx::query_as(query)
         .fetch_all(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
@@ -119,31 +119,20 @@ pub async fn get_all_note_lists(
 
     // 將 tags 字串處理成不重複的 HashSet
     for record in records {
-        let categories = parse(record.tags);
-        let data = HackmdNoteListAndCategories {
+        result.push(HackmdNoteListAndCategories {
             id: record.id,
             title: record.title,
             publish_link: record.publish_link,
             last_changed_at: record.last_changed_at,
             read_permission: record.read_permission,
-            categories,
-        };
-        result.push(data);
+            categories: parse(record.tags),
+        });
     }
 
     Ok(Json(result))
 }
 
-fn parse(x: Option<String>) -> HashSet<Option<String>> {
-    match x {
-        None => HashSet::new(),
-        Some(i) => {
-            let mut set: HashSet<Option<String>> = HashSet::new();
-            for x in i.split(",").collect::<Vec<&str>>() {
-                set.insert(Some(x.to_string()));
-            }
-
-            set
-        }
-    }
+fn parse(x: Option<String>) -> HashSet<String> {
+    x.map(|i| i.split(',').map(|x| x.trim().to_string()).collect())
+        .unwrap_or_default()
 }
