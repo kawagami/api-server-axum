@@ -151,12 +151,12 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
         _ = &mut send_task => {
             recv_task.abort();
 
-            remove_user_set(state.clone(), &token).await;
+            remove_user_set(&state, &token).await;
         },
         _ = &mut recv_task => {
             send_task.abort();
 
-            remove_user_set(state.clone(), &token).await;
+            remove_user_set(&state, &token).await;
         },
     };
 
@@ -172,7 +172,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
     let _ = state.get_tx().await.send(send_exit_msg);
 }
 
-async fn remove_user_set(state: AppStateV2, token: &str) {
+async fn remove_user_set(state: &AppStateV2, token: &str) {
     let _ = state.redis_zrem("online_members", token).await;
 }
 
