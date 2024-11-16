@@ -1,9 +1,15 @@
 use crate::{errors::internal_error, state::AppStateV2};
 use axum::{
-    extract::State,
+    extract::{Query, State},
     response::{IntoResponse, Json, Response},
 };
 use rand::{distributions::Alphanumeric, Rng};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct Params {
+    length: Option<u8>,
+}
 
 pub async fn using_connection_pool_extractor(
     State(state): State<AppStateV2>,
@@ -17,24 +23,18 @@ pub async fn using_connection_pool_extractor(
 }
 
 pub async fn for_test(State(state): State<AppStateV2>) -> Result<Json<Vec<String>>, Response> {
-    // let redis_pool = state.get_redis_pool().await;
-    // let mut conn = redis_pool.get().await.unwrap();
-
-    // // 使用 zrange 取得範圍資料，並解析為 Vec<String>
-    // let result: Vec<String> = conn.zrange("iszadd", 0, -1).await.unwrap();
-
-    let _ = generate_random_string();
-    // let _ = state.redis_zadd("iszadd", &value).await;
-
-    // let _ = state.redis_zrem("iszadd", "O7lznz5D").await;
-
-    // let result = state.redis_zrange("iszadd").await.unwrap();
     let result = state.redis_zrevrange("online_members").await.unwrap();
 
     Ok(result)
 }
 
-fn generate_random_string() -> String {
+pub async fn new_password(Query(params): Query<Params>) -> Result<String, ()> {
+    Ok(generate_random_string(params.length))
+}
+
+fn generate_random_string(length: Option<u8>) -> String {
+    // 預設長度為 8
+    let len = length.unwrap_or(8);
     let mut rng = rand::thread_rng();
-    (0..8).map(|_| rng.sample(Alphanumeric) as char).collect()
+    (0..len).map(|_| rng.sample(Alphanumeric) as char).collect()
 }
