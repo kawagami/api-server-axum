@@ -79,7 +79,7 @@ pub async fn get_note_list(
 ) -> Result<Json<HackmdNoteList>, (StatusCode, String)> {
     let pool = &state.get_pool().await;
     let query = "select * from hackmd_note_lists where id = $1";
-    let result = sqlx::query_as::<_, HackmdNoteList>(query)
+    let result: HackmdNoteList = sqlx::query_as(query)
         .bind(id)
         .fetch_one(pool)
         .await

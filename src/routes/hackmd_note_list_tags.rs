@@ -18,7 +18,7 @@ pub async fn get_all_note_list_tags(
     let query = r#"
             SELECT id, name FROM hackmd_tags
         "#;
-    let records = sqlx::query_as::<_, Tag>(query)
+    let records: Vec<Tag> = sqlx::query_as(query)
         .fetch_all(pool)
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
