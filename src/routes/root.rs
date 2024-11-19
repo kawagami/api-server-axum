@@ -8,6 +8,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Params {
+    count: Option<u8>,
     length: Option<u8>,
 }
 
@@ -28,13 +29,19 @@ pub async fn for_test(State(state): State<AppStateV2>) -> Result<Json<Vec<String
     Ok(result)
 }
 
-pub async fn new_password(Query(params): Query<Params>) -> Result<String, ()> {
-    Ok(generate_random_string(params.length))
+pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<String>>, ()> {
+    Ok(Json(generate_random_strings(params.length, params.count)))
 }
 
-fn generate_random_string(length: Option<u8>) -> String {
-    // 預設長度為 8
-    let len = length.unwrap_or(8);
+fn generate_random_strings(length: Option<u8>, count: Option<u8>) -> Vec<String> {
+    // 預設長度為 8，預設數量為 1
+    let len = length.unwrap_or(8) as usize;
+    let cnt = count.unwrap_or(1);
+
     let mut rng = rand::thread_rng();
-    (0..len).map(|_| rng.sample(Alphanumeric) as char).collect()
+
+    // 生成指定數量的隨機字串
+    (0..cnt)
+        .map(|_| (0..len).map(|_| rng.sample(Alphanumeric) as char).collect())
+        .collect()
 }
