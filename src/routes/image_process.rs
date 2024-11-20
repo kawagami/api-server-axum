@@ -20,9 +20,7 @@ pub async fn resize(mut multipart: Multipart) -> impl IntoResponse {
 
         // 將處理後的圖片寫入內存緩衝區
         let mut buffer = Cursor::new(Vec::new());
-        resized_img
-            .write_to(&mut buffer, ImageFormat::Png)
-            .unwrap();
+        resized_img.write_to(&mut buffer, ImageFormat::Png).unwrap();
         let resized_data = buffer.into_inner();
 
         // 返回圖片作為 Body

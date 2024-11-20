@@ -19,7 +19,10 @@ use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 
 pub async fn app() -> Router {
-    let origins = ["https://sg-vite.kawa.homes".parse().unwrap()];
+    let origins = [
+        "https://sg-vite.kawa.homes".parse().unwrap(),
+        "https://next-blog.kawa.homes".parse().unwrap(),
+    ];
 
     let state2 = AppStateV2::new().await;
 
