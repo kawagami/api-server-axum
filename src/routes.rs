@@ -2,6 +2,7 @@ mod blogs;
 mod firebase;
 mod hackmd_note_list_tags;
 mod hackmd_note_lists;
+mod image_process;
 mod root;
 mod ws;
 
@@ -11,7 +12,7 @@ use axum::{
     http::{header::CONTENT_TYPE, Method, StatusCode},
     middleware,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use tower_http::cors::CorsLayer;
@@ -26,6 +27,7 @@ pub async fn app() -> Router {
         .route("/", get(root::using_connection_pool_extractor))
         .route("/test", get(root::for_test))
         .route("/new_password", get(root::new_password))
+        .route("/image_resize", post(image_process::resize))
         .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
         .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
         .route(
