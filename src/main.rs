@@ -1,5 +1,6 @@
 mod auth;
 mod errors;
+mod image_processor;
 mod routes;
 mod state;
 mod structs;
