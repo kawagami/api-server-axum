@@ -6,7 +6,7 @@ mod image_process;
 mod root;
 mod ws;
 
-use crate::{auth, state::AppStateV2};
+use crate::{auth, hackmd_process, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header::CONTENT_TYPE, Method, StatusCode},
@@ -28,7 +28,7 @@ pub async fn app() -> Router {
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
-        .route("/test", get(root::for_test))
+        .route("/test", get(hackmd_process::fetch_notes_handler))
         .route("/new_password", get(root::new_password))
         .route("/image_resize", post(image_process::resize))
         .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
