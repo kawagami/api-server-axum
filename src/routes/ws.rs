@@ -17,6 +17,11 @@ pub struct QueryParams {
     pub token: String,
 }
 
+#[derive(Deserialize)]
+pub struct GetParams {
+    limit: Option<i32>,
+}
+
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<QueryParams>,
@@ -176,8 +181,14 @@ async fn remove_user_set(state: &AppStateV2, token: &str) {
     let _ = state.redis_zrem("online_members", token).await;
 }
 
-pub async fn ws_message(State(state): State<AppStateV2>) -> Json<Vec<ChatMessage>> {
-    let messages = sqlx::query_as::<_, DbChatMessage>(
+pub async fn ws_message(
+    State(state): State<AppStateV2>,
+    Query(params): Query<GetParams>,
+) -> Json<Vec<ChatMessage>> {
+    // 設定預設值，如果未提供 limit 參數則使用 10
+    let limit = params.limit.unwrap_or(10);
+
+    let messages: Vec<DbChatMessage> = sqlx::query_as(
         r#"
             SELECT
                 id,
@@ -190,9 +201,10 @@ pub async fn ws_message(State(state): State<AppStateV2>) -> Json<Vec<ChatMessage
             ORDER BY
                 id DESC
             LIMIT
-                10
+                $1
         "#,
     )
+    .bind(limit)
     .fetch_all(&state.get_pool().await)
     .await
     .unwrap();
