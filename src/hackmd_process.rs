@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde_json::Value;
 use std::env;
 
-pub async fn fetch_notes_handler() -> impl IntoResponse {
+pub async fn _fetch_notes_handler() -> impl IntoResponse {
     // 取得環境變數中的 Token
     let token = env::var("HACKMD_TOKEN").expect("HACKMD_TOKEN not set");
 
