@@ -1,18 +1,21 @@
 use crate::image_processor::resize_image;
 use axum::{
     body::Body,
-    extract::Multipart,
+    extract::{Multipart, Path},
     http::header,
     response::{IntoResponse, Response},
 };
 
 // 圖片上傳處理路由
-pub async fn resize(mut multipart: Multipart) -> impl IntoResponse {
+pub async fn resize(
+    Path((witdh, height)): Path<(u32, u32)>,
+    mut multipart: Multipart,
+) -> impl IntoResponse {
     while let Some(field) = multipart.next_field().await.unwrap() {
         let data = field.bytes().await.unwrap();
 
         // 使用公共庫處理圖片
-        match resize_image(&data, 600, 600) {
+        match resize_image(&data, witdh, height) {
             Ok(resized_data) => {
                 // 返回圖片作為 Body
                 let body = Body::from(resized_data);
