@@ -9,6 +9,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use chrono::FixedOffset;
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
 
@@ -195,7 +196,8 @@ pub async fn ws_message(
                 message_type,
                 to_type,
                 user_name,
-                message
+                message,
+                created_at
             FROM
                 chat_messages
             ORDER BY
@@ -212,11 +214,19 @@ pub async fn ws_message(
     // 將 Vec<DbChatMessage> 轉換為 Vec<ChatMessage>
     let chat_messages: Vec<ChatMessage> = messages
         .into_iter()
-        .map(|db_msg| ChatMessage {
-            message_type: ChatMessageType::Message,
-            content: db_msg.message,
-            from: db_msg.user_name,
-            to: To::All,
+        .map(|db_msg| {
+            // 轉換 `created_at` 為 UTC+8 並格式化為 `yyyy-MM-dd HH:mm:ss`
+            let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
+            let created_at_plus_8 = db_msg.created_at.with_timezone(&utc_plus_8);
+            let created_at_str = created_at_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
+
+            ChatMessage {
+                message_type: ChatMessageType::Message,
+                content: db_msg.message,
+                from: db_msg.user_name,
+                to: To::All,
+                created_at: created_at_str,
+            }
         })
         .collect();
 
