@@ -18,6 +18,7 @@ pub struct ChatMessage {
     pub content: String,
     pub from: String,
     pub to: To,
+    #[serde(default)] // 缺少時使用預設值
     pub created_at: String,
 }
 
@@ -48,8 +49,21 @@ impl ChatMessage {
 
         serde_json::to_string(&send_json).expect("產生 json string 失敗")
     }
+
     pub fn decode(raw_json_string: &str) -> ChatMessage {
-        serde_json::from_str(&raw_json_string).expect("decode raw json string 失敗")
+        // 從 JSON 字串解析 ChatMessage
+        let mut chat_message: ChatMessage =
+            serde_json::from_str(raw_json_string).expect("decode raw json string 失敗");
+
+        // 如果 `created_at` 是預設值，動態補充目前時間
+        if chat_message.created_at.is_empty() {
+            let now_utc: DateTime<Utc> = Utc::now();
+            let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
+            let now_plus_8 = now_utc.with_timezone(&utc_plus_8);
+            chat_message.created_at = now_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
+        }
+
+        chat_message
     }
 }
 
