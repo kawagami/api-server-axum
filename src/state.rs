@@ -12,6 +12,13 @@ pub struct AppState {
     pub redis_pool: RedisPool<RedisConnectionManager>,
 }
 
+#[derive(serde::Serialize, sqlx::FromRow)]
+pub struct DbUser {
+    pub id: i64,
+    pub email: String,
+    pub password: String,
+}
+
 impl AppState {
     pub async fn new() -> Self {
         let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
@@ -111,6 +118,32 @@ impl AppStateV2 {
         // 使用 zscore 檢查 member 是否存在
         let score: Option<i64> = conn.zscore(key, member).await?;
         Ok(score.is_some()) // 如果 score 為 Some，表示 member 存在；否則為 None，表示不存在
+    }
+
+    pub async fn check_email_exists(&self, email: &str) -> Result<DbUser, sqlx::Error> {
+        let pool = self.get_pool().await;
+
+        // 使用 EXISTS 查詢是否有特定 email
+        let result: DbUser = sqlx::query_as(
+            r#"
+                SELECT
+                    id,
+                    email,
+                    password
+                FROM
+                    users
+                WHERE
+                    email = $1
+                LIMIT
+                    1;
+            "#,
+        )
+        .bind(email)
+        .fetch_one(&pool)
+        .await
+        .expect("check_email_exists 查詢失敗");
+
+        Ok(result)
     }
 
     // 設定 Redis 資料的過期時間（以秒為單位）

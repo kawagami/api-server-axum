@@ -48,7 +48,10 @@ pub async fn app() -> Router {
             "/firebase",
             get(firebase::images)
                 .post(firebase::upload)
-                .layer(middleware::from_fn(auth::authorize)),
+                .layer(middleware::from_fn_with_state(
+                    state2.clone(),
+                    auth::authorize,
+                )),
         )
         .route("/ws", get(ws::websocket_handler))
         .route("/ws/messages", get(ws::ws_message))

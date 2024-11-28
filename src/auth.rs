@@ -80,7 +80,11 @@ pub struct CurrentUser {
     pub password_hash: String,
 }
 
-pub async fn authorize(mut req: Request, next: Next) -> Result<Response<Body>, AuthError> {
+pub async fn authorize(
+    State(state): State<AppStateV2>,
+    mut req: Request,
+    next: Next,
+) -> Result<Response<Body>, AuthError> {
     let auth_header = req.headers_mut().get(http::header::AUTHORIZATION);
 
     let auth_header = match auth_header {
@@ -111,7 +115,7 @@ pub async fn authorize(mut req: Request, next: Next) -> Result<Response<Body>, A
     };
 
     // Fetch the user details from the database
-    let current_user = match retrieve_user_by_email(&token_data.claims.email) {
+    let current_user = match retrieve_user_by_email(state, &token_data.claims.email).await {
         Some(user) => user,
         None => {
             return Err(AuthError {
@@ -132,11 +136,11 @@ pub struct SignInData {
 }
 
 pub async fn sign_in(
-    State(_state): State<AppStateV2>,
+    State(state): State<AppStateV2>,
     Json(user_data): Json<SignInData>,
 ) -> Result<Json<String>, StatusCode> {
     // 1. Retrieve user from the database
-    let user = match retrieve_user_by_email(&user_data.email) {
+    let user = match retrieve_user_by_email(state, &user_data.email).await {
         Some(user) => user,
         None => return Err(StatusCode::UNAUTHORIZED), // User not found
     };
@@ -146,7 +150,7 @@ pub async fn sign_in(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
     // Handle bcrypt errors
     {
-        return Err(StatusCode::IM_A_TEAPOT); // Wrong password
+        return Err(StatusCode::UNAUTHORIZED); // Wrong password
     }
 
     // 3. Generate JWT
@@ -155,16 +159,19 @@ pub async fn sign_in(
     // 4. Return the token
     Ok(Json(token))
 }
-
-fn retrieve_user_by_email(email: &str) -> Option<CurrentUser> {
-    let fixed_email = "kawa@gmail.com";
-    if email != fixed_email {
-        return None;
+async fn retrieve_user_by_email(state: AppStateV2, email: &str) -> Option<CurrentUser> {
+    // 呼叫 check_email_exists 以查詢資料庫中是否存在指定的 email
+    match state.check_email_exists(email).await {
+        Ok(db_user) => {
+            // 將查詢結果對應為 CurrentUser 類型
+            Some(CurrentUser {
+                email: db_user.email,
+                password_hash: db_user.password,
+            })
+        }
+        Err(_) => {
+            // 如果查詢失敗或使用者不存在，則傳回 None
+            None
+        }
     }
-
-    let current_user: CurrentUser = CurrentUser {
-        email: fixed_email.to_string(),
-        password_hash: "$2b$12$K97effh9FPMRvOO8CGWwbOb6/Wb3d1LXN5NbkFrcgN/UTOUPzPzuW".to_string(),
-    };
-    Some(current_user)
 }
