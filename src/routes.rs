@@ -43,7 +43,7 @@ pub async fn app() -> Router {
         )
         .route("/blogs/:id", get(blogs::get_blog))
         .route("/blogs", get(blogs::get_blogs))
-        .route("/jwt", get(auth::sign_in))
+        .route("/jwt", post(auth::sign_in))
         .route(
             "/firebase",
             get(firebase::images)
