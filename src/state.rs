@@ -140,8 +140,7 @@ impl AppStateV2 {
         )
         .bind(email)
         .fetch_one(&pool)
-        .await
-        .expect("check_email_exists 查詢失敗");
+        .await?;
 
         Ok(result)
     }
