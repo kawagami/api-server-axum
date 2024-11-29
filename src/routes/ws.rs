@@ -57,7 +57,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
 
     // We subscribe *before* sending the "joined" message, so that we will also
     // display it to our client.
-    let mut rx = state.get_tx().await.subscribe();
+    let mut rx = state.get_tx().subscribe();
 
     // 加入 ws 時發出的訊息
     let join_users_set = state
@@ -72,7 +72,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
         token.clone(),
         To::All,
     );
-    let _ = state.get_tx().await.send(join_msg);
+    let _ = state.get_tx().send(join_msg);
 
     // clone 要 move 至不同部分的資料
     let token_clone = token.clone();
@@ -136,7 +136,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
                 let _: (i32,) = sqlx::query_as(str)
                     .bind(&data_msg.from)
                     .bind(&data_msg.content)
-                    .fetch_one(&cp_state.get_pool().await)
+                    .fetch_one(&cp_state.get_pool())
                     .await
                     .unwrap();
             }
@@ -148,7 +148,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
                 data_msg.to,
             );
 
-            let _ = cp_state.get_tx().await.send(send_msg);
+            let _ = cp_state.get_tx().send(send_msg);
         }
     });
 
@@ -175,7 +175,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
         .join(",");
     let send_exit_msg =
         ChatMessage::new_jsonstring(ChatMessageType::Leave, leave_users_set, token, To::All);
-    let _ = state.get_tx().await.send(send_exit_msg);
+    let _ = state.get_tx().send(send_exit_msg);
 }
 
 async fn remove_user_set(state: &AppStateV2, token: &str) {
@@ -207,7 +207,7 @@ pub async fn ws_message(
         "#,
     )
     .bind(limit)
-    .fetch_all(&state.get_pool().await)
+    .fetch_all(&state.get_pool())
     .await
     .unwrap();
 

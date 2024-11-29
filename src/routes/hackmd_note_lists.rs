@@ -77,7 +77,7 @@ pub async fn get_note_list(
     State(state): State<AppStateV2>,
     Path(id): Path<i32>,
 ) -> Result<Json<HackmdNoteList>, (StatusCode, String)> {
-    let pool = &state.get_pool().await;
+    let pool = &state.get_pool();
     let query = "select * from hackmd_note_lists where id = $1";
     let result: HackmdNoteList = sqlx::query_as(query)
         .bind(id)
@@ -91,7 +91,7 @@ pub async fn get_note_list(
 pub async fn get_all_note_lists(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<HackmdNoteListAndCategories>>, (StatusCode, String)> {
-    let pool = &state.get_pool().await;
+    let pool = &state.get_pool();
     let query = r#"
             SELECT
                 nl.id,

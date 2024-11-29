@@ -53,7 +53,7 @@ pub async fn upload(
                 .map_err(|_| AppError::InvalidJson)?;
 
             // Retrieve the database pool from state
-            let pool = state.get_pool().await;
+            let pool = state.get_pool();
 
             // Save image URL to the database and return the FirebaseImage
             let _: Result<FirebaseImage, _> = sqlx::query_as(
@@ -122,7 +122,7 @@ impl DbFirebaseImage {
 pub async fn images(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<ResponseFirebaseImage>>, AppError> {
-    let pool = state.get_pool().await;
+    let pool = state.get_pool();
 
     let images: Vec<DbFirebaseImage> = sqlx::query_as(
         r#"

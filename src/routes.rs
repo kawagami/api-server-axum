@@ -6,6 +6,8 @@ mod image_process;
 mod root;
 mod ws;
 
+use std::sync::Arc;
+
 use crate::{auth, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
@@ -15,6 +17,9 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use chrono::{DateTime, FixedOffset, Utc};
+use tokio::sync::Mutex;
+use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 
@@ -24,8 +29,40 @@ pub async fn app() -> Router {
         "https://next-blog.kawa.homes".parse().unwrap(),
         "http://localhost:3000".parse().unwrap(),
     ];
-
     let state2 = AppStateV2::new().await;
+
+    let scheduler = Arc::new(Mutex::new(JobScheduler::new().await.unwrap()));
+
+    let job_state2 = state2.clone();
+    let scheduler_clone = scheduler.clone();
+    tokio::spawn(async move {
+        let job = Job::new_async("1 * * * * *", move |_uuid, _l| {
+            let job_state2 = job_state2.clone();
+            Box::pin(async move {
+                // println!("每分鐘執行一次的任務!");
+
+                // 獲取當前時間並轉換為 UTC+8 時區
+                let now_utc: DateTime<Utc> = Utc::now();
+                let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
+                let now_utc_plus_8 = now_utc.with_timezone(&utc_plus_8);
+
+                // 格式化時間為 yyyy-mm-dd hh:ii:ss 字串
+                let formatted_time = now_utc_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
+
+                // 將格式化的時間插入到訊息中
+                if let Err(err) = job_state2
+                    .insert_chat_message("Message", "All", "KawaBot", &formatted_time)
+                    .await
+                {
+                    eprintln!("Failed to insert chat message: {:?}", err);
+                }
+            })
+        })
+        .unwrap();
+
+        scheduler_clone.lock().await.add(job).await.unwrap();
+        scheduler_clone.lock().await.start().await.unwrap();
+    });
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))

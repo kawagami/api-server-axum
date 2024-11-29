@@ -34,7 +34,7 @@ pub async fn get_blog(
     State(state): State<AppStateV2>,
     Path(id): Path<i32>,
 ) -> Result<Json<Blog>, (StatusCode, String)> {
-    let pool = &state.get_pool().await;
+    let pool = &state.get_pool();
     let query = r#"
         SELECT
             b.id AS id,
@@ -94,7 +94,7 @@ fn handle_blog(rows: Vec<PgRow>) -> Blog {
 pub async fn get_blogs(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<Blog>>, (StatusCode, String)> {
-    let pool = &state.get_pool().await;
+    let pool = &state.get_pool();
     let query = r#"
         SELECT
             b.id AS id,

@@ -4,7 +4,7 @@ use bb8_redis::RedisConnectionManager;
 use redis::{AsyncCommands, RedisError};
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::{sync::Arc, time::Duration};
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::broadcast;
 
 pub struct AppState {
     pub pool: Pool<Postgres>,
@@ -55,33 +55,29 @@ impl AppState {
 }
 
 #[derive(Clone)]
-pub struct AppStateV2(Arc<Mutex<AppState>>);
+pub struct AppStateV2(Arc<AppState>);
+
 impl AppStateV2 {
     pub async fn new() -> Self {
         let app_state = AppState::new().await;
-        AppStateV2(Arc::new(Mutex::new(app_state)))
+        AppStateV2(Arc::new(app_state))
     }
 
-    pub async fn get_pool(&self) -> Pool<Postgres> {
-        // 鎖定 Mutex，取得 AppState 的不可變引用
-        let app_state = self.0.lock().await;
-        // 回傳複製的 pool
-        app_state.pool.clone()
+    pub fn get_pool(&self) -> Pool<Postgres> {
+        self.0.pool.clone() // 直接複製
     }
 
-    pub async fn get_tx(&self) -> broadcast::Sender<String> {
-        let app_state = self.0.lock().await;
-        app_state.tx.clone()
+    pub fn get_tx(&self) -> broadcast::Sender<String> {
+        self.0.tx.clone() // 直接複製
     }
 
     // 取 Redis pool
-    pub async fn get_redis_pool(&self) -> RedisPool<RedisConnectionManager> {
-        let app_state = self.0.lock().await;
-        app_state.redis_pool.clone()
+    pub fn get_redis_pool(&self) -> RedisPool<RedisConnectionManager> {
+        self.0.redis_pool.clone() // 直接複製
     }
 
     pub async fn redis_zadd(&self, key: &str, member: &str) -> Result<(), RedisError> {
-        let redis_pool = self.get_redis_pool().await;
+        let redis_pool = self.get_redis_pool();
         let mut conn = redis_pool.get().await.expect("redis_pool get fail");
         let score = chrono::Utc::now().timestamp_millis();
 
@@ -89,14 +85,14 @@ impl AppStateV2 {
     }
 
     pub async fn redis_zrem(&self, key: &str, members: &str) -> Result<(), RedisError> {
-        let redis_pool = self.get_redis_pool().await;
+        let redis_pool = self.get_redis_pool();
         let mut conn = redis_pool.get().await.expect("redis_pool get fail");
 
         conn.zrem(key, members).await
     }
 
     pub async fn redis_zrange(&self, key: &str) -> Result<Json<Vec<String>>, RedisError> {
-        let redis_pool = self.get_redis_pool().await;
+        let redis_pool = self.get_redis_pool();
         let mut conn = redis_pool.get().await.expect("redis_pool get fail");
 
         let result: Vec<String> = conn.zrange(key, 0, -1).await.expect("zrange fail");
@@ -104,7 +100,7 @@ impl AppStateV2 {
     }
 
     pub async fn redis_zrevrange(&self, key: &str) -> Result<Json<Vec<String>>, RedisError> {
-        let redis_pool = self.get_redis_pool().await;
+        let redis_pool = self.get_redis_pool();
         let mut conn = redis_pool.get().await.expect("redis_pool get fail");
 
         let result: Vec<String> = conn.zrevrange(key, 0, -1).await.expect("zrevrange fail");
@@ -112,7 +108,7 @@ impl AppStateV2 {
     }
 
     pub async fn check_member_exists(&self, key: &str, member: &str) -> Result<bool, RedisError> {
-        let redis_pool = self.get_redis_pool().await;
+        let redis_pool = self.get_redis_pool();
         let mut conn = redis_pool.get().await.expect("redis_pool get fail");
 
         // 使用 zscore 檢查 member 是否存在
@@ -121,7 +117,7 @@ impl AppStateV2 {
     }
 
     pub async fn check_email_exists(&self, email: &str) -> Result<DbUser, sqlx::Error> {
-        let pool = self.get_pool().await;
+        let pool = self.get_pool();
 
         // 使用 EXISTS 查詢是否有特定 email
         let result: DbUser = sqlx::query_as(
@@ -143,6 +139,29 @@ impl AppStateV2 {
         .await?;
 
         Ok(result)
+    }
+
+    pub async fn insert_chat_message(
+        &self,
+        message_type: &str,
+        to_type: &str,
+        user_name: &str,
+        message: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO chat_messages (message_type, to_type, user_name, message)
+            VALUES ($1, $2, $3, $4)
+            "#,
+        )
+        .bind(message_type)
+        .bind(to_type)
+        .bind(user_name)
+        .bind(message)
+        .execute(&self.get_pool())
+        .await?;
+
+        Ok(())
     }
 
     // 設定 Redis 資料的過期時間（以秒為單位）
