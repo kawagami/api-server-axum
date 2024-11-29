@@ -8,7 +8,11 @@ mod ws;
 
 use std::sync::Arc;
 
-use crate::{auth, state::AppStateV2};
+use crate::{
+    auth,
+    state::AppStateV2,
+    structs::ws::{ChatMessage, ChatMessageType},
+};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header::CONTENT_TYPE, Method, StatusCode},
@@ -49,13 +53,22 @@ pub async fn app() -> Router {
                 // 格式化時間為 yyyy-mm-dd hh:ii:ss 字串
                 let formatted_time = now_utc_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
 
-                // 將格式化的時間插入到訊息中
-                if let Err(err) = job_state2
-                    .insert_chat_message("Message", "All", "KawaBot", &formatted_time)
-                    .await
-                {
-                    eprintln!("Failed to insert chat message: {:?}", err);
-                }
+                let jsonstring = ChatMessage::new_jsonstring(
+                    ChatMessageType::Message,
+                    formatted_time,
+                    "KawaBot".to_owned(),
+                    crate::structs::ws::To::All,
+                );
+
+                let _ = job_state2.get_tx().send(jsonstring);
+
+                // // 將格式化的時間插入到訊息中
+                // if let Err(err) = job_state2
+                //     .insert_chat_message("Message", "All", "KawaBot", &formatted_time)
+                //     .await
+                // {
+                //     eprintln!("Failed to insert chat message: {:?}", err);
+                // }
             })
         })
         .unwrap();

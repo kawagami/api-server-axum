@@ -141,7 +141,7 @@ impl AppStateV2 {
         Ok(result)
     }
 
-    pub async fn insert_chat_message(
+    pub async fn _insert_chat_message(
         &self,
         message_type: &str,
         to_type: &str,
