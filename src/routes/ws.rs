@@ -124,11 +124,11 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
 
             // 將全體訊息存入資料庫
             if data_msg.to == To::All {
-                let str = "INSERT INTO chat_messages(message_type, to_type, user_name, message) VALUES ('Message', 'All', $1, $2) RETURNING id";
-                let _: (i32,) = sqlx::query_as(str)
+                let str = "INSERT INTO chat_messages(message_type, to_type, user_name, message) VALUES ('Message', 'All', $1, $2)";
+                sqlx::query(str)
                     .bind(&data_msg.from)
                     .bind(&data_msg.content)
-                    .fetch_one(&cp_state.get_pool())
+                    .execute(&cp_state.get_pool())
                     .await
                     .unwrap();
             }
