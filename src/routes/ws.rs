@@ -1,6 +1,10 @@
-use crate::state::AppStateV2;
-use crate::structs::chat::{GetParams, QueryParams};
-use crate::structs::ws::{ChatMessage, ChatMessageType, DbChatMessage, To};
+use crate::{
+    state::AppStateV2,
+    structs::{
+        chat::{GetParams, QueryParams},
+        ws::{ChatMessage, ChatMessageType, DbChatMessage, To},
+    },
+};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
