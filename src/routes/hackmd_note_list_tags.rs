@@ -1,15 +1,8 @@
-use crate::state::AppStateV2;
+use crate::{state::AppStateV2, structs::hackmd::Tag};
 use axum::{
     extract::{Json, State},
     http::StatusCode,
 };
-use serde::Serialize;
-
-#[derive(Serialize, sqlx::FromRow)]
-pub struct Tag {
-    id: i64,
-    name: String,
-}
 
 pub async fn get_all_note_list_tags(
     State(state): State<AppStateV2>,

@@ -1,77 +1,12 @@
-use crate::state::AppStateV2;
+use crate::{
+    state::AppStateV2,
+    structs::hackmd::{HackmdNoteList, HackmdNoteListAndCategories, HackmdNoteListAndTagString},
+};
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
 };
-use serde::{Deserialize, Serialize};
-use sqlx::types::chrono::NaiveDateTime;
 use std::collections::HashSet;
-
-#[derive(Serialize, sqlx::FromRow)]
-pub struct HackmdNoteList {
-    id: i64,
-    is_public: bool,
-    hackmd_note_lists_id: String,
-    title: String,
-    #[sqlx(rename = "createdAt")]
-    created_at_hackmd: i64,
-    #[sqlx(rename = "publishType")]
-    publish_type: String,
-    #[sqlx(rename = "publishedAt")]
-    published_at: Option<i64>,
-    permalink: Option<String>,
-    #[sqlx(rename = "publishLink")]
-    publish_link: String,
-    #[sqlx(rename = "shortId")]
-    short_id: String,
-    #[sqlx(rename = "lastChangedAt")]
-    last_changed_at: i64,
-    #[sqlx(rename = "lastChangeUser")]
-    last_change_user: sqlx::types::Json<LastChangeUser>,
-    #[sqlx(rename = "userPath")]
-    user_path: String,
-    #[sqlx(rename = "teamPath")]
-    team_path: Option<String>,
-    #[sqlx(rename = "readPermission")]
-    read_permission: String,
-    #[sqlx(rename = "writePermission")]
-    write_permission: String,
-    created_at: NaiveDateTime,
-    updated_at: NaiveDateTime,
-}
-
-#[derive(sqlx::FromRow, Deserialize, Serialize)]
-struct LastChangeUser {
-    name: String,
-    photo: String,
-    biography: Option<String>,
-    #[sqlx(rename = "userPath")]
-    user_path: Option<String>,
-}
-
-#[derive(Serialize, sqlx::FromRow)]
-pub struct HackmdNoteListAndTagString {
-    id: i64,
-    title: String,
-    #[sqlx(rename = "publishLink")]
-    publish_link: String,
-    #[sqlx(rename = "lastChangedAt")]
-    last_changed_at: i64,
-    #[sqlx(rename = "readPermission")]
-    read_permission: String,
-    #[sqlx(rename = "tags")]
-    tags: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct HackmdNoteListAndCategories {
-    id: i64,
-    title: String,
-    publish_link: String,
-    last_changed_at: i64,
-    read_permission: String,
-    categories: HashSet<String>,
-}
 
 pub async fn get_note_list(
     State(state): State<AppStateV2>,

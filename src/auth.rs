@@ -1,4 +1,7 @@
-use crate::state::AppStateV2;
+use crate::{
+    state::AppStateV2,
+    structs::auth::{AuthError, Claims, CurrentUser, SignInData},
+};
 use axum::{
     body::Body,
     extract::{Json, Request, State},
@@ -10,20 +13,7 @@ use axum::{
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
-
-#[derive(Serialize, Deserialize)]
-pub struct Cliams {
-    pub exp: usize,
-    pub iat: usize,
-    pub email: String,
-}
-
-pub struct AuthError {
-    message: String,
-    status_code: StatusCode,
-}
 
 pub fn verify_password(password: &str, hash: &str) -> Result<bool, bcrypt::BcryptError> {
     verify(password, hash)
@@ -52,7 +42,7 @@ pub fn encode_jwt(email: String) -> Result<String, StatusCode> {
     let exp: usize = (now + expire).timestamp() as usize;
     let iat: usize = now.timestamp() as usize;
 
-    let claim = Cliams { iat, exp, email };
+    let claim = Claims { iat, exp, email };
 
     encode(
         &Header::default(),
@@ -62,22 +52,16 @@ pub fn encode_jwt(email: String) -> Result<String, StatusCode> {
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
-pub fn decode_jwt(jwt: String) -> Result<TokenData<Cliams>, StatusCode> {
+pub fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, StatusCode> {
     let jwt_secret = std::env::var("JWT_SECRET").expect("找不到 JWT_SECRET");
 
-    let result: Result<TokenData<Cliams>, StatusCode> = decode(
+    let result: Result<TokenData<Claims>, StatusCode> = decode(
         &jwt,
         &DecodingKey::from_secret(jwt_secret.as_ref()),
         &Validation::default(),
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
     result
-}
-
-#[derive(Clone)]
-pub struct CurrentUser {
-    pub email: String,
-    pub password_hash: String,
 }
 
 pub async fn authorize(
@@ -127,12 +111,6 @@ pub async fn authorize(
 
     req.extensions_mut().insert(current_user);
     Ok(next.run(req).await)
-}
-
-#[derive(Deserialize)]
-pub struct SignInData {
-    pub email: String,
-    pub password: String,
 }
 
 pub async fn sign_in(

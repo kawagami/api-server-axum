@@ -1,4 +1,5 @@
 use crate::state::AppStateV2;
+use crate::structs::chat::{GetParams, QueryParams};
 use crate::structs::ws::{ChatMessage, ChatMessageType, DbChatMessage, To};
 use axum::{
     extract::{
@@ -11,17 +12,6 @@ use axum::{
 };
 use chrono::FixedOffset;
 use futures::{sink::SinkExt, stream::StreamExt};
-use serde::Deserialize;
-
-#[derive(Deserialize)]
-pub struct QueryParams {
-    pub token: String,
-}
-
-#[derive(Deserialize)]
-pub struct GetParams {
-    limit: Option<i32>,
-}
 
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,

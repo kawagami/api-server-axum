@@ -1,16 +1,14 @@
-use crate::{errors::AppError, state::AppStateV2};
+use crate::{
+    errors::AppError,
+    state::AppStateV2,
+    structs::firebase::{DbFirebaseImage, FirebaseImage, ResponseFirebaseImage},
+};
 use axum::{
     extract::{Multipart, State},
     Json,
 };
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::FixedOffset;
 use reqwest::{multipart, Client};
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, sqlx::FromRow)]
-pub struct FirebaseImage {
-    image_url: String,
-}
 
 pub async fn upload(
     State(state): State<AppStateV2>,
@@ -75,22 +73,6 @@ pub async fn upload(
     }
 
     Err(AppError::NotThing)
-}
-
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct DbFirebaseImage {
-    id: i32,
-    image_url: String,
-    created_at: DateTime<Utc>, // 支援 TIMESTAMPTZ 型別
-    updated_at: DateTime<Utc>,
-}
-
-#[derive(Serialize)]
-pub struct ResponseFirebaseImage {
-    id: i32,
-    image_url: String,
-    created_at: String,
-    updated_at: String,
 }
 
 impl DbFirebaseImage {
