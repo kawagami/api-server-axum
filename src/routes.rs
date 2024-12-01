@@ -6,7 +6,7 @@ mod image_process;
 mod root;
 mod ws;
 
-use crate::{auth, hackmd_process::fetch_notes_job, state::AppStateV2};
+use crate::{auth, scheduler::initialize_scheduler, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header::CONTENT_TYPE, Method, StatusCode},
@@ -15,9 +15,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 
@@ -29,22 +26,8 @@ pub async fn app() -> Router {
     ];
     let state = AppStateV2::new().await;
 
-    let scheduler = Arc::new(Mutex::new(JobScheduler::new().await.unwrap()));
-
-    let job_state = state.clone();
-    let scheduler_clone = scheduler.clone();
-    tokio::spawn(async move {
-        let job = Job::new_async("0 0 * * * *", move |_uuid, _l| {
-            let job_state = job_state.clone();
-            Box::pin(async move {
-                let _ = fetch_notes_job(job_state).await;
-            })
-        })
-        .unwrap();
-
-        scheduler_clone.lock().await.add(job).await.unwrap();
-        scheduler_clone.lock().await.start().await.unwrap();
-    });
+    // 初始化 scheduler
+    let _scheduler = initialize_scheduler(state.clone()).await;
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))

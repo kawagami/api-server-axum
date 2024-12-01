@@ -3,6 +3,7 @@ mod errors;
 mod hackmd_process;
 mod image_processor;
 mod routes;
+mod scheduler;
 mod state;
 mod structs;
 
