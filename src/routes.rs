@@ -8,11 +8,7 @@ mod ws;
 
 use std::sync::Arc;
 
-use crate::{
-    auth, hackmd_process,
-    state::AppStateV2,
-    structs::ws::{ChatMessage, ChatMessageType},
-};
+use crate::{auth, hackmd_process::fetch_notes_job, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header::CONTENT_TYPE, Method, StatusCode},
@@ -21,7 +17,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use chrono::{DateTime, FixedOffset, Utc};
 use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::cors::CorsLayer;
@@ -40,35 +35,11 @@ pub async fn app() -> Router {
     let job_state2 = state2.clone();
     let scheduler_clone = scheduler.clone();
     tokio::spawn(async move {
-        let job = Job::new_async("1 * * * * *", move |_uuid, _l| {
+        // let job = Job::new_async("0 0 4,16 * * *", move |_uuid, _l| {
+        let job = Job::new_async("0 0 * * * *", move |_uuid, _l| {
             let job_state2 = job_state2.clone();
             Box::pin(async move {
-                // println!("每分鐘執行一次的任務!");
-
-                // 獲取當前時間並轉換為 UTC+8 時區
-                let now_utc: DateTime<Utc> = Utc::now();
-                let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
-                let now_utc_plus_8 = now_utc.with_timezone(&utc_plus_8);
-
-                // 格式化時間為 yyyy-mm-dd hh:ii:ss 字串
-                let formatted_time = now_utc_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
-
-                let jsonstring = ChatMessage::new_jsonstring(
-                    ChatMessageType::Message,
-                    formatted_time,
-                    "KawaBot".to_owned(),
-                    crate::structs::ws::To::All,
-                );
-
-                let _ = job_state2.get_tx().send(jsonstring);
-
-                // // 將格式化的時間插入到訊息中
-                // if let Err(err) = job_state2
-                //     .insert_chat_message("Message", "All", "KawaBot", &formatted_time)
-                //     .await
-                // {
-                //     eprintln!("Failed to insert chat message: {:?}", err);
-                // }
+                let _ = fetch_notes_job(job_state2).await;
             })
         })
         .unwrap();
@@ -80,10 +51,6 @@ pub async fn app() -> Router {
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
         .route("/test", get(root::for_test))
-        .route(
-            "/fetch_notes_handler",
-            get(hackmd_process::fetch_notes_handler),
-        )
         .route("/new_password", get(root::new_password))
         .route(
             "/image/:width/:height/:format/resize",
