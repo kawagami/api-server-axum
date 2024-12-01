@@ -6,8 +6,6 @@ mod image_process;
 mod root;
 mod ws;
 
-use std::sync::Arc;
-
 use crate::{auth, hackmd_process::fetch_notes_job, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
@@ -17,6 +15,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::cors::CorsLayer;
@@ -35,7 +34,6 @@ pub async fn app() -> Router {
     let job_state2 = state2.clone();
     let scheduler_clone = scheduler.clone();
     tokio::spawn(async move {
-        // let job = Job::new_async("0 0 4,16 * * *", move |_uuid, _l| {
         let job = Job::new_async("0 0 * * * *", move |_uuid, _l| {
             let job_state2 = job_state2.clone();
             Box::pin(async move {

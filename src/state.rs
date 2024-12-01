@@ -1,4 +1,4 @@
-use crate::structs::hackmd_v2::Post;
+use crate::structs::hackmd::Post;
 use axum::response::Json;
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;

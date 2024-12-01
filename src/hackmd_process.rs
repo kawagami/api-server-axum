@@ -3,7 +3,7 @@ use reqwest::Client;
 // use serde_json::Value;
 use std::env;
 
-use crate::{state::AppStateV2, structs::hackmd_v2::Post};
+use crate::{state::AppStateV2, structs::hackmd::Post};
 
 pub async fn _fetch_notes_handler(State(state): State<AppStateV2>) -> impl IntoResponse {
     // 取得環境變數中的 Token
