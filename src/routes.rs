@@ -1,7 +1,6 @@
 mod blogs;
 mod firebase;
-mod hackmd_note_list_tags;
-mod hackmd_note_lists;
+mod hackmd;
 mod image_process;
 mod root;
 mod ws;
@@ -37,11 +36,8 @@ pub async fn app() -> Router {
             "/image/:width/:height/:format/resize",
             post(image_process::resize),
         )
-        .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
-        .route(
-            "/note_list_tags",
-            get(hackmd_note_list_tags::get_all_note_list_tags),
-        )
+        .route("/note_lists", get(hackmd::get_all_note_lists))
+        .route("/note_list_tags", get(hackmd::get_all_note_list_tags))
         .route("/blogs/:id", get(blogs::get_blog))
         .route("/blogs", get(blogs::get_blogs))
         .route("/jwt", post(auth::sign_in))
