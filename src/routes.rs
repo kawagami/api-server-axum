@@ -27,17 +27,17 @@ pub async fn app() -> Router {
         "https://next-blog.kawa.homes".parse().unwrap(),
         "http://localhost:3000".parse().unwrap(),
     ];
-    let state2 = AppStateV2::new().await;
+    let state = AppStateV2::new().await;
 
     let scheduler = Arc::new(Mutex::new(JobScheduler::new().await.unwrap()));
 
-    let job_state2 = state2.clone();
+    let job_state = state.clone();
     let scheduler_clone = scheduler.clone();
     tokio::spawn(async move {
         let job = Job::new_async("0 0 * * * *", move |_uuid, _l| {
-            let job_state2 = job_state2.clone();
+            let job_state = job_state.clone();
             Box::pin(async move {
-                let _ = fetch_notes_job(job_state2).await;
+                let _ = fetch_notes_job(job_state).await;
             })
         })
         .unwrap();
@@ -67,7 +67,7 @@ pub async fn app() -> Router {
             get(firebase::images)
                 .post(firebase::upload)
                 .layer(middleware::from_fn_with_state(
-                    state2.clone(),
+                    state.clone(),
                     auth::authorize,
                 )),
         )
@@ -87,7 +87,7 @@ pub async fn app() -> Router {
                 .allow_origin(origins)
                 .allow_headers([CONTENT_TYPE]),
         )
-        .with_state(state2)
+        .with_state(state)
         .fallback(handler_404)
 }
 
