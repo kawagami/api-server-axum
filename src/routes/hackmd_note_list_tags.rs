@@ -7,12 +7,21 @@ use axum::{
 pub async fn get_all_note_list_tags(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<Tag>>, (StatusCode, String)> {
-    let pool = &state.get_pool();
     let query = r#"
-            SELECT id, name FROM hackmd_tags
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY MAX(last_changed_at) DESC) AS id,
+                name
+            FROM (
+                SELECT 
+                    unnest(tags) AS name,
+                    last_changed_at
+                FROM hackmd_posts
+            ) subquery
+            GROUP BY name
+            ORDER BY MAX(last_changed_at) DESC
         "#;
     let records: Vec<Tag> = sqlx::query_as(query)
-        .fetch_all(pool)
+        .fetch_all(&state.get_pool())
         .await
         .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err.to_string()))?;
 

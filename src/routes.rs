@@ -9,7 +9,7 @@ mod ws;
 use std::sync::Arc;
 
 use crate::{
-    auth,
+    auth, hackmd_process,
     state::AppStateV2,
     structs::ws::{ChatMessage, ChatMessageType},
 };
@@ -80,12 +80,15 @@ pub async fn app() -> Router {
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
         .route("/test", get(root::for_test))
+        .route(
+            "/fetch_notes_handler",
+            get(hackmd_process::fetch_notes_handler),
+        )
         .route("/new_password", get(root::new_password))
         .route(
             "/image/:width/:height/:format/resize",
             post(image_process::resize),
         )
-        .route("/note_lists/:id", get(hackmd_note_lists::get_note_list))
         .route("/note_lists", get(hackmd_note_lists::get_all_note_lists))
         .route(
             "/note_list_tags",

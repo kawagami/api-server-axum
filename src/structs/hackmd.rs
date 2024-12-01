@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::NaiveDateTime;
-use std::collections::HashSet;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct HackmdNoteList {
@@ -45,27 +44,13 @@ struct LastChangeUser {
 }
 
 #[derive(Serialize, sqlx::FromRow)]
-pub struct HackmdNoteListAndTagString {
-    pub id: i64,
-    pub title: String,
-    #[sqlx(rename = "publishLink")]
-    pub publish_link: String,
-    #[sqlx(rename = "lastChangedAt")]
-    pub last_changed_at: i64,
-    #[sqlx(rename = "readPermission")]
-    pub read_permission: String,
-    #[sqlx(rename = "tags")]
-    pub tags: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct HackmdNoteListAndCategories {
-    pub id: i64,
+pub struct HackmdNoteListAndTag {
+    pub id: String,
     pub title: String,
     pub publish_link: String,
     pub last_changed_at: i64,
     pub read_permission: String,
-    pub categories: HashSet<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]

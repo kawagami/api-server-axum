@@ -1,19 +1,21 @@
-use axum::{http::StatusCode, response::IntoResponse};
+use axum::{extract::State, http::StatusCode, response::IntoResponse};
 use reqwest::Client;
-use serde_json::Value;
+// use serde_json::Value;
 use std::env;
 
-pub async fn _fetch_notes_handler() -> impl IntoResponse {
+use crate::{state::AppStateV2, structs::hackmd_v2::Post};
+
+pub async fn fetch_notes_handler(State(state): State<AppStateV2>) -> impl IntoResponse {
     // 取得環境變數中的 Token
     let token = env::var("HACKMD_TOKEN").expect("HACKMD_TOKEN not set");
 
     // 構建請求 URL
-    let url = format!("{}", "https://api.hackmd.io/v1/notes");
+    let url = "https://api.hackmd.io/v1/notes";
 
     // 使用 reqwest 發送請求
     let client = Client::new();
     let response = client
-        .get(&url)
+        .get(url)
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await;
@@ -21,9 +23,13 @@ pub async fn _fetch_notes_handler() -> impl IntoResponse {
     match response {
         Ok(resp) => {
             if resp.status() == StatusCode::OK {
-                // 解析回應為 JSON
-                match resp.json::<Value>().await {
-                    Ok(note) => (StatusCode::OK, serde_json::to_string(&note).unwrap()),
+                // 解析回應為 JSON 並轉換為 `Vec<Post>` (假設 API 回應是一個 Post 的陣列)
+                match resp.json::<Vec<Post>>().await {
+                    Ok(posts) => {
+                        let _ = state.insert_posts_handler(posts).await;
+
+                        (StatusCode::OK, "success".to_string())
+                    }
                     Err(_) => (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         "Failed to parse response".to_string(),
