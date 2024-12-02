@@ -55,13 +55,15 @@ pub fn encode_jwt(email: String) -> Result<String, StatusCode> {
 pub fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, StatusCode> {
     let jwt_secret = std::env::var("JWT_SECRET").expect("找不到 JWT_SECRET");
 
-    let result: Result<TokenData<Claims>, StatusCode> = decode(
+    decode(
         &jwt,
         &DecodingKey::from_secret(jwt_secret.as_ref()),
         &Validation::default(),
     )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
-    result
+    .map_err(|e| match e.kind() {
+        jsonwebtoken::errors::ErrorKind::ExpiredSignature => StatusCode::UNAUTHORIZED,
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    })
 }
 
 pub async fn authorize(
@@ -137,6 +139,7 @@ pub async fn sign_in(
     // 4. Return the token
     Ok(Json(token))
 }
+
 async fn retrieve_user_by_email(state: AppStateV2, email: &str) -> Option<CurrentUser> {
     // 呼叫 check_email_exists 以查詢資料庫中是否存在指定的 email
     match state.check_email_exists(email).await {
