@@ -3,6 +3,7 @@ use axum::response::Json;
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
 use redis::{AsyncCommands, RedisError};
+use reqwest::Client;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres, QueryBuilder};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::broadcast;
@@ -11,6 +12,7 @@ pub struct AppState {
     pub pool: Pool<Postgres>,
     pub tx: broadcast::Sender<String>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
+    pub http_client: Client, // 新增 reqwest::Client
 }
 
 #[derive(serde::Serialize, sqlx::FromRow)]
@@ -47,10 +49,17 @@ impl AppState {
         }
         tracing::debug!("successfully connected to redis and pinged it");
 
+        // 初始化 HTTP 客戶端
+        let http_client = Client::builder()
+            .timeout(Duration::from_secs(10)) // 設定超時時間
+            .build()
+            .expect("Failed to build HTTP client");
+
         Self {
             pool,
             tx,
             redis_pool,
+            http_client,
         }
     }
 }
@@ -75,6 +84,10 @@ impl AppStateV2 {
     // 取 Redis pool
     pub fn get_redis_pool(&self) -> RedisPool<RedisConnectionManager> {
         self.0.redis_pool.clone() // 直接複製
+    }
+
+    pub fn get_http_client(&self) -> Client {
+        self.0.http_client.clone()
     }
 
     pub async fn redis_zadd(&self, key: &str, member: &str) -> Result<(), RedisError> {

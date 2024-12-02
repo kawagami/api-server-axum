@@ -8,13 +8,13 @@ use axum::{
     Json,
 };
 use chrono::FixedOffset;
-use reqwest::{multipart, Client};
+use reqwest::multipart;
 
 pub async fn upload(
     State(state): State<AppStateV2>,
     mut multipart: Multipart,
 ) -> Result<Json<FirebaseImage>, AppError> {
-    let client = Client::new();
+    let client = state.get_http_client();
 
     while let Some(field) = multipart
         .next_field()
