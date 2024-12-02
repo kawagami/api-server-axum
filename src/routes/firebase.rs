@@ -24,7 +24,10 @@ pub async fn upload(
         // let name = field.name().unwrap().to_string();
         let file_name = field.file_name().unwrap().to_string();
         let content_type = field.content_type().unwrap().to_string();
-        let data = field.bytes().await.map_err(|_| AppError::ReadBytesFail)?;
+        let data = field.bytes().await.map_err(|err| {
+            tracing::error!("Failed to read bytes: {:?}", err);
+            AppError::ReadBytesFail
+        })?;
 
         // Create a form part with the received file
         let part = multipart::Part::bytes(data.to_vec())
@@ -41,7 +44,10 @@ pub async fn upload(
             .multipart(form)
             .send()
             .await
-            .map_err(|_| AppError::ConnectFail)?;
+            .map_err(|err| {
+                tracing::error!("HTTP request failed: {:?}", err);
+                AppError::ConnectFail
+            })?;
 
         // Check the FirebaseImage status and body if needed
         if res.status().is_success() {
@@ -50,20 +56,20 @@ pub async fn upload(
                 .await
                 .map_err(|_| AppError::InvalidJson)?;
 
-            // Retrieve the database pool from state
-            let pool = state.get_pool();
-
             // Save image URL to the database and return the FirebaseImage
-            let _: Result<FirebaseImage, _> = sqlx::query_as(
+            sqlx::query(
                 r#"
                 INSERT INTO firebase_images (image_url)
                 VALUES ($1)
-                RETURNING image_url
                 "#,
             )
             .bind(&upload_response.image_url)
-            .fetch_one(&pool)
-            .await;
+            .execute(&state.get_pool())
+            .await
+            .map_err(|err| {
+                tracing::error!("Database insert failed: {:?}", err);
+                AppError::DbInsertFail
+            })?;
 
             // Return the inserted image data as JSON
             return Ok(Json(FirebaseImage {

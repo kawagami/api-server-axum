@@ -11,6 +11,7 @@ pub enum AppError {
     ReadBytesFail,
     InvalidJson,
     GetDbDataFail,
+    DbInsertFail,
 }
 
 impl IntoResponse for AppError {
@@ -27,6 +28,7 @@ impl IntoResponse for AppError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "取得 firebase_images 失敗",
             ),
+            AppError::DbInsertFail => (StatusCode::INTERNAL_SERVER_ERROR, "DB INSERT FAIL"),
         };
         (status, error_message).into_response()
     }
