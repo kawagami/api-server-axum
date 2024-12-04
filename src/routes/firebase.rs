@@ -82,8 +82,8 @@ pub async fn upload(
 
 pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>, AppError> {
     let client = state.get_http_client();
-    // let api_url = "http://fastapi-upload:8000/list-images";
-    let api_url = "http://host.docker.internal:8000/list-images";
+    let api_url = "http://fastapi-upload:8000/list-images";
+    // let api_url = "http://host.docker.internal:8000/list-images";
 
     let response = client
         .get(api_url)
@@ -108,8 +108,8 @@ pub async fn delete(
     Json(delete_data): Json<DeleteImageRequest>,
 ) -> Result<Json<()>, AppError> {
     let client = state.get_http_client();
-    // let api_url = "http://fastapi-upload:8000/delete-image";
-    let api_url = "http://host.docker.internal:8000/delete-image";
+    let api_url = "http://fastapi-upload:8000/delete-image";
+    // let api_url = "http://host.docker.internal:8000/delete-image";
     let response = client
         .delete(api_url)
         .json(&delete_data)
