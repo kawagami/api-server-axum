@@ -43,6 +43,7 @@ pub async fn app() -> Router {
             "/firebase",
             get(firebase::images)
                 .post(firebase::upload)
+                .delete(firebase::delete)
                 .layer(middleware::from_fn_with_state(
                     state.clone(),
                     auth::authorize,

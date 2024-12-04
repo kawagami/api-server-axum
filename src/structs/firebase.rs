@@ -14,10 +14,18 @@ pub struct DbFirebaseImage {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Serialize)]
-pub struct ResponseFirebaseImage {
-    pub id: i32,
-    pub image_url: String,
-    pub created_at: String,
-    pub updated_at: String,
+#[derive(Debug, Deserialize)]
+pub struct ApiResponse {
+    pub files: Vec<Image>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Image {
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteImageRequest {
+    pub file_name: String,
 }

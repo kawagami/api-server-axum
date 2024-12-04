@@ -1,13 +1,12 @@
 use crate::{
     errors::AppError,
     state::AppStateV2,
-    structs::firebase::{DbFirebaseImage, FirebaseImage, ResponseFirebaseImage},
+    structs::firebase::{ApiResponse, DeleteImageRequest, FirebaseImage, Image},
 };
 use axum::{
     extract::{Multipart, State},
     Json,
 };
-use chrono::FixedOffset;
 use reqwest::multipart;
 
 pub async fn upload(
@@ -81,60 +80,46 @@ pub async fn upload(
     Err(AppError::NotThing)
 }
 
-impl DbFirebaseImage {
-    fn to_local_formatted(&self) -> ResponseFirebaseImage {
-        // 設定 UTC+8 的時區偏移
-        let utc_plus_8 = FixedOffset::east_opt(8 * 3600).expect("east_opt fail");
+pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>, AppError> {
+    let client = state.get_http_client();
+    // let api_url = "http://fastapi-upload:8000/list-images";
+    let api_url = "http://host.docker.internal:8000/list-images";
 
-        // 轉換 `created_at` 和 `updated_at` 到當前時區並格式化
-        let created_at = self
-            .created_at
-            .with_timezone(&utc_plus_8)
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
-        let updated_at = self
-            .updated_at
-            .with_timezone(&utc_plus_8)
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
+    let response = client
+        .get(api_url)
+        .send()
+        .await
+        .map_err(|err| {
+            tracing::error!("HTTP request failed: {:?}", err);
+            AppError::ConnectFail
+        })?
+        .json::<ApiResponse>()
+        .await
+        .map_err(|err| {
+            tracing::error!("Failed to parse response JSON: {:?}", err);
+            AppError::InvalidResponse
+        })?;
 
-        ResponseFirebaseImage {
-            id: self.id,
-            image_url: self.image_url.clone(),
-            created_at,
-            updated_at,
-        }
-    }
+    Ok(Json(response.files))
 }
 
-pub async fn images(
+pub async fn delete(
     State(state): State<AppStateV2>,
-) -> Result<Json<Vec<ResponseFirebaseImage>>, AppError> {
-    let pool = state.get_pool();
+    Json(delete_data): Json<DeleteImageRequest>,
+) -> Result<Json<()>, AppError> {
+    let client = state.get_http_client();
+    // let api_url = "http://fastapi-upload:8000/delete-image";
+    let api_url = "http://host.docker.internal:8000/delete-image";
+    let response = client
+        .delete(api_url)
+        .json(&delete_data)
+        .send()
+        .await
+        .map_err(|err| {
+            tracing::error!("HTTP request failed: {:?}", err);
+            AppError::ConnectFail
+        })?;
 
-    let images: Vec<DbFirebaseImage> = sqlx::query_as(
-        r#"
-            SELECT
-                    id,
-                    image_url,
-                    created_at,
-                    updated_at
-            FROM
-                    firebase_images
-        "#,
-    )
-    .fetch_all(&pool)
-    .await
-    .map_err(|err| {
-        tracing::debug!("{}", err);
-        AppError::GetDbDataFail
-    })?;
-
-    // 使用 iter().map() 來簡化 for 迴圈
-    let response: Vec<ResponseFirebaseImage> = images
-        .iter()
-        .map(|image| image.to_local_formatted())
-        .collect();
-
-    Ok(Json(response))
+    tracing::debug!("{:?}", response);
+    Ok(Json(()))
 }
