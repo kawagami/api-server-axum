@@ -20,7 +20,6 @@ pub async fn upload(
         .await
         .map_err(|_| AppError::GetNextFieldFail)?
     {
-        // let name = field.name().unwrap().to_string();
         let file_name = field.file_name().unwrap().to_string();
         let content_type = field.content_type().unwrap().to_string();
         let data = field.bytes().await.map_err(|err| {
@@ -37,9 +36,12 @@ pub async fn upload(
         // Create a multipart form
         let form = multipart::Form::new().part("file", part);
 
+        let fastapi_upload_host =
+            std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
+        let url = format!("{}{}", fastapi_upload_host, "/upload-image");
+
         let res = client
-            .post("http://fastapi-upload:8000/upload-image")
-            // .post("http://host.docker.internal:8000/upload-image")
+            .post(url)
             .multipart(form)
             .send()
             .await
@@ -48,32 +50,13 @@ pub async fn upload(
                 AppError::ConnectFail
             })?;
 
-        // Check the FirebaseImage status and body if needed
+        // Check the response status and parse the JSON
         if res.status().is_success() {
-            let upload_response = res
-                .json::<FirebaseImage>()
-                .await
-                .map_err(|_| AppError::InvalidJson)?;
-
-            // Save image URL to the database and return the FirebaseImage
-            sqlx::query(
-                r#"
-                INSERT INTO firebase_images (image_url)
-                VALUES ($1)
-                "#,
-            )
-            .bind(&upload_response.image_url)
-            .execute(&state.get_pool())
-            .await
-            .map_err(|err| {
-                tracing::error!("Database insert failed: {:?}", err);
-                AppError::DbInsertFail
-            })?;
+            let upload_response: FirebaseImage =
+                res.json().await.map_err(|_| AppError::InvalidJson)?;
 
             // Return the inserted image data as JSON
-            return Ok(Json(FirebaseImage {
-                image_url: upload_response.image_url,
-            }));
+            return Ok(Json(upload_response));
         }
     }
 
@@ -82,11 +65,13 @@ pub async fn upload(
 
 pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>, AppError> {
     let client = state.get_http_client();
-    let api_url = "http://fastapi-upload:8000/list-images";
-    // let api_url = "http://host.docker.internal:8000/list-images";
+
+    let fastapi_upload_host =
+        std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
+    let url = format!("{}{}", fastapi_upload_host, "/list-images");
 
     let response = client
-        .get(api_url)
+        .get(url)
         .send()
         .await
         .map_err(|err| {
@@ -108,10 +93,13 @@ pub async fn delete(
     Json(delete_data): Json<DeleteImageRequest>,
 ) -> Result<Json<()>, AppError> {
     let client = state.get_http_client();
-    let api_url = "http://fastapi-upload:8000/delete-image";
-    // let api_url = "http://host.docker.internal:8000/delete-image";
+
+    let fastapi_upload_host =
+        std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
+    let url = format!("{}{}", fastapi_upload_host, "/delete-image");
+
     let response = client
-        .delete(api_url)
+        .delete(url)
         .json(&delete_data)
         .send()
         .await
