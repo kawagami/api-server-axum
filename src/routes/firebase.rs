@@ -36,9 +36,7 @@ pub async fn upload(
         // Create a multipart form
         let form = multipart::Form::new().part("file", part);
 
-        let fastapi_upload_host =
-            std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
-        let url = format!("{}{}", fastapi_upload_host, "/upload-image");
+        let url = format!("{}{}", state.get_fastapi_upload_host(), "/upload-image");
 
         let res = client
             .post(url)
@@ -66,9 +64,7 @@ pub async fn upload(
 pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>, AppError> {
     let client = state.get_http_client();
 
-    let fastapi_upload_host =
-        std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
-    let url = format!("{}{}", fastapi_upload_host, "/list-images");
+    let url = format!("{}{}", state.get_fastapi_upload_host(), "/list-images");
 
     let response = client
         .get(url)
@@ -94,9 +90,7 @@ pub async fn delete(
 ) -> Result<Json<()>, AppError> {
     let client = state.get_http_client();
 
-    let fastapi_upload_host =
-        std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
-    let url = format!("{}{}", fastapi_upload_host, "/delete-image");
+    let url = format!("{}{}", state.get_fastapi_upload_host(), "/delete-image");
 
     let response = client
         .delete(url)

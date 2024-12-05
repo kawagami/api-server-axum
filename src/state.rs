@@ -13,6 +13,7 @@ pub struct AppState {
     pub tx: broadcast::Sender<String>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
     pub http_client: Client, // 新增 reqwest::Client
+    pub fastapi_upload_host: String,
 }
 
 #[derive(serde::Serialize, sqlx::FromRow)]
@@ -55,11 +56,16 @@ impl AppState {
             .build()
             .expect("Failed to build HTTP client");
 
+        // FastAPI upload host
+        let fastapi_upload_host =
+            std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
+
         Self {
             pool,
             tx,
             redis_pool,
             http_client,
+            fastapi_upload_host,
         }
     }
 }
@@ -88,6 +94,10 @@ impl AppStateV2 {
 
     pub fn get_http_client(&self) -> Client {
         self.0.http_client.clone()
+    }
+
+    pub fn get_fastapi_upload_host(&self) -> &str {
+        &self.0.fastapi_upload_host
     }
 
     pub async fn redis_zadd(&self, key: &str, member: &str) -> Result<(), RedisError> {
