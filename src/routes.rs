@@ -39,10 +39,10 @@ pub async fn app() -> Router {
         .route("/note_lists", get(hackmd::get_all_note_lists))
         .route("/note_list_tags", get(hackmd::get_all_note_list_tags))
         .route("/jwt", post(auth::sign_in))
+        .route("/firebase", get(firebase::images))
         .route(
             "/firebase",
-            get(firebase::images)
-                .post(firebase::upload)
+            post(firebase::upload)
                 .delete(firebase::delete)
                 .layer(middleware::from_fn_with_state(
                     state.clone(),
