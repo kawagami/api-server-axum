@@ -12,10 +12,17 @@ use axum::{
     },
     http::StatusCode,
     response::IntoResponse,
-    Json,
+    routing::get,
+    Json, Router,
 };
 use chrono::FixedOffset;
 use futures::{sink::SinkExt, stream::StreamExt}; // 提供非同步流處理功能
+
+pub fn new() -> Router<AppStateV2> {
+    Router::new()
+        .route("/", get(websocket_handler))
+        .route("/messages", get(ws_message))
+}
 
 // 處理 WebSocket 升級請求的 handler
 pub async fn websocket_handler(

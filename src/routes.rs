@@ -47,8 +47,7 @@ pub async fn app() -> Router {
                     auth::authorize,
                 )),
         )
-        .route("/ws", get(ws::websocket_handler))
-        .route("/ws/messages", get(ws::ws_message))
+        .nest("/ws", ws::new())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
