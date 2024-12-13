@@ -18,7 +18,6 @@ use tower_http::limit::RequestBodyLimitLayer;
 
 pub async fn app() -> Router {
     let origins = [
-        "https://sg-vite.kawa.homes".parse().unwrap(),
         "https://kawa.homes".parse().unwrap(),
         "http://localhost:3000".parse().unwrap(),
     ];
