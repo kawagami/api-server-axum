@@ -1,13 +1,24 @@
 use crate::{
+    auth,
     errors::AppError,
     state::AppStateV2,
     structs::firebase::{ApiResponse, DeleteImageRequest, FirebaseImage, Image},
 };
 use axum::{
     extract::{Multipart, State},
-    Json,
+    middleware,
+    routing::{get, post},
+    Json, Router,
 };
 use reqwest::multipart;
+
+pub fn new(state: AppStateV2) -> Router<AppStateV2> {
+    let router = Router::new().route("/", get(images));
+    let middleware_router = Router::new()
+        .route("/", post(upload).delete(delete))
+        .layer(middleware::from_fn_with_state(state, auth::authorize));
+    router.merge(middleware_router)
+}
 
 pub async fn upload(
     State(state): State<AppStateV2>,

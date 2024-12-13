@@ -8,7 +8,6 @@ use crate::{auth, scheduler::initialize_scheduler, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header::CONTENT_TYPE, Method, StatusCode},
-    middleware,
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -37,16 +36,7 @@ pub async fn app() -> Router {
         .route("/note_lists", get(hackmd::get_all_note_lists))
         .route("/note_list_tags", get(hackmd::get_all_note_list_tags))
         .route("/jwt", post(auth::sign_in))
-        .route("/firebase", get(firebase::images))
-        .route(
-            "/firebase",
-            post(firebase::upload)
-                .delete(firebase::delete)
-                .layer(middleware::from_fn_with_state(
-                    state.clone(),
-                    auth::authorize,
-                )),
-        )
+        .nest("/firebase", firebase::new(state.clone()))
         .nest("/ws", ws::new())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
