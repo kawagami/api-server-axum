@@ -1,3 +1,4 @@
+mod blogs;
 mod firebase;
 mod hackmd;
 mod image_process;
@@ -38,6 +39,7 @@ pub async fn app() -> Router {
         .route("/jwt", post(auth::sign_in))
         .nest("/firebase", firebase::new(state.clone()))
         .nest("/ws", ws::new())
+        .nest("/blogs", blogs::new())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
