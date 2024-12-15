@@ -8,7 +8,10 @@ mod ws;
 use crate::{auth, scheduler::initialize_scheduler, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
-    http::{header::CONTENT_TYPE, Method, StatusCode},
+    http::{
+        header::{AUTHORIZATION, CONTENT_TYPE},
+        Method, StatusCode,
+    },
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -50,9 +53,9 @@ pub async fn app() -> Router {
             // it is required to add ".allow_headers([http::header::CONTENT_TYPE])"
             // or see this issue https://github.com/tokio-rs/axum/issues/849
             CorsLayer::new()
-                .allow_methods([Method::GET])
+                .allow_methods([Method::GET, Method::POST])
                 .allow_origin(origins)
-                .allow_headers([CONTENT_TYPE]),
+                .allow_headers([AUTHORIZATION, CONTENT_TYPE]),
         )
         .with_state(state)
         .fallback(handler_404)
