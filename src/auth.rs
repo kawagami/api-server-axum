@@ -38,7 +38,7 @@ pub fn encode_jwt(email: String) -> Result<String, StatusCode> {
     let jwt_secret = std::env::var("JWT_SECRET").expect("找不到 JWT_SECRET");
 
     let now = Utc::now();
-    let expire: chrono::TimeDelta = Duration::seconds(10);
+    let expire: chrono::TimeDelta = Duration::hours(1);
     let exp: usize = (now + expire).timestamp() as usize;
     let iat: usize = now.timestamp() as usize;
 
