@@ -1,9 +1,11 @@
 use axum::{
     extract::{Path, State},
+    http::StatusCode,
     response::IntoResponse,
     routing::get,
     Json, Router,
 };
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
@@ -25,8 +27,14 @@ async fn get_blogs(State(state): State<AppStateV2>) -> impl IntoResponse {
 
 /// 取 blog 詳細內容
 async fn get_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> impl IntoResponse {
-    let result = state.get_blog_by_id(id).await.expect("get_blog fail");
-    Json(result)
+    match state.get_blog_by_id(id).await {
+        Ok(blog) => (StatusCode::OK, Json(blog)).into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            Json(json!([])), // 使用空陣列作為錯誤返回
+        )
+            .into_response(),
+    }
 }
 
 async fn create_blog(
