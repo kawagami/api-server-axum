@@ -8,14 +8,7 @@ pub struct CreateBlog {
     pub id: Uuid,
     pub markdown: String,
     pub html: String,
-    pub tags: Vec<Option<String>>,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct UpdateBlog {
-    pub markdown: Option<String>,
-    pub html: Option<String>,
-    pub tags: Option<Vec<Option<String>>>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, FromRow)]

@@ -8,10 +8,7 @@ use axum::{
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::{
-    state::AppStateV2,
-    structs::blogs::{CreateBlog, UpdateBlog},
-};
+use crate::{state::AppStateV2, structs::blogs::CreateBlog};
 
 pub fn new() -> Router<AppStateV2> {
     Router::new()
@@ -42,11 +39,11 @@ async fn create_blog(
     Json(blog): Json<CreateBlog>,
 ) -> impl IntoResponse {
     let result = state
-        .insert_blog(&blog.id, &blog.markdown, &blog.html, &blog.tags)
+        .upsert_blog(blog.id, blog.markdown, blog.html, blog.tags)
         .await;
 
     tracing::debug!("create_blog result => {:?}", result);
-    Json(blog)
+    Json("create_blog")
 }
 
 async fn delete_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> impl IntoResponse {
@@ -59,13 +56,13 @@ async fn delete_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> i
 async fn put_blog(
     State(state): State<AppStateV2>,
     Path(id): Path<Uuid>,
-    Json(blog): Json<UpdateBlog>,
+    Json(blog): Json<CreateBlog>,
 ) -> impl IntoResponse {
     let markdown = blog.markdown;
     let html = blog.html;
     let tags = blog.tags;
 
-    let result = state.update_blog(id, markdown, html, tags).await;
+    let result = state.upsert_blog(id, markdown, html, tags).await;
 
     tracing::debug!("put_blog result => {:?}", result);
     Json(format!("put_blog 收到\nid => {}\n", id))
