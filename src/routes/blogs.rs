@@ -1,7 +1,15 @@
-use axum::{extract::Path, response::IntoResponse, routing::get, Json, Router};
-use serde_json::Value;
+use axum::{
+    extract::{Path, State},
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
+use uuid::Uuid;
 
-use crate::state::AppStateV2;
+use crate::{
+    state::AppStateV2,
+    structs::blogs::{CreateBlog, UpdateBlog},
+};
 
 pub fn new() -> Router<AppStateV2> {
     Router::new()
@@ -10,24 +18,47 @@ pub fn new() -> Router<AppStateV2> {
 }
 
 /// 取 blogs 清單
-async fn get_blogs() -> impl IntoResponse {
-    Json("這是 fn get_blogs")
+async fn get_blogs(State(state): State<AppStateV2>) -> impl IntoResponse {
+    let result = state.get_all_blogs().await.expect("get_blogs fail");
+    Json(result)
 }
 
 /// 取 blog 詳細內容
-async fn get_blog(Path(id): Path<String>) -> impl IntoResponse {
-    // Json(format!("收到 id => {}", id))
-    format!("get_blog 收到 id => {}", id)
+async fn get_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> impl IntoResponse {
+    let result = state.get_blog_by_id(id).await.expect("get_blog fail");
+    Json(result)
 }
 
-async fn create_blog(Json(value): Json<Value>) -> impl IntoResponse {
-    Json(value)
+async fn create_blog(
+    State(state): State<AppStateV2>,
+    Json(blog): Json<CreateBlog>,
+) -> impl IntoResponse {
+    let result = state
+        .insert_blog(&blog.id, &blog.markdown, &blog.html, &blog.tags)
+        .await;
+
+    tracing::debug!("create_blog result => {:?}", result);
+    Json(blog)
 }
 
-async fn delete_blog(Path(id): Path<String>) -> impl IntoResponse {
-    format!("delete_blog 收到 id => {}", id)
+async fn delete_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> impl IntoResponse {
+    let result = state.delete_blog(id).await;
+
+    tracing::debug!("delete_blog result => {:?}", result);
+    Json(format!("delete_blog 收到 id => {}", id))
 }
 
-async fn put_blog(Path(id): Path<String>, Json(value): Json<Value>) -> impl IntoResponse {
-    format!("put_blog 收到\nid => {}\nvalue => {}\n", id, value)
+async fn put_blog(
+    State(state): State<AppStateV2>,
+    Path(id): Path<Uuid>,
+    Json(blog): Json<UpdateBlog>,
+) -> impl IntoResponse {
+    let markdown = blog.markdown;
+    let html = blog.html;
+    let tags = blog.tags;
+
+    let result = state.update_blog(id, markdown, html, tags).await;
+
+    tracing::debug!("put_blog result => {:?}", result);
+    Json(format!("put_blog 收到\nid => {}\n", id))
 }

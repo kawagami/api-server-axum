@@ -1,4 +1,4 @@
-use crate::structs::hackmd::Post;
+use crate::structs::{blogs::DbBlog, hackmd::Post};
 use axum::response::Json;
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
@@ -247,6 +247,122 @@ impl AppStateV2 {
 
         query.execute(&self.get_pool()).await?;
 
+        Ok(())
+    }
+
+    /// 取得所有 blogs
+    pub async fn get_all_blogs(&self) -> Result<Vec<DbBlog>, sqlx::Error> {
+        let blogs = sqlx::query_as::<_, DbBlog>(
+            r#"
+            SELECT id, markdown, html, tags, created_at, updated_at
+            FROM blogs
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(&self.get_pool())
+        .await?;
+
+        Ok(blogs)
+    }
+
+    /// 取得特定 blog
+    pub async fn get_blog_by_id(&self, id: uuid::Uuid) -> Result<DbBlog, sqlx::Error> {
+        let blog = sqlx::query_as::<_, DbBlog>(
+            r#"
+            SELECT id, markdown, html, tags, created_at, updated_at
+            FROM blogs
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_one(&self.get_pool())
+        .await?;
+
+        Ok(blog)
+    }
+
+    pub async fn insert_blog(
+        &self,
+        id: &uuid::Uuid,
+        markdown: &str,
+        html: &str,
+        tags: &Vec<Option<String>>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO blogs (id, markdown, html, tags, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, NOW(), NOW())
+            "#,
+        )
+        .bind(id)
+        .bind(markdown)
+        .bind(html)
+        .bind(tags)
+        .execute(&self.get_pool())
+        .await?;
+
+        Ok(())
+    }
+    /// 刪除特定 blog
+    pub async fn delete_blog(&self, id: uuid::Uuid) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            DELETE FROM blogs
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .execute(&self.get_pool())
+        .await?;
+
+        Ok(())
+    }
+
+    /// 更新特定 blog
+    pub async fn update_blog(
+        &self,
+        id: uuid::Uuid,
+        markdown: Option<String>,
+        html: Option<String>,
+        tags: Option<Vec<Option<String>>>,
+    ) -> Result<(), sqlx::Error> {
+        let mut query_builder = QueryBuilder::new(
+            r#"
+            UPDATE blogs
+            SET
+            "#,
+        );
+
+        // 動態構建更新語句
+        let mut has_updates = false;
+
+        if let Some(markdown) = markdown {
+            query_builder
+                .push("markdown = ")
+                .push_bind(markdown)
+                .push(", ");
+            has_updates = true;
+        }
+
+        if let Some(html) = html {
+            query_builder.push("html = ").push_bind(html).push(", ");
+            has_updates = true;
+        }
+
+        if let Some(tags) = tags {
+            query_builder.push("tags = ").push_bind(tags).push(", ");
+            has_updates = true;
+        }
+
+        if has_updates {
+            query_builder.push("updated_at = NOW() ");
+            query_builder.push("WHERE id = ").push_bind(id);
+        } else {
+            // 如果沒有更新內容，直接返回錯誤
+            return Err(sqlx::Error::RowNotFound);
+        }
+
+        query_builder.build().execute(&self.get_pool()).await?;
         Ok(())
     }
 }
