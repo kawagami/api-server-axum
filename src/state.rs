@@ -254,7 +254,7 @@ impl AppStateV2 {
     pub async fn get_all_blogs(&self) -> Result<Vec<DbBlog>, sqlx::Error> {
         let blogs = sqlx::query_as::<_, DbBlog>(
             r#"
-            SELECT id, markdown, html, tags, created_at, updated_at
+            SELECT id, markdown, html, tocs, tags, created_at, updated_at
             FROM blogs
             ORDER BY created_at DESC
             "#,
@@ -269,7 +269,7 @@ impl AppStateV2 {
     pub async fn get_blog_by_id(&self, id: uuid::Uuid) -> Result<DbBlog, sqlx::Error> {
         let blog = sqlx::query_as::<_, DbBlog>(
             r#"
-            SELECT id, markdown, html, tags, created_at, updated_at
+            SELECT id, markdown, html, tocs, tags, created_at, updated_at
             FROM blogs
             WHERE id = $1
             "#,
@@ -302,11 +302,12 @@ impl AppStateV2 {
         id: uuid::Uuid,
         markdown: String,
         html: String,
+        tocs: Vec<String>,
         tags: Vec<String>,
     ) -> Result<(), sqlx::Error> {
         let query = r#"
-            INSERT INTO blogs (id, markdown, html, tags, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, NOW(), NOW())
+            INSERT INTO blogs (id, markdown, html, tocs, tags, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
             ON CONFLICT (id)
             DO UPDATE SET
                 markdown = EXCLUDED.markdown,
@@ -319,7 +320,8 @@ impl AppStateV2 {
             .bind(id) // $1
             .bind(markdown) // $2
             .bind(html) // $3
-            .bind(tags) // $4
+            .bind(tocs) // $4
+            .bind(tags) // $5
             .execute(&self.get_pool())
             .await?;
 
