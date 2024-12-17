@@ -46,7 +46,7 @@ async fn put_blog(
     Path(id): Path<Uuid>,
     Json(blog): Json<PutBlog>,
 ) -> impl IntoResponse {
-    let tocs = blog.clone().extract_toc_texts();
+    let tocs = blog.extract_toc_texts();
     let result = state
         .upsert_blog(id, blog.markdown, blog.html, tocs, blog.tags)
         .await;
