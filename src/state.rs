@@ -312,6 +312,7 @@ impl AppStateV2 {
             DO UPDATE SET
                 markdown = EXCLUDED.markdown,
                 html = EXCLUDED.html,
+                tocs = EXCLUDED.tocs,
                 tags = EXCLUDED.tags,
                 updated_at = NOW();
         "#;
