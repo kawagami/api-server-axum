@@ -5,7 +5,6 @@ use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
 pub struct PutBlog {
-    pub id: Uuid,
     pub markdown: String,
     pub html: String,
     pub tocs: Vec<Toc>,
