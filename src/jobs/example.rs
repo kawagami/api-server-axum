@@ -21,8 +21,6 @@ impl AppJob for ExampleJob {
         // 獲取當前 UTC+8 時間並格式化
         let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
-        let message = format!("{}", current_time);
-
         let chat_message = ChatMessage::new_jsonstring(
             ChatMessageType::Message,
             current_time.clone(),
@@ -31,8 +29,10 @@ impl AppJob for ExampleJob {
         );
         let _ = state.get_tx().send(chat_message);
 
-        let _ = state
-            .insert_chat_message("Message", "All", "KawaBot", &message)
-            .await;
+        // 寫進資料庫 在歷史訊息中會取得
+        // let message = format!("{}", current_time);
+        // let _ = state
+        //     .insert_chat_message("Message", "All", "KawaBot", &message)
+        //     .await;
     }
 }
