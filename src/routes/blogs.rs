@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
@@ -8,7 +8,10 @@ use axum::{
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::{state::AppStateV2, structs::blogs::PutBlog};
+use crate::{
+    state::AppStateV2,
+    structs::blogs::{Pagination, PutBlog},
+};
 
 pub fn new() -> Router<AppStateV2> {
     Router::new()
@@ -17,9 +20,22 @@ pub fn new() -> Router<AppStateV2> {
 }
 
 /// 取 blogs 清單
-async fn get_blogs(State(state): State<AppStateV2>) -> impl IntoResponse {
-    let result = state.get_all_blogs().await.expect("get_blogs fail");
-    Json(result)
+async fn get_blogs(
+    Query(query): Query<Pagination>,
+    State(state): State<AppStateV2>,
+) -> impl IntoResponse {
+    let offset = (query.page.saturating_sub(1)) * query.per_page;
+
+    match state
+        .get_blogs_with_pagination(query.per_page, offset)
+        .await
+    {
+        Ok(result) => Json(result).into_response(), // 使用 `.into_response()` 統一類型
+        Err(err) => {
+            // 將錯誤回應轉換為 Response 類型
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)).into_response()
+        }
+    }
 }
 
 /// 取 blog 詳細內容

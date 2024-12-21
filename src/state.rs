@@ -241,15 +241,22 @@ impl AppStateV2 {
         Ok(())
     }
 
-    /// 取得所有 blogs
-    pub async fn get_all_blogs(&self) -> Result<Vec<DbBlog>, sqlx::Error> {
+    /// 取得帶分頁的 blogs
+    pub async fn get_blogs_with_pagination(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<DbBlog>, sqlx::Error> {
         let blogs = sqlx::query_as::<_, DbBlog>(
             r#"
             SELECT id, markdown, html, tocs, tags, created_at, updated_at
             FROM blogs
             ORDER BY created_at DESC
+            LIMIT $1 OFFSET $2
             "#,
         )
+        .bind(limit as i64) // 將限制數量綁定到查詢
+        .bind(offset as i64) // 將偏移量綁定到查詢
         .fetch_all(&self.get_pool())
         .await?;
 

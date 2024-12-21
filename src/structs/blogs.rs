@@ -11,6 +11,23 @@ pub struct PutBlog {
     pub tags: Vec<String>,
 }
 
+#[derive(Deserialize)]
+pub struct Pagination {
+    #[serde(default = "default_page")]
+    pub page: usize, // 第幾頁
+    #[serde(default = "default_per_page")]
+    pub per_page: usize, // 每頁的數量
+}
+
+// 預設值函式
+fn default_page() -> usize {
+    1
+}
+
+fn default_per_page() -> usize {
+    10
+}
+
 impl PutBlog {
     /// 提取 tocs 中的 text 字段，返回 Vec<String>
     pub fn extract_toc_texts(&self) -> Vec<String> {
