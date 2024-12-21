@@ -40,15 +40,6 @@ impl AppState {
         let redis_host = std::env::var("REDIS_HOST").expect("找不到 REDIS_HOST");
         let manager = RedisConnectionManager::new(format!("redis://{}:6379", redis_host)).unwrap();
         let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
-        {
-            // ping the database before starting
-            let mut conn = redis_pool.get().await.unwrap();
-            conn.set::<&str, &str, ()>("foo", "bar").await.unwrap();
-            let result: String = conn.get("foo").await.unwrap();
-            assert_eq!(result, "bar");
-            conn.expire::<&str, ()>("foo", 10).await.unwrap();
-        }
-        tracing::debug!("successfully connected to redis and pinged it");
 
         // 初始化 HTTP 客戶端
         let http_client = Client::builder()
