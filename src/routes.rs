@@ -3,6 +3,7 @@ mod firebase;
 mod hackmd;
 mod image_process;
 mod root;
+mod users;
 mod ws;
 
 use crate::{auth, scheduler::initialize_scheduler, state::AppStateV2};
@@ -43,6 +44,7 @@ pub async fn app() -> Router {
         .nest("/firebase", firebase::new(state.clone()))
         .nest("/ws", ws::new())
         .nest("/blogs", blogs::new())
+        .nest("/users", users::new())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(

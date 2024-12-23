@@ -1,6 +1,7 @@
 mod auth;
 mod errors;
 mod image_processor;
+mod repositories;
 mod jobs;
 mod routes;
 mod scheduler;
