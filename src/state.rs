@@ -16,13 +16,6 @@ pub struct AppState {
     pub fastapi_upload_host: String,
 }
 
-#[derive(serde::Serialize, sqlx::FromRow)]
-pub struct DbUser {
-    pub id: i64,
-    pub email: String,
-    pub password: String,
-}
-
 impl AppState {
     pub async fn new() -> Self {
         let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
@@ -129,31 +122,6 @@ impl AppStateV2 {
         // 使用 zscore 檢查 member 是否存在
         let score: Option<i64> = conn.zscore(key, member).await?;
         Ok(score.is_some()) // 如果 score 為 Some，表示 member 存在；否則為 None，表示不存在
-    }
-
-    pub async fn check_email_exists(&self, email: &str) -> Result<DbUser, sqlx::Error> {
-        let pool = self.get_pool();
-
-        // 使用 EXISTS 查詢是否有特定 email
-        let result: DbUser = sqlx::query_as(
-            r#"
-                SELECT
-                    id,
-                    email,
-                    password
-                FROM
-                    users
-                WHERE
-                    email = $1
-                LIMIT
-                    1;
-            "#,
-        )
-        .bind(email)
-        .fetch_one(&pool)
-        .await?;
-
-        Ok(result)
     }
 
     pub async fn insert_chat_message(

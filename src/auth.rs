@@ -1,4 +1,5 @@
 use crate::{
+    repositories::users,
     state::AppStateV2,
     structs::auth::{AuthError, Claims, CurrentUser, SignInData},
 };
@@ -142,7 +143,7 @@ pub async fn sign_in(
 
 async fn retrieve_user_by_email(state: AppStateV2, email: &str) -> Option<CurrentUser> {
     // 呼叫 check_email_exists 以查詢資料庫中是否存在指定的 email
-    match state.check_email_exists(email).await {
+    match users::check_email_exists(&state, email).await {
         Ok(db_user) => {
             // 將查詢結果對應為 CurrentUser 類型
             Some(CurrentUser {
