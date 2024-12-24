@@ -123,29 +123,6 @@ impl AppStateV2 {
         Ok(score.is_some()) // 如果 score 為 Some，表示 member 存在；否則為 None，表示不存在
     }
 
-    pub async fn insert_chat_message(
-        &self,
-        message_type: &str,
-        to_type: &str,
-        user_name: &str,
-        message: &str,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"
-            INSERT INTO chat_messages (message_type, to_type, user_name, message)
-            VALUES ($1, $2, $3, $4)
-            "#,
-        )
-        .bind(message_type)
-        .bind(to_type)
-        .bind(user_name)
-        .bind(message)
-        .execute(&self.get_pool())
-        .await?;
-
-        Ok(())
-    }
-
     // 設定 Redis 資料的過期時間（以秒為單位）
     // pub async fn expire_redis_key(&self, key: &str, seconds: usize) -> Result<(), RedisError> {
     //     let app_state = self.0.lock().await;

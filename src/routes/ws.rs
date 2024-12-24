@@ -1,4 +1,5 @@
 use crate::{
+    repositories::ws,
     state::AppStateV2,
     structs::{
         chat::{GetParams, QueryParams},
@@ -131,9 +132,14 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
 
             // 將全體訊息存入資料庫
             if data_msg.to == To::All {
-                let _ = &cp_state
-                    .insert_chat_message("Message", "All", &data_msg.from, &data_msg.content)
-                    .await;
+                let _ = ws::insert_chat_message(
+                    &cp_state,
+                    "Message",
+                    "All",
+                    &data_msg.from,
+                    &data_msg.content,
+                )
+                .await;
             }
 
             // 廣播接收到的訊息
