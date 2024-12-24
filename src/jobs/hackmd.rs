@@ -1,4 +1,5 @@
 use crate::{
+    repositories::hackmd,
     state::AppStateV2,
     structs::{hackmd::Post, jobs::AppJob},
 };
@@ -37,7 +38,7 @@ impl AppJob for FetchNotesJob {
                 if resp.status() == StatusCode::OK {
                     match resp.json::<Vec<Post>>().await {
                         Ok(posts) => {
-                            if let Err(err) = state.insert_posts_handler(posts).await {
+                            if let Err(err) = hackmd::insert_posts_handler(&state, posts).await {
                                 tracing::error!("insert_posts_handler failed: {}", err);
                             } else {
                                 tracing::info!("insert_posts_handler success");
