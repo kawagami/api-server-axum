@@ -1,5 +1,5 @@
 use crate::{
-    repositories::ws,
+    repositories::{redis, ws},
     state::AppStateV2,
     structs::{
         chat::{GetParams, QueryParams},
@@ -42,15 +42,14 @@ pub async fn websocket_handler(
 
 // 驗證 token 是否有效
 async fn is_valid_token(token: &str, state: &AppStateV2) -> bool {
-    if state
-        .check_member_exists("online_members", token) // 檢查 token 是否已存在於線上成員
+    if redis::check_member_exists(state, "online_members", token) // 檢查 token 是否已存在於線上成員
         .await
         .unwrap()
     {
         tracing::debug!("{}", "token 已經存在");
         return false; // 如果已存在，返回 false
     }
-    let _ = state.redis_zadd("online_members", token).await; // 將 token 加入線上成員集合
+    let _ = redis::redis_zadd(state, "online_members", token).await; // 將 token 加入線上成員集合
     true // 返回 true 表示 token 有效
 }
 
@@ -64,8 +63,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
     let mut rx = state.get_tx().subscribe();
 
     // 當用戶加入時，通知所有在線成員
-    let join_users_set = state
-        .redis_zrange("online_members") // 獲取所有線上成員
+    let join_users_set = redis::redis_zrange(&state, "online_members") // 獲取所有線上成員
         .await
         .unwrap()
         .0
@@ -166,8 +164,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
     };
 
     // 用戶離開時廣播訊息
-    let leave_users_set = state
-        .redis_zrange("online_members")
+    let leave_users_set = redis::redis_zrange(&state, "online_members")
         .await
         .unwrap()
         .0
@@ -179,7 +176,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
 
 // 移除用戶資料
 async fn remove_user_set(state: &AppStateV2, token: &str) {
-    let _ = state.redis_zrem("online_members", token).await; // 從 Redis 刪除用戶 token
+    let _ = redis::redis_zrem(state, "online_members", token).await; // 從 Redis 刪除用戶 token
 }
 
 // 處理查詢聊天訊息的 handler

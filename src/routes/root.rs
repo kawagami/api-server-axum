@@ -1,4 +1,4 @@
-use crate::{errors::internal_error, state::AppStateV2};
+use crate::{errors::internal_error, repositories::redis, state::AppStateV2};
 use axum::{
     extract::{Query, State},
     response::{IntoResponse, Json, Response},
@@ -24,7 +24,9 @@ pub async fn using_connection_pool_extractor(
 }
 
 pub async fn for_test(State(state): State<AppStateV2>) -> Result<Json<Vec<String>>, Response> {
-    let result = state.redis_zrevrange("online_members").await.unwrap();
+    let result = redis::redis_zrevrange(&state, "online_members")
+        .await
+        .unwrap();
 
     Ok(result)
 }

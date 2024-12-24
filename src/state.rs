@@ -1,7 +1,5 @@
-use axum::response::Json;
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
-use redis::{AsyncCommands, RedisError};
 use reqwest::Client;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::{sync::Arc, time::Duration};
@@ -82,55 +80,4 @@ impl AppStateV2 {
     pub fn get_fastapi_upload_host(&self) -> &str {
         &self.0.fastapi_upload_host
     }
-
-    pub async fn redis_zadd(&self, key: &str, member: &str) -> Result<(), RedisError> {
-        let redis_pool = self.get_redis_pool();
-        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
-        let score = chrono::Utc::now().timestamp_millis();
-
-        conn.zadd(key, member, score).await
-    }
-
-    pub async fn redis_zrem(&self, key: &str, members: &str) -> Result<(), RedisError> {
-        let redis_pool = self.get_redis_pool();
-        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
-
-        conn.zrem(key, members).await
-    }
-
-    pub async fn redis_zrange(&self, key: &str) -> Result<Json<Vec<String>>, RedisError> {
-        let redis_pool = self.get_redis_pool();
-        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
-
-        let result: Vec<String> = conn.zrange(key, 0, -1).await.expect("zrange fail");
-        Ok(Json(result))
-    }
-
-    pub async fn redis_zrevrange(&self, key: &str) -> Result<Json<Vec<String>>, RedisError> {
-        let redis_pool = self.get_redis_pool();
-        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
-
-        let result: Vec<String> = conn.zrevrange(key, 0, -1).await.expect("zrevrange fail");
-        Ok(Json(result))
-    }
-
-    pub async fn check_member_exists(&self, key: &str, member: &str) -> Result<bool, RedisError> {
-        let redis_pool = self.get_redis_pool();
-        let mut conn = redis_pool.get().await.expect("redis_pool get fail");
-
-        // 使用 zscore 檢查 member 是否存在
-        let score: Option<i64> = conn.zscore(key, member).await?;
-        Ok(score.is_some()) // 如果 score 為 Some，表示 member 存在；否則為 None，表示不存在
-    }
-
-    // 設定 Redis 資料的過期時間（以秒為單位）
-    // pub async fn expire_redis_key(&self, key: &str, seconds: usize) -> Result<(), RedisError> {
-    //     let app_state = self.0.lock().await;
-    //     let mut conn = app_state
-    //         .redis_pool
-    //         .get()
-    //         .await
-    //         .expect("get redis_pool fail");
-    //     conn.expire(key, seconds as i64).await
-    // }
 }
