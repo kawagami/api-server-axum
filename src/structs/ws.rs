@@ -82,3 +82,18 @@ pub enum To {
     Private(String), // 這裡的 String 表示特定使用者的 token 或 username
     Myself,
 }
+
+#[derive(Deserialize)]
+pub struct QueryParams {
+    pub token: String,
+}
+
+#[derive(Deserialize)]
+pub struct GetParams {
+    #[serde(default = "default_limit")]
+    pub limit: i32,
+}
+
+fn default_limit() -> i32 {
+    10
+}

@@ -1,10 +1,7 @@
 use crate::{
     repositories::{redis, ws},
     state::AppStateV2,
-    structs::{
-        chat::{GetParams, QueryParams},
-        ws::{ChatMessage, ChatMessageType, DbChatMessage, To},
-    },
+    structs::ws::{ChatMessage, ChatMessageType, GetParams, QueryParams, To},
 };
 use axum::{
     extract::{
@@ -184,30 +181,14 @@ pub async fn ws_message(
     State(state): State<AppStateV2>,
     Query(params): Query<GetParams>,
 ) -> Json<Vec<ChatMessage>> {
-    // 設定查詢訊息的上限，預設為 10
-    let limit = params.limit.unwrap_or(10);
-
-    let messages: Vec<DbChatMessage> = sqlx::query_as(
-        r#"
-            SELECT
-                id,
-                message_type,
-                to_type,
-                user_name,
-                message,
-                created_at
-            FROM
-                chat_messages
-            ORDER BY
-                id DESC
-            LIMIT
-                $1
-        "#,
-    )
-    .bind(limit)
-    .fetch_all(&state.get_pool())
-    .await
-    .unwrap();
+    let response = ws::ws_message(&state, params.limit).await;
+    let messages = match response {
+        Ok(result) => result,
+        Err(err) => {
+            tracing::error!("{}", err);
+            vec![]
+        }
+    };
 
     // 將資料庫訊息轉換為客戶端格式的訊息
     let chat_messages: Vec<ChatMessage> = messages
