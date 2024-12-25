@@ -1,4 +1,7 @@
-use crate::{state::AppStateV2, structs::hackmd::Post};
+use crate::{
+    state::AppStateV2,
+    structs::hackmd::{HackmdNoteListAndTag, Post, Tag},
+};
 use sqlx::QueryBuilder;
 
 pub async fn delete_posts(state: &AppStateV2) -> Result<(), sqlx::Error> {
@@ -50,4 +53,47 @@ pub async fn insert_posts_handler(state: &AppStateV2, posts: Vec<Post>) -> Resul
     query.execute(&state.get_pool()).await?;
 
     Ok(())
+}
+
+pub async fn get_all_note_list_tags(state: &AppStateV2) -> Result<Vec<Tag>, sqlx::Error> {
+    sqlx::query_as(
+        r#"
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY MAX(last_changed_at) DESC) AS id,
+                name
+            FROM (
+                SELECT 
+                    unnest(tags) AS name,
+                    last_changed_at
+                FROM hackmd_posts
+            ) subquery
+            GROUP BY name
+            ORDER BY MAX(last_changed_at) DESC
+        "#,
+    )
+    .fetch_all(&state.get_pool())
+    .await
+}
+
+pub async fn get_all_note_lists(
+    state: &AppStateV2,
+) -> Result<Vec<HackmdNoteListAndTag>, sqlx::Error> {
+    sqlx::query_as(
+        r#"
+            SELECT
+                id,
+                title,
+                publish_link,
+                last_changed_at,
+                read_permission,
+                tags
+            FROM
+                hackmd_posts
+         	WHERE NOT (tags @> ARRAY['工作']) AND read_permission='guest'
+            ORDER BY
+                last_changed_at DESC;
+        "#,
+    )
+    .fetch_all(&state.get_pool())
+    .await
 }
