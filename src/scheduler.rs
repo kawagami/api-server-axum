@@ -10,21 +10,10 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 pub async fn initialize_scheduler(state: AppStateV2) -> Arc<Mutex<JobScheduler>> {
     let scheduler = Arc::new(Mutex::new(JobScheduler::new().await.unwrap()));
 
-    let cloned_state = state.clone();
-    let cloned_scheduler = scheduler.clone();
+    add_job_to_scheduler(scheduler.clone(), state.clone(), FetchNotesJob).await;
+    add_job_to_scheduler(scheduler.clone(), state.clone(), ExampleJob).await;
 
-    tokio::spawn(async move {
-        add_job_to_scheduler(
-            cloned_scheduler.clone(),
-            cloned_state.clone(),
-            FetchNotesJob,
-        )
-        .await;
-        add_job_to_scheduler(cloned_scheduler.clone(), cloned_state.clone(), ExampleJob).await;
-
-        cloned_scheduler.lock().await.start().await.unwrap();
-    });
-
+    scheduler.lock().await.start().await.unwrap();
     scheduler
 }
 
