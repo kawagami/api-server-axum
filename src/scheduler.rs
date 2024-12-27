@@ -1,5 +1,5 @@
 use crate::{
-    jobs::{example::ExampleJob, hackmd::FetchNotesJob},
+    jobs::{example::ExampleJob, notes::FetchNotesJob},
     state::AppStateV2,
     structs::jobs::AppJob,
 };

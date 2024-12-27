@@ -1,7 +1,7 @@
 use crate::{
-    repositories::hackmd,
+    repositories::notes,
     state::AppStateV2,
-    structs::{hackmd::Post, jobs::AppJob},
+    structs::{notes::Post, jobs::AppJob},
 };
 use async_trait::async_trait;
 use axum::http::StatusCode;
@@ -38,7 +38,7 @@ impl AppJob for FetchNotesJob {
                 if resp.status() == StatusCode::OK {
                     match resp.json::<Vec<Post>>().await {
                         Ok(posts) => {
-                            if let Err(err) = hackmd::insert_posts_handler(&state, posts).await {
+                            if let Err(err) = notes::insert_posts_handler(&state, posts).await {
                                 tracing::error!("insert_posts_handler failed: {}", err);
                             } else {
                                 tracing::info!("insert_posts_handler success");

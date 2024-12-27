@@ -1,5 +1,5 @@
 pub mod blogs;
-pub mod hackmd;
+pub mod notes;
 pub mod redis;
 pub mod users;
 pub mod ws;

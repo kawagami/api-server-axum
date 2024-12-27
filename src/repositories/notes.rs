@@ -1,6 +1,6 @@
 use crate::{
     state::AppStateV2,
-    structs::hackmd::{HackmdNoteListAndTag, Post, Tag},
+    structs::notes::{HackmdNoteListAndTag, Post, Tag},
 };
 use sqlx::QueryBuilder;
 
