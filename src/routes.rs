@@ -3,6 +3,7 @@ mod firebase;
 mod hackmd;
 mod image_process;
 mod root;
+mod tools;
 mod users;
 mod ws;
 
@@ -32,7 +33,6 @@ pub async fn app() -> Router {
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
-        .route("/new_password", get(root::new_password))
         .route(
             "/image/:width/:height/:format/resize",
             post(image_process::resize),
@@ -44,6 +44,7 @@ pub async fn app() -> Router {
         .nest("/ws", ws::new())
         .nest("/blogs", blogs::new())
         .nest("/users", users::new())
+        .nest("/tools", tools::new())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
