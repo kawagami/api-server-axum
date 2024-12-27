@@ -1,7 +1,6 @@
 mod blogs;
 mod firebase;
 mod hackmd;
-mod image_process;
 mod root;
 mod tools;
 mod users;
@@ -33,10 +32,6 @@ pub async fn app() -> Router {
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
-        .route(
-            "/image/:width/:height/:format/resize",
-            post(image_process::resize),
-        )
         .route("/note_lists", get(hackmd::get_all_note_lists))
         .route("/note_list_tags", get(hackmd::get_all_note_list_tags))
         .route("/jwt", post(auth::sign_in))
