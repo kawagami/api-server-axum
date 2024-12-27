@@ -32,7 +32,6 @@ pub async fn app() -> Router {
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
-        .route("/test", get(root::for_test))
         .route("/new_password", get(root::new_password))
         .route(
             "/image/:width/:height/:format/resize",

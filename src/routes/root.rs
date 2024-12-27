@@ -1,7 +1,7 @@
-use crate::{errors::internal_error, repositories::redis, state::AppStateV2};
+use crate::{errors::internal_error, state::AppStateV2};
 use axum::{
     extract::{Query, State},
-    response::{IntoResponse, Json, Response},
+    response::{IntoResponse, Json},
 };
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
@@ -21,14 +21,6 @@ pub async fn using_connection_pool_extractor(
         .fetch_one(&pool)
         .await
         .map_err(internal_error)
-}
-
-pub async fn for_test(State(state): State<AppStateV2>) -> Result<Json<Vec<String>>, Response> {
-    let result = redis::redis_zrevrange(&state, "online_members")
-        .await
-        .unwrap();
-
-    Ok(result)
 }
 
 pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<String>>, ()> {

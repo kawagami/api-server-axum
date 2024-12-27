@@ -25,7 +25,7 @@ pub async fn redis_zrange(state: &AppStateV2, key: &str) -> Result<Json<Vec<Stri
     Ok(Json(result))
 }
 
-pub async fn redis_zrevrange(
+pub async fn _redis_zrevrange(
     state: &AppStateV2,
     key: &str,
 ) -> Result<Json<Vec<String>>, RedisError> {
