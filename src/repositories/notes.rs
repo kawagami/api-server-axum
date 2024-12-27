@@ -55,7 +55,7 @@ pub async fn insert_posts_handler(state: &AppStateV2, posts: Vec<Post>) -> Resul
     Ok(())
 }
 
-pub async fn get_all_note_list_tags(state: &AppStateV2) -> Result<Vec<Tag>, sqlx::Error> {
+pub async fn get_tags(state: &AppStateV2) -> Result<Vec<Tag>, sqlx::Error> {
     sqlx::query_as(
         r#"
             SELECT 
@@ -75,9 +75,7 @@ pub async fn get_all_note_list_tags(state: &AppStateV2) -> Result<Vec<Tag>, sqlx
     .await
 }
 
-pub async fn get_all_note_lists(
-    state: &AppStateV2,
-) -> Result<Vec<HackmdNoteListAndTag>, sqlx::Error> {
+pub async fn get_lists(state: &AppStateV2) -> Result<Vec<HackmdNoteListAndTag>, sqlx::Error> {
     sqlx::query_as(
         r#"
             SELECT

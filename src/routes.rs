@@ -32,14 +32,13 @@ pub async fn app() -> Router {
 
     Router::new()
         .route("/", get(root::using_connection_pool_extractor))
-        .route("/note_lists", get(notes::get_all_note_lists))
-        .route("/note_list_tags", get(notes::get_all_note_list_tags))
         .route("/jwt", post(auth::sign_in))
         .nest("/firebase", firebase::new(state.clone()))
         .nest("/ws", ws::new())
         .nest("/blogs", blogs::new())
         .nest("/users", users::new())
         .nest("/tools", tools::new())
+        .nest("/notes", notes::new())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
