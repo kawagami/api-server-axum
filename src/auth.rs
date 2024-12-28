@@ -9,29 +9,94 @@ use axum::{
     http,
     http::{Response, StatusCode},
     middleware::Next,
-    response::IntoResponse,
 };
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
-use serde_json::json;
 
-pub fn verify_password(password: &str, hash: &str) -> Result<bool, bcrypt::BcryptError> {
-    verify(password, hash)
+pub async fn authorize(
+    State(state): State<AppStateV2>,
+    mut req: Request,
+    next: Next,
+) -> Result<Response<Body>, AuthError> {
+    // 取得 header 中的 token
+    let auth_header = req.headers_mut().get(http::header::AUTHORIZATION);
+    let auth_header = match auth_header {
+        Some(header) => header.to_str().map_err(|_| AuthError {
+            message: "Empty header is not allowed".to_string(),
+            status_code: StatusCode::FORBIDDEN,
+        })?,
+        None => {
+            return Err(AuthError {
+                message: "Please add the JWT token to the header".to_string(),
+                status_code: StatusCode::FORBIDDEN,
+            })
+        }
+    };
+    let mut header = auth_header.split_whitespace();
+    let (_bearer, token) = (header.next(), header.next());
+
+    // 解密 token
+    let token_data = match decode_jwt(token.unwrap().to_string()) {
+        Ok(data) => data,
+        Err(_) => {
+            return Err(AuthError {
+                message: "Unable to decode token".to_string(),
+                status_code: StatusCode::UNAUTHORIZED,
+            })
+        }
+    };
+
+    // 檢查 token 中的 email 是否存在於資料庫
+    let current_user = match retrieve_user_by_email(&state, &token_data.claims.email).await {
+        Some(user) => user,
+        None => {
+            return Err(AuthError {
+                message: "You are not an authorized user".to_string(),
+                status_code: StatusCode::UNAUTHORIZED,
+            })
+        }
+    };
+
+    req.extensions_mut().insert(current_user);
+    Ok(next.run(req).await)
 }
 
-pub fn _hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
-    let hash = hash(password, DEFAULT_COST)?;
-    Ok(hash)
+pub async fn sign_in(
+    State(state): State<AppStateV2>,
+    Json(user_data): Json<SignInData>,
+) -> Result<Json<String>, StatusCode> {
+    // 檢查資料庫是否存在該 email
+    let user = match retrieve_user_by_email(&state, &user_data.email).await {
+        Some(user) => user,
+        None => return Err(StatusCode::UNAUTHORIZED),
+    };
+
+    // 比對密碼是否吻合
+    if !verify_password(&user_data.password, &user.password_hash)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // 生成合規 token
+    let token = encode_jwt(user.email).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // 返回 json 格式包裹的 token
+    Ok(Json(token))
 }
 
-impl IntoResponse for AuthError {
-    fn into_response(self) -> Response<Body> {
-        let body = Json(json!({
-            "error": self.message,
-        }));
-
-        (self.status_code, body).into_response()
+async fn retrieve_user_by_email(state: &AppStateV2, email: &str) -> Option<CurrentUser> {
+    // 呼叫 check_email_exists 以查詢資料庫中是否存在指定的 email
+    match users::check_email_exists(state, email).await {
+        Ok(db_user) => {
+            // 將查詢結果對應為 CurrentUser 類型
+            Some(CurrentUser {
+                email: db_user.email,
+                password_hash: db_user.password,
+            })
+        }
+        Err(_) => None, // 如果查詢失敗或使用者不存在，則傳回 None
     }
 }
 
@@ -67,93 +132,11 @@ pub fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, StatusCode> {
     })
 }
 
-pub async fn authorize(
-    State(state): State<AppStateV2>,
-    mut req: Request,
-    next: Next,
-) -> Result<Response<Body>, AuthError> {
-    let auth_header = req.headers_mut().get(http::header::AUTHORIZATION);
-
-    let auth_header = match auth_header {
-        Some(header) => header.to_str().map_err(|_| AuthError {
-            message: "Empty header is not allowed".to_string(),
-            status_code: StatusCode::FORBIDDEN,
-        })?,
-        None => {
-            return Err(AuthError {
-                message: "Please add the JWT token to the header".to_string(),
-                status_code: StatusCode::FORBIDDEN,
-            })
-        }
-    };
-
-    let mut header = auth_header.split_whitespace();
-
-    let (_bearer, token) = (header.next(), header.next());
-
-    let token_data = match decode_jwt(token.unwrap().to_string()) {
-        Ok(data) => data,
-        Err(_) => {
-            return Err(AuthError {
-                message: "Unable to decode token".to_string(),
-                status_code: StatusCode::UNAUTHORIZED,
-            })
-        }
-    };
-
-    // Fetch the user details from the database
-    let current_user = match retrieve_user_by_email(state, &token_data.claims.email).await {
-        Some(user) => user,
-        None => {
-            return Err(AuthError {
-                message: "You are not an authorized user".to_string(),
-                status_code: StatusCode::UNAUTHORIZED,
-            })
-        }
-    };
-
-    req.extensions_mut().insert(current_user);
-    Ok(next.run(req).await)
+pub fn verify_password(password: &str, hash: &str) -> Result<bool, bcrypt::BcryptError> {
+    verify(password, hash)
 }
 
-pub async fn sign_in(
-    State(state): State<AppStateV2>,
-    Json(user_data): Json<SignInData>,
-) -> Result<Json<String>, StatusCode> {
-    // 1. Retrieve user from the database
-    let user = match retrieve_user_by_email(state, &user_data.email).await {
-        Some(user) => user,
-        None => return Err(StatusCode::UNAUTHORIZED), // User not found
-    };
-
-    // 2. Compare the password
-    if !verify_password(&user_data.password, &user.password_hash)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    // Handle bcrypt errors
-    {
-        return Err(StatusCode::UNAUTHORIZED); // Wrong password
-    }
-
-    // 3. Generate JWT
-    let token = encode_jwt(user.email).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    // 4. Return the token
-    Ok(Json(token))
-}
-
-async fn retrieve_user_by_email(state: AppStateV2, email: &str) -> Option<CurrentUser> {
-    // 呼叫 check_email_exists 以查詢資料庫中是否存在指定的 email
-    match users::check_email_exists(&state, email).await {
-        Ok(db_user) => {
-            // 將查詢結果對應為 CurrentUser 類型
-            Some(CurrentUser {
-                email: db_user.email,
-                password_hash: db_user.password,
-            })
-        }
-        Err(_) => {
-            // 如果查詢失敗或使用者不存在，則傳回 None
-            None
-        }
-    }
+pub fn _hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
+    let hash = hash(password, DEFAULT_COST)?;
+    Ok(hash)
 }
