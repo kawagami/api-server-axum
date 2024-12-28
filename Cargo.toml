@@ -46,3 +46,4 @@ image = "0.25.5"
 tokio-cron-scheduler = "*"
 async-trait = "0.1"
 uuid = { version = "1.11.0", features = ["v4", "serde"] }
+thiserror = "2"
