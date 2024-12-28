@@ -1,5 +1,5 @@
 use crate::{
-    repositories::users,
+    repositories::{redis, users},
     state::AppStateV2,
     structs::auth::{AuthError, Claims, CurrentUser, SignInData},
 };
@@ -47,18 +47,15 @@ pub async fn authorize(
         }
     };
 
-    // 檢查 token 中的 email 是否存在於資料庫
-    let current_user = match retrieve_user_by_email(&state, &token_data.claims.email).await {
-        Some(user) => user,
-        None => {
-            return Err(AuthError {
-                message: "You are not an authorized user".to_string(),
-                status_code: StatusCode::UNAUTHORIZED,
-            })
-        }
-    };
+    // 檢查 token 中的 email 是否存在於 redis
+    let key = format!("user:login:{}", token_data.claims.email);
+    if !redis::redis_check_key_exists(&state, &key).await.unwrap() {
+        return Err(AuthError {
+            message: "You are not an authorized user".to_string(),
+            status_code: StatusCode::UNAUTHORIZED,
+        });
+    }
 
-    req.extensions_mut().insert(current_user);
     Ok(next.run(req).await)
 }
 
@@ -78,6 +75,10 @@ pub async fn sign_in(
     {
         return Err(StatusCode::UNAUTHORIZED);
     }
+
+    // 在 redis 紀錄登入資訊
+    let key = format!("user:login:{}", user.email);
+    let _ = redis::redis_set(&state, &key, &user.email).await;
 
     // 生成合規 token
     let token = encode_jwt(user.email).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
