@@ -1,3 +1,4 @@
+mod auth;
 mod blogs;
 mod firebase;
 mod notes;
@@ -6,7 +7,7 @@ mod tools;
 mod users;
 mod ws;
 
-use crate::{auth, scheduler::initialize_scheduler, state::AppStateV2};
+use crate::{scheduler::initialize_scheduler, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
     http::{

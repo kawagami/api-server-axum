@@ -1,6 +1,6 @@
 use crate::{
-    auth,
     errors::AppError,
+    routes::auth,
     state::AppStateV2,
     structs::firebase::{ApiResponse, DeleteImageRequest, FirebaseImage, Image},
 };

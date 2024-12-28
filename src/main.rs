@@ -1,8 +1,7 @@
-mod auth;
 mod errors;
 mod image_processor;
-mod repositories;
 mod jobs;
+mod repositories;
 mod routes;
 mod scheduler;
 mod state;
