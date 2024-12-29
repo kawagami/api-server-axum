@@ -29,14 +29,14 @@ pub async fn upload(
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|_| AppError::GetNextFieldFail)?
+        .map_err(|err| AppError::GetNextFieldFail(err.into()))?
     {
         let file_name = field.file_name().unwrap().to_string();
         let content_type = field.content_type().unwrap().to_string();
-        let data = field.bytes().await.map_err(|err| {
-            tracing::error!("Failed to read bytes: {:?}", err);
-            AppError::ReadBytesFail
-        })?;
+        let data = field
+            .bytes()
+            .await
+            .map_err(|err| AppError::ReadBytesFail(err.into()))?;
 
         // Create a form part with the received file
         let part = multipart::Part::bytes(data.to_vec())
@@ -54,17 +54,14 @@ pub async fn upload(
             .multipart(form)
             .send()
             .await
-            .map_err(|err| {
-                tracing::error!("HTTP request failed: {:?}", err);
-                AppError::ConnectFail
-            })?;
+            .map_err(|err| AppError::ConnectFail(err.into()))?;
 
-        // Check the response status and parse the JSON
         if res.status().is_success() {
-            let upload_response: FirebaseImage =
-                res.json().await.map_err(|_| AppError::InvalidJson)?;
+            let upload_response: FirebaseImage = res
+                .json()
+                .await
+                .map_err(|err| AppError::InvalidJson(err.into()))?;
 
-            // Return the inserted image data as JSON
             return Ok(Json(upload_response));
         }
     }
@@ -81,16 +78,10 @@ pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>,
         .get(url)
         .send()
         .await
-        .map_err(|err| {
-            tracing::error!("HTTP request failed: {:?}", err);
-            AppError::ConnectFail
-        })?
+        .map_err(|err| AppError::ConnectFail(err.into()))?
         .json::<ApiResponse>()
         .await
-        .map_err(|err| {
-            tracing::error!("Failed to parse response JSON: {:?}", err);
-            AppError::InvalidResponse
-        })?;
+        .map_err(|err| AppError::InvalidResponse(err.into()))?;
 
     Ok(Json(response.files))
 }
@@ -108,10 +99,7 @@ pub async fn delete(
         .json(&delete_data)
         .send()
         .await
-        .map_err(|err| {
-            tracing::error!("HTTP request failed: {:?}", err);
-            AppError::ConnectFail
-        })?;
+        .map_err(|err| AppError::ConnectFail(err.into()))?;
 
     tracing::debug!("{:?}", response);
     Ok(Json(()))
