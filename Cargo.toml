@@ -7,10 +7,7 @@ edition = "2021"
 
 [dependencies]
 axum = { version = "0.7", features = ["tracing", "multipart", "ws"] }
-hyper = { version = "1.0", features = [] }
-hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
 tokio = { version = "1", features = ["full"] }
-tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = [
     "fs",
     "timeout",
@@ -32,8 +29,6 @@ dotenvy = "0.15.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4.34", features = ["serde"] }
-axum-macros = "0.4.1"
-tokio-util = { version = "0.7.10", features = ["io"] }
 futures = "0.3.30"
 reqwest = { version = "0.12", features = ["multipart", "json"] }
 jsonwebtoken = "9.3.0"
