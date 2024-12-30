@@ -1,59 +1,45 @@
 use crate::{
+    errors::AppError,
     repositories::{redis, users},
     state::AppStateV2,
-    structs::auth::{AuthError, Claims, CurrentUser, SignInData},
+    structs::auth::{Claims, CurrentUser, SignInData},
 };
 use axum::{
     body::Body,
     extract::{Json, Request, State},
     http,
-    http::{Response, StatusCode},
+    http::Response,
     middleware::Next,
 };
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
-
 pub async fn authorize(
     State(state): State<AppStateV2>,
     mut req: Request,
     next: Next,
-) -> Result<Response<Body>, AuthError> {
+) -> Result<Response<Body>, AppError> {
     // 取得 header 中的 token
-    let auth_header = req.headers_mut().get(http::header::AUTHORIZATION);
-    let auth_header = match auth_header {
-        Some(header) => header.to_str().map_err(|_| AuthError {
-            message: "Empty header is not allowed".to_string(),
-            status_code: StatusCode::FORBIDDEN,
-        })?,
-        None => {
-            return Err(AuthError {
-                message: "Please add the JWT token to the header".to_string(),
-                status_code: StatusCode::FORBIDDEN,
-            })
-        }
-    };
+    let auth_header = req
+        .headers_mut()
+        .get(http::header::AUTHORIZATION)
+        .ok_or(AppError::MissingToken)?
+        .to_str()
+        .map_err(|_| AppError::InvalidHeaderFormat)?;
     let mut header = auth_header.split_whitespace();
     let (_bearer, token) = (header.next(), header.next());
 
-    // 解密 token
-    let token_data = match decode_jwt(token.unwrap().to_string()) {
-        Ok(data) => data,
-        Err(_) => {
-            return Err(AuthError {
-                message: "Unable to decode token".to_string(),
-                status_code: StatusCode::UNAUTHORIZED,
-            })
-        }
-    };
+    let token_data = decode_jwt(token.ok_or(AppError::MissingToken)?.to_string())
+        .map_err(|_| AppError::DecodeTokenFail)?;
 
     // 檢查 token 中的 email 是否存在於 redis
     let key = format!("user:login:{}", token_data.claims.email);
-    if !redis::redis_check_key_exists(&state, &key).await.unwrap() {
-        return Err(AuthError {
-            message: "You are not an authorized user".to_string(),
-            status_code: StatusCode::UNAUTHORIZED,
-        });
+    let exists = redis::redis_check_key_exists(&state, &key)
+        .await
+        .map_err(|err| AppError::RedisError(err.to_string()))?;
+
+    if !exists {
+        return Err(AppError::UnauthorizedUser);
     }
 
     Ok(next.run(req).await)
@@ -62,47 +48,45 @@ pub async fn authorize(
 pub async fn sign_in(
     State(state): State<AppStateV2>,
     Json(user_data): Json<SignInData>,
-) -> Result<Json<String>, StatusCode> {
+) -> Result<Json<String>, AppError> {
     // 檢查資料庫是否存在該 email
-    let user = match retrieve_user_by_email(&state, &user_data.email).await {
-        Some(user) => user,
-        None => return Err(StatusCode::UNAUTHORIZED),
-    };
+    let user = retrieve_user_by_email(&state, &user_data.email)
+        .await
+        .map_err(|_| AppError::UserNotFound)?;
 
     // 比對密碼是否吻合
     if !verify_password(&user_data.password, &user.password_hash)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|_| AppError::InternalError("密碼驗證處理失敗".into()))?
     {
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err(AppError::PasswordVerificationFailed);
     }
 
     // 在 redis 紀錄登入資訊
     let key = format!("user:login:{}", user.email);
-    let _ = redis::redis_set(&state, &key, &user.email).await;
+    redis::redis_set(&state, &key, &user.email)
+        .await
+        .map_err(|err| AppError::RedisError(err.to_string()))?;
 
     // 生成合規 token
-    let token = encode_jwt(user.email).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let token = encode_jwt(user.email)?;
 
     // 返回 json 格式包裹的 token
     Ok(Json(token))
 }
 
-async fn retrieve_user_by_email(state: &AppStateV2, email: &str) -> Option<CurrentUser> {
-    // 呼叫 check_email_exists 以查詢資料庫中是否存在指定的 email
-    match users::check_email_exists(state, email).await {
-        Ok(db_user) => {
-            // 將查詢結果對應為 CurrentUser 類型
-            Some(CurrentUser {
-                email: db_user.email,
-                password_hash: db_user.password,
-            })
-        }
-        Err(_) => None, // 如果查詢失敗或使用者不存在，則傳回 None
-    }
+async fn retrieve_user_by_email(state: &AppStateV2, email: &str) -> Result<CurrentUser, AppError> {
+    users::check_email_exists(state, email)
+        .await
+        .map(|db_user| CurrentUser {
+            email: db_user.email,
+            password_hash: db_user.password,
+        })
+        .map_err(|_| AppError::UserNotFound)
 }
 
-pub fn encode_jwt(email: String) -> Result<String, StatusCode> {
-    let jwt_secret = std::env::var("JWT_SECRET").expect("找不到 JWT_SECRET");
+pub fn encode_jwt(email: String) -> Result<String, AppError> {
+    let jwt_secret = std::env::var("JWT_SECRET")
+        .map_err(|_| AppError::MissingEnvVariable("JWT_SECRET".to_string()))?;
 
     let now = Utc::now();
     let expire: chrono::TimeDelta = Duration::hours(1);
@@ -116,11 +100,12 @@ pub fn encode_jwt(email: String) -> Result<String, StatusCode> {
         &claim,
         &EncodingKey::from_secret(jwt_secret.as_ref()),
     )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+    .map_err(|_| AppError::JwtEncodeFailed)
 }
 
-pub fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, StatusCode> {
-    let jwt_secret = std::env::var("JWT_SECRET").expect("找不到 JWT_SECRET");
+pub fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, AppError> {
+    let jwt_secret = std::env::var("JWT_SECRET")
+        .map_err(|_| AppError::MissingEnvVariable("JWT_SECRET".to_string()))?;
 
     decode(
         &jwt,
@@ -128,8 +113,8 @@ pub fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, StatusCode> {
         &Validation::default(),
     )
     .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => StatusCode::UNAUTHORIZED,
-        _ => StatusCode::INTERNAL_SERVER_ERROR,
+        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::JwtExpired,
+        _ => AppError::JwtDecodeFailed,
     })
 }
 
