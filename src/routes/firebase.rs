@@ -85,9 +85,9 @@ pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>,
 pub async fn delete(
     State(state): State<AppStateV2>,
     Json(delete_data): Json<DeleteImageRequest>,
-) -> Result<(), AppError> {
+) -> Result<Json<()>, AppError> {
     let response = repo_delete(&state, delete_data).await;
 
     tracing::debug!("{:?}", response);
-    Ok(())
+    Ok(Json(()))
 }
