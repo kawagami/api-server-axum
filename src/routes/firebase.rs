@@ -1,8 +1,9 @@
 use crate::{
     errors::AppError,
+    repositories::firebase::{delete as repo_delete, images as repo_images},
     routes::auth,
     state::AppStateV2,
-    structs::firebase::{ApiResponse, DeleteImageRequest, FirebaseImage, Image},
+    structs::firebase::{DeleteImageRequest, FirebaseImage, Image},
 };
 use axum::{
     extract::{Multipart, State},
@@ -70,37 +71,23 @@ pub async fn upload(
 }
 
 pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>, AppError> {
-    let client = state.get_http_client();
+    let images = match repo_images(&state).await {
+        Ok(images) => images,
+        Err(err) => {
+            tracing::error!("{}", err);
+            vec![]
+        }
+    };
 
-    let url = format!("{}{}", state.get_fastapi_upload_host(), "/list-images");
-
-    let response = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|err| AppError::ConnectFail(err.into()))?
-        .json::<ApiResponse>()
-        .await
-        .map_err(|err| AppError::InvalidResponse(err.into()))?;
-
-    Ok(Json(response.files))
+    Ok(Json(images))
 }
 
 pub async fn delete(
     State(state): State<AppStateV2>,
     Json(delete_data): Json<DeleteImageRequest>,
-) -> Result<Json<()>, AppError> {
-    let client = state.get_http_client();
-
-    let url = format!("{}{}", state.get_fastapi_upload_host(), "/delete-image");
-
-    let response = client
-        .delete(url)
-        .json(&delete_data)
-        .send()
-        .await
-        .map_err(|err| AppError::ConnectFail(err.into()))?;
+) -> Result<(), AppError> {
+    let response = repo_delete(&state, delete_data).await;
 
     tracing::debug!("{:?}", response);
-    Ok(Json(()))
+    Ok(())
 }
