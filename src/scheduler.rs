@@ -1,5 +1,5 @@
 use crate::{
-    jobs::{example::ExampleJob, notes::FetchNotesJob},
+    jobs::{blogs::ActiveImageJob, example::ExampleJob, notes::FetchNotesJob},
     state::AppStateV2,
     structs::jobs::AppJob,
 };
@@ -12,6 +12,7 @@ pub async fn initialize_scheduler(state: AppStateV2) -> Arc<Mutex<JobScheduler>>
 
     add_job_to_scheduler(scheduler.clone(), state.clone(), FetchNotesJob).await;
     add_job_to_scheduler(scheduler.clone(), state.clone(), ExampleJob).await;
+    add_job_to_scheduler(scheduler.clone(), state.clone(), ActiveImageJob).await;
 
     scheduler.lock().await.start().await.unwrap();
     scheduler

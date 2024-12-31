@@ -43,3 +43,4 @@ async-trait = "0.1"
 uuid = { version = "1.11.0", features = ["v4", "serde"] }
 thiserror = "2"
 anyhow = "1.0"
+regex = "1"
