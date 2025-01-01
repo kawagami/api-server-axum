@@ -3,6 +3,20 @@ use crate::{
     state::AppStateV2,
     structs::firebase::{ApiResponse, DeleteImageRequest, Image},
 };
+use reqwest::{multipart::Form, Response};
+
+pub async fn upload(state: &AppStateV2, form: Form) -> Result<Response, AppError> {
+    let client = state.get_http_client();
+
+    let url = format!("{}{}", state.get_fastapi_upload_host(), "/upload-image");
+
+    client
+        .post(url)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|err| AppError::ConnectFail(err.into()))
+}
 
 pub async fn images(state: &AppStateV2) -> Result<Vec<Image>, AppError> {
     let client = state.get_http_client();

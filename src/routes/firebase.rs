@@ -1,6 +1,6 @@
 use crate::{
     errors::AppError,
-    repositories::firebase::{delete as repo_delete, images as repo_images},
+    repositories::firebase::{delete as repo_delete, images as repo_images, upload as repo_upload},
     routes::auth,
     state::AppStateV2,
     structs::firebase::{DeleteImageRequest, FirebaseImage, Image},
@@ -25,8 +25,6 @@ pub async fn upload(
     State(state): State<AppStateV2>,
     mut multipart: Multipart,
 ) -> Result<Json<FirebaseImage>, AppError> {
-    let client = state.get_http_client();
-
     while let Some(field) = multipart
         .next_field()
         .await
@@ -48,14 +46,7 @@ pub async fn upload(
         // Create a multipart form
         let form = multipart::Form::new().part("file", part);
 
-        let url = format!("{}{}", state.get_fastapi_upload_host(), "/upload-image");
-
-        let res = client
-            .post(url)
-            .multipart(form)
-            .send()
-            .await
-            .map_err(|err| AppError::ConnectFail(err.into()))?;
+        let res = repo_upload(&state, form).await?;
 
         if res.status().is_success() {
             let upload_response: FirebaseImage = res
