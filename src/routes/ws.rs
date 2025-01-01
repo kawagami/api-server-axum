@@ -94,7 +94,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
                         To::All,
                     );
 
-                    if sender.send(Message::Text(send_msg)).await.is_err() {
+                    if sender.send(Message::Text(send_msg.into())).await.is_err() {
                         break; // 如果發送失敗，結束任務
                     }
                 }
@@ -109,7 +109,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
 
                     // 如果目標是自己，也需要接收訊息
                     if target_user == &token_clone || data_msg.from == token_clone {
-                        if sender.send(Message::Text(send_msg)).await.is_err() {
+                        if sender.send(Message::Text(send_msg.into())).await.is_err() {
                             break;
                         }
                     }

@@ -13,7 +13,7 @@ use rand::{distributions::Alphanumeric, Rng};
 pub fn new() -> Router<AppStateV2> {
     Router::new()
         .route("/new_password", get(new_password))
-        .route("/image/:width/:height/:format/resize", post(resize))
+        .route("/image/{width}/{height}/{format}/resize", post(resize))
 }
 
 pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<String>>, ()> {

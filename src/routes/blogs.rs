@@ -17,7 +17,7 @@ use crate::{
 pub fn new() -> Router<AppStateV2> {
     Router::new()
         .route("/", get(get_blogs))
-        .route("/:id", get(get_blog).delete(delete_blog).put(put_blog))
+        .route("/{id}", get(get_blog).delete(delete_blog).put(put_blog))
 }
 
 /// 取 blogs 清單
