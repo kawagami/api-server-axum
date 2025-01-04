@@ -7,13 +7,19 @@ use crate::{
 use axum::{
     body::Body,
     extract::{Json, Request, State},
-    http,
-    http::Response,
+    http::{self, Response},
     middleware::Next,
+    routing::post,
+    Router,
 };
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
+
+pub fn new() -> Router<AppStateV2> {
+    Router::new().route("/", post(sign_in))
+}
+
 pub async fn authorize(
     State(state): State<AppStateV2>,
     mut req: Request,

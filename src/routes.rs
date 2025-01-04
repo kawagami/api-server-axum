@@ -12,10 +12,8 @@ use axum::{
     extract::DefaultBodyLimit,
     http::{
         header::{AUTHORIZATION, CONTENT_TYPE},
-        Method, StatusCode,
+        Method,
     },
-    response::IntoResponse,
-    routing::{get, post},
     Router,
 };
 use tower_http::cors::CorsLayer;
@@ -32,8 +30,8 @@ pub async fn app() -> Router {
     let _scheduler = initialize_scheduler(state.clone()).await;
 
     Router::new()
-        .route("/", get(root::using_connection_pool_extractor))
-        .route("/jwt", post(auth::sign_in))
+        .merge(root::new())
+        .nest("/jwt", auth::new())
         .nest("/firebase", firebase::new(state.clone()))
         .nest("/ws", ws::new())
         .nest("/blogs", blogs::new())
@@ -43,21 +41,11 @@ pub async fn app() -> Router {
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
-            // see https://docs.rs/tower-http/latest/tower_http/cors/index.html
-            // for more details
-            //
-            // pay attention that for some request types like posting content-type: application/json
-            // it is required to add ".allow_headers([http::header::CONTENT_TYPE])"
-            // or see this issue https://github.com/tokio-rs/axum/issues/849
             CorsLayer::new()
                 .allow_methods([Method::GET, Method::POST])
                 .allow_origin(origins)
                 .allow_headers([AUTHORIZATION, CONTENT_TYPE]),
         )
         .with_state(state)
-        .fallback(handler_404)
-}
-
-async fn handler_404() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "nothing to see here")
+        .fallback(root::handler_404)
 }
