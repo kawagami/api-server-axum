@@ -45,7 +45,7 @@ pub struct Post {
     pub write_permission: String,
 }
 
-#[derive(Serialize, sqlx::FromRow)]
+#[derive(Serialize, FromRow)]
 pub struct HackmdNoteListAndTag {
     pub id: String,
     pub title: String,
@@ -55,7 +55,7 @@ pub struct HackmdNoteListAndTag {
     pub tags: Vec<String>,
 }
 
-#[derive(Serialize, sqlx::FromRow)]
+#[derive(Serialize, FromRow)]
 pub struct Tag {
     pub id: i64,
     pub name: String,
