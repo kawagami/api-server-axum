@@ -26,7 +26,6 @@ pub async fn app() -> Router {
     ];
     let state = AppStateV2::new().await;
 
-    // 初始化 scheduler
     let _scheduler = initialize_scheduler(state.clone()).await;
 
     Router::new()
