@@ -9,7 +9,7 @@ pub struct AppState {
     pub pool: Pool<Postgres>,
     pub tx: broadcast::Sender<String>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
-    pub http_client: Client, // 新增 reqwest::Client
+    pub http_client: Client,
     pub fastapi_upload_host: String,
 }
 
@@ -18,7 +18,6 @@ impl AppState {
         let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
         let (tx, _rx) = broadcast::channel(64);
 
-        // set up connection pool
         let pool = PgPoolOptions::new()
             .max_connections(20)
             .acquire_timeout(Duration::from_secs(3))
@@ -26,18 +25,15 @@ impl AppState {
             .await
             .expect("can't connect to database");
 
-        // redis
         let redis_host = std::env::var("REDIS_HOST").expect("找不到 REDIS_HOST");
         let manager = RedisConnectionManager::new(format!("redis://{}:6379", redis_host)).unwrap();
         let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
 
-        // 初始化 HTTP 客戶端
         let http_client = Client::builder()
-            .timeout(Duration::from_secs(10)) // 設定超時時間
+            .timeout(Duration::from_secs(10))
             .build()
             .expect("Failed to build HTTP client");
 
-        // FastAPI upload host
         let fastapi_upload_host =
             std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
 
@@ -61,16 +57,15 @@ impl AppStateV2 {
     }
 
     pub fn get_pool(&self) -> Pool<Postgres> {
-        self.0.pool.clone() // 直接複製
+        self.0.pool.clone()
     }
 
     pub fn get_tx(&self) -> broadcast::Sender<String> {
-        self.0.tx.clone() // 直接複製
+        self.0.tx.clone()
     }
 
-    // 取 Redis pool
     pub fn get_redis_pool(&self) -> RedisPool<RedisConnectionManager> {
-        self.0.redis_pool.clone() // 直接複製
+        self.0.redis_pool.clone()
     }
 
     pub fn get_http_client(&self) -> Client {
