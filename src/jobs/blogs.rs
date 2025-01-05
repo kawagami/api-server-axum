@@ -56,9 +56,14 @@ impl AppJob for ActiveImageJob {
             }
         };
 
+        let mut delete_data_vec: Vec<String> = vec![];
+
         // 對所有圖片檢查是否在 blogs 中有使用
         for image in &all_images {
             if !image_paths.contains(&image.url) {
+                // 紀錄刪除了那些
+                delete_data_vec.push(image.name.clone());
+
                 // 整理為 delete API 的格式
                 let delete_data = DeleteImageRequest {
                     file_name: image.name.to_owned(),
@@ -67,5 +72,7 @@ impl AppJob for ActiveImageJob {
                 let _ = delete(&state, delete_data).await;
             }
         }
+
+        tracing::info!("{:?}", delete_data_vec);
     }
 }
