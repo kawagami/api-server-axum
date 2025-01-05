@@ -8,7 +8,7 @@ pub async fn get_blogs_with_pagination(
 ) -> Result<Vec<DbBlog>, sqlx::Error> {
     let blogs = sqlx::query_as::<_, DbBlog>(
         r#"
-            SELECT id, markdown, html, tocs, tags, created_at, updated_at
+            SELECT id, markdown, tocs, tags, created_at, updated_at
             FROM blogs
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
@@ -26,7 +26,7 @@ pub async fn get_blogs_with_pagination(
 pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog, sqlx::Error> {
     let blog = sqlx::query_as::<_, DbBlog>(
         r#"
-            SELECT id, markdown, html, tocs, tags, created_at, updated_at
+            SELECT id, markdown, tocs, tags, created_at, updated_at
             FROM blogs
             WHERE id = $1
             "#,
