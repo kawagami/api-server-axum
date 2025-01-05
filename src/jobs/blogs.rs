@@ -16,8 +16,9 @@ pub struct ActiveImageJob;
 
 #[async_trait]
 impl AppJob for ActiveImageJob {
+    // 凌晨五點執行
     fn cron_expression(&self) -> &str {
-        "0 0 * * * *"
+        "0 0 21 * * *"
     }
 
     // 每小時清除 blogs 中沒有在使用的圖片
