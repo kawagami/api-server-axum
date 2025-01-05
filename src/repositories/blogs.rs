@@ -58,17 +58,15 @@ pub async fn upsert_blog(
     state: &AppStateV2,
     id: uuid::Uuid,
     markdown: String,
-    html: String,
     tocs: Vec<String>,
     tags: Vec<String>,
 ) -> Result<(), sqlx::Error> {
     let query = r#"
-            INSERT INTO blogs (id, markdown, html, tocs, tags, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+            INSERT INTO blogs (id, markdown, tocs, tags, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, NOW(), NOW())
             ON CONFLICT (id)
             DO UPDATE SET
                 markdown = EXCLUDED.markdown,
-                html = EXCLUDED.html,
                 tocs = EXCLUDED.tocs,
                 tags = EXCLUDED.tags,
                 updated_at = NOW();
@@ -77,9 +75,8 @@ pub async fn upsert_blog(
     sqlx::query(query)
         .bind(id) // $1
         .bind(markdown) // $2
-        .bind(html) // $3
-        .bind(tocs) // $4
-        .bind(tags) // $5
+        .bind(tocs) // $3
+        .bind(tags) // $4
         .execute(&state.get_pool())
         .await?;
 

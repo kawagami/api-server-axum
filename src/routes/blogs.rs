@@ -61,7 +61,7 @@ async fn put_blog(
     Json(blog): Json<PutBlog>,
 ) -> impl IntoResponse {
     let tocs = blog.extract_toc_texts();
-    let result = blogs::upsert_blog(&state, id, blog.markdown, blog.html, tocs, blog.tags).await;
+    let result = blogs::upsert_blog(&state, id, blog.markdown, tocs, blog.tags).await;
 
     tracing::debug!("put_blog result => {:?}", result);
     Json(format!("put_blog 收到\nid => {}\n", id))

@@ -6,7 +6,6 @@ use uuid::Uuid;
 #[derive(Deserialize, Serialize)]
 pub struct PutBlog {
     pub markdown: String,
-    pub html: String,
     pub tocs: Vec<Toc>,
     pub tags: Vec<String>,
 }
@@ -46,7 +45,6 @@ pub struct Toc {
 pub struct DbBlog {
     pub id: Uuid,
     pub markdown: String,
-    pub html: String,
     pub tocs: Vec<String>,
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
