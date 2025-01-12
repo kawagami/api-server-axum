@@ -73,6 +73,6 @@ impl AppJob for ActiveImageJob {
             }
         }
 
-        tracing::info!("{:?}", delete_data_vec);
+        tracing::info!("deleted images vec => {:?}", delete_data_vec);
     }
 }

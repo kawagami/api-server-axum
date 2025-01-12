@@ -41,7 +41,7 @@ pub struct Toc {
     text: String,
 }
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize, FromRow, Default)]
 pub struct DbBlog {
     pub id: Uuid,
     pub markdown: String,

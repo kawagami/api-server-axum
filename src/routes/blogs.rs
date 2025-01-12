@@ -1,17 +1,14 @@
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
     routing::get,
     Json, Router,
 };
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     repositories::blogs,
     state::AppStateV2,
-    structs::blogs::{Pagination, PutBlog},
+    structs::blogs::{DbBlog, Pagination, PutBlog},
 };
 
 pub fn new() -> Router<AppStateV2> {
@@ -24,45 +21,44 @@ pub fn new() -> Router<AppStateV2> {
 async fn get_blogs(
     Query(query): Query<Pagination>,
     State(state): State<AppStateV2>,
-) -> impl IntoResponse {
+) -> Json<Vec<DbBlog>> {
     let offset = (query.page.saturating_sub(1)) * query.per_page;
 
     match blogs::get_blogs_with_pagination(&state, query.per_page, offset).await {
-        Ok(result) => Json(result).into_response(), // 使用 `.into_response()` 統一類型
+        Ok(result) => Json(result),
         Err(err) => {
-            // 將錯誤回應轉換為 Response 類型
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)).into_response()
+            tracing::error!("{:?}", err);
+            Json(vec![])
         }
     }
 }
 
 /// 取 blog 詳細內容
-async fn get_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn get_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> Json<DbBlog> {
     match blogs::get_blog_by_id(&state, id).await {
-        Ok(blog) => (StatusCode::OK, Json(blog)).into_response(),
-        Err(_) => (
-            StatusCode::NOT_FOUND,
-            Json(json!([])), // 使用空陣列作為錯誤返回
-        )
-            .into_response(),
+        Ok(blog) => Json(blog),
+        Err(err) => {
+            tracing::error!("{:?}", err);
+            Json(DbBlog::default())
+        }
     }
 }
 
-async fn delete_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn delete_blog(State(state): State<AppStateV2>, Path(id): Path<Uuid>) -> Json<()> {
     let result = blogs::delete_blog(&state, id).await;
 
-    tracing::debug!("delete_blog result => {:?}", result);
-    Json(format!("delete_blog 收到 id => {}", id))
+    tracing::info!("delete_blog result => {:?}", result);
+    Json(())
 }
 
 async fn put_blog(
     State(state): State<AppStateV2>,
     Path(id): Path<Uuid>,
     Json(blog): Json<PutBlog>,
-) -> impl IntoResponse {
+) -> Json<()> {
     let tocs = blog.extract_toc_texts();
     let result = blogs::upsert_blog(&state, id, blog.markdown, tocs, blog.tags).await;
 
-    tracing::debug!("put_blog result => {:?}", result);
-    Json(format!("put_blog 收到\nid => {}\n", id))
+    tracing::info!("put_blog result => {:?}", result);
+    Json(())
 }
