@@ -66,6 +66,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
         .0
         .join(",");
     let join_msg = ChatMessage::new_jsonstring(
+        None,
         ChatMessageType::Join, // 訊息類型為加入
         join_users_set,
         token.clone(),
@@ -88,6 +89,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
                 To::All => {
                     // 發送給所有用戶
                     let send_msg = ChatMessage::new_jsonstring(
+                        None,
                         data_msg.message_type,
                         data_msg.content,
                         data_msg.from,
@@ -101,6 +103,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
                 To::Private(target_user) => {
                     // 發送給特定用戶
                     let send_msg = ChatMessage::new_jsonstring(
+                        None,
                         data_msg.message_type,
                         data_msg.content,
                         data_msg.from.clone(),
@@ -139,6 +142,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
 
             // 廣播接收到的訊息
             let send_msg = ChatMessage::new_jsonstring(
+                None,
                 data_msg.message_type,
                 data_msg.content,
                 data_msg.from,
@@ -166,8 +170,13 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
         .unwrap()
         .0
         .join(",");
-    let send_exit_msg =
-        ChatMessage::new_jsonstring(ChatMessageType::Leave, leave_users_set, token, To::All);
+    let send_exit_msg = ChatMessage::new_jsonstring(
+        None,
+        ChatMessageType::Leave,
+        leave_users_set,
+        token,
+        To::All,
+    );
     let _ = state.get_tx().send(send_exit_msg);
 }
 
@@ -181,7 +190,7 @@ pub async fn ws_message(
     State(state): State<AppStateV2>,
     Query(params): Query<GetParams>,
 ) -> Json<Vec<ChatMessage>> {
-    let response = ws::ws_message(&state, params.limit).await;
+    let response = ws::ws_message(&state, params.limit, params.before_id).await;
     let messages = match response {
         Ok(result) => result,
         Err(err) => {
@@ -199,6 +208,7 @@ pub async fn ws_message(
             let created_at_str = created_at_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
 
             ChatMessage {
+                id: Some(db_msg.id),
                 message_type: ChatMessageType::Message,
                 content: db_msg.message,
                 from: db_msg.user_name,

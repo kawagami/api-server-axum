@@ -14,6 +14,7 @@ pub struct DbChatMessage {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
+    pub id: Option<i32>,
     pub message_type: ChatMessageType,
     pub content: String,
     pub from: String,
@@ -24,6 +25,7 @@ pub struct ChatMessage {
 
 impl ChatMessage {
     pub fn new_jsonstring(
+        id: Option<i32>,
         message_type: ChatMessageType,
         content: String,
         from: String,
@@ -40,6 +42,7 @@ impl ChatMessage {
         let now_str = now_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
 
         let send_json = ChatMessage {
+            id,
             message_type,
             content,
             from,
@@ -92,6 +95,7 @@ pub struct QueryParams {
 pub struct GetParams {
     #[serde(default = "default_limit")]
     pub limit: i32,
+    pub before_id: Option<i32>,
 }
 
 fn default_limit() -> i32 {

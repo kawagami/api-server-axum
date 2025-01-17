@@ -22,6 +22,7 @@ impl AppJob for ExampleJob {
         let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         let chat_message = ChatMessage::new_jsonstring(
+            None,
             ChatMessageType::Message,
             current_time.clone(),
             "KawaBot".to_string(),
