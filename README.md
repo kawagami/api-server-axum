@@ -1,89 +1,66 @@
 # Template Axum
 
-A Rust web server built using the **Axum** framework, leveraging powerful features like tracing, multipart handling, WebSocket support, and integration with a PostgreSQL database. This project is containerized and ready for deployment using a minimal Docker image.
+這是一個使用 [Axum](https://github.com/tokio-rs/axum) 框架構建的 Rust Web 應用模板。該模板整合了多種常用的 Rust 庫，並提供了 Docker 支持，方便快速部署。
 
-## Features
+## 功能
 
-- **Web Framework:** Axum with tracing, multipart, and WebSocket support.
-- **Database:** SQLx for PostgreSQL with support for TLS, UUIDs, and chrono.
-- **Background Tasks:** Scheduled tasks powered by `tokio-cron-scheduler`.
-- **Authentication:** JSON Web Tokens (JWT) with bcrypt for password hashing.
-- **Caching:** Redis connection pooling with `bb8`.
-- **Utilities:** Includes Serde for JSON (de)serialization, regex utilities, and error handling using `thiserror` and `anyhow`.
-- **Dockerized:** Optimized for production using a multi-stage build process with `distroless` base image.
+- **Web 框架**: 使用 `axum` 作為主要的 Web 框架。
+- **異步支持**: 使用 `tokio` 作為異步運行時。
+- **HTTP 中間件**: 使用 `tower-http` 提供的中間件功能，如 CORS、超時、請求限制等。
+- **日誌記錄**: 使用 `tracing` 和 `tracing-subscriber` 進行日誌記錄。
+- **數據庫支持**: 使用 `sqlx` 進行 PostgreSQL 數據庫操作。
+- **環境變量管理**: 使用 `dotenvy` 管理環境變量。
+- **JSON 序列化/反序列化**: 使用 `serde` 和 `serde_json` 進行 JSON 處理。
+- **身份驗證**: 使用 `jsonwebtoken` 和 `bcrypt` 進行 JWT 身份驗證和密碼哈希。
+- **Redis 支持**: 使用 `bb8` 和 `bb8-redis` 進行 Redis 連接池管理。
+- **圖片處理**: 使用 `image` 庫進行圖片處理。
+- **定時任務**: 使用 `tokio-cron-scheduler` 進行定時任務調度。
+- **錯誤處理**: 使用 `thiserror` 和 `anyhow` 進行錯誤處理。
+- **UUID 生成**: 使用 `uuid` 生成唯一標識符。
+- **正則表達式**: 使用 `regex` 進行正則表達式操作。
 
-## Getting Started
+## 快速開始
 
-### Prerequisites
+### 本地運行
 
-- Rust (https://www.rust-lang.org/)
-- Docker (https://www.docker.com/)
-- PostgreSQL (https://www.postgresql.org/)
-- Redis (https://redis.io/)
-
-### Setting Up
-
-1. Clone the repository:
-
+1. 克隆此倉庫：
    ```bash
    git clone <repository_url>
    cd template_axum
    ```
 
-2. Set up your `.env` file:
-
-   Create a `.env` file in the root directory with the following variables:
-
-   ```env
-   DATABASE_URL=postgres://username:password@localhost:5432/database_name
-   REDIS_URL=redis://localhost
-   JWT_SECRET=your_secret_key
+2. 安裝依賴：
+   ```bash
+   cargo build
    ```
 
-3. Run the application in development:
-
+3. 運行應用：
    ```bash
    cargo run
    ```
 
-4. To run with Docker:
+### 使用 Docker 運行
 
-   Build and run the container:
-
+1. 構建 Docker 鏡像：
    ```bash
    docker build -t template_axum .
-   docker run -p 8080:8080 --env-file .env template_axum
    ```
 
-### Scheduled Tasks
+2. 運行 Docker 容器：
+   ```bash
+   docker run -p 8080:8080 template_axum
+   ```
 
-The project includes support for scheduled tasks using `tokio-cron-scheduler`. You can define your tasks in the `main.rs` or separate them into a module.
+## 環境變量
 
-## Dependencies
+請在 `.env` 文件中設置以下環境變量：
 
-- **Axum**: Web framework for async programming.
-- **SQLx**: Async PostgreSQL database interface.
-- **Tokio**: Async runtime.
-- **Redis & bb8**: Caching and connection pooling.
-- **JWT**: Authentication.
-- **Tracing**: Observability and debugging.
-- **Serde**: JSON serialization and deserialization.
-
-## Building and Running
-
-### Development
-
-Run the application directly using Cargo:
-
-```bash
-cargo run
+```env
+DATABASE_URL=postgres://user:password@localhost/dbname
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your_jwt_secret
 ```
 
-### Production
+## 依賴
 
-Use the provided Dockerfile to build an optimized production container:
-
-```bash
-docker build -t template_axum .
-docker run -p 8080:8080 --env-file .env template_axum
-```
+詳細的依賴列表請參考 [Cargo.toml](./Cargo.toml)。
