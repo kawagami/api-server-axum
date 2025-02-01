@@ -17,7 +17,7 @@ pub async fn insert_chat_message(
     .bind(to_type)
     .bind(user_name)
     .bind(message)
-    .execute(&state.get_pool())
+    .execute(state.get_pool())
     .await?;
 
     Ok(())
@@ -70,5 +70,5 @@ pub async fn ws_message(
         .bind(limit),
     };
 
-    query.fetch_all(&state.get_pool()).await
+    query.fetch_all(state.get_pool()).await
 }

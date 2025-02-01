@@ -8,10 +8,8 @@ pub fn new() -> Router<AppStateV2> {
 pub async fn using_connection_pool_extractor(
     State(state): State<AppStateV2>,
 ) -> Result<String, impl IntoResponse> {
-    let pool = state.get_pool();
-
     sqlx::query_scalar("select 'hello world from pg'")
-        .fetch_one(&pool)
+        .fetch_one(state.get_pool())
         .await
         .map_err(internal_error)
 }

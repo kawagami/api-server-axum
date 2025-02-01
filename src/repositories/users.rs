@@ -4,10 +4,8 @@ use crate::{
 };
 
 pub async fn get_users(state: &AppStateV2) -> Result<Vec<User>, sqlx::Error> {
-    let pool = state.get_pool();
-
     sqlx::query_as("SELECT id, name, email FROM users")
-        .fetch_all(&pool)
+        .fetch_all(state.get_pool())
         .await
 }
 
@@ -28,7 +26,7 @@ pub async fn check_email_exists(state: &AppStateV2, email: &str) -> Result<DbUse
         "#,
     )
     .bind(email)
-    .fetch_one(&state.get_pool())
+    .fetch_one(state.get_pool())
     .await?;
 
     Ok(result)

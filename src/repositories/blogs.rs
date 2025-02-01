@@ -16,7 +16,7 @@ pub async fn get_blogs_with_pagination(
     )
     .bind(limit as i64) // 將限制數量綁定到查詢
     .bind(offset as i64) // 將偏移量綁定到查詢
-    .fetch_all(&state.get_pool())
+    .fetch_all(state.get_pool())
     .await?;
 
     Ok(blogs)
@@ -32,7 +32,7 @@ pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog
             "#,
     )
     .bind(id)
-    .fetch_one(&state.get_pool())
+    .fetch_one(state.get_pool())
     .await?;
 
     Ok(blog)
@@ -47,7 +47,7 @@ pub async fn delete_blog(state: &AppStateV2, id: uuid::Uuid) -> Result<(), sqlx:
             "#,
     )
     .bind(id)
-    .execute(&state.get_pool())
+    .execute(state.get_pool())
     .await?;
 
     Ok(())
@@ -77,7 +77,7 @@ pub async fn upsert_blog(
         .bind(markdown) // $2
         .bind(tocs) // $3
         .bind(tags) // $4
-        .execute(&state.get_pool())
+        .execute(state.get_pool())
         .await?;
 
     Ok(())

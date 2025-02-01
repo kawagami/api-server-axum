@@ -56,8 +56,8 @@ impl AppStateV2 {
         AppStateV2(Arc::new(app_state))
     }
 
-    pub fn get_pool(&self) -> Pool<Postgres> {
-        self.0.pool.clone()
+    pub fn get_pool(&self) -> &Pool<Postgres> {
+        &self.0.pool
     }
 
     pub fn get_tx(&self) -> broadcast::Sender<String> {

@@ -6,7 +6,7 @@ use sqlx::QueryBuilder;
 
 pub async fn delete_posts(state: &AppStateV2) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM hackmd_posts;")
-        .execute(&state.get_pool())
+        .execute(state.get_pool())
         .await?;
 
     Ok(())
@@ -50,7 +50,7 @@ pub async fn insert_posts_handler(state: &AppStateV2, posts: Vec<Post>) -> Resul
 
     let query = query_builder.build();
 
-    query.execute(&state.get_pool()).await?;
+    query.execute(state.get_pool()).await?;
 
     Ok(())
 }
@@ -71,7 +71,7 @@ pub async fn get_tags(state: &AppStateV2) -> Result<Vec<Tag>, sqlx::Error> {
             ORDER BY MAX(last_changed_at) DESC
         "#,
     )
-    .fetch_all(&state.get_pool())
+    .fetch_all(state.get_pool())
     .await
 }
 
@@ -92,6 +92,6 @@ pub async fn get_lists(state: &AppStateV2) -> Result<Vec<HackmdNoteListAndTag>, 
                 last_changed_at DESC;
         "#,
     )
-    .fetch_all(&state.get_pool())
+    .fetch_all(state.get_pool())
     .await
 }
