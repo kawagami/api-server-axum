@@ -64,8 +64,8 @@ impl AppStateV2 {
         self.0.tx.clone()
     }
 
-    pub fn get_redis_pool(&self) -> RedisPool<RedisConnectionManager> {
-        self.0.redis_pool.clone()
+    pub fn get_redis_pool(&self) -> &RedisPool<RedisConnectionManager> {
+        &self.0.redis_pool
     }
 
     pub fn get_http_client(&self) -> Client {
