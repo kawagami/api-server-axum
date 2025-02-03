@@ -68,8 +68,8 @@ impl AppStateV2 {
         &self.0.redis_pool
     }
 
-    pub fn get_http_client(&self) -> Client {
-        self.0.http_client.clone()
+    pub fn get_http_client(&self) -> &Client {
+        &self.0.http_client
     }
 
     pub fn get_fastapi_upload_host(&self) -> &str {
