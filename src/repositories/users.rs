@@ -11,7 +11,7 @@ pub async fn get_users(state: &AppStateV2) -> Result<Vec<User>, sqlx::Error> {
 
 pub async fn check_email_exists(state: &AppStateV2, email: &str) -> Result<DbUser, sqlx::Error> {
     // 使用 EXISTS 查詢是否有特定 email
-    let result: DbUser = sqlx::query_as(
+    sqlx::query_as(
         r#"
             SELECT
                 id,
@@ -27,7 +27,5 @@ pub async fn check_email_exists(state: &AppStateV2, email: &str) -> Result<DbUse
     )
     .bind(email)
     .fetch_one(state.get_pool())
-    .await?;
-
-    Ok(result)
+    .await
 }
