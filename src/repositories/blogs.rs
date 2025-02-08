@@ -6,7 +6,7 @@ pub async fn get_blogs_with_pagination(
     limit: usize,
     offset: usize,
 ) -> Result<Vec<DbBlog>, sqlx::Error> {
-    let blogs: Vec<DbBlog> = sqlx::query_as(
+    sqlx::query_as(
         r#"
             SELECT id, markdown, tocs, tags, created_at, updated_at
             FROM blogs
@@ -17,14 +17,12 @@ pub async fn get_blogs_with_pagination(
     .bind(limit as i64) // 將限制數量綁定到查詢
     .bind(offset as i64) // 將偏移量綁定到查詢
     .fetch_all(state.get_pool())
-    .await?;
-
-    Ok(blogs)
+    .await
 }
 
 /// 取得特定 blog
 pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog, sqlx::Error> {
-    let blog: DbBlog = sqlx::query_as(
+    sqlx::query_as(
         r#"
             SELECT id, markdown, tocs, tags, created_at, updated_at
             FROM blogs
@@ -33,9 +31,7 @@ pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog
     )
     .bind(id)
     .fetch_one(state.get_pool())
-    .await?;
-
-    Ok(blog)
+    .await
 }
 
 /// 刪除特定 blog
