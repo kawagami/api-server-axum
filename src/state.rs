@@ -68,6 +68,15 @@ impl AppStateV2 {
         &self.0.redis_pool
     }
 
+    pub async fn get_redis_conn(
+        &self,
+    ) -> Result<bb8::PooledConnection<'_, RedisConnectionManager>, redis::RedisError> {
+        self.get_redis_pool().get().await.map_err(|e| {
+            tracing::error!("Failed to get Redis connection: {:?}", e);
+            redis::RedisError::from((redis::ErrorKind::IoError, "Failed to get Redis connection"))
+        })
+    }
+
     pub fn get_http_client(&self) -> &Client {
         &self.0.http_client
     }
