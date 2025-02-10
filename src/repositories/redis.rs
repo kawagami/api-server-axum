@@ -30,8 +30,7 @@ pub async fn redis_zrange(state: &AppStateV2, key: &str) -> Result<Json<Vec<Stri
         .await
         .expect("redis_pool get fail");
 
-    let result: Vec<String> = conn.zrange(key, 0, -1).await.expect("zrange fail");
-    Ok(Json(result))
+    Ok(Json(conn.zrange(key, 0, -1).await?))
 }
 
 pub async fn _redis_zrevrange(
@@ -44,8 +43,7 @@ pub async fn _redis_zrevrange(
         .await
         .expect("redis_pool get fail");
 
-    let result: Vec<String> = conn.zrevrange(key, 0, -1).await.expect("zrevrange fail");
-    Ok(Json(result))
+    Ok(Json(conn.zrevrange(key, 0, -1).await?))
 }
 
 pub async fn check_member_exists(
@@ -83,7 +81,6 @@ pub async fn redis_check_key_exists(state: &AppStateV2, key: &str) -> Result<boo
         .await
         .expect("redis_pool get fail");
 
-    // 使用 EXISTS 命令檢查鍵是否存在
-    let exists: bool = conn.exists(key).await?;
-    Ok(exists) // 返回 true 表示鍵存在；false 表示鍵不存在
+    // 使用 EXISTS 命令檢查鍵是否存在 返回 true 表示鍵存在；false 表示鍵不存在
+    Ok(conn.exists(key).await?)
 }
