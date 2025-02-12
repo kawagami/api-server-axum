@@ -25,30 +25,43 @@ pub async fn authorize(
     mut req: Request,
     next: Next,
 ) -> Result<Response<Body>, AppError> {
-    // 取得 header 中的 token
+    let token = extract_token(&mut req)?;
+    let token_data = decode_jwt(token).map_err(|_| AppError::DecodeTokenFail)?;
+
+    let key = format!("user:login:{}", token_data.claims.email);
+    verify_user_login(&state, &key).await?;
+
+    Ok(next.run(req).await)
+}
+
+// 抽取 token 解析邏輯
+fn extract_token(req: &Request) -> Result<String, AppError> {
     let auth_header = req
-        .headers_mut()
+        .headers()
         .get(http::header::AUTHORIZATION)
         .ok_or(AppError::MissingToken)?
         .to_str()
         .map_err(|_| AppError::InvalidHeaderFormat)?;
-    let mut header = auth_header.split_whitespace();
-    let (_bearer, token) = (header.next(), header.next());
 
-    let token_data = decode_jwt(token.ok_or(AppError::MissingToken)?.to_string())
-        .map_err(|_| AppError::DecodeTokenFail)?;
+    auth_header
+        .split_whitespace()
+        .nth(1)
+        .ok_or(AppError::MissingToken)
+        .map(ToString::to_string)
+}
 
-    // 檢查 token 中的 email 是否存在於 redis
-    let key = format!("user:login:{}", token_data.claims.email);
-    let exists = redis::redis_check_key_exists(&state, &key)
+// 抽取 Redis 驗證邏輯
+async fn verify_user_login(state: &AppStateV2, key: &str) -> Result<(), AppError> {
+    redis::redis_check_key_exists(state, key)
         .await
-        .map_err(|err| AppError::RedisError(err.to_string()))?;
-
-    if !exists {
-        return Err(AppError::UnauthorizedUser);
-    }
-
-    Ok(next.run(req).await)
+        .map_err(|err| AppError::RedisError(err.to_string()))
+        .and_then(|exists| {
+            if exists {
+                Ok(())
+            } else {
+                Err(AppError::UnauthorizedUser)
+            }
+        })
 }
 
 pub async fn sign_in(
