@@ -191,29 +191,24 @@ pub async fn ws_message(
     Query(params): Query<GetParams>,
 ) -> Json<Vec<ChatMessage>> {
     let response = ws::ws_message(&state, params.limit, params.before_id).await;
-    let messages = match response {
-        Ok(result) => result,
-        Err(err) => {
+    let messages = response.unwrap_or_else(|err| {
             tracing::error!("{}", err);
             vec![]
-        }
-    };
+    });
 
-    // 將資料庫訊息轉換為客戶端格式的訊息
     let chat_messages: Vec<ChatMessage> = messages
         .into_iter()
         .map(|db_msg| {
-            let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
-            let created_at_plus_8 = db_msg.created_at.with_timezone(&utc_plus_8);
-            let created_at_str = created_at_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
-
+            let created_at = db_msg
+                .created_at
+                .with_timezone(&FixedOffset::east_opt(8 * 3600).unwrap());
             ChatMessage {
                 id: Some(db_msg.id),
                 message_type: ChatMessageType::Message,
                 content: db_msg.message,
                 from: db_msg.user_name,
                 to: To::All,
-                created_at: created_at_str,
+                created_at: created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
             }
         })
         .collect();
