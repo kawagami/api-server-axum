@@ -1,4 +1,5 @@
 use crate::image_processor::resize_image;
+use crate::structs::tools::ImageFormat;
 use crate::{state::AppStateV2, structs::tools::Params};
 use axum::{
     body::Body,
@@ -31,34 +32,24 @@ pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<Strin
     Ok(Json(result))
 }
 
-// 圖片上傳處理路由
 pub async fn resize(
-    Path((witdh, height, format)): Path<(u32, u32, String)>,
+    Path((width, height, format)): Path<(u32, u32, String)>,
     mut multipart: Multipart,
 ) -> impl IntoResponse {
-    // 預設輸出格式為 PNG
     while let Some(field) = multipart.next_field().await.unwrap() {
         let data = field.bytes().await.unwrap();
 
-        // 使用公共庫處理圖片
-        match resize_image(&data, witdh, height, &format) {
-            Ok(resized_data) => {
-                // 設置正確的 Content-Type
-                let content_type = match format.as_str() {
-                    "png" => "image/png",
-                    "webp" => "image/webp",
-                    "jpeg" | "jpg" => "image/jpeg",
-                    "bmp" => "image/bmp",
-                    "gif" => "image/gif",
-                    "ico" => "image/x-icon",
-                    "tiff" => "image/tiff",
-                    _ => "image/png",
-                };
+        // 將字串轉換為 ImageFormat
+        let image_format = match ImageFormat::from_str(&format) {
+            Some(format) => format,
+            None => ImageFormat::PNG, // 預設使用 PNG
+        };
 
-                // 返回圖片作為 Body
+        match resize_image(&data, width, height, &format) {
+            Ok(resized_data) => {
                 let body = Body::from(resized_data);
                 return Response::builder()
-                    .header(header::CONTENT_TYPE, content_type)
+                    .header(header::CONTENT_TYPE, image_format.content_type())
                     .body(body)
                     .unwrap();
             }
@@ -71,7 +62,6 @@ pub async fn resize(
         }
     }
 
-    // 如果沒有上傳文件，返回錯誤
     Response::builder()
         .status(400)
         .body(Body::from("No file uploaded"))
