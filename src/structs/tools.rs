@@ -1,6 +1,11 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
-#[derive(Deserialize)]
+// 常數定義
+pub const DEFAULT_PASSWORD_COUNT: u8 = 1;
+pub const DEFAULT_PASSWORD_LENGTH: u8 = 8;
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Params {
     #[serde(default = "default_count")]
     pub count: u8,
@@ -8,49 +13,86 @@ pub struct Params {
     pub length: u8,
 }
 
+impl Default for Params {
+    fn default() -> Self {
+        Self {
+            count: DEFAULT_PASSWORD_COUNT,
+            length: DEFAULT_PASSWORD_LENGTH,
+        }
+    }
+}
+
+impl Params {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.length < 4 {
+            return Err("Password length must be at least 4 characters");
+        }
+        if self.length > 100 {
+            return Err("Password length must not exceed 100 characters");
+        }
+        if self.count == 0 {
+            return Err("Password count must be at least 1");
+        }
+        if self.count > 100 {
+            return Err("Password count must not exceed 100");
+        }
+        Ok(())
+    }
+}
+
 fn default_count() -> u8 {
-    1
+    DEFAULT_PASSWORD_COUNT
 }
 
 fn default_length() -> u8 {
-    8
+    DEFAULT_PASSWORD_LENGTH
 }
 
-// 圖片格式的型別定義
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum ImageFormat {
-    PNG,
-    WEBP,
-    JPEG,
-    BMP,
-    GIF,
-    ICO,
-    TIFF,
+    Png,
+    Webp,
+    Jpeg,
+    Bmp,
+    Gif,
+    Ico,
+    Tiff,
 }
 
 impl ImageFormat {
     pub fn content_type(&self) -> &'static str {
         match self {
-            ImageFormat::PNG => "image/png",
-            ImageFormat::WEBP => "image/webp",
-            ImageFormat::JPEG => "image/jpeg",
-            ImageFormat::BMP => "image/bmp",
-            ImageFormat::GIF => "image/gif",
-            ImageFormat::ICO => "image/x-icon",
-            ImageFormat::TIFF => "image/tiff",
+            Self::Png => "image/png",
+            Self::Webp => "image/webp",
+            Self::Jpeg => "image/jpeg",
+            Self::Bmp => "image/bmp",
+            Self::Gif => "image/gif",
+            Self::Ico => "image/x-icon",
+            Self::Tiff => "image/tiff",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for ImageFormat {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "png" => Some(Self::PNG),
-            "webp" => Some(Self::WEBP),
-            "jpeg" | "jpg" => Some(Self::JPEG),
-            "bmp" => Some(Self::BMP),
-            "gif" => Some(Self::GIF),
-            "ico" => Some(Self::ICO),
-            "tiff" => Some(Self::TIFF),
-            _ => None,
+            "png" => Ok(Self::Png),
+            "webp" => Ok(Self::Webp),
+            "jpeg" | "jpg" => Ok(Self::Jpeg),
+            "bmp" => Ok(Self::Bmp),
+            "gif" => Ok(Self::Gif),
+            "ico" => Ok(Self::Ico),
+            "tiff" => Ok(Self::Tiff),
+            _ => Err(format!("Unsupported image format: {}", s)),
         }
+    }
+}
+
+impl Default for ImageFormat {
+    fn default() -> Self {
+        Self::Png
     }
 }

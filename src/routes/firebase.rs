@@ -1,5 +1,5 @@
 use crate::{
-    errors::AppError,
+    errors::{AppError, RequestError, SystemError},
     repositories::firebase::{delete as repo_delete, images as repo_images, upload as repo_upload},
     routes::auth,
     state::AppStateV2,
@@ -28,47 +28,59 @@ pub async fn upload(
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|err| AppError::GetNextFieldFail(err.into()))?
+        .map_err(|err| AppError::RequestError(RequestError::MultipartError(err.into())))?
     {
-        let file_name = field.file_name().unwrap().to_string();
-        let content_type = field.content_type().unwrap().to_string();
+        let file_name = field
+            .file_name()
+            .ok_or_else(|| {
+                AppError::RequestError(RequestError::InvalidContent(
+                    "Missing file name".to_string(),
+                ))
+            })?
+            .to_string();
+
+        let content_type = field
+            .content_type()
+            .ok_or_else(|| {
+                AppError::RequestError(RequestError::InvalidContent(
+                    "Missing content type".to_string(),
+                ))
+            })?
+            .to_string();
+
         let data = field
             .bytes()
             .await
-            .map_err(|err| AppError::ReadBytesFail(err.into()))?;
+            .map_err(|err| AppError::RequestError(RequestError::MultipartError(err.into())))?;
 
-        // Create a form part with the received file
         let part = multipart::Part::bytes(data.to_vec())
             .file_name(file_name.clone())
             .mime_str(&content_type)
-            .unwrap();
+            .map_err(|err| AppError::RequestError(RequestError::InvalidContent(err.to_string())))?;
 
-        // Create a multipart form
         let form = multipart::Form::new().part("file", part);
-
         let res = repo_upload(&state, form).await?;
 
         if res.status().is_success() {
-            let upload_response: FirebaseImage = res
+            return res
                 .json()
                 .await
-                .map_err(|err| AppError::InvalidJson(err.into()))?;
-
-            return Ok(Json(upload_response));
+                .map(Json)
+                .map_err(|err| AppError::RequestError(RequestError::InvalidJson(err.into())));
         }
     }
 
-    Err(AppError::NotThing)
+    Err(AppError::RequestError(RequestError::NotFound))
 }
 
 pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>, AppError> {
-    let images = match repo_images(&state).await {
-        Ok(images) => images,
-        Err(err) => {
-            tracing::error!("{}", err);
-            vec![]
-        }
-    };
+    let images = repo_images(&state)
+        .await
+        .map_err(|err| {
+            tracing::error!("Failed to fetch images: {}", err);
+            AppError::SystemError(SystemError::Internal("Failed to fetch images".to_string()))
+        })
+        .unwrap_or_default();
 
     Ok(Json(images))
 }
@@ -77,8 +89,10 @@ pub async fn delete(
     State(state): State<AppStateV2>,
     Json(delete_data): Json<DeleteImageRequest>,
 ) -> Result<Json<()>, AppError> {
-    let response = repo_delete(&state, delete_data).await;
+    repo_delete(&state, delete_data).await.map_err(|err| {
+        tracing::error!("Failed to delete image: {:?}", err);
+        AppError::SystemError(SystemError::Internal("Failed to delete image".to_string()))
+    })?;
 
-    tracing::debug!("{:?}", response);
     Ok(Json(()))
 }

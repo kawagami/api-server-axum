@@ -1,17 +1,23 @@
-use crate::{errors::internal_error, state::AppStateV2};
+use crate::{
+    errors::{AppError, SystemError},
+    state::AppStateV2,
+};
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Router};
 
 pub fn new() -> Router<AppStateV2> {
-    Router::new().route("/", get(using_connection_pool_extractor))
+    Router::new().route("/", get(health_check))
 }
 
-pub async fn using_connection_pool_extractor(
-    State(state): State<AppStateV2>,
-) -> Result<String, impl IntoResponse> {
+pub async fn health_check(State(state): State<AppStateV2>) -> Result<String, AppError> {
     sqlx::query_scalar("select 'hello world from pg'")
         .fetch_one(state.get_pool())
         .await
-        .map_err(internal_error)
+        .map_err(|err| {
+            AppError::SystemError(SystemError::Internal(format!(
+                "Database health check failed: {}",
+                err
+            )))
+        })
 }
 
 pub async fn handler_404() -> impl IntoResponse {

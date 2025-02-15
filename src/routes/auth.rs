@@ -1,5 +1,5 @@
 use crate::{
-    errors::AppError,
+    errors::{AppError, AuthError, SystemError},
     repositories::{redis, users},
     state::AppStateV2,
     structs::auth::{Claims, CurrentUser, SignInData},
@@ -26,7 +26,7 @@ pub async fn authorize(
     next: Next,
 ) -> Result<Response<Body>, AppError> {
     let token = extract_token(&mut req)?;
-    let token_data = decode_jwt(token).map_err(|_| AppError::DecodeTokenFail)?;
+    let token_data = decode_jwt(token)?;
 
     let key = format!("user:login:{}", token_data.claims.email);
     verify_user_login(&state, &key).await?;
@@ -39,14 +39,14 @@ fn extract_token(req: &Request) -> Result<String, AppError> {
     let auth_header = req
         .headers()
         .get(http::header::AUTHORIZATION)
-        .ok_or(AppError::MissingToken)?
+        .ok_or(AppError::AuthError(AuthError::MissingToken))?
         .to_str()
-        .map_err(|_| AppError::InvalidHeaderFormat)?;
+        .map_err(|_| AppError::AuthError(AuthError::InvalidHeader))?;
 
     auth_header
         .split_whitespace()
         .nth(1)
-        .ok_or(AppError::MissingToken)
+        .ok_or(AppError::AuthError(AuthError::MissingToken))
         .map(ToString::to_string)
 }
 
@@ -54,42 +54,28 @@ fn extract_token(req: &Request) -> Result<String, AppError> {
 async fn verify_user_login(state: &AppStateV2, key: &str) -> Result<(), AppError> {
     redis::redis_check_key_exists(state, key)
         .await
-        .map_err(|err| AppError::RedisError(err.to_string()))
-        .and_then(|exists| {
-            if exists {
-                Ok(())
-            } else {
-                Err(AppError::UnauthorizedUser)
-            }
-        })
+        .map_err(|err| AppError::SystemError(SystemError::RedisError(err.to_string())))?
+        .then_some(())
+        .ok_or(AppError::AuthError(AuthError::Unauthorized))
 }
 
 pub async fn sign_in(
     State(state): State<AppStateV2>,
     Json(user_data): Json<SignInData>,
 ) -> Result<Json<String>, AppError> {
-    // 檢查資料庫是否存在該 email
-    let user = retrieve_user_by_email(&state, &user_data.email)
-        .await
-        .map_err(|_| AppError::UserNotFound)?;
+    let user = retrieve_user_by_email(&state, &user_data.email).await?;
 
-    // 比對密碼是否吻合
-    if !verify_password(&user_data.password, &user.password_hash)
-        .map_err(|_| AppError::InternalError("密碼驗證處理失敗".into()))?
-    {
-        return Err(AppError::PasswordVerificationFailed);
+    if !verify_password(&user_data.password, &user.password_hash)? {
+        return Err(AppError::AuthError(AuthError::InvalidPassword));
     }
 
-    // 在 redis 紀錄登入資訊
     let key = format!("user:login:{}", user.email);
     redis::redis_set(&state, &key, &user.email)
         .await
-        .map_err(|err| AppError::RedisError(err.to_string()))?;
+        .map_err(|err| AppError::SystemError(SystemError::RedisError(err.to_string())))?;
 
-    // 生成合規 token
     let token = encode_jwt(user.email)?;
 
-    // 返回 json 格式包裹的 token
     Ok(Json(token))
 }
 
@@ -100,17 +86,16 @@ async fn retrieve_user_by_email(state: &AppStateV2, email: &str) -> Result<Curre
             email: db_user.email,
             password_hash: db_user.password,
         })
-        .map_err(|_| AppError::UserNotFound)
+        .map_err(|_| AppError::AuthError(AuthError::UserNotFound))
 }
 
 pub fn encode_jwt(email: String) -> Result<String, AppError> {
     let jwt_secret = std::env::var("JWT_SECRET")
-        .map_err(|_| AppError::MissingEnvVariable("JWT_SECRET".to_string()))?;
+        .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing("JWT_SECRET".to_string())))?;
 
     let now = Utc::now();
-    let expire: chrono::TimeDelta = Duration::hours(1);
-    let exp: usize = (now + expire).timestamp() as usize;
-    let iat: usize = now.timestamp() as usize;
+    let exp = (now + Duration::hours(1)).timestamp() as usize;
+    let iat = now.timestamp() as usize;
 
     let claim = Claims { iat, exp, email };
 
@@ -119,12 +104,12 @@ pub fn encode_jwt(email: String) -> Result<String, AppError> {
         &claim,
         &EncodingKey::from_secret(jwt_secret.as_ref()),
     )
-    .map_err(|_| AppError::JwtEncodeFailed)
+    .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
 }
 
 pub fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, AppError> {
     let jwt_secret = std::env::var("JWT_SECRET")
-        .map_err(|_| AppError::MissingEnvVariable("JWT_SECRET".to_string()))?;
+        .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing("JWT_SECRET".to_string())))?;
 
     decode(
         &jwt,
@@ -132,16 +117,19 @@ pub fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, AppError> {
         &Validation::default(),
     )
     .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::JwtExpired,
-        _ => AppError::JwtDecodeFailed,
+        jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+            AppError::AuthError(AuthError::TokenExpired)
+        }
+        _ => AppError::AuthError(AuthError::InvalidToken),
     })
 }
 
-pub fn verify_password(password: &str, hash: &str) -> Result<bool, bcrypt::BcryptError> {
+pub fn verify_password(password: &str, hash: &str) -> Result<bool, AppError> {
     verify(password, hash)
+        .map_err(|_| AppError::SystemError(SystemError::Internal("密碼驗證處理失敗".to_string())))
 }
 
-pub fn _hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
-    let hash = hash(password, DEFAULT_COST)?;
-    Ok(hash)
+pub fn _hash_password(password: &str) -> Result<String, AppError> {
+    hash(password, DEFAULT_COST)
+        .map_err(|_| AppError::SystemError(SystemError::Internal("密碼哈希失敗".to_string())))
 }
