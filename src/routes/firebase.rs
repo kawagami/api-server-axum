@@ -14,11 +14,13 @@ use axum::{
 use reqwest::multipart;
 
 pub fn new(state: AppStateV2) -> Router<AppStateV2> {
-    let router = Router::new().route("/", get(images));
-    let middleware_router = Router::new()
-        .route("/", post(upload).delete(delete))
-        .layer(middleware::from_fn_with_state(state, auth::authorize));
-    router.merge(middleware_router)
+    let protected_routes = Router::new().route("/", post(upload).delete(delete)).layer(
+        middleware::from_fn_with_state(state.clone(), auth::authorize),
+    );
+
+    Router::new()
+        .route("/", get(images))
+        .merge(protected_routes)
 }
 
 pub async fn upload(
