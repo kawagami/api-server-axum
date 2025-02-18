@@ -1,4 +1,5 @@
 use crate::{
+    errors::{AppError, SystemError, WebSocketError},
     repositories::{redis, ws},
     state::AppStateV2,
     structs::ws::{ChatMessage, ChatMessageType, GetParams, QueryParams, To},
@@ -8,13 +9,12 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
     },
-    http::StatusCode,
     response::IntoResponse,
     routing::get,
     Json, Router,
 };
 use chrono::FixedOffset;
-use futures::{sink::SinkExt, stream::StreamExt}; // 提供非同步流處理功能
+use futures::{sink::SinkExt, stream::StreamExt};
 
 pub fn new() -> Router<AppStateV2> {
     Router::new()
@@ -22,179 +22,239 @@ pub fn new() -> Router<AppStateV2> {
         .route("/messages", get(ws_message))
 }
 
-// 處理 WebSocket 升級請求的 handler
 pub async fn websocket_handler(
-    ws: WebSocketUpgrade, // 表示 WebSocket 升級請求
+    ws: WebSocketUpgrade,
     Query(params): Query<QueryParams>,
     State(state): State<AppStateV2>,
-) -> impl IntoResponse {
-    // 檢查 token 是否有效，如果有效則進行 WebSocket 升級
-    if is_valid_token(&params.token, &state).await {
-        ws.on_upgrade(|socket| websocket(socket, state, params.token)) // 啟動 WebSocket 連線
-    } else {
-        // 如果 token 無效，返回錯誤回應
-        (StatusCode::INTERNAL_SERVER_ERROR, "Invalid token").into_response()
-    }
+) -> Result<impl IntoResponse, AppError> {
+    // 驗證token
+    validate_token(&params.token, &state).await?;
+    Ok(ws.on_upgrade(move |socket| websocket(socket, state, params.token)))
 }
 
-// 驗證 token 是否有效
-async fn is_valid_token(token: &str, state: &AppStateV2) -> bool {
-    if redis::check_member_exists(state, "online_members", token) // 檢查 token 是否已存在於線上成員
+// 驗證token
+async fn validate_token(token: &str, state: &AppStateV2) -> Result<(), WebSocketError> {
+    let is_member_exists = redis::check_member_exists(state, "online_members", token)
         .await
-        .unwrap()
-    {
-        tracing::debug!("{}", "token 已經存在");
-        return false; // 如果已存在，返回 false
+        .map_err(|e| WebSocketError::UserManagementFailed(e.to_string()))?;
+
+    if is_member_exists {
+        tracing::debug!("token已經存在");
+        return Err(WebSocketError::InvalidToken);
     }
-    let _ = redis::redis_zadd(state, "online_members", token).await; // 將 token 加入線上成員集合
-    true // 返回 true 表示 token 有效
+
+    redis::redis_zadd(state, "online_members", token)
+        .await
+        .map_err(|e| WebSocketError::ConnectionFailed(e.to_string()))?;
+
+    Ok(())
 }
 
-// 處理單一 WebSocket 連線的邏輯
-// 即單一連接的客戶端/用戶，我們將為其產生兩個獨立的任務（對於接收/傳送聊天訊息）。
+// 處理WebSocket連線
 async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
-    // 分割 WebSocket 流，便於同時處理發送與接收
     let (mut sender, mut receiver) = stream.split();
-
-    // 訂閱訊息，確保之後的加入訊息也能顯示給客戶端
     let mut rx = state.get_tx().subscribe();
 
-    // 當用戶加入時，通知所有在線成員
-    let join_users_set = redis::redis_zrange(&state, "online_members") // 獲取所有線上成員
-        .await
-        .unwrap()
-        .0
-        .join(",");
-    let join_msg = ChatMessage::new_jsonstring(
-        None,
-        ChatMessageType::Join, // 訊息類型為加入
-        join_users_set,
-        token.clone(),
-        To::All, // 傳送給所有人
-    );
-    let _ = state.get_tx().send(join_msg); // 廣播加入訊息
+    // 廣播用戶加入消息
+    if let Err(e) = broadcast_join_message(&state, &token).await {
+        tracing::error!("廣播加入消息失敗: {}", e);
+        return;
+    }
 
-    // clone token，傳遞給需要移動的任務
+    // 創建發送任務
     let token_clone = token.clone();
+    let mut send_task =
+        tokio::spawn(
+            async move { process_outgoing_messages(&mut rx, &mut sender, token_clone).await },
+        );
 
-    // 伺服器端發送訊息的任務
-    // 運用 subscribe 之後的 rx
-    // 將要傳遞的訊息使用 split 出來的 sender 發送給這個訂閱者
-    let mut send_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            // 從訊息通道接收訊息
-            let data_msg = ChatMessage::decode(&msg);
-
-            match &data_msg.to {
-                To::All => {
-                    // 發送給所有用戶
-                    let send_msg = ChatMessage::new_jsonstring(
-                        None,
-                        data_msg.message_type,
-                        data_msg.content,
-                        data_msg.from,
-                        To::All,
-                    );
-
-                    if sender.send(Message::Text(send_msg.into())).await.is_err() {
-                        break; // 如果發送失敗，結束任務
-                    }
-                }
-                To::Private(target_user) => {
-                    // 發送給特定用戶
-                    let send_msg = ChatMessage::new_jsonstring(
-                        None,
-                        data_msg.message_type,
-                        data_msg.content,
-                        data_msg.from.clone(),
-                        To::Private(target_user.clone()),
-                    );
-
-                    // 如果目標是自己，也需要接收訊息
-                    if target_user == &token_clone || data_msg.from == token_clone {
-                        if sender.send(Message::Text(send_msg.into())).await.is_err() {
-                            break;
-                        }
-                    }
-                }
-                To::Myself => {} // 忽略自己
-            }
-        }
-    });
-
-    // 接收客戶端訊息的任務
+    // 創建接收任務
     let cp_state = state.clone();
-    let mut recv_task = tokio::spawn(async move {
-        while let Some(Ok(Message::Text(text))) = receiver.next().await {
-            let data_msg = ChatMessage::decode(&text);
+    let mut recv_task =
+        tokio::spawn(async move { process_incoming_messages(&mut receiver, &cp_state).await });
 
-            // 將全體訊息存入資料庫
-            if data_msg.to == To::All {
-                let _ = ws::insert_chat_message(
-                    &cp_state,
-                    "Message",
-                    "All",
-                    &data_msg.from,
-                    &data_msg.content,
-                )
-                .await;
+    // 等待任一任務結束
+    tokio::select! {
+        _ = &mut send_task => {
+            recv_task.abort();
+        },
+        _ = &mut recv_task => {
+            send_task.abort();
+        },
+    };
+
+    // 清理用戶資源
+    if let Err(e) = remove_user(&state, &token).await {
+        tracing::error!("移除用戶失敗: {}", e);
+    }
+
+    // 廣播用戶離開消息
+    if let Err(e) = broadcast_leave_message(&state, &token).await {
+        tracing::error!("廣播離開消息失敗: {}", e);
+    }
+}
+
+// 廣播用戶加入消息
+async fn broadcast_join_message(state: &AppStateV2, token: &str) -> Result<(), WebSocketError> {
+    let users_result = redis::redis_zrange(state, "online_members")
+        .await
+        .map_err(|e| WebSocketError::UserManagementFailed(e.to_string()))?;
+
+    let join_users_set = users_result.0.join(",");
+    let join_msg = ChatMessage::new(
+        None,
+        ChatMessageType::Join,
+        join_users_set,
+        token.to_string(),
+        To::All,
+    );
+
+    let json_msg = serde_json::to_string(&join_msg)
+        .map_err(|e| WebSocketError::MessageDecodeFailed(e.to_string()))?;
+
+    state
+        .get_tx()
+        .send(json_msg)
+        .map_err(|e| WebSocketError::BroadcastFailed(e.to_string()))?;
+
+    Ok(())
+}
+
+// 處理傳出消息
+async fn process_outgoing_messages(
+    rx: &mut tokio::sync::broadcast::Receiver<String>,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+    token: String,
+) {
+    while let Ok(msg) = rx.recv().await {
+        let data_msg = match ChatMessage::decode(&msg) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!("解析訊息失敗: {}", e);
+                continue;
             }
+        };
 
-            // 廣播接收到的訊息
-            let send_msg = ChatMessage::new_jsonstring(
+        // 根據目標決定是否發送
+        let should_send = match &data_msg.to {
+            To::All => true,
+            To::Private(target_user) => target_user == &token || data_msg.from == token,
+            To::Myself => false,
+        };
+
+        if should_send {
+            let send_msg = ChatMessage::new(
                 None,
                 data_msg.message_type,
                 data_msg.content,
                 data_msg.from,
                 data_msg.to,
             );
-            let _ = cp_state.get_tx().send(send_msg);
+
+            let json_msg = match serde_json::to_string(&send_msg) {
+                Ok(j) => j,
+                Err(e) => {
+                    tracing::error!("序列化訊息失敗: {}", e);
+                    continue;
+                }
+            };
+
+            if sender.send(Message::Text(json_msg.into())).await.is_err() {
+                tracing::error!("發送WebSocket訊息失敗");
+                break;
+            }
         }
-    });
+    }
+}
 
-    // 如果任務之一完成或中止，另一個也會被中止
-    tokio::select! {
-        _ = &mut send_task => {
-            recv_task.abort();
-            remove_user_set(&state, &token).await; // 移除用戶
-        },
-        _ = &mut recv_task => {
-            send_task.abort();
-            remove_user_set(&state, &token).await; // 移除用戶
-        },
-    };
+// 處理接收消息
+async fn process_incoming_messages(
+    receiver: &mut futures::stream::SplitStream<WebSocket>,
+    state: &AppStateV2,
+) {
+    while let Some(Ok(Message::Text(text))) = receiver.next().await {
+        let data_msg = match ChatMessage::decode(&text) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!("解析接收訊息失敗: {}", e);
+                continue;
+            }
+        };
 
-    // 用戶離開時廣播訊息
-    let leave_users_set = redis::redis_zrange(&state, "online_members")
+        // 儲存公開訊息
+        if data_msg.to == To::All {
+            if let Err(e) =
+                ws::insert_chat_message(state, "Message", "All", &data_msg.from, &data_msg.content)
+                    .await
+            {
+                tracing::error!("儲存聊天訊息失敗: {}", e);
+            }
+        }
+
+        // 廣播訊息
+        let send_msg = ChatMessage::new(
+            None,
+            data_msg.message_type,
+            data_msg.content,
+            data_msg.from,
+            data_msg.to,
+        );
+
+        let json_msg = match serde_json::to_string(&send_msg) {
+            Ok(j) => j,
+            Err(e) => {
+                tracing::error!("序列化回應訊息失敗: {}", e);
+                continue;
+            }
+        };
+
+        if let Err(e) = state.get_tx().send(json_msg) {
+            tracing::error!("廣播訊息失敗: {}", e);
+        }
+    }
+}
+
+// 移除用戶
+async fn remove_user(state: &AppStateV2, token: &str) -> Result<(), WebSocketError> {
+    redis::redis_zrem(state, "online_members", token)
         .await
-        .unwrap()
-        .0
-        .join(",");
-    let send_exit_msg = ChatMessage::new_jsonstring(
+        .map_err(|e| WebSocketError::UserManagementFailed(e.to_string()))
+}
+
+// 廣播用戶離開消息
+async fn broadcast_leave_message(state: &AppStateV2, token: &str) -> Result<(), WebSocketError> {
+    let users_result = redis::redis_zrange(state, "online_members")
+        .await
+        .map_err(|e| WebSocketError::UserManagementFailed(e.to_string()))?;
+
+    let leave_users_set = users_result.0.join(",");
+    let leave_msg = ChatMessage::new(
         None,
         ChatMessageType::Leave,
         leave_users_set,
-        token,
+        token.to_string(),
         To::All,
     );
-    let _ = state.get_tx().send(send_exit_msg);
+
+    let json_msg = serde_json::to_string(&leave_msg)
+        .map_err(|e| WebSocketError::MessageDecodeFailed(e.to_string()))?;
+
+    state
+        .get_tx()
+        .send(json_msg)
+        .map_err(|e| WebSocketError::BroadcastFailed(e.to_string()))?;
+
+    Ok(())
 }
 
-// 移除用戶資料
-async fn remove_user_set(state: &AppStateV2, token: &str) {
-    let _ = redis::redis_zrem(state, "online_members", token).await; // 從 Redis 刪除用戶 token
-}
-
-// 處理查詢聊天訊息的 handler
+// 獲取歷史訊息
 pub async fn ws_message(
     State(state): State<AppStateV2>,
     Query(params): Query<GetParams>,
-) -> Json<Vec<ChatMessage>> {
-    let response = ws::ws_message(&state, params.limit, params.before_id).await;
-    let messages = response.unwrap_or_else(|err| {
-            tracing::error!("{}", err);
-            vec![]
-    });
+) -> Result<Json<Vec<ChatMessage>>, AppError> {
+    let messages = ws::ws_message(&state, params.limit, params.before_id)
+        .await
+        .map_err(|e| AppError::SystemError(SystemError::Internal(e.to_string())))?;
 
     let chat_messages: Vec<ChatMessage> = messages
         .into_iter()
@@ -203,7 +263,7 @@ pub async fn ws_message(
                 .created_at
                 .with_timezone(&FixedOffset::east_opt(8 * 3600).unwrap());
             ChatMessage {
-                id: Some(db_msg.id),
+                id: Some(db_msg.id.into()),
                 message_type: ChatMessageType::Message,
                 content: db_msg.message,
                 from: db_msg.user_name,
@@ -213,5 +273,5 @@ pub async fn ws_message(
         })
         .collect();
 
-    Json(chat_messages)
+    Ok(Json(chat_messages))
 }

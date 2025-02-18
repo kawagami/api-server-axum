@@ -1,5 +1,6 @@
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 // 從 DB 取原始資料用的結構
 #[derive(Serialize, sqlx::FromRow)]
@@ -12,80 +13,70 @@ pub struct DbChatMessage {
     pub created_at: DateTime<Utc>, // 對應 TIMESTAMPTZ
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ChatMessageType {
+    Message,
+    Join,
+    Leave,
+    System,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum To {
+    All,
+    Private(String),
+    Myself,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
-    pub id: Option<i32>,
+    pub id: Option<i64>,
     pub message_type: ChatMessageType,
     pub content: String,
     pub from: String,
     pub to: To,
-    #[serde(default)] // 缺少時使用預設值
+    #[serde(default = "default_created_at")]
     pub created_at: String,
 }
 
+fn default_created_at() -> String {
+    chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
 impl ChatMessage {
-    pub fn new_jsonstring(
-        id: Option<i32>,
+    pub fn new(
+        id: Option<i64>,
         message_type: ChatMessageType,
         content: String,
         from: String,
         to: To,
-    ) -> String {
-        // 取得目前 UTC 時間
-        let now_utc: DateTime<Utc> = Utc::now();
-
-        // 轉換為 UTC+8 時區
-        let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
-        let now_plus_8 = now_utc.with_timezone(&utc_plus_8);
-
-        // 格式化為 `yyyy-MM-dd HH:mm:ss`
-        let now_str = now_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
-
-        let send_json = ChatMessage {
+    ) -> Self {
+        ChatMessage {
             id,
             message_type,
             content,
             from,
             to,
-            created_at: now_str,
-        };
-
-        serde_json::to_string(&send_json).expect("產生 json string 失敗")
-    }
-
-    pub fn decode(raw_json_string: &str) -> ChatMessage {
-        // 從 JSON 字串解析 ChatMessage
-        let mut chat_message: ChatMessage =
-            serde_json::from_str(raw_json_string).expect("decode raw json string 失敗");
-
-        // 如果 `created_at` 是預設值，動態補充目前時間
-        if chat_message.created_at.is_empty() {
-            let now_utc: DateTime<Utc> = Utc::now();
-            let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
-            let now_plus_8 = now_utc.with_timezone(&utc_plus_8);
-            chat_message.created_at = now_plus_8.format("%Y-%m-%d %H:%M:%S").to_string();
+            created_at: default_created_at(),
         }
+    }
 
-        chat_message
+    pub fn decode(json_str: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json_str)
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub enum ChatMessageType {
-    Message,
-    Join,
-    Leave,
-    Info,
-    PING,
+impl fmt::Display for ChatMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", serde_json::to_string(self).unwrap_or_default())
+    }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
-pub enum To {
-    All,
-    Private(String), // 這裡的 String 表示特定使用者的 token 或 username
-    Myself,
+impl From<ChatMessage> for String {
+    fn from(msg: ChatMessage) -> Self {
+        msg.to_string()
+    }
 }
-
 #[derive(Deserialize)]
 pub struct QueryParams {
     pub token: String,

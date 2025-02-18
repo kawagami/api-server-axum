@@ -6,7 +6,8 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use chrono::Local; // 引入 chrono 來處理時間
+use chrono::Local;
+use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct ExampleJob;
@@ -21,19 +22,27 @@ impl AppJob for ExampleJob {
         // 獲取當前 UTC+8 時間並格式化
         let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
-        let chat_message = ChatMessage::new_jsonstring(
+        info!("執行定時任務: 發送當前時間 {}", current_time);
+
+        // 創建聊天訊息
+        let chat_message = ChatMessage::new(
             None,
             ChatMessageType::Message,
-            current_time.clone(),
+            current_time,
             "KawaBot".to_string(),
             To::All,
         );
-        let _ = state.get_tx().send(chat_message);
 
-        // 寫進資料庫 在歷史訊息中會取得
-        // let message = format!("{}", current_time);
-        // let _ = state
-        //     .insert_chat_message("Message", "All", "KawaBot", &message)
-        //     .await;
+        // 序列化為 JSON 字串
+        match serde_json::to_string(&chat_message) {
+            Ok(json_message) => {
+                if let Err(err) = state.get_tx().send(json_message) {
+                    error!("廣播定時訊息失敗: {}", err);
+                }
+            }
+            Err(err) => {
+                error!("序列化聊天訊息失敗: {}", err);
+            }
+        }
     }
 }
