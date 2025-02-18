@@ -33,8 +33,8 @@ impl AppJob for ExampleJob {
         // 序列化為 JSON 字串
         match serde_json::to_string(&chat_message) {
             Ok(json_message) => {
-                if let Err(err) = state.get_tx().send(json_message) {
-                    tracing::error!("廣播定時訊息失敗: {}", err);
+                if let Err(_err) = state.get_tx().send(json_message) {
+                    // tracing::error!("廣播定時訊息失敗: {}", err);
                 }
             }
             Err(err) => {

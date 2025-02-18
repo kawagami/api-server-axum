@@ -89,8 +89,8 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
     }
 
     // 廣播用戶離開消息
-    if let Err(e) = broadcast_leave_message(&state, &token).await {
-        tracing::error!("廣播離開消息失敗: {}", e);
+    if let Err(_e) = broadcast_leave_message(&state, &token).await {
+        // tracing::error!("廣播離開消息失敗: {}", e);
     }
 }
 
