@@ -7,7 +7,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::Local;
-use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct ExampleJob;
@@ -22,8 +21,6 @@ impl AppJob for ExampleJob {
         // 獲取當前 UTC+8 時間並格式化
         let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
-        info!("執行定時任務: 發送當前時間 {}", current_time);
-
         // 創建聊天訊息
         let chat_message = ChatMessage::new(
             None,
@@ -37,11 +34,11 @@ impl AppJob for ExampleJob {
         match serde_json::to_string(&chat_message) {
             Ok(json_message) => {
                 if let Err(err) = state.get_tx().send(json_message) {
-                    error!("廣播定時訊息失敗: {}", err);
+                    tracing::error!("廣播定時訊息失敗: {}", err);
                 }
             }
             Err(err) => {
-                error!("序列化聊天訊息失敗: {}", err);
+                tracing::error!("序列化聊天訊息失敗: {}", err);
             }
         }
     }

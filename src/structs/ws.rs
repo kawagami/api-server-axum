@@ -19,6 +19,7 @@ pub enum ChatMessageType {
     Join,
     Leave,
     System,
+    PING,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
