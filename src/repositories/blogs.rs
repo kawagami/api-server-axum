@@ -1,11 +1,11 @@
-use crate::{state::AppStateV2, structs::blogs::DbBlog};
+use crate::{errors::AppError, state::AppStateV2, structs::blogs::DbBlog};
 
 /// 取得帶分頁的 blogs
 pub async fn get_blogs_with_pagination(
     state: &AppStateV2,
     limit: usize,
     offset: usize,
-) -> Result<Vec<DbBlog>, sqlx::Error> {
+) -> Result<Vec<DbBlog>, AppError> {
     sqlx::query_as(
         r#"
             SELECT id, markdown, tocs, tags, created_at, updated_at
@@ -18,10 +18,11 @@ pub async fn get_blogs_with_pagination(
     .bind(offset as i64) // 將偏移量綁定到查詢
     .fetch_all(state.get_pool())
     .await
+    .map_err(AppError::from)
 }
 
 /// 取得特定 blog
-pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog, sqlx::Error> {
+pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog, AppError> {
     sqlx::query_as(
         r#"
             SELECT id, markdown, tocs, tags, created_at, updated_at
@@ -32,10 +33,11 @@ pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog
     .bind(id)
     .fetch_one(state.get_pool())
     .await
+    .map_err(AppError::from)
 }
 
 /// 刪除特定 blog
-pub async fn delete_blog(state: &AppStateV2, id: uuid::Uuid) -> Result<(), sqlx::Error> {
+pub async fn delete_blog(state: &AppStateV2, id: uuid::Uuid) -> Result<(), AppError> {
     sqlx::query(
         r#"
             DELETE FROM blogs
@@ -56,7 +58,7 @@ pub async fn upsert_blog(
     markdown: String,
     tocs: Vec<String>,
     tags: Vec<String>,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), AppError> {
     let query = r#"
             INSERT INTO blogs (id, markdown, tocs, tags, created_at, updated_at)
             VALUES ($1, $2, $3, $4, NOW(), NOW())
