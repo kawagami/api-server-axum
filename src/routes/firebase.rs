@@ -1,5 +1,5 @@
 use crate::{
-    errors::{AppError, RequestError, SystemError},
+    errors::{AppError, RequestError},
     repositories::firebase::{delete as repo_delete, images as repo_images, upload as repo_upload},
     routes::auth,
     state::AppStateV2,
@@ -76,13 +76,7 @@ pub async fn upload(
 }
 
 pub async fn images(State(state): State<AppStateV2>) -> Result<Json<Vec<Image>>, AppError> {
-    let images = repo_images(&state)
-        .await
-        .map_err(|err| {
-            tracing::error!("Failed to fetch images: {}", err);
-            AppError::SystemError(SystemError::Internal("Failed to fetch images".to_string()))
-        })
-        .unwrap_or_default();
+    let images = repo_images(&state).await?;
 
     Ok(Json(images))
 }
@@ -91,10 +85,7 @@ pub async fn delete(
     State(state): State<AppStateV2>,
     Json(delete_data): Json<DeleteImageRequest>,
 ) -> Result<Json<()>, AppError> {
-    repo_delete(&state, delete_data).await.map_err(|err| {
-        tracing::error!("Failed to delete image: {:?}", err);
-        AppError::SystemError(SystemError::Internal("Failed to delete image".to_string()))
-    })?;
+    repo_delete(&state, delete_data).await?;
 
     Ok(Json(()))
 }
