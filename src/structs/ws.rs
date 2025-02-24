@@ -65,6 +65,11 @@ impl ChatMessage {
     pub fn decode(json_str: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(json_str)
     }
+
+    // 新增方法：將 self 轉換成 JSON 字串
+    pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
 }
 
 impl fmt::Display for ChatMessage {

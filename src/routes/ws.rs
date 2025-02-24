@@ -95,7 +95,7 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
 }
 
 // 廣播用戶加入消息
-async fn broadcast_join_message(state: &AppStateV2, token: &str) -> Result<(), WebSocketError> {
+async fn broadcast_join_message(state: &AppStateV2, token: &str) -> Result<(), AppError> {
     let users_result = redis::redis_zrange(state, "online_members")
         .await
         .map_err(|e| WebSocketError::UserManagementFailed(e.to_string()))?;
@@ -109,12 +109,9 @@ async fn broadcast_join_message(state: &AppStateV2, token: &str) -> Result<(), W
         To::All,
     );
 
-    let json_msg = serde_json::to_string(&join_msg)
-        .map_err(|e| WebSocketError::MessageDecodeFailed(e.to_string()))?;
-
     state
         .get_tx()
-        .send(json_msg)
+        .send(join_msg.to_json_string().map_err(AppError::from)?)
         .map_err(|e| WebSocketError::BroadcastFailed(e.to_string()))?;
 
     Ok(())
