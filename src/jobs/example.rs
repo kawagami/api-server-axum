@@ -18,20 +18,16 @@ impl AppJob for ExampleJob {
     }
 
     async fn run(&self, state: AppStateV2) {
-        // 獲取當前 UTC+8 時間並格式化
-        let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-
         // 創建聊天訊息
-        let chat_message = ChatMessage::new(
+        match ChatMessage::new(
             None,
             ChatMessageType::Message,
-            current_time,
+            Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
             "KawaBot".to_string(),
             To::All,
-        );
-
-        // 序列化為 JSON 字串
-        match serde_json::to_string(&chat_message) {
+        )
+        .to_json_string()
+        {
             Ok(json_message) => {
                 if let Err(_err) = state.get_tx().send(json_message) {
                     // tracing::error!("廣播定時訊息失敗: {}", err);
