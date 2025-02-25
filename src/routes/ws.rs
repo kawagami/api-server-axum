@@ -101,17 +101,20 @@ async fn broadcast_join_message(state: &AppStateV2, token: &str) -> Result<(), A
         .map_err(|e| WebSocketError::UserManagementFailed(e.to_string()))?;
 
     let join_users_set = users_result.0.join(",");
-    let join_msg = ChatMessage::new(
-        None,
-        ChatMessageType::Join,
-        join_users_set,
-        token.to_string(),
-        To::All,
-    );
 
     state
         .get_tx()
-        .send(join_msg.to_json_string().map_err(AppError::from)?)
+        .send(
+            ChatMessage::new(
+                None,
+                ChatMessageType::Join,
+                join_users_set,
+                token.to_string(),
+                To::All,
+            )
+            .to_json_string()
+            .map_err(AppError::from)?,
+        )
         .map_err(|e| WebSocketError::BroadcastFailed(e.to_string()))?;
 
     Ok(())
@@ -140,15 +143,15 @@ async fn process_outgoing_messages(
         };
 
         if should_send {
-            let send_msg = ChatMessage::new(
+            let json_msg = match ChatMessage::new(
                 None,
                 data_msg.message_type,
                 data_msg.content,
                 data_msg.from,
                 data_msg.to,
-            );
-
-            let json_msg = match serde_json::to_string(&send_msg) {
+            )
+            .to_json_string()
+            {
                 Ok(j) => j,
                 Err(e) => {
                     tracing::error!("序列化訊息失敗: {}", e);
@@ -189,15 +192,15 @@ async fn process_incoming_messages(
         }
 
         // 廣播訊息
-        let send_msg = ChatMessage::new(
+        let json_msg = match ChatMessage::new(
             None,
             data_msg.message_type,
             data_msg.content,
             data_msg.from,
             data_msg.to,
-        );
-
-        let json_msg = match serde_json::to_string(&send_msg) {
+        )
+        .to_json_string()
+        {
             Ok(j) => j,
             Err(e) => {
                 tracing::error!("序列化回應訊息失敗: {}", e);
@@ -219,26 +222,26 @@ async fn remove_user(state: &AppStateV2, token: &str) -> Result<(), WebSocketErr
 }
 
 // 廣播用戶離開消息
-async fn broadcast_leave_message(state: &AppStateV2, token: &str) -> Result<(), WebSocketError> {
+async fn broadcast_leave_message(state: &AppStateV2, token: &str) -> Result<(), AppError> {
     let users_result = redis::redis_zrange(state, "online_members")
         .await
         .map_err(|e| WebSocketError::UserManagementFailed(e.to_string()))?;
 
     let leave_users_set = users_result.0.join(",");
-    let leave_msg = ChatMessage::new(
-        None,
-        ChatMessageType::Leave,
-        leave_users_set,
-        token.to_string(),
-        To::All,
-    );
-
-    let json_msg = serde_json::to_string(&leave_msg)
-        .map_err(|e| WebSocketError::MessageDecodeFailed(e.to_string()))?;
 
     state
         .get_tx()
-        .send(json_msg)
+        .send(
+            ChatMessage::new(
+                None,
+                ChatMessageType::Leave,
+                leave_users_set,
+                token.to_string(),
+                To::All,
+            )
+            .to_json_string()
+            .map_err(AppError::from)?,
+        )
         .map_err(|e| WebSocketError::BroadcastFailed(e.to_string()))?;
 
     Ok(())

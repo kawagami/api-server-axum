@@ -101,9 +101,6 @@ pub enum WebSocketError {
 
     #[error("在線用戶管理失敗: {0}")]
     UserManagementFailed(String),
-
-    #[error("訊息解析失敗: {0}")]
-    MessageDecodeFailed(String),
 }
 
 impl AppError {
@@ -141,7 +138,6 @@ impl AppError {
                 WebSocketError::ConnectionFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
                 WebSocketError::BroadcastFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
                 WebSocketError::UserManagementFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-                WebSocketError::MessageDecodeFailed(_) => StatusCode::BAD_REQUEST,
             },
         }
     }
