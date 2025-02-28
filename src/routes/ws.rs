@@ -22,17 +22,18 @@ pub fn new() -> Router<AppStateV2> {
         .route("/messages", get(ws_message))
 }
 
+// WebSocket 處理函數
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<QueryParams>,
     State(state): State<AppStateV2>,
 ) -> Result<impl IntoResponse, AppError> {
-    // 驗證token
+    // 驗證 token
     validate_token(&params.token, &state).await?;
     Ok(ws.on_upgrade(move |socket| websocket(socket, state, params.token)))
 }
 
-// 驗證token
+// 驗證 token
 async fn validate_token(token: &str, state: &AppStateV2) -> Result<(), WebSocketError> {
     let is_member_exists = redis::check_member_exists(state, "online_members", token)
         .await
@@ -43,6 +44,7 @@ async fn validate_token(token: &str, state: &AppStateV2) -> Result<(), WebSocket
         return Err(WebSocketError::InvalidToken);
     }
 
+    // 新增用戶至線上列表
     redis::redis_zadd(state, "online_members", token)
         .await
         .map_err(|e| WebSocketError::ConnectionFailed(e.to_string()))?;
@@ -50,30 +52,28 @@ async fn validate_token(token: &str, state: &AppStateV2) -> Result<(), WebSocket
     Ok(())
 }
 
-// 處理WebSocket連線
+// 處理 WebSocket 連線
 async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
     let (mut sender, mut receiver) = stream.split();
     let mut rx = state.get_tx().subscribe();
 
-    // 廣播用戶加入消息
+    // 廣播用戶加入訊息
     if let Err(e) = broadcast_join_message(&state, &token).await {
-        tracing::error!("廣播加入消息失敗: {}", e);
+        tracing::error!("廣播加入訊息失敗: {}", e);
         return;
     }
 
-    // 創建發送任務
+    // 創建發送與接收任務
     let token_clone = token.clone();
     let mut send_task =
         tokio::spawn(
             async move { process_outgoing_messages(&mut rx, &mut sender, token_clone).await },
         );
-
-    // 創建接收任務
     let cp_state = state.clone();
     let mut recv_task =
         tokio::spawn(async move { process_incoming_messages(&mut receiver, &cp_state).await });
 
-    // 等待任一任務結束
+    // 等待任一任務結束後中止另一個
     tokio::select! {
         _ = &mut send_task => {
             recv_task.abort();
@@ -88,13 +88,13 @@ async fn websocket(stream: WebSocket, state: AppStateV2, token: String) {
         tracing::error!("移除用戶失敗: {}", e);
     }
 
-    // 廣播用戶離開消息
+    // 廣播用戶離開訊息
     if let Err(_e) = broadcast_leave_message(&state, &token).await {
-        // tracing::error!("廣播離開消息失敗: {}", e);
+        // tracing::error!("廣播離開訊息失敗: {}", e);
     }
 }
 
-// 廣播用戶加入消息
+// 廣播用戶加入訊息
 async fn broadcast_join_message(state: &AppStateV2, token: &str) -> Result<(), AppError> {
     let users_result = redis::redis_zrange(state, "online_members")
         .await
@@ -120,7 +120,7 @@ async fn broadcast_join_message(state: &AppStateV2, token: &str) -> Result<(), A
     Ok(())
 }
 
-// 處理傳出消息
+// 處理傳出訊息
 async fn process_outgoing_messages(
     rx: &mut tokio::sync::broadcast::Receiver<String>,
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
@@ -135,7 +135,6 @@ async fn process_outgoing_messages(
             }
         };
 
-        // 根據目標決定是否發送
         let should_send = match &data_msg.to {
             To::All => true,
             To::Private(target_user) => target_user == &token || data_msg.from == token,
@@ -160,7 +159,7 @@ async fn process_outgoing_messages(
             };
 
             if sender.send(Message::Text(json_msg.into())).await.is_err() {
-                tracing::error!("發送WebSocket訊息失敗");
+                tracing::error!("發送 WebSocket 訊息失敗");
                 break;
             }
         }
