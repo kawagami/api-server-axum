@@ -1,66 +1,74 @@
-# Template Axum
+# Rust Axum API Server
 
-這是一個使用 [Axum](https://github.com/tokio-rs/axum) 框架構建的 Rust Web 應用模板。該模板整合了多種常用的 Rust 庫，並提供了 Docker 支持，方便快速部署。
+## 簡介
+本專案是一個基於 Rust 和 Axum 框架的 API 伺服器，提供 JWT 驗證、Firebase 整合、WebSocket 服務以及多種 API 端點。
 
-## 功能
+## 主要功能
+- **JWT 驗證** (`/jwt`)
+- **Firebase 整合** (`/firebase`)
+- **WebSocket 服務** (`/ws`)
+- **部落格 API** (`/blogs`)
+- **使用者管理** (`/users`)
+- **工具 API** (`/tools`)
+- **筆記 API** (`/notes`)
+- **CORS 設定**，允許 `https://kawa.homes` 及 `http://localhost:3000`
+- **請求體大小限制**，最大 10MB
+- **排程機制**，初始化時啟動定時任務
 
-- **Web 框架**: 使用 `axum` 作為主要的 Web 框架。
-- **異步支持**: 使用 `tokio` 作為異步運行時。
-- **HTTP 中間件**: 使用 `tower-http` 提供的中間件功能，如 CORS、超時、請求限制等。
-- **日誌記錄**: 使用 `tracing` 和 `tracing-subscriber` 進行日誌記錄。
-- **數據庫支持**: 使用 `sqlx` 進行 PostgreSQL 數據庫操作。
-- **環境變量管理**: 使用 `dotenvy` 管理環境變量。
-- **JSON 序列化/反序列化**: 使用 `serde` 和 `serde_json` 進行 JSON 處理。
-- **身份驗證**: 使用 `jsonwebtoken` 和 `bcrypt` 進行 JWT 身份驗證和密碼哈希。
-- **Redis 支持**: 使用 `bb8` 和 `bb8-redis` 進行 Redis 連接池管理。
-- **圖片處理**: 使用 `image` 庫進行圖片處理。
-- **定時任務**: 使用 `tokio-cron-scheduler` 進行定時任務調度。
-- **錯誤處理**: 使用 `thiserror` 和 `anyhow` 進行錯誤處理。
-- **UUID 生成**: 使用 `uuid` 生成唯一標識符。
-- **正則表達式**: 使用 `regex` 進行正則表達式操作。
+## 環境需求
+- Rust 1.75+
+- Cargo
 
-## 快速開始
-
-### 本地運行
-
-1. 克隆此倉庫：
-   ```bash
-   git clone <repository_url>
-   cd template_axum
+## 安裝與執行
+1. Clone 專案：
+   ```sh
+   git clone https://github.com/your-repo/axum-api-server.git
+   cd axum-api-server
    ```
-
 2. 安裝依賴：
-   ```bash
+   ```sh
    cargo build
    ```
-
-3. 運行應用：
-   ```bash
+3. 執行伺服器：
+   ```sh
    cargo run
    ```
 
-### 使用 Docker 運行
-
-1. 構建 Docker 鏡像：
-   ```bash
-   docker build -t template_axum .
-   ```
-
-2. 運行 Docker 容器：
-   ```bash
-   docker run -p 8080:8080 template_axum
-   ```
-
-## 環境變量
-
-請在 `.env` 文件中設置以下環境變量：
-
-```env
-DATABASE_URL=postgres://user:password@localhost/dbname
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=your_jwt_secret
+## 專案結構
+```
+src/
+├── auth.rs        # JWT 驗證模組
+├── blogs.rs       # 部落格 API
+├── firebase.rs    # Firebase 相關功能
+├── notes.rs       # 筆記 API
+├── root.rs        # 根路由及 404 處理
+├── tools.rs       # 工具 API
+├── users.rs       # 使用者管理 API
+├── ws.rs          # WebSocket 服務
+├── scheduler.rs   # 排程機制
+├── state.rs       # 全域應用狀態
+└── main.rs        # 入口點
 ```
 
-## 依賴
+## API 路由
+| Method | Endpoint      | 描述 |
+|--------|-------------|------|
+| GET    | `/`         | 根路由 |
+| POST   | `/jwt`      | JWT 驗證 |
+| GET    | `/blogs`    | 取得部落格列表 |
+| GET    | `/users`    | 取得使用者列表 |
+| GET    | `/tools`    | 工具 API |
+| GET    | `/notes`    | 筆記 API |
+| GET    | `/ws`       | WebSocket 連線 |
 
-詳細的依賴列表請參考 [Cargo.toml](./Cargo.toml)。
+## CORS 設定
+允許以下來源存取 API：
+- `https://kawa.homes`
+
+允許的方法：
+- `GET`
+- `POST`
+
+允許的標頭：
+- `Authorization`
+- `Content-Type`
