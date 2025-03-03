@@ -11,7 +11,7 @@
 - **使用者管理** (`/users`)
 - **工具 API** (`/tools`)
 - **筆記 API** (`/notes`)
-- **CORS 設定**，允許 `https://kawa.homes` 及 `http://localhost:3000`
+- **CORS 設定**，允許 `https://kawa.homes`
 - **請求體大小限制**，最大 10MB
 - **排程機制**，初始化時啟動定時任務
 
