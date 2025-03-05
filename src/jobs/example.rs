@@ -29,9 +29,7 @@ impl AppJob for ExampleJob {
         .to_json_string()
         {
             Ok(json_message) => {
-                if let Err(_err) = state.get_tx().send(json_message) {
-                    // tracing::error!("廣播定時訊息失敗: {}", err);
-                }
+                let _ = state.get_tx().send(json_message);
             }
             Err(err) => {
                 tracing::error!("序列化聊天訊息失敗: {}", err);
