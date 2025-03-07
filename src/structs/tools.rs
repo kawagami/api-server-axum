@@ -22,24 +22,6 @@ impl Default for Params {
     }
 }
 
-impl Params {
-    pub fn validate(&self) -> Result<(), &'static str> {
-        if self.length < 4 {
-            return Err("Password length must be at least 4 characters");
-        }
-        if self.length > 100 {
-            return Err("Password length must not exceed 100 characters");
-        }
-        if self.count == 0 {
-            return Err("Password count must be at least 1");
-        }
-        if self.count > 100 {
-            return Err("Password count must not exceed 100");
-        }
-        Ok(())
-    }
-}
-
 fn default_count() -> u8 {
     DEFAULT_PASSWORD_COUNT
 }

@@ -40,11 +40,6 @@ impl IntoResponse for AppError {
 }
 
 pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<String>>, AppError> {
-    // 驗證參數
-    if let Err(msg) = params.validate() {
-        return Err(AppError::ValidationError(msg.to_string()));
-    }
-
     let mut rng = rand::thread_rng();
 
     // 生成指定數量的隨機字串
