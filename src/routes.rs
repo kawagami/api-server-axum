@@ -20,10 +20,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 
 pub async fn app() -> Router {
-    let origins = [
-        "https://kawa.homes".parse().unwrap(),
-        "http://localhost:3000".parse().unwrap(),
-    ];
+    let origins = ["https://kawa.homes".parse().unwrap()];
     let state = AppStateV2::new().await;
 
     let _scheduler = initialize_scheduler(state.clone()).await;
