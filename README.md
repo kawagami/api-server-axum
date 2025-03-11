@@ -19,21 +19,6 @@
 - Rust 1.75+
 - Cargo
 
-## 安裝與執行
-1. Clone 專案：
-   ```sh
-   git clone https://github.com/your-repo/axum-api-server.git
-   cd axum-api-server
-   ```
-2. 安裝依賴：
-   ```sh
-   cargo build
-   ```
-3. 執行伺服器：
-   ```sh
-   cargo run
-   ```
-
 ## 專案結構
 ```
 src/
