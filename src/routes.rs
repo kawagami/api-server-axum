@@ -31,7 +31,7 @@ pub async fn app() -> Router {
         .nest("/firebase", firebase::new(state.clone()))
         .nest("/ws", ws::new())
         .nest("/blogs", blogs::new())
-        .nest("/users", users::new())
+        .nest("/users", users::new(state.clone()))
         .nest("/tools", tools::new())
         .nest("/notes", notes::new())
         .layer(DefaultBodyLimit::disable())
