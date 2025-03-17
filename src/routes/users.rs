@@ -1,5 +1,9 @@
 use crate::{
-    errors::AppError, repositories::users, routes::auth, state::AppStateV2, structs::users::User,
+    errors::AppError,
+    repositories::users,
+    routes::auth,
+    state::AppStateV2,
+    structs::users::{NewUser, User},
 };
 use axum::{
     extract::State,
@@ -28,10 +32,12 @@ async fn get_users(State(state): State<AppStateV2>) -> Result<Json<Vec<User>>, A
 }
 
 async fn create_user(
-    State(_state): State<AppStateV2>,
-    Json(_user): Json<User>,
+    State(state): State<AppStateV2>,
+    Json(user): Json<NewUser>,
 ) -> Result<Json<bool>, AppError> {
-    // let result = users::get_users(&state).await.map_err(AppError::from)?;
+    let _result = users::create_user(&state, user)
+        .await
+        .map_err(AppError::from)?;
 
     Ok(Json(true))
 }

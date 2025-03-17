@@ -14,3 +14,10 @@ pub struct DbUser {
     pub email: String,
     pub password: String,
 }
+
+#[derive(Deserialize)]
+pub struct NewUser {
+    pub name: String,
+    pub email: String,
+    pub password: String,
+}
