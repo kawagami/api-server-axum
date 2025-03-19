@@ -78,13 +78,12 @@ pub async fn resize(
 pub async fn caculate_complete_time(
     Query(troops): Query<Troops>,
 ) -> Result<Json<CompleteTimeResponse>, AppError> {
-    tracing::info!("{:#?}", troops);
-
     let remaining_time = (troops.full - troops.now - troops.remaining_troops).max(0); // 確保不小於 0
     let minutes = remaining_time / 127;
     let complete_time = Local::now() + Duration::minutes(minutes);
 
     Ok(Json(CompleteTimeResponse {
         complete_time: complete_time.format("%Y-%m-%d %H:%M:%S").to_string(),
+        minutes: format!("{} 分鐘", minutes),
     }))
 }

@@ -101,4 +101,5 @@ fn default_remaining_troops() -> i64 {
 #[derive(Serialize)]
 pub struct CompleteTimeResponse {
     pub complete_time: String,
+    pub minutes: String,
 }
