@@ -84,6 +84,6 @@ pub async fn caculate_complete_time(
 
     Ok(Json(CompleteTimeResponse {
         complete_time: complete_time.format("%Y-%m-%d %H:%M:%S").to_string(),
-        minutes: format!("{} 分鐘", minutes),
+        minutes,
     }))
 }
