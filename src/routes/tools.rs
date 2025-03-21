@@ -78,7 +78,7 @@ pub async fn resize(
 pub async fn caculate_complete_time(
     Query(troops): Query<Troops>,
 ) -> Result<Json<CompleteTimeResponse>, AppError> {
-    let remaining_time = (troops.full - troops.now - troops.remaining_troops).max(0); // 確保不小於 0
+    let remaining_time = (troops.full - troops.now - troops.remaining_troops).max(0); // 跟 0 比取大者
     let minutes = remaining_time / 127;
     let complete_time = Local::now() + Duration::minutes(minutes);
 
