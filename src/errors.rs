@@ -197,6 +197,12 @@ impl From<serde_json::Error> for AppError {
     }
 }
 
+impl From<reqwest::Error> for AppError {
+    fn from(err: reqwest::Error) -> Self {
+        Self::SystemError(SystemError::Internal(err.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

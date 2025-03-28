@@ -3,6 +3,7 @@ mod blogs;
 mod firebase;
 mod notes;
 mod root;
+mod stocks;
 mod tools;
 mod users;
 mod ws;
@@ -34,6 +35,7 @@ pub async fn app() -> Router {
         .nest("/users", users::new(state.clone()))
         .nest("/tools", tools::new())
         .nest("/notes", notes::new())
+        .nest("/stocks", stocks::new(state.clone()))
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
