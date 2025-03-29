@@ -11,3 +11,21 @@ pub struct Stock {
     #[serde(rename = "MonthlyAveragePrice")]
     pub monthly_average_price: String,
 }
+
+#[derive(Serialize, Deserialize, sqlx::FromRow)]
+pub struct StockRequest {
+    pub stock_no: String,
+    pub start_date: String,
+    pub end_date: String,
+}
+
+#[derive(Serialize, Deserialize, sqlx::FromRow)]
+pub struct StockChange {
+    pub stock_no: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub stock_name: Option<String>,
+    pub start_price: Option<f64>,
+    pub end_price: Option<f64>,
+    pub change: Option<f64>,
+}
