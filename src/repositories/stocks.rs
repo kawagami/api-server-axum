@@ -75,7 +75,35 @@ pub async fn save_request(
 
 pub async fn get_all_stock_changes(state: &AppStateV2) -> Result<Vec<StockChange>, AppError> {
     let pool = state.get_pool();
-    let query = "SELECT stock_no, start_date, end_date, stock_name, start_price, end_price, change FROM stock_changes";
+    let query = r#"
+        SELECT
+            *
+        FROM
+            stock_changes s
+        WHERE
+            s."status" = 'completed'
+        ORDER BY
+            s.start_date DESC;
+    "#;
+    let requests = sqlx::query_as::<_, StockChange>(query)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(requests)
+}
+
+pub async fn get_all_pending_stock_changes(state: &AppStateV2) -> Result<Vec<StockChange>, AppError> {
+    let pool = state.get_pool();
+    let query = r#"
+        SELECT
+            *
+        FROM
+            stock_changes s
+        WHERE
+            s."status" = 'pending'
+        ORDER BY
+            s.start_date DESC;
+    "#;
     let requests = sqlx::query_as::<_, StockChange>(query)
         .fetch_all(pool)
         .await?;

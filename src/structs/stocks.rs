@@ -19,7 +19,7 @@ pub struct StockRequest {
     pub end_date: String,
 }
 
-#[derive(Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Serialize, Deserialize, sqlx::FromRow, Default)]
 pub struct StockChange {
     pub stock_no: String,
     pub start_date: String,
