@@ -169,3 +169,44 @@ pub async fn get_one_pending_stock_change(
         Ok(None)
     }
 }
+
+pub async fn upsert_stock_change(state: &AppStateV2, info: &StockChange) -> Result<(), AppError> {
+    sqlx::query(
+        r#"
+        INSERT INTO stock_changes (
+            stock_no,
+            stock_name,
+            start_date,
+            start_price,
+            end_date,
+            end_price,
+            change,
+            status,
+            created_at,
+            updated_at
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6, $7, 'completed', now(), now()
+        )
+        ON CONFLICT (stock_no, start_date, end_date) 
+        DO UPDATE SET
+            status = 'completed',
+            stock_name = EXCLUDED.stock_name,
+            start_price = EXCLUDED.start_price,
+            end_price = EXCLUDED.end_price,
+            change = EXCLUDED.change,
+            updated_at = now()
+        "#,
+    )
+    .bind(&info.stock_no)
+    .bind(&info.stock_name)
+    .bind(&info.start_date)
+    .bind(&info.start_price)
+    .bind(&info.end_date)
+    .bind(&info.end_price)
+    .bind(&info.change)
+    .execute(state.get_pool())
+    .await?;
+
+    Ok(())
+}

@@ -14,7 +14,10 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .route("/get_codes", get(get_codes))
         .route("/new_pending_stock_change", post(new_pending_stock_change))
         .route("/get_all_stock_changes", get(get_all_stock_changes))
-        .route("/get_all_pending_stock_changes", get(get_all_pending_stock_changes))
+        .route(
+            "/get_all_pending_stock_changes",
+            get(get_all_pending_stock_changes),
+        )
         .route("/get_stock_change_info", post(get_stock_change_info))
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -80,7 +83,7 @@ pub async fn get_all_pending_stock_changes(
     Ok(Json(stocks::get_all_pending_stock_changes(&state).await?))
 }
 
-// 
+//
 pub async fn get_stock_change_info(
     State(state): State<AppStateV2>,
     Json(payload): Json<StockRequest>,
@@ -109,29 +112,12 @@ pub async fn get_stock_change_info(
     // 3️⃣ 沒有資料的話，向 FastAPI 查詢
     let info = stocks::get_stock_change_info(&state, &payload).await?;
 
-    // 4️⃣ 更新新查詢到的資料到資料庫
-    sqlx::query(
-        "
-        INSERT INTO stock_changes (stock_no, stock_name, start_date, start_price, end_date, end_price, change, status, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', now(), now())
-        ON CONFLICT (stock_no, start_date, end_date) DO UPDATE 
-        SET status = 'completed',
-            stock_name = EXCLUDED.stock_name,
-            start_price = EXCLUDED.start_price,
-            end_price = EXCLUDED.end_price,
-            change = EXCLUDED.change,
-            updated_at = now()
+    tracing::info!("get_stock_change_info 成功");
 
-        ")
-    .bind(&info.stock_no) 
-    .bind(&info.stock_name)
-    .bind(&info.start_date)
-    .bind(&info.start_price)
-    .bind(&info.end_date)
-    .bind(&info.end_price)
-    .bind(&info.change)
-    .execute(pool)
-    .await?;
+    // 4️⃣ 更新新查詢到的資料到資料庫
+    let _ = stocks::upsert_stock_change(&state, &info).await;
+
+    tracing::info!("upsert_stock_change 成功");
 
     Ok(Json(info))
 }
