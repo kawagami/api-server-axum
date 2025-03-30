@@ -210,3 +210,36 @@ pub async fn upsert_stock_change(state: &AppStateV2, info: &StockChange) -> Resu
 
     Ok(())
 }
+
+/// 查詢是否已存在特定條件的 stock_change 記錄
+pub async fn get_existing_stock_change(
+    state: &AppStateV2,
+    payload: &StockRequest,
+) -> Result<Option<StockChange>, AppError> {
+    let existing_info = sqlx::query_as::<_, StockChange>(
+        r#"
+        SELECT
+            stock_no,
+            start_date,
+            end_date,
+            stock_name,
+            start_price,
+            end_price,
+            change
+        FROM
+            stock_changes
+        WHERE
+            stock_no = $1
+            AND start_date = $2
+            AND end_date = $3
+            AND status = 'completed'
+        "#,
+    )
+    .bind(&payload.stock_no)
+    .bind(&payload.start_date)
+    .bind(&payload.end_date)
+    .fetch_optional(state.get_pool())
+    .await?;
+
+    Ok(existing_info)
+}

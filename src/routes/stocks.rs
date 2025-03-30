@@ -88,31 +88,18 @@ pub async fn get_stock_change_info(
     State(state): State<AppStateV2>,
     Json(payload): Json<StockRequest>,
 ) -> Result<Json<StockChange>, AppError> {
-    let pool = state.get_pool();
+    // 先查詢資料庫是否已有該筆資料
+    let existing_info = stocks::get_existing_stock_change(&state, &payload).await?;
 
-    // 1️⃣ 先查詢資料庫是否已有該筆資料
-    let existing_info = sqlx::query_as(
-        "
-        SELECT stock_no, start_date, end_date, stock_name, start_price, end_price, change
-        FROM stock_changes
-        WHERE stock_no = $1 AND start_date = $2 AND end_date = $3 AND status = 'completed'
-        ",
-    )
-    .bind(&payload.stock_no)
-    .bind(&payload.start_date)
-    .bind(&payload.end_date)
-    .fetch_optional(pool)
-    .await?;
-
-    // 2️⃣ 如果資料已存在，直接返回
+    // 如果資料已存在，直接返回
     if let Some(info) = existing_info {
         return Ok(Json(info));
     }
 
-    // 3️⃣ 沒有資料的話，向 FastAPI 查詢
+    // 沒有資料的話，向 FastAPI 查詢
     let info = stocks::get_stock_change_info(&state, &payload).await?;
 
-    // 4️⃣ 更新新查詢到的資料到資料庫
+    // 更新新查詢到的資料到資料庫
     let _ = stocks::upsert_stock_change(&state, &info).await;
 
     Ok(Json(info))
