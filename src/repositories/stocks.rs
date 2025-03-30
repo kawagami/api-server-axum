@@ -3,6 +3,7 @@ use crate::{
     state::AppStateV2,
     structs::stocks::{Stock, StockChange, StockRequest},
 };
+use sqlx::Row;
 
 pub async fn get_codes(state: &AppStateV2) -> Result<Vec<Stock>, AppError> {
     let client = state.get_http_client();
@@ -92,7 +93,9 @@ pub async fn get_all_stock_changes(state: &AppStateV2) -> Result<Vec<StockChange
     Ok(requests)
 }
 
-pub async fn get_all_pending_stock_changes(state: &AppStateV2) -> Result<Vec<StockChange>, AppError> {
+pub async fn get_all_pending_stock_changes(
+    state: &AppStateV2,
+) -> Result<Vec<StockChange>, AppError> {
     let pool = state.get_pool();
     let query = r#"
         SELECT
@@ -134,4 +137,35 @@ pub async fn get_stock_change_info(
     }
 
     Ok(response.json::<StockChange>().await?)
+}
+
+pub async fn get_one_pending_stock_change(
+    state: &AppStateV2,
+) -> anyhow::Result<Option<StockRequest>> {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            stock_no,
+            start_date,
+            end_date
+        FROM
+            stock_changes
+        WHERE
+            status = 'pending'
+        LIMIT
+            1
+        "#,
+    )
+    .fetch_optional(state.get_pool())
+    .await?;
+
+    if let Some(row) = row {
+        Ok(Some(StockRequest {
+            stock_no: row.get("stock_no"),
+            start_date: row.get("start_date"),
+            end_date: row.get("end_date"),
+        }))
+    } else {
+        Ok(None)
+    }
 }

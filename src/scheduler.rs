@@ -1,5 +1,8 @@
 use crate::{
-    jobs::{blogs::ActiveImageJob, example::ExampleJob, notes::FetchNotesJob},
+    jobs::{
+        blogs::ActiveImageJob, example::ExampleJob, notes::FetchNotesJob,
+        stocks::ConsumePendingStockChangeJob,
+    },
     state::AppStateV2,
     structs::jobs::AppJob,
 };
@@ -10,9 +13,15 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 pub async fn initialize_scheduler(state: AppStateV2) -> Arc<Mutex<JobScheduler>> {
     let scheduler = Arc::new(Mutex::new(JobScheduler::new().await.unwrap()));
 
-    add_job_to_scheduler(scheduler.clone(), state.clone(), FetchNotesJob).await;
     add_job_to_scheduler(scheduler.clone(), state.clone(), ExampleJob).await;
+    add_job_to_scheduler(scheduler.clone(), state.clone(), FetchNotesJob).await;
     add_job_to_scheduler(scheduler.clone(), state.clone(), ActiveImageJob).await;
+    add_job_to_scheduler(
+        scheduler.clone(),
+        state.clone(),
+        ConsumePendingStockChangeJob,
+    )
+    .await;
 
     scheduler.lock().await.start().await.unwrap();
     scheduler
