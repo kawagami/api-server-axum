@@ -29,3 +29,9 @@ pub struct StockChange {
     pub end_price: Option<f64>,
     pub change: Option<f64>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BuybackDuration {
+    pub start_date: String,
+    pub end_date: String,
+}

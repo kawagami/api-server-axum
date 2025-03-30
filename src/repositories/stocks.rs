@@ -243,3 +243,68 @@ pub async fn get_existing_stock_change(
 
     Ok(existing_info)
 }
+
+pub async fn insert_stock_data_batch(
+    state: &AppStateV2,
+    stocks: &[StockRequest],
+) -> Result<usize, AppError> {
+    let mut tx = state.get_pool().begin().await?;
+
+    let query = "
+        INSERT INTO stock_changes (stock_no, start_date, end_date, status, created_at, updated_at)
+        SELECT * FROM UNNEST(
+            $1::text[], $2::text[], $3::text[], 
+            $4::text[], $5::timestamptz[], $6::timestamptz[]
+        )
+        ON CONFLICT (stock_no, start_date, end_date) DO NOTHING;
+    ";
+
+    let stock_nos: Vec<&str> = stocks.iter().map(|s| s.stock_no.as_str()).collect();
+    let start_dates: Vec<&str> = stocks.iter().map(|s| s.start_date.as_str()).collect();
+    let end_dates: Vec<&str> = stocks.iter().map(|s| s.end_date.as_str()).collect();
+    let statuses: Vec<&str> = vec!["pending"; stocks.len()]; // 預設 'pending'
+    let timestamps: Vec<&str> = vec!["NOW()"; stocks.len()]; // `NOW()`
+
+    sqlx::query(query)
+        .bind(&stock_nos)
+        .bind(&start_dates)
+        .bind(&end_dates)
+        .bind(&statuses)
+        .bind(&timestamps)
+        .bind(&timestamps)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(stocks.len())
+}
+
+// 將打 fastapi 失敗的資料改成 failed
+pub async fn update_stock_change_failed(
+    state: &AppStateV2,
+    stock: &StockRequest,
+) -> Result<(), AppError> {
+    let mut tx = state.get_pool().begin().await?;
+
+    // status 欄位改成 failed 的 update sql where
+    let query = r#"
+            UPDATE stock_changes
+            SET
+                updated_at = NOW(),
+                status = 'failed'
+            WHERE
+                stock_no = $1
+                AND start_date = $2
+                AND end_date = $3
+        "#;
+
+    sqlx::query(query)
+        .bind(&stock.stock_no)
+        .bind(&stock.start_date)
+        .bind(&stock.end_date)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(())
+}

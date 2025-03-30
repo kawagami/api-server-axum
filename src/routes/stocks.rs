@@ -1,6 +1,7 @@
+use crate::errors::RequestError;
 use crate::repositories::stocks;
 use crate::state::AppStateV2;
-use crate::structs::stocks::{StockChange, StockRequest};
+use crate::structs::stocks::{BuybackDuration, StockChange, StockRequest};
 use crate::{errors::AppError, routes::auth};
 use axum::{
     extract::State,
@@ -8,6 +9,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use scraper::{Html, Selector};
 
 pub fn new(state: AppStateV2) -> Router<AppStateV2> {
     Router::new()
@@ -19,6 +21,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             get(get_all_pending_stock_changes),
         )
         .route("/get_stock_change_info", post(get_stock_change_info))
+        .route("/buyback_stock_record", post(buyback_stock_record))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -103,4 +106,93 @@ pub async fn get_stock_change_info(
     let _ = stocks::upsert_stock_change(&state, &info).await;
 
     Ok(Json(info))
+}
+
+//依照 input 的時間區間抓資料
+pub async fn buyback_stock_record(
+    State(state): State<AppStateV2>,
+    Json(payload): Json<BuybackDuration>,
+) -> Result<Json<Vec<StockRequest>>, AppError> {
+    // Create HTTP client
+    let client = state.get_http_client();
+
+    // Prepare form data
+    let form_data = form_urlencoded::Serializer::new(String::new())
+        .append_pair("encodeURIComponent", "1")
+        .append_pair("step", "1")
+        .append_pair("firstin", "1")
+        .append_pair("off", "1")
+        .append_pair("TYPEK", "sii")
+        .append_pair("d1", &payload.start_date)
+        .append_pair("d2", &payload.end_date)
+        .append_pair("RD", "1")
+        .finish();
+
+    // Send POST request to get the data
+    let response = client
+        .post("https://mopsov.twse.com.tw/mops/web/ajax_t35sc09")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(form_data)
+        .send()
+        .await?;
+
+    // Check if request was successful
+    if !response.status().is_success() {
+        return Err(AppError::RequestError(RequestError::InvalidContent(
+            "取資料失敗".to_string(),
+        )));
+    }
+
+    // Parse the HTML content
+    let html = response.text().await?;
+
+    let records = parse_document(html);
+
+    // 這裡要使用 insert_stock_data_batch
+    let _ = stocks::insert_stock_data_batch(&state, &records).await?;
+
+    // let ttt = stocks::test_insert_stock_data_batch()?;
+
+    // Ok(Json(data))
+    Ok(Json(records))
+    // Ok(Json(vec![]))
+}
+
+fn parse_document(html: String) -> Vec<StockRequest> {
+    let document = Html::parse_document(&html);
+
+    // Define selectors for the table rows
+    let row_selector = Selector::parse("tr.odd, tr.even").unwrap();
+
+    // Extract data from each row
+    let mut records = Vec::new();
+
+    for row in document.select(&row_selector) {
+        let cells: Vec<_> = row.select(&Selector::parse("td").unwrap()).collect();
+
+        // Skip rows that don't have enough cells
+        if cells.len() < 11 {
+            continue;
+        }
+
+        // Extract company code (2nd cell)
+        let stock_no = cells[1].text().collect::<String>().trim().to_string();
+
+        // Extract buyback period start date (9th cell)
+        let start_date = cells[9].text().collect::<String>().trim().replace("/", "");
+
+        // Extract buyback period end date (10th cell)
+        let end_date = cells[10].text().collect::<String>().trim().replace("/", "");
+
+        // Create and store record
+        let record = StockRequest {
+            stock_no,
+            start_date,
+            end_date,
+        };
+
+        records.push(record);
+    }
+
+    records
 }

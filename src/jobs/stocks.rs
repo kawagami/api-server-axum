@@ -1,5 +1,7 @@
 use crate::{
-    repositories::stocks::{get_one_pending_stock_change, get_stock_change_info},
+    repositories::stocks::{
+        get_one_pending_stock_change, get_stock_change_info, update_stock_change_failed,
+    },
     state::AppStateV2,
     structs::jobs::AppJob,
 };
@@ -29,7 +31,12 @@ impl AppJob for ConsumePendingStockChangeJob {
         let stock_info = match get_stock_change_info(&state, &pending_stock).await {
             Ok(info) => info,
             Err(err) => {
-                tracing::debug!("Error fetching stock change info: {:?}", err);
+                tracing::debug!(
+                    "Error fetching stock change info: {:?}, stock_no: {}",
+                    err,
+                    pending_stock.stock_no
+                );
+                let _ = update_stock_change_failed(&state, &pending_stock).await;
                 return;
             }
         };
