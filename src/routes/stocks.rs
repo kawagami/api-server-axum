@@ -112,12 +112,8 @@ pub async fn get_stock_change_info(
     // 3️⃣ 沒有資料的話，向 FastAPI 查詢
     let info = stocks::get_stock_change_info(&state, &payload).await?;
 
-    tracing::info!("get_stock_change_info 成功");
-
     // 4️⃣ 更新新查詢到的資料到資料庫
     let _ = stocks::upsert_stock_change(&state, &info).await;
-
-    tracing::info!("upsert_stock_change 成功");
 
     Ok(Json(info))
 }
