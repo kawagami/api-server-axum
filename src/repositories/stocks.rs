@@ -308,3 +308,22 @@ pub async fn update_stock_change_failed(
     tx.commit().await?;
     Ok(())
 }
+
+pub async fn update_stock_change_pending(
+    state: &AppStateV2,
+) -> Result<Vec<StockRequest>, AppError> {
+    let mut tx = state.get_pool().begin().await?;
+
+    // status 欄位改成 failed 的 update sql where
+    let query = r#"
+            SELECT stock_no, start_date, end_date
+            FROM stock_changes
+            WHERE
+                status = 'failed'
+        "#;
+
+    let data: Vec<StockRequest> = sqlx::query_as(query).fetch_all(&mut *tx).await?;
+
+    tx.commit().await?;
+    Ok(data)
+}

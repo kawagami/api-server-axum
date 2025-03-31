@@ -22,6 +22,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         )
         .route("/get_stock_change_info", post(get_stock_change_info))
         .route("/buyback_stock_record", post(buyback_stock_record))
+        .route("/get_all_failed", get(get_all_failed))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -195,4 +196,10 @@ fn parse_document(html: String) -> Vec<StockRequest> {
     }
 
     records
+}
+
+pub async fn get_all_failed(
+    State(state): State<AppStateV2>,
+) -> Result<Json<Vec<StockRequest>>, AppError> {
+    Ok(Json(stocks::update_stock_change_pending(&state).await?))
 }
