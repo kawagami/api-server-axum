@@ -201,5 +201,5 @@ fn parse_document(html: String) -> Vec<StockRequest> {
 pub async fn get_all_failed(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockRequest>>, AppError> {
-    Ok(Json(stocks::update_stock_change_pending(&state).await?))
+    Ok(Json(stocks::get_all_failed(&state).await?))
 }
