@@ -320,9 +320,7 @@ pub async fn get_all_failed(state: &AppStateV2) -> Result<Vec<StockRequest>, App
     Ok(sqlx::query_as(query).fetch_all(state.get_pool()).await?)
 }
 
-pub async fn _update_stock_change_pending(
-    state: &AppStateV2,
-) -> Result<Vec<StockRequest>, AppError> {
+pub async fn update_stock_change_pending(state: &AppStateV2) -> Result<(), AppError> {
     let mut tx = state.get_pool().begin().await?;
 
     // status 欄位改成 failed 的 update sql where
@@ -335,8 +333,8 @@ pub async fn _update_stock_change_pending(
                 "status" = 'failed';
         "#;
 
-    let data: Vec<StockRequest> = sqlx::query_as(query).fetch_all(&mut *tx).await?;
+    sqlx::query(query).fetch_all(&mut *tx).await?;
 
     tx.commit().await?;
-    Ok(data)
+    Ok(())
 }

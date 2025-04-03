@@ -6,7 +6,7 @@ use crate::{errors::AppError, routes::auth};
 use axum::{
     extract::State,
     middleware,
-    routing::{get, post},
+    routing::{get, patch, post},
     Json, Router,
 };
 use scraper::{Html, Selector};
@@ -23,6 +23,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .route("/get_stock_change_info", post(get_stock_change_info))
         .route("/buyback_stock_record", post(buyback_stock_record))
         .route("/get_all_failed", get(get_all_failed))
+        .route("/update_stock_change_pending", patch(update_stock_change_pending))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -202,4 +203,10 @@ pub async fn get_all_failed(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockRequest>>, AppError> {
     Ok(Json(stocks::get_all_failed(&state).await?))
+}
+
+pub async fn update_stock_change_pending(
+    State(state): State<AppStateV2>,
+) -> Result<Json<()>, AppError> {
+    Ok(Json(stocks::update_stock_change_pending(&state).await?))
 }
