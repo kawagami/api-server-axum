@@ -332,3 +332,26 @@ pub async fn update_stock_change_pending(state: &AppStateV2) -> Result<(), AppEr
     tx.commit().await?;
     Ok(())
 }
+
+pub async fn update_one_stock_change_pending(state: &AppStateV2, id: i32) -> Result<(), AppError> {
+    let mut tx = state.get_pool().begin().await?;
+
+    // status 欄位改成 failed 的 update sql where
+    let query = r#"
+            UPDATE stock_changes
+            SET
+                "status" = 'pending',
+                stock_name = NULL,
+                start_price = NULL,
+                end_price = NULL,
+                change = NULL,
+                updated_at = NOW ()
+            WHERE
+                id = $1;
+        "#;
+
+    sqlx::query(query).bind(id).fetch_all(&mut *tx).await?;
+
+    tx.commit().await?;
+    Ok(())
+}

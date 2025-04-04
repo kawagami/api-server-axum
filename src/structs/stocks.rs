@@ -37,3 +37,8 @@ pub struct BuybackDuration {
     pub start_date: String,
     pub end_date: String,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StockChangeId {
+    pub id: i32,
+}

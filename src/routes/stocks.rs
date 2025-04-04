@@ -1,7 +1,7 @@
 use crate::errors::RequestError;
 use crate::repositories::stocks;
 use crate::state::AppStateV2;
-use crate::structs::stocks::{BuybackDuration, StockChange, StockRequest};
+use crate::structs::stocks::{BuybackDuration, StockChange, StockChangeId, StockRequest};
 use crate::{errors::AppError, routes::auth};
 use axum::{
     extract::State,
@@ -23,7 +23,14 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .route("/get_stock_change_info", post(get_stock_change_info))
         .route("/buyback_stock_record", post(buyback_stock_record))
         .route("/get_all_failed", get(get_all_failed))
-        .route("/update_stock_change_pending", patch(update_stock_change_pending))
+        .route(
+            "/update_stock_change_pending",
+            patch(update_stock_change_pending),
+        )
+        .route(
+            "/update_one_stock_change_pending",
+            patch(update_one_stock_change_pending),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -209,4 +216,14 @@ pub async fn update_stock_change_pending(
     State(state): State<AppStateV2>,
 ) -> Result<Json<()>, AppError> {
     Ok(Json(stocks::update_stock_change_pending(&state).await?))
+}
+
+// 將有資料的 stock_change 改成 pending
+pub async fn update_one_stock_change_pending(
+    State(state): State<AppStateV2>,
+    Json(payload): Json<StockChangeId>,
+) -> Result<Json<()>, AppError> {
+    Ok(Json(
+        stocks::update_one_stock_change_pending(&state, payload.id).await?,
+    ))
 }
