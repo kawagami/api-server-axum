@@ -21,9 +21,11 @@ pub struct StockRequest {
 
 #[derive(Serialize, Deserialize, sqlx::FromRow, Default)]
 pub struct StockChange {
+    pub id: i32,
     pub stock_no: String,
     pub start_date: String,
     pub end_date: String,
+    pub status: Option<String>,
     pub stock_name: Option<String>,
     pub start_price: Option<f64>,
     pub end_price: Option<f64>,

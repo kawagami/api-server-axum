@@ -81,14 +81,10 @@ pub async fn get_all_stock_changes(state: &AppStateV2) -> Result<Vec<StockChange
             *
         FROM
             stock_changes s
-        WHERE
-            s."status" = 'completed'
         ORDER BY
             s.start_date DESC;
     "#;
-    let requests = sqlx::query_as::<_, StockChange>(query)
-        .fetch_all(pool)
-        .await?;
+    let requests: Vec<StockChange> = sqlx::query_as(query).fetch_all(pool).await?;
 
     Ok(requests)
 }
@@ -107,9 +103,7 @@ pub async fn get_all_pending_stock_changes(
         ORDER BY
             s.start_date DESC;
     "#;
-    let requests = sqlx::query_as::<_, StockChange>(query)
-        .fetch_all(pool)
-        .await?;
+    let requests: Vec<StockChange> = sqlx::query_as(query).fetch_all(pool).await?;
 
     Ok(requests)
 }
