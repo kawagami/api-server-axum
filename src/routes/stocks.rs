@@ -2,11 +2,11 @@ use crate::errors::RequestError;
 use crate::repositories::stocks;
 use crate::state::AppStateV2;
 use crate::structs::stocks::{
-    BuybackDuration, StockChange, StockChangeId, StockChangeWithoutId, StockRequest,
+    BuybackDuration, Conditions, StockChange, StockChangeId, StockChangeWithoutId, StockRequest,
 };
 use crate::{errors::AppError, routes::auth};
 use axum::{
-    extract::State,
+    extract::{Query, State},
     middleware,
     routing::{get, patch, post},
     Json, Router,
@@ -87,8 +87,9 @@ pub async fn new_pending_stock_change(
 
 pub async fn get_all_stock_changes(
     State(state): State<AppStateV2>,
+    Query(payload): Query<Conditions>,
 ) -> Result<Json<Vec<StockChange>>, AppError> {
-    Ok(Json(stocks::get_all_stock_changes(&state).await?))
+    Ok(Json(stocks::get_all_stock_changes(&state, payload).await?))
 }
 
 pub async fn get_all_pending_stock_changes(

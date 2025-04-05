@@ -1,9 +1,9 @@
 use crate::{
     errors::{AppError, RequestError},
     state::AppStateV2,
-    structs::stocks::{Stock, StockChange, StockChangeWithoutId, StockRequest},
+    structs::stocks::{Conditions, Stock, StockChange, StockChangeWithoutId, StockRequest},
 };
-use sqlx::Row;
+use sqlx::{QueryBuilder, Row};
 
 pub async fn get_codes(state: &AppStateV2) -> Result<Vec<Stock>, AppError> {
     let client = state.get_http_client();
@@ -74,17 +74,33 @@ pub async fn save_request(
     Ok(())
 }
 
-pub async fn get_all_stock_changes(state: &AppStateV2) -> Result<Vec<StockChange>, AppError> {
-    let pool = state.get_pool();
-    let query = r#"
+pub async fn get_all_stock_changes(
+    state: &AppStateV2,
+    conditions: Conditions,
+) -> Result<Vec<StockChange>, AppError> {
+    let mut query = QueryBuilder::new(
+        r#"
         SELECT
             *
         FROM
             stock_changes s
-        ORDER BY
-            s.start_date DESC;
-    "#;
-    let requests: Vec<StockChange> = sqlx::query_as(query).fetch_all(pool).await?;
+        WHERE 1=1
+    "#,
+    );
+
+    // Add status condition if it exists
+    if let Some(status) = &conditions.status {
+        query.push(" AND s.status = ");
+        query.push_bind(status);
+    }
+
+    // Add the ordering at the end
+    query.push(" ORDER BY s.start_date DESC");
+
+    tracing::debug!("{}", query.sql());
+
+    // Execute the query with the arguments
+    let requests: Vec<StockChange> = query.build_query_as().fetch_all(state.get_pool()).await?;
 
     Ok(requests)
 }

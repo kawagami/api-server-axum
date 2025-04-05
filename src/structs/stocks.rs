@@ -54,3 +54,8 @@ pub struct BuybackDuration {
 pub struct StockChangeId {
     pub id: i32,
 }
+
+#[derive(Deserialize)]
+pub struct Conditions {
+    pub status: Option<String>,
+}
