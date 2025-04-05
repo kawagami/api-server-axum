@@ -97,8 +97,6 @@ pub async fn get_all_stock_changes(
     // Add the ordering at the end
     query.push(" ORDER BY s.start_date DESC");
 
-    tracing::debug!("{}", query.sql());
-
     // Execute the query with the arguments
     let requests: Vec<StockChange> = query.build_query_as().fetch_all(state.get_pool()).await?;
 
