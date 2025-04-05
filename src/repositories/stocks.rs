@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
     state::AppStateV2,
-    structs::stocks::{Stock, StockChange, StockRequest},
+    structs::stocks::{Stock, StockChange, StockChangeWithoutId, StockRequest},
 };
 use sqlx::Row;
 
@@ -112,7 +112,7 @@ pub async fn get_all_pending_stock_changes(
 pub async fn get_stock_change_info(
     state: &AppStateV2,
     stock_form: &StockRequest,
-) -> Result<StockChange, AppError> {
+) -> Result<StockChangeWithoutId, AppError> {
     let client = state.get_http_client();
     let url = format!("{}{}", state.get_fastapi_upload_host(), "/stock-change");
 
@@ -130,7 +130,7 @@ pub async fn get_stock_change_info(
         )));
     }
 
-    Ok(response.json::<StockChange>().await?)
+    Ok(response.json::<StockChangeWithoutId>().await?)
 }
 
 pub async fn get_one_pending_stock_change(
@@ -164,7 +164,10 @@ pub async fn get_one_pending_stock_change(
     }
 }
 
-pub async fn upsert_stock_change(state: &AppStateV2, info: &StockChange) -> Result<(), AppError> {
+pub async fn upsert_stock_change(
+    state: &AppStateV2,
+    info: &StockChangeWithoutId,
+) -> Result<(), AppError> {
     sqlx::query(
         r#"
         INSERT INTO stock_changes (
@@ -209,13 +212,14 @@ pub async fn upsert_stock_change(state: &AppStateV2, info: &StockChange) -> Resu
 pub async fn get_existing_stock_change(
     state: &AppStateV2,
     payload: &StockRequest,
-) -> Result<Option<StockChange>, AppError> {
-    let existing_info = sqlx::query_as::<_, StockChange>(
+) -> Result<Option<StockChangeWithoutId>, AppError> {
+    let existing_info = sqlx::query_as::<_, StockChangeWithoutId>(
         r#"
         SELECT
             stock_no,
             start_date,
             end_date,
+            status,
             stock_name,
             start_price,
             end_price,
@@ -226,7 +230,6 @@ pub async fn get_existing_stock_change(
             stock_no = $1
             AND start_date = $2
             AND end_date = $3
-            AND status = 'completed'
         "#,
     )
     .bind(&payload.stock_no)

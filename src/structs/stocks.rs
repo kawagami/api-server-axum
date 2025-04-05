@@ -32,6 +32,18 @@ pub struct StockChange {
     pub change: Option<f64>,
 }
 
+#[derive(Serialize, Deserialize, sqlx::FromRow, Default)]
+pub struct StockChangeWithoutId {
+    pub stock_no: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub status: Option<String>,
+    pub stock_name: Option<String>,
+    pub start_price: Option<f64>,
+    pub end_price: Option<f64>,
+    pub change: Option<f64>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BuybackDuration {
     pub start_date: String,

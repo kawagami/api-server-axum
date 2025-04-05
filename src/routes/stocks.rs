@@ -1,7 +1,9 @@
 use crate::errors::RequestError;
 use crate::repositories::stocks;
 use crate::state::AppStateV2;
-use crate::structs::stocks::{BuybackDuration, StockChange, StockChangeId, StockRequest};
+use crate::structs::stocks::{
+    BuybackDuration, StockChange, StockChangeId, StockChangeWithoutId, StockRequest,
+};
 use crate::{errors::AppError, routes::auth};
 use axum::{
     extract::State,
@@ -99,7 +101,7 @@ pub async fn get_all_pending_stock_changes(
 pub async fn get_stock_change_info(
     State(state): State<AppStateV2>,
     Json(payload): Json<StockRequest>,
-) -> Result<Json<StockChange>, AppError> {
+) -> Result<Json<StockChangeWithoutId>, AppError> {
     // 先查詢資料庫是否已有該筆資料
     let existing_info = stocks::get_existing_stock_change(&state, &payload).await?;
 
