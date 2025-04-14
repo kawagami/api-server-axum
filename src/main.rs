@@ -4,6 +4,7 @@ mod jobs;
 mod repositories;
 mod routes;
 mod scheduler;
+mod services;
 mod state;
 mod structs;
 
