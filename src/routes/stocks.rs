@@ -18,10 +18,6 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .route("/get_codes", get(get_codes))
         .route("/new_pending_stock_change", post(new_pending_stock_change))
         .route("/get_all_stock_changes", get(get_all_stock_changes))
-        .route(
-            "/get_all_pending_stock_changes",
-            get(get_all_pending_stock_changes),
-        )
         .route("/get_stock_change_info", post(get_stock_change_info))
         .route("/buyback_stock_record", post(buyback_stock_record))
         .route("/get_all_failed", get(get_all_failed))
@@ -90,12 +86,6 @@ pub async fn get_all_stock_changes(
     Query(payload): Query<Conditions>,
 ) -> Result<Json<Vec<StockChange>>, AppError> {
     Ok(Json(stocks::get_all_stock_changes(&state, payload).await?))
-}
-
-pub async fn get_all_pending_stock_changes(
-    State(state): State<AppStateV2>,
-) -> Result<Json<Vec<StockChange>>, AppError> {
-    Ok(Json(stocks::get_all_pending_stock_changes(&state).await?))
 }
 
 //

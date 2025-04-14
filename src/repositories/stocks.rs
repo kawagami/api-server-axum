@@ -103,25 +103,6 @@ pub async fn get_all_stock_changes(
     Ok(requests)
 }
 
-pub async fn get_all_pending_stock_changes(
-    state: &AppStateV2,
-) -> Result<Vec<StockChange>, AppError> {
-    let pool = state.get_pool();
-    let query = r#"
-        SELECT
-            *
-        FROM
-            stock_changes s
-        WHERE
-            s."status" = 'pending'
-        ORDER BY
-            s.start_date DESC;
-    "#;
-    let requests: Vec<StockChange> = sqlx::query_as(query).fetch_all(pool).await?;
-
-    Ok(requests)
-}
-
 /// 使用 fastapi 獲取股票期間差異
 pub async fn get_stock_change_info(
     state: &AppStateV2,
