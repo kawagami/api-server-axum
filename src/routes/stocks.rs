@@ -150,14 +150,10 @@ pub async fn buyback_stock_record(
 
     let records = parse_document(html);
 
-    // 這裡要使用 insert_stock_data_batch
+    // 批次寫入取得的資料
     let _ = stocks::insert_stock_data_batch(&state, &records).await?;
 
-    // let ttt = stocks::test_insert_stock_data_batch()?;
-
-    // Ok(Json(data))
     Ok(Json(records))
-    // Ok(Json(vec![]))
 }
 
 pub async fn get_all_failed(
