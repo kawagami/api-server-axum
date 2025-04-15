@@ -1,4 +1,8 @@
-use crate::structs::stocks::StockRequest;
+use crate::{
+    errors::{AppError, RequestError},
+    structs::stocks::StockRequest,
+};
+use reqwest::Client;
 use scraper::{Html, Selector};
 
 /// Parses HTML document to extract stock buyback information
@@ -8,7 +12,7 @@ use scraper::{Html, Selector};
 ///
 /// # Returns
 /// A vector of StockRequest objects containing extracted stock information
-pub fn parse_document(html: String) -> Vec<StockRequest> {
+pub fn parse_buyback_stock_raw_html(html: String) -> Vec<StockRequest> {
     let document = Html::parse_document(&html);
 
     // Define all selectors outside the loop
@@ -57,4 +61,40 @@ pub fn parse_document(html: String) -> Vec<StockRequest> {
             })
         })
         .collect()
+}
+
+/// 取得庫藏股列表頁面資訊 string
+pub async fn get_buyback_stock_raw_html_string(
+    reqewst_client: &Client,
+    start_date: &str,
+    end_date: &str,
+) -> Result<String, AppError> {
+    // Prepare form data
+    let form_data = form_urlencoded::Serializer::new(String::new())
+        .append_pair("encodeURIComponent", "1")
+        .append_pair("step", "1")
+        .append_pair("firstin", "1")
+        .append_pair("off", "1")
+        .append_pair("TYPEK", "sii")
+        .append_pair("d1", start_date)
+        .append_pair("d2", end_date)
+        .append_pair("RD", "1")
+        .finish();
+
+    // Send POST request to get the data
+    let response = reqewst_client
+        .post("https://mopsov.twse.com.tw/mops/web/ajax_t35sc09")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(form_data)
+        .send()
+        .await?;
+
+    // Check if request was successful
+    if !response.status().is_success() {
+        return Err(AppError::RequestError(RequestError::InvalidContent(
+            "取資料失敗".to_string(),
+        )));
+    }
+
+    Ok(response.text().await?)
 }

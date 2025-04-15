@@ -1,6 +1,5 @@
-use crate::errors::RequestError;
 use crate::repositories::stocks;
-use crate::services::stocks::parse_document;
+use crate::services::stocks::{get_buyback_stock_raw_html_string, parse_buyback_stock_raw_html};
 use crate::state::AppStateV2;
 use crate::structs::stocks::{
     BuybackDuration, Conditions, StockChange, StockChangeId, StockChangeWithoutId, StockRequest,
@@ -48,21 +47,8 @@ pub async fn new_pending_stock_change(
     State(state): State<AppStateV2>,
     Json(payload): Json<StockRequest>,
 ) -> Result<Json<StockChange>, AppError> {
-    let pool = state.get_pool();
-
     // 先查詢資料庫是否已有該筆資料
-    let existing_info = sqlx::query_as(
-        "
-        SELECT stock_no, start_date, end_date, stock_name, start_price, end_price, change
-        FROM stock_changes
-        WHERE stock_no = $1 AND start_date = $2 AND end_date = $3 AND status = 'pending'
-        ",
-    )
-    .bind(&payload.stock_no)
-    .bind(&payload.start_date)
-    .bind(&payload.end_date)
-    .fetch_optional(pool)
-    .await?;
+    let existing_info = stocks::check_stock_change_pending_exist(&state, &payload).await?;
 
     // 如果資料已存在，直接返回
     if let Some(info) = existing_info {
@@ -70,13 +56,7 @@ pub async fn new_pending_stock_change(
     }
 
     // 沒資料的話加入排程
-    stocks::save_request(
-        &state,
-        &payload.stock_no,
-        &payload.start_date,
-        &payload.end_date,
-    )
-    .await?;
+    stocks::save_request(&state, &payload).await?;
 
     Ok(Json(StockChange::default()))
 }
@@ -110,48 +90,22 @@ pub async fn get_stock_change_info(
     Ok(Json(info))
 }
 
-//依照 input 的時間區間抓資料
+/// 依照 input 的時間區間抓資料
 pub async fn buyback_stock_record(
     State(state): State<AppStateV2>,
     Json(payload): Json<BuybackDuration>,
 ) -> Result<Json<Vec<StockRequest>>, AppError> {
-    // Create HTTP client
-    let client = state.get_http_client();
-
-    // Prepare form data
-    let form_data = form_urlencoded::Serializer::new(String::new())
-        .append_pair("encodeURIComponent", "1")
-        .append_pair("step", "1")
-        .append_pair("firstin", "1")
-        .append_pair("off", "1")
-        .append_pair("TYPEK", "sii")
-        .append_pair("d1", &payload.start_date)
-        .append_pair("d2", &payload.end_date)
-        .append_pair("RD", "1")
-        .finish();
-
-    // Send POST request to get the data
-    let response = client
-        .post("https://mopsov.twse.com.tw/mops/web/ajax_t35sc09")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(form_data)
-        .send()
-        .await?;
-
-    // Check if request was successful
-    if !response.status().is_success() {
-        return Err(AppError::RequestError(RequestError::InvalidContent(
-            "取資料失敗".to_string(),
-        )));
-    }
-
-    // Parse the HTML content
-    let html = response.text().await?;
-
-    let records = parse_document(html);
+    let records = parse_buyback_stock_raw_html(
+        get_buyback_stock_raw_html_string(
+            state.get_http_client(),
+            &payload.start_date,
+            &payload.end_date,
+        )
+        .await?,
+    );
 
     // 批次寫入取得的資料
-    let _ = stocks::insert_stock_data_batch(&state, &records).await?;
+    stocks::insert_stock_data_batch(&state, &records).await?;
 
     Ok(Json(records))
 }

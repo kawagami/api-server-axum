@@ -53,21 +53,16 @@ pub async fn save_codes(state: &AppStateV2, stocks: &[Stock]) -> Result<usize, A
     Ok(stocks.len())
 }
 
-pub async fn save_request(
-    state: &AppStateV2,
-    stock_no: &str,
-    start_date: &str,
-    end_date: &str,
-) -> Result<(), AppError> {
+pub async fn save_request(state: &AppStateV2, payload: &StockRequest) -> Result<(), AppError> {
     let pool = state.get_pool();
     let query = "
         INSERT INTO stock_changes (stock_no, start_date, end_date, status, created_at, updated_at)
         VALUES ($1, $2, $3, 'pending', now(), now())
     ";
     sqlx::query(query)
-        .bind(stock_no)
-        .bind(start_date)
-        .bind(end_date)
+        .bind(&payload.stock_no)
+        .bind(&payload.start_date)
+        .bind(&payload.end_date)
         .execute(pool)
         .await?;
 
@@ -352,4 +347,22 @@ pub async fn update_one_stock_change_pending(state: &AppStateV2, id: i32) -> Res
 
     tx.commit().await?;
     Ok(())
+}
+
+pub async fn check_stock_change_pending_exist(
+    state: &AppStateV2,
+    payload: &StockRequest,
+) -> Result<Option<StockChange>, AppError> {
+    Ok(sqlx::query_as(
+        "
+        SELECT stock_no, start_date, end_date, stock_name, start_price, end_price, change
+        FROM stock_changes
+        WHERE stock_no = $1 AND start_date = $2 AND end_date = $3 AND status = 'pending'
+        ",
+    )
+    .bind(&payload.stock_no)
+    .bind(&payload.start_date)
+    .bind(&payload.end_date)
+    .fetch_optional(state.get_pool())
+    .await?)
 }
