@@ -5,20 +5,19 @@ use crate::{
 };
 use sqlx::{QueryBuilder, Row};
 
-pub async fn get_codes(state: &AppStateV2) -> Result<Vec<Stock>, AppError> {
-    let client = state.get_http_client();
+pub async fn fetch_stock_day_avg_all(state: &AppStateV2) -> Result<Vec<Stock>, AppError> {
     let url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL";
 
-    client
+    Ok(state
+        .get_http_client()
         .get(url)
         .send()
         .await?
         .json::<Vec<Stock>>()
-        .await
-        .map_err(AppError::from)
+        .await?)
 }
 
-pub async fn save_codes(state: &AppStateV2, stocks: &[Stock]) -> Result<usize, AppError> {
+pub async fn save_stock_day_avg_all(state: &AppStateV2, stocks: &[Stock]) -> Result<usize, AppError> {
     let mut tx = state.get_pool().begin().await?;
 
     let query = "

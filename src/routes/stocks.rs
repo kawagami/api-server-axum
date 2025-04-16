@@ -14,7 +14,10 @@ use axum::{
 
 pub fn new(state: AppStateV2) -> Router<AppStateV2> {
     Router::new()
-        .route("/get_codes", get(get_codes))
+        .route(
+            "/fetch_and_save_stock_day_avg_all",
+            get(fetch_and_save_stock_day_avg_all),
+        )
         .route("/new_pending_stock_change", post(new_pending_stock_change))
         .route("/get_all_stock_changes", get(get_all_stock_changes))
         .route("/get_stock_change_info", post(get_stock_change_info))
@@ -33,10 +36,13 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         ))
 }
 
-pub async fn get_codes(State(state): State<AppStateV2>) -> Result<Json<usize>, AppError> {
-    let response = stocks::get_codes(&state).await?;
+/// 打 openapi 取當天所有股票的 STOCK_DAY_AVG_ALL 資料
+pub async fn fetch_and_save_stock_day_avg_all(
+    State(state): State<AppStateV2>,
+) -> Result<Json<usize>, AppError> {
+    let response = stocks::fetch_stock_day_avg_all(&state).await?;
 
-    let count = stocks::save_codes(&state, &response).await?;
+    let count = stocks::save_stock_day_avg_all(&state, &response).await?;
 
     Ok(Json(count))
 }
