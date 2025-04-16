@@ -21,8 +21,8 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .route("/buyback_stock_record", post(buyback_stock_record))
         .route("/get_all_failed", get(get_all_failed))
         .route(
-            "/update_stock_change_pending",
-            patch(update_stock_change_pending),
+            "/reset_failed_stock_changes_to_pending",
+            patch(reset_failed_stock_changes_to_pending),
         )
         .route(
             "/update_one_stock_change_pending",
@@ -116,10 +116,12 @@ pub async fn get_all_failed(
     Ok(Json(stocks::get_all_failed(&state).await?))
 }
 
-pub async fn update_stock_change_pending(
+pub async fn reset_failed_stock_changes_to_pending(
     State(state): State<AppStateV2>,
 ) -> Result<Json<()>, AppError> {
-    Ok(Json(stocks::update_stock_change_pending(&state).await?))
+    Ok(Json(
+        stocks::reset_failed_stock_changes_to_pending(&state).await?,
+    ))
 }
 
 // 將有資料的 stock_change 改成 pending
