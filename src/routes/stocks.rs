@@ -19,7 +19,6 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .route("/get_all_stock_changes", get(get_all_stock_changes))
         .route("/get_stock_change_info", post(get_stock_change_info))
         .route("/buyback_stock_record", post(buyback_stock_record))
-        .route("/get_all_failed", get(get_all_failed))
         .route(
             "/reset_failed_stock_changes_to_pending",
             patch(reset_failed_stock_changes_to_pending),
@@ -108,12 +107,6 @@ pub async fn buyback_stock_record(
     stocks::insert_stock_data_batch(&state, &records).await?;
 
     Ok(Json(records))
-}
-
-pub async fn get_all_failed(
-    State(state): State<AppStateV2>,
-) -> Result<Json<Vec<StockRequest>>, AppError> {
-    Ok(Json(stocks::get_all_failed(&state).await?))
 }
 
 pub async fn reset_failed_stock_changes_to_pending(

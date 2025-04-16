@@ -296,17 +296,6 @@ pub async fn update_stock_change_failed(
     Ok(())
 }
 
-pub async fn get_all_failed(state: &AppStateV2) -> Result<Vec<StockRequest>, AppError> {
-    let query = r#"
-            SELECT stock_no, start_date, end_date
-            FROM stock_changes
-            WHERE
-                status = 'failed'
-        "#;
-
-    Ok(sqlx::query_as(query).fetch_all(state.get_pool()).await?)
-}
-
 pub async fn reset_failed_stock_changes_to_pending(state: &AppStateV2) -> Result<(), AppError> {
     let mut tx = state.get_pool().begin().await?;
 
