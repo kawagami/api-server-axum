@@ -16,6 +16,10 @@ pub struct ActiveImageJob;
 
 #[async_trait]
 impl AppJob for ActiveImageJob {
+    fn enabled(&self) -> bool {
+        std::env::var("ENABLE_ACTIVE_IMAGE_JOB").unwrap_or_else(|_| "true".to_string()) == "true"
+    }
+
     // 凌晨五點執行
     fn cron_expression(&self) -> &str {
         "0 0 21 * * *"

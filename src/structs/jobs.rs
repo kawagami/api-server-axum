@@ -8,4 +8,8 @@ pub trait AppJob {
 
     // 要執行的任務
     async fn run(&self, state: AppStateV2);
+
+    fn enabled(&self) -> bool {
+        true
+    }
 }

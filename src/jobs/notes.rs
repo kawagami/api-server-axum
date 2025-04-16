@@ -12,6 +12,10 @@ pub struct FetchNotesJob;
 
 #[async_trait]
 impl AppJob for FetchNotesJob {
+    fn enabled(&self) -> bool {
+        std::env::var("ENABLE_FETCH_NOTES_JOB").unwrap_or_else(|_| "true".to_string()) == "true"
+    }
+
     fn cron_expression(&self) -> &str {
         "0 0 * * * *" // 每小時執行一次
     }
