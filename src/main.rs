@@ -7,6 +7,7 @@ mod scheduler;
 mod services;
 mod state;
 mod structs;
+mod utils;
 
 use std::env::var;
 use tokio::{net::TcpListener, signal};

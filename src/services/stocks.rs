@@ -1,7 +1,4 @@
-use crate::{
-    errors::{AppError, RequestError},
-    structs::stocks::StockRequest,
-};
+use crate::{errors::AppError, structs::stocks::StockRequest, utils::reqwest::get_raw_html_string};
 use reqwest::Client;
 use scraper::{Html, Selector};
 
@@ -65,36 +62,27 @@ pub fn parse_buyback_stock_raw_html(html: String) -> Vec<StockRequest> {
 
 /// 取得庫藏股列表頁面資訊 string
 pub async fn get_buyback_stock_raw_html_string(
-    reqewst_client: &Client,
+    reqwest_client: &Client,
     start_date: &str,
     end_date: &str,
 ) -> Result<String, AppError> {
-    // Prepare form data
-    let form_data = form_urlencoded::Serializer::new(String::new())
-        .append_pair("encodeURIComponent", "1")
-        .append_pair("step", "1")
-        .append_pair("firstin", "1")
-        .append_pair("off", "1")
-        .append_pair("TYPEK", "sii")
-        .append_pair("d1", start_date)
-        .append_pair("d2", end_date)
-        .append_pair("RD", "1")
-        .finish();
+    let form_data_pairs = vec![
+        ("encodeURIComponent", "1"),
+        ("step", "1"),
+        ("firstin", "1"),
+        ("off", "1"),
+        ("TYPEK", "sii"),
+        ("d1", start_date),
+        ("d2", end_date),
+        ("RD", "1"),
+    ];
 
-    // Send POST request to get the data
-    let response = reqewst_client
-        .post("https://mopsov.twse.com.tw/mops/web/ajax_t35sc09")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(form_data)
-        .send()
-        .await?;
-
-    // Check if request was successful
-    if !response.status().is_success() {
-        return Err(AppError::RequestError(RequestError::InvalidContent(
-            "取資料失敗".to_string(),
-        )));
-    }
-
-    Ok(response.text().await?)
+    get_raw_html_string(
+        reqwest_client,
+        "https://mopsov.twse.com.tw/mops/web/ajax_t35sc09",
+        reqwest::Method::POST,
+        None,
+        Some(form_data_pairs),
+    )
+    .await
 }
