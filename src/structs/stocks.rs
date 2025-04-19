@@ -59,3 +59,18 @@ pub struct StockChangeId {
 pub struct Conditions {
     pub status: Option<String>,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct StockDayAvgResponse {
+    pub stat: String,
+    pub title: String,
+    pub fields: Vec<String>,
+    pub data: Vec<Vec<String>>,
+    pub notes: Vec<String>,
+}
+
+#[derive(Deserialize)]
+pub struct GetStockHistoryPriceRequest {
+    pub stock_no: String,
+    pub date: String,
+}

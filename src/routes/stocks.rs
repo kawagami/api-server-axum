@@ -1,8 +1,11 @@
 use crate::repositories::stocks;
-use crate::services::stocks::{get_buyback_stock_raw_html_string, parse_buyback_stock_raw_html};
+use crate::services::stocks::{
+    get_buyback_stock_raw_html_string, get_stock_day_avg, parse_buyback_stock_raw_html,
+};
 use crate::state::AppStateV2;
 use crate::structs::stocks::{
-    BuybackDuration, Conditions, StockChange, StockChangeId, StockChangeWithoutId, StockRequest,
+    BuybackDuration, Conditions, GetStockHistoryPriceRequest, StockChange, StockChangeId,
+    StockChangeWithoutId, StockDayAvgResponse, StockRequest,
 };
 use crate::{errors::AppError, routes::auth};
 use axum::{
@@ -30,6 +33,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             "/update_one_stock_change_pending",
             patch(update_one_stock_change_pending),
         )
+        .route("/get_stock_history_price", get(get_stock_history_price))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -130,5 +134,15 @@ pub async fn update_one_stock_change_pending(
 ) -> Result<Json<()>, AppError> {
     Ok(Json(
         stocks::update_one_stock_change_pending(&state, payload.id).await?,
+    ))
+}
+
+/// 取歷史收盤價
+pub async fn get_stock_history_price(
+    State(state): State<AppStateV2>,
+    Query(payload): Query<GetStockHistoryPriceRequest>,
+) -> Result<Json<StockDayAvgResponse>, AppError> {
+    Ok(Json(
+        get_stock_day_avg(state.get_http_client(), &payload.stock_no, &payload.date).await?,
     ))
 }
