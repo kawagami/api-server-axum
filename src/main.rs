@@ -21,7 +21,11 @@ async fn main() {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "template_axum=debug".into()),
         )
-        .with(tracing_subscriber::fmt::layer()) // 設定格式化日誌輸出
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_file(true) // 顯示檔案名稱
+                .with_line_number(true), // 顯示行號
+        ) // 設定格式化日誌輸出
         .init();
 
     dotenvy::dotenv().ok(); // 載入 .env 環境變數檔案（若存在）
