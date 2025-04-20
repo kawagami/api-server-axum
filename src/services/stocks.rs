@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     errors::AppError,
-    structs::stocks::{StockDayAvgResponse, StockRequest},
+    structs::stocks::{NewStockClosingPrice, StockDayAvgResponse, StockRequest},
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
 use reqwest::Client;
@@ -143,4 +143,40 @@ fn get_timestamp() -> String {
         .expect("Time went backwards");
 
     now.as_millis().to_string()
+}
+
+pub fn parse_stock_day_avg_response(
+    api: StockDayAvgResponse,
+    stock_no: &str,
+) -> Vec<NewStockClosingPrice> {
+    api.data
+        .iter()
+        .filter_map(|row| {
+            if row.len() != 2 {
+                return None;
+            }
+
+            let date_str = row[0].trim();
+            let price_str = row[1].trim().replace(",", "");
+
+            // 濾掉非日期資料（像「月平均收盤價」）
+            let date_parts: Vec<_> = date_str.split('/').collect();
+            if date_parts.len() != 3 {
+                return None;
+            }
+
+            let year = 1911 + date_parts[0].parse::<i32>().ok()?;
+            let month = date_parts[1].parse::<u32>().ok()?;
+            let day = date_parts[2].parse::<u32>().ok()?;
+
+            let date = chrono::NaiveDate::from_ymd_opt(year, month, day)?;
+            let close_price = price_str.parse::<f64>().ok()?;
+
+            Some(NewStockClosingPrice {
+                stock_no: stock_no.to_string(),
+                date,
+                close_price,
+            })
+        })
+        .collect()
 }

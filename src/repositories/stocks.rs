@@ -1,7 +1,10 @@
 use crate::{
     errors::{AppError, RequestError},
     state::AppStateV2,
-    structs::stocks::{Conditions, Stock, StockChange, StockChangeWithoutId, StockRequest},
+    structs::stocks::{
+        Conditions, NewStockClosingPrice, Stock, StockChange, StockChangeWithoutId,
+        StockClosingPrice, StockRequest,
+    },
 };
 use sqlx::{QueryBuilder, Row};
 
@@ -17,7 +20,10 @@ pub async fn fetch_stock_day_avg_all(state: &AppStateV2) -> Result<Vec<Stock>, A
         .await?)
 }
 
-pub async fn save_stock_day_avg_all(state: &AppStateV2, stocks: &[Stock]) -> Result<usize, AppError> {
+pub async fn save_stock_day_avg_all(
+    state: &AppStateV2,
+    stocks: &[Stock],
+) -> Result<usize, AppError> {
     let mut tx = state.get_pool().begin().await?;
 
     let query = "
@@ -353,4 +359,68 @@ pub async fn check_stock_change_pending_exist(
     .bind(&payload.end_date)
     .fetch_optional(state.get_pool())
     .await?)
+}
+
+pub async fn get_all_stock_closing_prices(
+    state: &AppStateV2,
+) -> Result<Vec<StockClosingPrice>, AppError> {
+    let mut query = QueryBuilder::new(
+        r#"
+        SELECT
+            *
+        FROM
+            stock_closing_prices s
+        WHERE 1=1
+    "#,
+    );
+
+    // // Add status condition if it exists
+    // if let Some(status) = &conditions.status {
+    //     query.push(" AND s.status = ");
+    //     query.push_bind(status);
+    // }
+
+    // Add the ordering at the end
+    query.push(" ORDER BY s.date DESC");
+
+    // Execute the query with the arguments
+    let requests: Vec<StockClosingPrice> =
+        query.build_query_as().fetch_all(state.get_pool()).await?;
+
+    Ok(requests)
+}
+
+pub async fn upsert_stock_closing_prices(
+    state: &AppStateV2,
+    data: &Vec<NewStockClosingPrice>,
+) -> Result<(), AppError> {
+    if data.is_empty() {
+        return Ok(()); // 無資料可寫入
+    }
+
+    let now = chrono::Utc::now().naive_utc(); // 統一時間
+
+    let mut query_builder = QueryBuilder::new(
+        "INSERT INTO stock_closing_prices (stock_no, date, close_price, created_at, updated_at) ",
+    );
+
+    // 插入多筆
+    query_builder.push_values(data.iter(), |mut b, row| {
+        b.push_bind(&row.stock_no)
+            .push_bind(row.date)
+            .push_bind(row.close_price)
+            .push_bind(now)
+            .push_bind(now);
+    });
+
+    // ON CONFLICT 更新條件
+    query_builder.push(
+        " ON CONFLICT (stock_no, date) DO UPDATE SET close_price = EXCLUDED.close_price, updated_at = EXCLUDED.updated_at",
+    );
+
+    let query = query_builder.build();
+
+    query.execute(state.get_pool()).await?;
+
+    Ok(())
 }

@@ -74,3 +74,20 @@ pub struct GetStockHistoryPriceRequest {
     pub stock_no: String,
     pub date: String,
 }
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct StockClosingPrice {
+    pub id: i32,
+    pub stock_no: String,
+    pub date: chrono::NaiveDate,
+    pub close_price: f64,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+}
+
+#[derive(Serialize)]
+pub struct NewStockClosingPrice {
+    pub stock_no: String,
+    pub date: chrono::NaiveDate,
+    pub close_price: f64,
+}

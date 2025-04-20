@@ -1,11 +1,12 @@
 use crate::repositories::stocks;
 use crate::services::stocks::{
     get_buyback_stock_raw_html_string, get_stock_day_avg, parse_buyback_stock_raw_html,
+    parse_stock_day_avg_response,
 };
 use crate::state::AppStateV2;
 use crate::structs::stocks::{
-    BuybackDuration, Conditions, GetStockHistoryPriceRequest, StockChange, StockChangeId,
-    StockChangeWithoutId, StockDayAvgResponse, StockRequest,
+    BuybackDuration, Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, StockChange,
+    StockChangeId, StockChangeWithoutId, StockClosingPrice, StockRequest,
 };
 use crate::{errors::AppError, routes::auth};
 use axum::{
@@ -34,6 +35,10 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             patch(update_one_stock_change_pending),
         )
         .route("/get_stock_history_price", get(get_stock_history_price))
+        .route(
+            "/get_all_stock_closing_prices",
+            get(get_all_stock_closing_prices),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -137,12 +142,25 @@ pub async fn update_one_stock_change_pending(
     ))
 }
 
-/// 取歷史收盤價
+/// 打外部 API 取歷史收盤價
 pub async fn get_stock_history_price(
     State(state): State<AppStateV2>,
     Query(payload): Query<GetStockHistoryPriceRequest>,
-) -> Result<Json<StockDayAvgResponse>, AppError> {
-    Ok(Json(
+) -> Result<Json<Vec<NewStockClosingPrice>>, AppError> {
+    let new_stock_closing_prices = parse_stock_day_avg_response(
         get_stock_day_avg(state.get_http_client(), &payload.stock_no, &payload.date).await?,
-    ))
+        &payload.stock_no,
+    );
+
+    // 將歷史價寫進資料庫
+    stocks::upsert_stock_closing_prices(&state, &new_stock_closing_prices).await?;
+
+    Ok(Json(new_stock_closing_prices))
+}
+
+/// 取資料庫中所有歷史收盤價
+pub async fn get_all_stock_closing_prices(
+    State(state): State<AppStateV2>,
+) -> Result<Json<Vec<StockClosingPrice>>, AppError> {
+    Ok(Json(stocks::get_all_stock_closing_prices(&state).await?))
 }
