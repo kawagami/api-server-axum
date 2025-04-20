@@ -2,8 +2,8 @@ use crate::{
     errors::{AppError, RequestError},
     state::AppStateV2,
     structs::stocks::{
-        Conditions, NewStockClosingPrice, Stock, StockChange, StockChangeWithoutId,
-        StockClosingPrice, StockRequest,
+        Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, Stock, StockChange,
+        StockChangeWithoutId, StockClosingPrice, StockRequest,
     },
 };
 use sqlx::{QueryBuilder, Row};
@@ -388,6 +388,39 @@ pub async fn get_all_stock_closing_prices(
         query.build_query_as().fetch_all(state.get_pool()).await?;
 
     Ok(requests)
+}
+
+pub async fn get_stock_closing_price(
+    state: &AppStateV2,
+    query: &GetStockHistoryPriceRequest,
+) -> Result<Vec<StockClosingPrice>, AppError> {
+    let mut query_builder = QueryBuilder::new(
+        r#"
+        SELECT
+            *
+        FROM
+            stock_closing_prices s
+        WHERE 1=1
+    "#,
+    );
+
+    // 添加股票編號條件 (必填)
+    query_builder.push(" AND s.stock_no = ");
+    query_builder.push_bind(&query.stock_no);
+
+    // 添加日期條件，將 YYYYMMDD 格式的字串轉換為日期格式
+    query_builder.push(" AND s.date = ");
+    query_builder.push(" TO_DATE(");
+    query_builder.push_bind(&query.date);
+    query_builder.push(", 'YYYYMMDD')");
+
+    // 執行查詢並獲取結果
+    let results: Vec<StockClosingPrice> = query_builder
+        .build_query_as()
+        .fetch_all(state.get_pool())
+        .await?;
+
+    Ok(results)
 }
 
 pub async fn upsert_stock_closing_prices(

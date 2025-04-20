@@ -146,6 +146,25 @@ pub async fn get_stock_history_price(
     State(state): State<AppStateV2>,
     Query(payload): Query<GetStockHistoryPriceRequest>,
 ) -> Result<Json<Vec<NewStockClosingPrice>>, AppError> {
+    // 先看資料庫有沒有查詢那個日期的資料
+    let existing_prices = stocks::get_stock_closing_price(&state, &payload).await?;
+
+    // 如果資料庫中已有該股票該日期的資料，則直接返回
+    if !existing_prices.is_empty() {
+        // 將 StockClosingPrice 轉換為 NewStockClosingPrice
+        let result = existing_prices
+            .into_iter()
+            .map(|price| NewStockClosingPrice {
+                stock_no: price.stock_no,
+                date: price.date,
+                close_price: price.close_price,
+            })
+            .collect::<Vec<NewStockClosingPrice>>();
+
+        return Ok(Json(result));
+    }
+
+    // 沒有的話打外部 API 取歷史收盤價
     let new_stock_closing_prices = parse_stock_day_avg_response(
         get_stock_day_avg(state.get_http_client(), &payload.stock_no, &payload.date).await?,
         &payload.stock_no,
