@@ -103,14 +103,18 @@ pub async fn get_all_stock_changes(
     Ok(requests)
 }
 
-/// 使用 fastapi 獲取股票期間差異
+// 預計改用 rust 實現的方式
+// 使用 fastapi 獲取股票期間差異
 pub async fn get_stock_change_info(
     state: &AppStateV2,
     stock_form: &StockRequest,
 ) -> Result<StockChangeWithoutId, AppError> {
     let client = state.get_http_client();
+
+    // 此 API 在 fastapi 打外部 API 取兩個時間點的歷史價格整理後返回
     let url = format!("{}{}", state.get_fastapi_upload_host(), "/stock-change");
 
+    // 把這部分改成 stocks service 完成
     let response = client
         .post(url)
         .json(&stock_form)
