@@ -39,6 +39,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             "/get_all_stock_closing_prices",
             get(get_all_stock_closing_prices),
         )
+        .route("/get_test", get(get_test))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -181,4 +182,20 @@ pub async fn get_all_stock_closing_prices(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockClosingPrice>>, AppError> {
     Ok(Json(stocks::get_all_stock_closing_prices(&state).await?))
+}
+
+// 打外部 API 取歷史收盤價
+pub async fn get_test(
+    State(state): State<AppStateV2>,
+    Query(payload): Query<GetStockHistoryPriceRequest>,
+) -> Result<Json<Vec<NewStockClosingPrice>>, AppError> {
+    // 沒有的話打外部 API 取歷史收盤價
+    let new_stock_closing_prices = parse_stock_day_avg_response(
+        get_stock_day_avg(state.get_http_client(), &payload.stock_no, &payload.date).await?,
+        &payload.stock_no,
+    );
+
+    // 整理 new_stock_closing_prices 依照 指定時間點 > 小於指定時間點 > 大於指定時間點 的優先度取資料
+
+    Ok(Json(new_stock_closing_prices))
 }
