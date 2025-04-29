@@ -226,7 +226,7 @@ pub fn get_stock_price_by_date(
 
 /// 整理 start_date_closing_prices 依照 指定時間點 > 小於指定時間點 > 大於指定時間點 的優先度取資料
 pub async fn fetch_stock_price_for_date(
-    http_client: &reqwest::Client,
+    http_client: &Client,
     stock_no: &str,
     date: &str,
 ) -> Result<NewStockClosingPrice, AppError> {
