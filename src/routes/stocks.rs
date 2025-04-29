@@ -1,7 +1,7 @@
 use crate::repositories::stocks;
 use crate::services::stocks::{
-    get_buyback_stock_raw_html_string, get_stock_day_avg, parse_buyback_stock_raw_html,
-    parse_stock_day_avg_response,
+    fetch_stock_price_for_date, get_buyback_stock_raw_html_string, get_stock_day_avg,
+    parse_buyback_stock_raw_html, parse_stock_day_avg_response,
 };
 use crate::state::AppStateV2;
 use crate::structs::stocks::{
@@ -39,7 +39,10 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             "/get_all_stock_closing_prices",
             get(get_all_stock_closing_prices),
         )
-        .route("/get_test", get(get_test))
+        .route(
+            "/fetch_stock_closing_price_pair",
+            get(fetch_stock_closing_price_pair),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -184,18 +187,25 @@ pub async fn get_all_stock_closing_prices(
     Ok(Json(stocks::get_all_stock_closing_prices(&state).await?))
 }
 
-// 打外部 API 取歷史收盤價
-pub async fn get_test(
+// 打外部 API 取 start_date & end_date 的歷史收盤價
+pub async fn fetch_stock_closing_price_pair(
     State(state): State<AppStateV2>,
-    Query(payload): Query<GetStockHistoryPriceRequest>,
-) -> Result<Json<Vec<NewStockClosingPrice>>, AppError> {
-    // 沒有的話打外部 API 取歷史收盤價
-    let new_stock_closing_prices = parse_stock_day_avg_response(
-        get_stock_day_avg(state.get_http_client(), &payload.stock_no, &payload.date).await?,
+    Query(payload): Query<StockRequest>,
+) -> Result<Json<(NewStockClosingPrice, NewStockClosingPrice)>, AppError> {
+    let start_date_price = fetch_stock_price_for_date(
+        state.get_http_client(),
         &payload.stock_no,
-    );
+        &payload.start_date,
+    )
+    .await?;
 
-    // 整理 new_stock_closing_prices 依照 指定時間點 > 小於指定時間點 > 大於指定時間點 的優先度取資料
+    let end_date_price = fetch_stock_price_for_date(
+        state.get_http_client(),
+        &payload.stock_no,
+        &payload.end_date,
+    )
+    .await?;
 
-    Ok(Json(new_stock_closing_prices))
+    // 返回找到的價格
+    Ok(Json((start_date_price, end_date_price)))
 }

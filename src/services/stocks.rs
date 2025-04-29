@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    errors::AppError,
+    errors::{AppError, RequestError},
     structs::stocks::{NewStockClosingPrice, StockDayAvgResponse, StockRequest},
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
+use chrono::NaiveDate;
 use reqwest::Client;
 use scraper::{Html, Selector};
 
@@ -179,4 +180,62 @@ pub fn parse_stock_day_avg_response(
             })
         })
         .collect()
+}
+
+/// 根據指定日期從股票資料中取得單日資料
+/// 優先順序：指定日期 > 小於指定日期的最近一天 > 大於指定日期的最近一天
+pub fn get_stock_price_by_date(
+    stock_prices: &Vec<NewStockClosingPrice>,
+    target_date_str: &str,
+) -> Result<NewStockClosingPrice, AppError> {
+    let target_date = NaiveDate::parse_from_str(
+        &format!(
+            "{}-{}-{}",
+            &target_date_str[0..4],
+            &target_date_str[4..6],
+            &target_date_str[6..8]
+        ),
+        "%Y-%m-%d",
+    )
+    .map_err(|_| {
+        AppError::RequestError(RequestError::InvalidDateFormat(target_date_str.to_string()))
+    })?;
+
+    if let Some(price) = stock_prices.iter().find(|price| price.date == target_date) {
+        return Ok(price.clone());
+    }
+
+    let less_than_target = stock_prices
+        .iter()
+        .filter(|price| price.date < target_date)
+        .max_by_key(|price| price.date);
+
+    let greater_than_target = stock_prices
+        .iter()
+        .filter(|price| price.date > target_date)
+        .min_by_key(|price| price.date);
+
+    if let Some(price) = less_than_target {
+        Ok(price.clone())
+    } else if let Some(price) = greater_than_target {
+        Ok(price.clone())
+    } else {
+        Err(AppError::RequestError(RequestError::StockPriceNotFound))
+    }
+}
+
+/// 整理 start_date_closing_prices 依照 指定時間點 > 小於指定時間點 > 大於指定時間點 的優先度取資料
+pub async fn fetch_stock_price_for_date(
+    http_client: &reqwest::Client,
+    stock_no: &str,
+    date: &str,
+) -> Result<NewStockClosingPrice, AppError> {
+    // Get historical closing prices from external API
+    let response = get_stock_day_avg(http_client, stock_no, date).await?;
+
+    // Parse the response into closing prices
+    let closing_prices = parse_stock_day_avg_response(response, stock_no);
+
+    // Get the price by date with priority: exact date > before date > after date
+    get_stock_price_by_date(&closing_prices, date)
 }

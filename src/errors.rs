@@ -50,6 +50,12 @@ pub enum RequestError {
 
     #[error("找不到資源")]
     NotFound,
+
+    #[error("無效的日期格式: {0}")]
+    InvalidDateFormat(String),
+
+    #[error("找不到符合條件的股價資料")]
+    StockPriceNotFound,
 }
 
 #[derive(Error, Debug)]
@@ -122,6 +128,8 @@ impl AppError {
                 RequestError::InvalidContent(_) => StatusCode::BAD_REQUEST,
                 RequestError::InvalidJson(_) => StatusCode::UNPROCESSABLE_ENTITY,
                 RequestError::NotFound => StatusCode::NOT_FOUND,
+                RequestError::InvalidDateFormat(_) => StatusCode::NOT_FOUND,
+                RequestError::StockPriceNotFound => StatusCode::NOT_FOUND,
             },
             Self::AuthError(err) => match err {
                 AuthError::MissingToken => StatusCode::UNAUTHORIZED,
