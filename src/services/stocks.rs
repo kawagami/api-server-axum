@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     errors::{AppError, RequestError},
+    repositories::stocks::upsert_stock_closing_prices,
+    state::AppStateV2,
     structs::stocks::{NewStockClosingPrice, StockDayAvgResponse, StockRequest},
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
@@ -226,15 +228,18 @@ pub fn get_stock_price_by_date(
 
 /// 整理 start_date_closing_prices 依照 指定時間點 > 小於指定時間點 > 大於指定時間點 的優先度取資料
 pub async fn fetch_stock_price_for_date(
-    http_client: &Client,
+    state: &AppStateV2,
     stock_no: &str,
     date: &str,
 ) -> Result<NewStockClosingPrice, AppError> {
     // Get historical closing prices from external API
-    let response = get_stock_day_avg(http_client, stock_no, date).await?;
+    let response = get_stock_day_avg(state.get_http_client(), stock_no, date).await?;
 
     // Parse the response into closing prices
     let closing_prices = parse_stock_day_avg_response(response, stock_no);
+
+    // 將取得的盤後價資料紀錄進資料庫
+    upsert_stock_closing_prices(&state, &closing_prices).await?;
 
     // Get the price by date with priority: exact date > before date > after date
     get_stock_price_by_date(&closing_prices, date)

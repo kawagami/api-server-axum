@@ -192,19 +192,11 @@ pub async fn fetch_stock_closing_price_pair(
     State(state): State<AppStateV2>,
     Query(payload): Query<StockRequest>,
 ) -> Result<Json<(NewStockClosingPrice, NewStockClosingPrice)>, AppError> {
-    let start_date_price = fetch_stock_price_for_date(
-        state.get_http_client(),
-        &payload.stock_no,
-        &payload.start_date,
-    )
-    .await?;
+    let start_date_price =
+        fetch_stock_price_for_date(&state, &payload.stock_no, &payload.start_date).await?;
 
-    let end_date_price = fetch_stock_price_for_date(
-        state.get_http_client(),
-        &payload.stock_no,
-        &payload.end_date,
-    )
-    .await?;
+    let end_date_price =
+        fetch_stock_price_for_date(&state, &payload.stock_no, &payload.end_date).await?;
 
     // 返回找到的價格
     Ok(Json((start_date_price, end_date_price)))
