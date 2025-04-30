@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use crate::{
     errors::{AppError, RequestError},
-    repositories::stocks::upsert_stock_closing_prices,
+    repositories::stocks::{get_one_stock_closing_price, upsert_stock_closing_prices},
     state::AppStateV2,
-    structs::stocks::{NewStockClosingPrice, StockDayAvgResponse, StockRequest},
+    structs::stocks::{
+        GetStockHistoryPriceRequest, NewStockClosingPrice, StockDayAvgResponse, StockRequest,
+    },
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
 use chrono::NaiveDate;
@@ -232,6 +234,16 @@ pub async fn fetch_stock_price_for_date(
     stock_no: &str,
     date: &str,
 ) -> Result<NewStockClosingPrice, AppError> {
+    // 先檢查資料庫有沒有該筆資料
+    let data = GetStockHistoryPriceRequest {
+        stock_no: stock_no.to_string(),
+        date: date.to_string(),
+    };
+    // 有資料的話在這邊就 return
+    if let Ok(price) = get_one_stock_closing_price(&state, &data).await {
+        return Ok(price);
+    }
+
     // Get historical closing prices from external API
     let response = get_stock_day_avg(state.get_http_client(), stock_no, date).await?;
 

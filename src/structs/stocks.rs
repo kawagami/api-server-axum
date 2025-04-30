@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Stock {
@@ -12,14 +13,14 @@ pub struct Stock {
     pub monthly_average_price: String,
 }
 
-#[derive(Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Serialize, Deserialize, FromRow)]
 pub struct StockRequest {
     pub stock_no: String,
     pub start_date: String,
     pub end_date: String,
 }
 
-#[derive(Serialize, Deserialize, sqlx::FromRow, Default)]
+#[derive(Serialize, Deserialize, FromRow, Default)]
 pub struct StockChange {
     pub id: i32,
     pub stock_no: String,
@@ -32,7 +33,7 @@ pub struct StockChange {
     pub change: Option<f64>,
 }
 
-#[derive(Serialize, Deserialize, sqlx::FromRow, Default)]
+#[derive(Serialize, Deserialize, FromRow, Default)]
 pub struct StockChangeWithoutId {
     pub stock_no: String,
     pub start_date: String,
@@ -75,7 +76,7 @@ pub struct GetStockHistoryPriceRequest {
     pub date: String,
 }
 
-#[derive(Serialize, sqlx::FromRow)]
+#[derive(Serialize, FromRow)]
 pub struct StockClosingPrice {
     pub id: i32,
     pub stock_no: String,
@@ -85,7 +86,7 @@ pub struct StockClosingPrice {
     pub updated_at: chrono::NaiveDateTime,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, FromRow)]
 pub struct NewStockClosingPrice {
     pub stock_no: String,
     pub date: chrono::NaiveDate,
