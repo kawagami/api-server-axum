@@ -233,8 +233,18 @@ pub async fn fetch_stock_price_for_date(
     stock_no: &str,
     date: &str,
 ) -> Result<NewStockClosingPrice, AppError> {
-    // 抓取資料庫中前後 3 天的範圍
+    // 檢查是否為未來日期
     let date_obj = NaiveDate::parse_from_str(date, "%Y%m%d")?;
+    let today = chrono::Local::now().date_naive();
+    if date_obj > today {
+        return Err(RequestError::InvalidContent(format!(
+            "Cannot fetch stock price for future date: {}",
+            date
+        ))
+        .into());
+    }
+
+    // 抓取資料庫中前後 3 天的範圍
     let start_date = (date_obj - Duration::days(3)).format("%Y%m%d").to_string();
     let end_date = (date_obj + Duration::days(3)).format("%Y%m%d").to_string();
 
