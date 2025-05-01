@@ -198,10 +198,7 @@ pub fn get_stock_price_by_date(
             &target_date_str[6..8]
         ),
         "%Y-%m-%d",
-    )
-    .map_err(|_| {
-        AppError::RequestError(RequestError::InvalidDateFormat(target_date_str.to_string()))
-    })?;
+    )?;
 
     if let Some(price) = stock_prices.iter().find(|price| price.date == target_date) {
         return Ok(price.clone());
@@ -222,7 +219,7 @@ pub fn get_stock_price_by_date(
     } else if let Some(price) = greater_than_target {
         Ok(price.clone())
     } else {
-        Err(AppError::RequestError(RequestError::StockPriceNotFound))
+        Err(RequestError::StockPriceNotFound.into())
     }
 }
 
