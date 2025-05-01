@@ -211,6 +211,12 @@ impl From<reqwest::Error> for AppError {
     }
 }
 
+impl From<chrono::ParseError> for AppError {
+    fn from(err: chrono::ParseError) -> Self {
+        Self::SystemError(SystemError::Internal(err.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

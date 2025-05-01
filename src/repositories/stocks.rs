@@ -462,10 +462,12 @@ pub async fn upsert_stock_closing_prices(
     Ok(())
 }
 
-pub async fn get_one_stock_closing_price(
+pub async fn get_stock_closing_prices_by_date_range(
     state: &AppStateV2,
-    query: &GetStockHistoryPriceRequest,
-) -> Result<NewStockClosingPrice, AppError> {
+    stock_no: &str,
+    start_date: &str,
+    end_date: &str,
+) -> Result<Vec<NewStockClosingPrice>, AppError> {
     let mut query_builder = QueryBuilder::new(
         r#"
         SELECT
@@ -478,18 +480,21 @@ pub async fn get_one_stock_closing_price(
 
     // 添加股票編號條件 (必填)
     query_builder.push(" AND s.stock_no = ");
-    query_builder.push_bind(&query.stock_no);
+    query_builder.push_bind(stock_no);
 
     // 添加日期條件，將 YYYYMMDD 格式的字串轉換為日期格式
-    query_builder.push(" AND s.date = ");
+    query_builder.push(" AND s.date BETWEEN ");
     query_builder.push(" TO_DATE(");
-    query_builder.push_bind(&query.date);
+    query_builder.push_bind(start_date);
+    query_builder.push(", 'YYYYMMDD')");
+    query_builder.push(" AND TO_DATE(");
+    query_builder.push_bind(end_date);
     query_builder.push(", 'YYYYMMDD')");
 
     // 執行查詢並獲取結果
-    let results: NewStockClosingPrice = query_builder
+    let results: Vec<NewStockClosingPrice> = query_builder
         .build_query_as()
-        .fetch_one(state.get_pool())
+        .fetch_all(state.get_pool())
         .await?;
 
     Ok(results)

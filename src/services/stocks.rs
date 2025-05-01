@@ -2,14 +2,12 @@ use std::collections::HashMap;
 
 use crate::{
     errors::{AppError, RequestError},
-    repositories::stocks::{get_one_stock_closing_price, upsert_stock_closing_prices},
+    repositories::stocks::{get_stock_closing_prices_by_date_range, upsert_stock_closing_prices},
     state::AppStateV2,
-    structs::stocks::{
-        GetStockHistoryPriceRequest, NewStockClosingPrice, StockDayAvgResponse, StockRequest,
-    },
+    structs::stocks::{NewStockClosingPrice, StockDayAvgResponse, StockRequest},
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
-use chrono::NaiveDate;
+use chrono::{Duration, NaiveDate};
 use reqwest::Client;
 use scraper::{Html, Selector};
 
@@ -228,31 +226,40 @@ pub fn get_stock_price_by_date(
     }
 }
 
-/// 整理 start_date_closing_prices 依照 指定時間點 > 小於指定時間點 > 大於指定時間點 的優先度取資料
+/// 先查詢資料庫有沒有資料 沒有的話才會打外部 API 查詢
+/// 依照 指定時間點 > 小於指定時間點 > 大於指定時間點 的優先度取資料
 pub async fn fetch_stock_price_for_date(
     state: &AppStateV2,
     stock_no: &str,
     date: &str,
 ) -> Result<NewStockClosingPrice, AppError> {
-    // 先檢查資料庫有沒有該筆資料
-    let data = GetStockHistoryPriceRequest {
-        stock_no: stock_no.to_string(),
-        date: date.to_string(),
-    };
-    // 有資料的話在這邊就 return
-    if let Ok(price) = get_one_stock_closing_price(&state, &data).await {
-        return Ok(price);
+    // 抓取資料庫中前後 3 天的範圍
+    let date_obj = NaiveDate::parse_from_str(date, "%Y%m%d")?;
+    let start_date = (date_obj - Duration::days(3)).format("%Y%m%d").to_string();
+    let end_date = (date_obj + Duration::days(3)).format("%Y%m%d").to_string();
+
+    // 從資料庫獲取日期範圍內的所有股票價格
+    let db_prices =
+        get_stock_closing_prices_by_date_range(state, stock_no, &start_date, &end_date).await?;
+
+    // 資料集合不是空的話 按照優先順序選擇
+    if !db_prices.is_empty() {
+        // 嘗試從資料集合中按優先順序找出合適的價格
+        if let Ok(price) = get_stock_price_by_date(&db_prices, date) {
+            // tracing::info!("從資料庫中找到適合的資料 {:#?}", price);
+            return Ok(price);
+        }
     }
 
-    // Get historical closing prices from external API
+    // 如果沒有合適的資料，從外部 API 獲取
     let response = get_stock_day_avg(state.get_http_client(), stock_no, date).await?;
 
-    // Parse the response into closing prices
+    // 解析響應
     let closing_prices = parse_stock_day_avg_response(response, stock_no);
 
     // 將取得的盤後價資料紀錄進資料庫
-    upsert_stock_closing_prices(&state, &closing_prices).await?;
+    upsert_stock_closing_prices(state, &closing_prices).await?;
 
-    // Get the price by date with priority: exact date > before date > after date
+    // 再次按照優先順序獲取日期的價格
     get_stock_price_by_date(&closing_prices, date)
 }

@@ -86,7 +86,7 @@ pub struct StockClosingPrice {
     pub updated_at: chrono::NaiveDateTime,
 }
 
-#[derive(Serialize, Clone, FromRow)]
+#[derive(Serialize, Clone, FromRow, Debug)]
 pub struct NewStockClosingPrice {
     pub stock_no: String,
     pub date: chrono::NaiveDate,
