@@ -46,9 +46,12 @@ pub async fn get_raw_html_string(
 
     // 檢查請求是否成功
     if !response.status().is_success() {
-        return Err(AppError::RequestError(RequestError::InvalidContent(
-            format!("獲取 {} 頁面數據失敗，狀態碼: {}", url, response.status()),
-        )));
+        return Err(RequestError::InvalidContent(format!(
+            "獲取 {} 頁面數據失敗，狀態碼: {}",
+            url,
+            response.status()
+        ))
+        .into());
     }
 
     Ok(response.text().await?)
@@ -105,9 +108,12 @@ where
 
     // 檢查請求是否成功
     if !response.status().is_success() {
-        return Err(AppError::RequestError(RequestError::InvalidContent(
-            format!("獲取 {} 數據失敗，狀態碼: {}", url, response.status()),
-        )));
+        return Err(RequestError::InvalidContent(format!(
+            "獲取 {} 數據失敗，狀態碼: {}",
+            url,
+            response.status()
+        ))
+        .into());
     }
 
     // 解析 JSON 數據
