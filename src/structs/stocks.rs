@@ -92,3 +92,17 @@ pub struct NewStockClosingPrice {
     pub date: chrono::NaiveDate,
     pub close_price: f64,
 }
+
+#[derive(Serialize)]
+pub struct StockClosingPriceResponse {
+    pub prices: (NewStockClosingPrice, NewStockClosingPrice),
+    pub stats: StockStats,
+}
+
+#[derive(Serialize)]
+pub struct StockStats {
+    pub price_diff: f64,     // end - start
+    pub percent_change: f64, // %
+    pub is_increase: bool,
+    pub day_span: i64, // 天數 (可正可負)
+}

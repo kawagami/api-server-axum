@@ -1,14 +1,18 @@
-use crate::repositories::stocks;
-use crate::services::stocks::{
-    fetch_stock_price_for_date, get_buyback_stock_raw_html_string, get_stock_day_avg,
-    parse_buyback_stock_raw_html, parse_stock_day_avg_response,
+use crate::{
+    errors::AppError,
+    repositories::stocks,
+    routes::auth,
+    services::stocks::{
+        fetch_stock_price_for_date, get_buyback_stock_raw_html_string, get_stock_day_avg,
+        parse_buyback_stock_raw_html, parse_stock_day_avg_response, round_to_n_decimal,
+    },
+    state::AppStateV2,
+    structs::stocks::{
+        BuybackDuration, Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice,
+        StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
+        StockClosingPriceResponse, StockRequest, StockStats,
+    },
 };
-use crate::state::AppStateV2;
-use crate::structs::stocks::{
-    BuybackDuration, Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, StockChange,
-    StockChangeId, StockChangeWithoutId, StockClosingPrice, StockRequest,
-};
-use crate::{errors::AppError, routes::auth};
 use axum::{
     extract::{Query, State},
     middleware,
@@ -42,6 +46,10 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .route(
             "/fetch_stock_closing_price_pair",
             get(fetch_stock_closing_price_pair),
+        )
+        .route(
+            "/fetch_stock_closing_price_pair_stats",
+            get(fetch_stock_closing_price_pair_stats),
         )
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -199,4 +207,40 @@ pub async fn fetch_stock_closing_price_pair(
 
     // 返回找到的價格
     Ok(Json((start_date_price, end_date_price)))
+}
+
+// get_all_stock_closing_prices 增加額外統計資訊
+pub async fn fetch_stock_closing_price_pair_stats(
+    State(state): State<AppStateV2>,
+    Query(payload): Query<StockRequest>,
+) -> Result<Json<StockClosingPriceResponse>, AppError> {
+    let (start_price, end_price) = tokio::try_join!(
+        fetch_stock_price_for_date(&state, &payload.stock_no, &payload.start_date),
+        fetch_stock_price_for_date(&state, &payload.stock_no, &payload.end_date)
+    )?;
+
+    let price_diff = end_price.close_price - start_price.close_price;
+    let raw_percent_change = if start_price.close_price != 0.0 {
+        (price_diff / start_price.close_price) * 100.0
+    } else {
+        0.0
+    };
+    let percent_change = round_to_n_decimal(raw_percent_change, 2);
+    let is_increase = price_diff > 0.0;
+
+    let day_span = (end_price.date - start_price.date).num_days();
+
+    let stats = StockStats {
+        price_diff,
+        percent_change,
+        is_increase,
+        day_span,
+    };
+
+    let response = StockClosingPriceResponse {
+        prices: (start_price, end_price),
+        stats,
+    };
+
+    Ok(Json(response))
 }

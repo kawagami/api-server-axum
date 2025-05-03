@@ -270,3 +270,9 @@ pub async fn fetch_stock_price_for_date(
     // 再次按照優先順序獲取日期的價格
     get_stock_price_by_date(&closing_prices, date)
 }
+
+// 工具函數：四捨五入到小數點 N 位
+pub fn round_to_n_decimal(value: f64, decimals: u32) -> f64 {
+    let factor = 10_f64.powi(decimals as i32);
+    (value * factor).round() / factor
+}
