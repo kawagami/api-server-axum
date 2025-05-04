@@ -84,23 +84,7 @@ where
 
             // 檢查日期是否有效
             match NaiveDate::from_ymd_opt(gregorian_year, month, day) {
-                Some(input_date) => {
-                    let today = chrono::Local::now().date_naive();
-                    if input_date > today {
-                        return Err(E::custom(format!(
-                            "不允許輸入未來日期: {}, 今天是: {}",
-                            value,
-                            format!(
-                                "{}{:02}{:02}",
-                                today.format("%Y").to_string().parse::<i32>().unwrap() - 1911,
-                                today.format("%m").to_string(),
-                                today.format("%d").to_string()
-                            )
-                        )));
-                    }
-
-                    Ok(value.to_string())
-                }
+                Some(_) => Ok(value.to_string()),
                 None => Err(E::custom(format!("無效的日期: {}", value))),
             }
         }
