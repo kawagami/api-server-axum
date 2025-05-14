@@ -5,6 +5,7 @@ use crate::{
     services::stocks::{
         fetch_stock_price_for_date, get_buyback_stock_raw_html_string, get_stock_day_avg,
         parse_buyback_stock_raw_html, parse_stock_day_avg_response, round_to_n_decimal,
+        stock_day_all_service,
     },
     state::AppStateV2,
     structs::stocks::{
@@ -51,6 +52,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             "/fetch_stock_closing_price_pair_stats",
             get(fetch_stock_closing_price_pair_stats),
         )
+        .route("/bulk_insert_stock_day_all", get(bulk_insert_stock_day_all))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -243,4 +245,12 @@ pub async fn fetch_stock_closing_price_pair_stats(
     };
 
     Ok(Json(response))
+}
+
+pub async fn bulk_insert_stock_day_all(
+    State(state): State<AppStateV2>,
+) -> Result<impl axum::response::IntoResponse, AppError> {
+    stock_day_all_service(&state).await?;
+
+    Ok(Json("成功"))
 }

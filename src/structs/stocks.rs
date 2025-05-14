@@ -157,3 +157,9 @@ pub struct StockStats {
     pub is_increase: bool,
     pub day_span: i64, // 天數 (可正可負)
 }
+
+#[derive(Deserialize, Debug)]
+pub struct TwseApiResponse {
+    pub date: String,
+    pub data: Vec<Vec<String>>,
+}
