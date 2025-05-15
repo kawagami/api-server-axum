@@ -124,9 +124,11 @@ pub async fn get_stock_change_info(
 
     // 先檢查狀態碼
     if !response.status().is_success() {
-        return Err(AppError::RequestError(RequestError::InvalidContent(
-            format!("Server returned status code: {}", response.status()),
-        )));
+        return Err(RequestError::InvalidContent(format!(
+            "Server returned status code: {}",
+            response.status()
+        ))
+        .into());
     }
 
     Ok(response.json::<StockChangeWithoutId>().await?)
@@ -145,6 +147,10 @@ pub async fn get_one_pending_stock_change(
             stock_changes
         WHERE
             status = 'pending'
+            AND TO_DATE(
+                (CAST((CAST(end_date AS TEXT)::INT + 19110000) AS TEXT)), 
+                'YYYYMMDD'
+            ) <= CURRENT_DATE
         LIMIT
             1
         "#,
