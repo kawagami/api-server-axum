@@ -17,14 +17,7 @@ tower-http = { version = "0.5", features = [
 ] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-sqlx = { version = "0.8", features = [
-    "runtime-tokio",
-    "tls-rustls-ring",
-    "any",
-    "postgres",
-    "chrono",
-    "uuid",
-] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "any", "postgres", "chrono", "uuid", "rust_decimal"] }
 dotenvy = "0.15.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
@@ -46,3 +39,4 @@ anyhow = "1.0"
 regex = "1"
 form_urlencoded = "1.2.1"
 scraper = "0.23.1"
+rust_decimal = { version = "1", features = ["serde"] }

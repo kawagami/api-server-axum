@@ -3,9 +3,10 @@ use crate::{
     state::AppStateV2,
     structs::stocks::{
         Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, Stock, StockChange,
-        StockChangeWithoutId, StockClosingPrice, StockRequest,
+        StockChangeWithoutId, StockClosingPrice, StockDayAll, StockRequest,
     },
 };
+use chrono::NaiveDate;
 use sqlx::{QueryBuilder, Row};
 
 pub async fn fetch_stock_day_avg_all(state: &AppStateV2) -> Result<Vec<Stock>, AppError> {
@@ -502,6 +503,42 @@ pub async fn get_stock_closing_prices_by_date_range(
         .build_query_as()
         .fetch_all(state.get_pool())
         .await?;
+
+    Ok(results)
+}
+
+// let stock_code: Option<&str> = Some("00645");
+// let trade_date: Option<NaiveDate> = None;
+
+pub async fn get_stock_day_all(
+    state: &AppStateV2,
+    stock_code: Option<String>,
+    trade_date: Option<NaiveDate>,
+) -> Result<Vec<StockDayAll>, AppError> {
+    let mut builder = QueryBuilder::new("SELECT * FROM stock_day_all");
+
+    let mut has_where = false;
+
+    if stock_code.is_some() || trade_date.is_some() {
+        builder.push(" WHERE ");
+    }
+
+    if let Some(code) = stock_code {
+        builder.push("stock_code = ").push_bind(code);
+        has_where = true;
+    }
+
+    if let Some(date) = trade_date {
+        if has_where {
+            builder.push(" AND ");
+        }
+        builder.push("trade_date = ").push_bind(date);
+    }
+
+    builder.push(" ORDER BY trade_date DESC");
+
+    let query = builder.build_query_as::<StockDayAll>();
+    let results = query.fetch_all(state.get_pool()).await?;
 
     Ok(results)
 }

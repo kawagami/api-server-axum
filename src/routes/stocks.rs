@@ -9,8 +9,8 @@ use crate::{
     },
     state::AppStateV2,
     structs::stocks::{
-        BuybackDuration, Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice,
-        StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
+        BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
+        NewStockClosingPrice, StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
         StockClosingPriceResponse, StockRequest, StockStats,
     },
 };
@@ -53,6 +53,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             get(fetch_stock_closing_price_pair_stats),
         )
         .route("/bulk_insert_stock_day_all", get(bulk_insert_stock_day_all))
+        .route("/get_stock_day_all", get(get_stock_day_all))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -253,4 +254,14 @@ pub async fn bulk_insert_stock_day_all(
     stock_day_all_service(&state).await?;
 
     Ok(Json("成功"))
+}
+
+pub async fn get_stock_day_all(
+    State(state): State<AppStateV2>,
+    Query(payload): Query<GetStockDayAll>,
+) -> Result<impl axum::response::IntoResponse, AppError> {
+    let response =
+        stocks::get_stock_day_all(&state, payload.stock_code, payload.trade_date).await?;
+
+    Ok(Json(response))
 }

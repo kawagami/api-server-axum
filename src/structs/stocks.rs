@@ -1,7 +1,8 @@
 use chrono::{NaiveDate, NaiveDateTime};
 use regex::Regex;
+use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use sqlx::prelude::FromRow;
+use sqlx::FromRow;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Stock {
@@ -162,4 +163,26 @@ pub struct StockStats {
 pub struct TwseApiResponse {
     pub date: String,
     pub data: Vec<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+pub struct GetStockDayAll {
+    pub trade_date: Option<NaiveDate>,
+    pub stock_code: Option<String>,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct StockDayAll {
+    pub id: i32,
+    pub trade_date: NaiveDate,
+    pub stock_code: String,
+    pub stock_name: String,
+    pub trade_volume: Option<i64>,
+    pub trade_amount: Option<i64>,
+    pub open_price: Option<Decimal>,
+    pub high_price: Option<Decimal>,
+    pub low_price: Option<Decimal>,
+    pub close_price: Option<Decimal>,
+    pub price_change: Option<Decimal>,
+    pub transaction_count: Option<i32>,
 }
