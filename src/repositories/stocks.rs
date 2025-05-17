@@ -542,3 +542,67 @@ pub async fn get_stock_day_all(
 
     Ok(results)
 }
+
+pub async fn bulk_insert_stock_buyback_periods(
+    state: &AppStateV2,
+    stocks: &[StockRequest],
+) -> Result<usize, AppError> {
+    let mut tx = state.get_pool().begin().await?;
+
+    let query = "
+        INSERT INTO stock_buyback_periods (stock_no, start_date, end_date)
+        SELECT * FROM UNNEST(
+            $1::text[], $2::date[], $3::date[]
+        )
+        ON CONFLICT (stock_no, start_date, end_date) DO NOTHING;
+    ";
+
+    let stock_nos: Vec<&str> = stocks.iter().map(|s| s.stock_no.as_str()).collect();
+
+    // 轉換民國年月日為 NaiveDate
+    let start_dates: Result<Vec<NaiveDate>, AppError> = stocks
+        .iter()
+        .map(|s| roc_date_to_naive_date(s.start_date.as_str()))
+        .collect();
+    let start_dates = start_dates?;
+
+    let end_dates: Result<Vec<NaiveDate>, AppError> = stocks
+        .iter()
+        .map(|s| roc_date_to_naive_date(s.end_date.as_str()))
+        .collect();
+    let end_dates = end_dates?;
+
+    sqlx::query(query)
+        .bind(&stock_nos)
+        .bind(&start_dates)
+        .bind(&end_dates)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(stocks.len())
+}
+
+// 將民國年月日轉換為 NaiveDate
+fn roc_date_to_naive_date(roc_date: &str) -> Result<NaiveDate, AppError> {
+    if roc_date.len() != 7 {
+        return Err(RequestError::InvalidContent(format!("無效的民國日期格式")).into());
+    }
+
+    // 取出民國年、月、日
+    let roc_year = &roc_date[0..3];
+    let month = &roc_date[3..5];
+    let day = &roc_date[5..7];
+
+    // 轉換為數字
+    let roc_year: i32 = roc_year.parse().unwrap();
+    let month: u32 = month.parse().unwrap();
+    let day: u32 = day.parse().unwrap();
+
+    // 民國年轉換為西元年 (民國年+1911=西元年)
+    let gregorian_year = roc_year + 1911;
+
+    // 創建 NaiveDate
+    chrono::NaiveDate::from_ymd_opt(gregorian_year, month, day)
+        .ok_or_else(|| RequestError::InvalidContent(format!("創建 NaiveDate fail")).into())
+}
