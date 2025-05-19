@@ -288,3 +288,8 @@ pub async fn get_stock_buyback_periods(
 
     Ok(Json(records))
 }
+
+/// 取得未到結束日的庫藏股起始日到現在的價格差距 & 資訊
+pub async fn _get_something(State(_state): State<AppStateV2>) -> Result<Json<()>, AppError> {
+    todo!()
+}
