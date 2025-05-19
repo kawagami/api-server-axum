@@ -292,8 +292,28 @@ pub async fn stock_day_all_service(
 
     let trade_date = chrono::NaiveDate::parse_from_str(&resp.date, "%Y%m%d")?;
 
-    let parse_i64 = |s: &str| s.replace(",", "").parse::<i64>().ok();
-    let parse_f64 = |s: &str| s.replace(",", "").parse::<f64>().ok();
+    // 修改解析函數，處理空字符串和 "--" 情況
+    let parse_i64 = |s: &str| {
+        if s.is_empty() || s == "--" {
+            None
+        } else {
+            s.replace(",", "").parse::<i64>().ok()
+        }
+    };
+
+    let parse_f64 = |s: &str| {
+        if s.is_empty() || s == "--" {
+            None
+        } else {
+            let cleaned = s.replace(",", "");
+            // 特別處理 "0" 和 "0.00" 等表示零的情況
+            if cleaned == "0" || cleaned == "0.0" || cleaned == "0.00" {
+                Some(0.0)
+            } else {
+                cleaned.parse::<f64>().ok()
+            }
+        }
+    };
 
     // 收集欄位資料（每欄一個 Vec）
     let mut trade_dates = Vec::new();
