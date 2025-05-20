@@ -305,7 +305,7 @@ pub async fn stock_day_all_service(
         if s.is_empty() || s == "--" {
             None
         } else {
-            let cleaned = s.replace(",", "");
+            let cleaned = s.trim().replace(",", "");
             // 特別處理 "0" 和 "0.00" 等表示零的情況
             if cleaned == "0" || cleaned == "0.0" || cleaned == "0.00" {
                 Some(0.0)
