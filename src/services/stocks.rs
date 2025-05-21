@@ -297,7 +297,8 @@ pub async fn stock_day_all_service(
         if s.is_empty() || s == "--" {
             None
         } else {
-            s.replace(",", "").parse::<i64>().ok()
+            let cleaned = s.trim().replace(",", "");
+            cleaned.parse::<i64>().ok()
         }
     };
 
@@ -306,12 +307,7 @@ pub async fn stock_day_all_service(
             None
         } else {
             let cleaned = s.trim().replace(",", "");
-            // 特別處理 "0" 和 "0.00" 等表示零的情況
-            if cleaned == "0" || cleaned == "0.0" || cleaned == "0.00" {
-                Some(0.0)
-            } else {
-                cleaned.parse::<f64>().ok()
-            }
+            cleaned.parse::<f64>().ok()
         }
     };
 
