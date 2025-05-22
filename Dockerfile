@@ -1,7 +1,8 @@
-FROM rust:1.85.0-slim-bookworm AS builder
+FROM rust:1.87.0-slim-bookworm AS builder
 
 WORKDIR /app
 
+COPY migrations/ migrations/
 COPY src/ src/
 COPY Cargo.toml .
 
@@ -19,6 +20,7 @@ FROM gcr.io/distroless/cc-debian12
 COPY --from=builder /usr/share/zoneinfo/Asia/Taipei /usr/share/zoneinfo/Asia/Taipei
 ENV TZ=Asia/Taipei
 
+COPY --from=builder /app/migrations/ /app/migrations/
 COPY --from=builder /app/target/release/template_axum /app/template_axum
 
 CMD ["/app/template_axum"]
