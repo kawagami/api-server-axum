@@ -223,7 +223,7 @@ pub async fn fetch_stock_closing_price_pair_stats(
         fetch_stock_price_for_date(&state, &payload.stock_no, &payload.end_date)
     )?;
 
-    let price_diff = end_price.close_price - start_price.close_price;
+    let price_diff = round_to_n_decimal(end_price.close_price - start_price.close_price, 2);
     let raw_percent_change = if start_price.close_price != 0.0 {
         (price_diff / start_price.close_price) * 100.0
     } else {
