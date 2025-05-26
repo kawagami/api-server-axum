@@ -2,8 +2,8 @@ use crate::{
     errors::{AppError, RequestError},
     state::AppStateV2,
     structs::stocks::{
-        Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, Stock, StockChange,
-        StockChangeWithoutId, StockClosingPrice, StockDayAll, StockRequest,
+        Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, Stock, StockBuybackInfo,
+        StockChange, StockChangeWithoutId, StockClosingPrice, StockDayAll, StockRequest,
     },
 };
 use chrono::NaiveDate;
@@ -581,6 +581,44 @@ pub async fn bulk_insert_stock_buyback_periods(
 
     tx.commit().await?;
     Ok(stocks.len())
+}
+
+/// 取 stock_buyback_periods 中包含未來日期的庫藏股 起始價格 & 當前價格
+pub async fn get_active_buyback_prices(
+    state: &AppStateV2,
+) -> Result<Vec<StockBuybackInfo>, AppError> {
+    let query = "
+        SELECT
+            p.stock_no,
+            p.start_date,
+            p.end_date,
+            start_date_price.close_price AS price_on_start_date,
+            latest_prices.close_price AS latest_price
+        FROM
+            stock_buyback_periods p
+            LEFT JOIN (
+                SELECT DISTINCT
+                    ON (stock_code) stock_code,
+                    trade_date,
+                    close_price
+                FROM
+                    stock_day_all
+                ORDER BY
+                    stock_code,
+                    trade_date DESC
+            ) latest_prices ON latest_prices.stock_code = p.stock_no
+            LEFT JOIN stock_closing_prices start_date_price ON start_date_price.stock_no = p.stock_no
+            AND start_date_price.date = p.start_date
+        WHERE
+            p.end_date > CURRENT_DATE
+            -- AND start_date_price.close_price IS NULL -- 只取沒起始價格的
+        ORDER BY
+            p.start_date ASC;
+    ";
+
+    let response: Vec<StockBuybackInfo> = sqlx::query_as(query).fetch_all(state.get_pool()).await?;
+
+    Ok(response)
 }
 
 // 將民國年月日轉換為 NaiveDate

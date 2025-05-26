@@ -186,3 +186,28 @@ pub struct StockDayAll {
     pub price_change: Option<Decimal>,
     pub transaction_count: Option<i32>,
 }
+
+/// 給 repository 的 fn get_active_buyback_prices 接收 DB 資料用的結構
+///
+/// 包含股票代號、庫藏股起訖日期，以及起始日價格與最新價格等資訊
+#[derive(Debug, FromRow, Serialize)]
+pub struct StockBuybackInfo {
+    /// 股票代號。
+    pub stock_no: String,
+
+    /// 庫藏股開始日期。
+    pub start_date: NaiveDate,
+
+    /// 庫藏股結束日期。
+    pub end_date: NaiveDate,
+
+    /// 庫藏股開始當日的股價。
+    ///
+    /// 若資料缺漏則為 `None`。
+    pub price_on_start_date: Option<f64>,
+
+    /// 最新的股價。
+    ///
+    /// 若資料尚未更新則為 `None`。
+    pub latest_price: Option<Decimal>,
+}

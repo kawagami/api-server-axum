@@ -10,8 +10,8 @@ use crate::{
     state::AppStateV2,
     structs::stocks::{
         BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
-        NewStockClosingPrice, StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
-        StockClosingPriceResponse, StockRequest, StockStats,
+        NewStockClosingPrice, StockBuybackInfo, StockChange, StockChangeId, StockChangeWithoutId,
+        StockClosingPrice, StockClosingPriceResponse, StockRequest, StockStats,
     },
 };
 use axum::{
@@ -55,6 +55,10 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .route("/bulk_insert_stock_day_all", get(bulk_insert_stock_day_all))
         .route("/get_stock_day_all", get(get_stock_day_all))
         .route("/get_stock_buyback_periods", get(get_stock_buyback_periods))
+        .route(
+            "/get_unfinished_buyback_price_gap",
+            get(get_unfinished_buyback_price_gap),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -157,7 +161,7 @@ pub async fn update_one_stock_change_pending(
     ))
 }
 
-// 打外部 API 取歷史收盤價
+// 打外部 API 取歷史收盤價 寫進 stock_closing_prices table
 pub async fn get_stock_history_price(
     State(state): State<AppStateV2>,
     Query(payload): Query<GetStockHistoryPriceRequest>,
@@ -186,7 +190,7 @@ pub async fn get_stock_history_price(
         &payload.stock_no,
     );
 
-    // 將歷史價寫進資料庫
+    // 將歷史價寫進資料庫 stock_closing_prices 只記錄特定股票在特定日的收盤價
     stocks::upsert_stock_closing_prices(&state, &new_stock_closing_prices).await?;
 
     Ok(Json(new_stock_closing_prices))
@@ -290,6 +294,8 @@ pub async fn get_stock_buyback_periods(
 }
 
 /// 取得未到結束日的庫藏股起始日到現在的價格差距 & 資訊
-pub async fn _get_something(State(_state): State<AppStateV2>) -> Result<Json<()>, AppError> {
-    todo!()
+pub async fn get_unfinished_buyback_price_gap(
+    State(state): State<AppStateV2>,
+) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
+    Ok(Json(stocks::get_active_buyback_prices(&state).await?))
 }
