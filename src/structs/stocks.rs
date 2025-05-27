@@ -211,3 +211,14 @@ pub struct StockBuybackInfo {
     /// 若資料尚未更新則為 `None`。
     pub latest_price: Option<Decimal>,
 }
+
+/// 定義查詢篩選條件的枚舉
+#[derive(Debug, Clone, Copy)]
+pub enum StartPriceFilter {
+    /// 全部（不過濾）
+    All,
+    /// 只有沒起始價格的
+    MissingOnly,
+    /// 只有有起始價格的
+    ExistsOnly,
+}
