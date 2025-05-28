@@ -212,6 +212,17 @@ pub struct StockBuybackInfo {
     pub latest_price: Option<Decimal>,
 }
 
+#[derive(Debug, FromRow, Serialize)]
+pub struct StockBuybackMoreInfo {
+    pub stock_no: String,
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
+    pub price_on_start_date: Option<f64>,
+    pub latest_price: Option<Decimal>,
+    pub diff: Option<Decimal>,
+    pub diff_percent: Option<Decimal>,
+}
+
 /// 定義查詢篩選條件的枚舉
 #[derive(Debug, Clone, Copy)]
 pub enum StartPriceFilter {

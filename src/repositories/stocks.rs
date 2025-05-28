@@ -3,8 +3,8 @@ use crate::{
     state::AppStateV2,
     structs::stocks::{
         Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, StartPriceFilter, Stock,
-        StockBuybackInfo, StockChange, StockChangeWithoutId, StockClosingPrice, StockDayAll,
-        StockRequest,
+        StockBuybackInfo, StockBuybackMoreInfo, StockChange, StockChangeWithoutId,
+        StockClosingPrice, StockDayAll, StockRequest,
     },
 };
 use chrono::NaiveDate;
@@ -587,14 +587,23 @@ pub async fn bulk_insert_stock_buyback_periods(
 /// 取 stock_buyback_periods 中包含未來日期的庫藏股 起始價格 & 當前價格
 pub async fn get_active_buyback_prices(
     state: &AppStateV2,
-) -> Result<Vec<StockBuybackInfo>, AppError> {
+) -> Result<Vec<StockBuybackMoreInfo>, AppError> {
     let query = "
         SELECT
             p.stock_no,
             p.start_date,
             p.end_date,
             start_date_price.close_price AS price_on_start_date,
-            latest_prices.close_price AS latest_price
+            latest_prices.close_price AS latest_price,
+            ROUND((latest_prices.close_price - start_date_price.close_price)::numeric, 2) AS diff,
+            ROUND(
+                CASE 
+                    WHEN start_date_price.close_price IS NOT NULL AND start_date_price.close_price <> 0 
+                    THEN ((latest_prices.close_price - start_date_price.close_price) / start_date_price.close_price)::numeric * 100
+                    ELSE NULL
+                END, 
+                2
+            ) AS diff_percent
         FROM
             stock_buyback_periods p
             LEFT JOIN (
@@ -608,16 +617,28 @@ pub async fn get_active_buyback_prices(
                     stock_code,
                     trade_date DESC
             ) latest_prices ON latest_prices.stock_code = p.stock_no
-            LEFT JOIN stock_closing_prices start_date_price ON start_date_price.stock_no = p.stock_no
-            AND start_date_price.date = p.start_date
+            LEFT JOIN LATERAL (
+                SELECT
+                    close_price
+                FROM
+                    stock_closing_prices
+                WHERE
+                    stock_no = p.stock_no
+                    AND date BETWEEN p.start_date AND p.start_date  + INTERVAL '3 days'
+                ORDER BY
+                    date ASC
+                LIMIT
+                    1
+            ) AS start_date_price ON TRUE
         WHERE
             p.end_date > CURRENT_DATE
-            -- AND start_date_price.close_price IS NULL -- 只取沒起始價格的
+            AND start_date_price.close_price IS NOT NULL
         ORDER BY
             p.start_date ASC;
     ";
 
-    let response: Vec<StockBuybackInfo> = sqlx::query_as(query).fetch_all(state.get_pool()).await?;
+    let response: Vec<StockBuybackMoreInfo> =
+        sqlx::query_as(query).fetch_all(state.get_pool()).await?;
 
     Ok(response)
 }

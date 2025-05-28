@@ -10,8 +10,9 @@ use crate::{
     state::AppStateV2,
     structs::stocks::{
         BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
-        NewStockClosingPrice, StockBuybackInfo, StockChange, StockChangeId, StockChangeWithoutId,
-        StockClosingPrice, StockClosingPriceResponse, StockRequest, StockStats,
+        NewStockClosingPrice, StockBuybackMoreInfo, StockChange, StockChangeId,
+        StockChangeWithoutId, StockClosingPrice, StockClosingPriceResponse, StockRequest,
+        StockStats,
     },
 };
 use axum::{
@@ -296,6 +297,6 @@ pub async fn get_stock_buyback_periods(
 /// 取得未到結束日的庫藏股起始日到現在的價格差距 & 資訊
 pub async fn get_unfinished_buyback_price_gap(
     State(state): State<AppStateV2>,
-) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
+) -> Result<Json<Vec<StockBuybackMoreInfo>>, AppError> {
     Ok(Json(stocks::get_active_buyback_prices(&state).await?))
 }
