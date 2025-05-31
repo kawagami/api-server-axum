@@ -2,7 +2,7 @@ use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{redis, users},
     state::AppStateV2,
-    structs::auth::{Claims, CurrentUser, SignInData},
+    structs::auth::{Claims, CurrentUser, PasswordInput, SignInData},
 };
 use axum::{
     body::Body,
@@ -17,7 +17,9 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 
 pub fn new() -> Router<AppStateV2> {
-    Router::new().route("/", post(sign_in))
+    Router::new()
+        .route("/", post(sign_in))
+        .route("/hash", post(hash_password_handler))
 }
 
 // 授權中介層，驗證請求的 JWT token
@@ -135,8 +137,15 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, AppError> {
         .map_err(|_| AppError::SystemError(SystemError::Internal("密碼驗證處理失敗".to_string())))
 }
 
+pub async fn hash_password_handler(
+    Json(input): Json<PasswordInput>,
+) -> Result<Json<String>, AppError> {
+    let hashed = hash_password(&input.password)?;
+    Ok(Json(hashed))
+}
+
 // 哈希用戶密碼
-pub fn _hash_password(password: &str) -> Result<String, AppError> {
+pub fn hash_password(password: &str) -> Result<String, AppError> {
     hash(password, DEFAULT_COST)
         .map_err(|_| AppError::SystemError(SystemError::Internal("密碼哈希失敗".to_string())))
 }
