@@ -46,10 +46,6 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             get(get_all_stock_closing_prices),
         )
         .route(
-            "/fetch_stock_closing_price_pair",
-            get(fetch_stock_closing_price_pair),
-        )
-        .route(
             "/fetch_stock_closing_price_pair_stats",
             get(fetch_stock_closing_price_pair_stats),
         )
@@ -204,21 +200,7 @@ pub async fn get_all_stock_closing_prices(
     Ok(Json(stocks::get_all_stock_closing_prices(&state).await?))
 }
 
-// 打外部 API 取 start_date & end_date 的歷史收盤價
-pub async fn fetch_stock_closing_price_pair(
-    State(state): State<AppStateV2>,
-    Query(payload): Query<StockRequest>,
-) -> Result<Json<(NewStockClosingPrice, NewStockClosingPrice)>, AppError> {
-    let (start_date_price, end_date_price) = tokio::try_join!(
-        fetch_stock_price_for_date(&state, &payload.stock_no, &payload.start_date),
-        fetch_stock_price_for_date(&state, &payload.stock_no, &payload.end_date)
-    )?;
-
-    // 返回找到的價格
-    Ok(Json((start_date_price, end_date_price)))
-}
-
-// get_all_stock_closing_prices 增加額外統計資訊
+// 打外部 API 取 start_date & end_date 的歷史收盤價 增加額外統計資訊
 pub async fn fetch_stock_closing_price_pair_stats(
     State(state): State<AppStateV2>,
     Query(payload): Query<StockRequest>,
