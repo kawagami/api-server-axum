@@ -236,6 +236,7 @@ pub async fn fetch_stock_closing_price_pair_stats(
     Ok(Json(response))
 }
 
+/// Job StockDayAllJob 會排程執行 可考慮移除
 pub async fn bulk_insert_stock_day_all(
     State(state): State<AppStateV2>,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
