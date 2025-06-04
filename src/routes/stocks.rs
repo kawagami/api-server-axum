@@ -62,7 +62,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         ))
 }
 
-// 打 openapi 取當天所有股票的 STOCK_DAY_AVG_ALL 資料
+/// 打 openapi 取當天所有股票的 STOCK_DAY_AVG_ALL 資料
 pub async fn fetch_and_save_stock_day_avg_all(
     State(state): State<AppStateV2>,
 ) -> Result<Json<usize>, AppError> {
@@ -73,7 +73,7 @@ pub async fn fetch_and_save_stock_day_avg_all(
     Ok(Json(count))
 }
 
-// 新增 pending 的等待查詢的股票代號 & 時間區間
+/// 新增 pending 的等待查詢的股票代號 & 時間區間
 pub async fn new_pending_stock_change(
     State(state): State<AppStateV2>,
     Json(payload): Json<StockRequest>,
@@ -120,7 +120,7 @@ pub async fn get_stock_change_info(
     Ok(Json(info))
 }
 
-// 依照 input 的時間區間抓資料
+/// 依照 input 的時間區間抓資料
 pub async fn buyback_stock_record(
     State(state): State<AppStateV2>,
     Json(payload): Json<BuybackDuration>,
@@ -158,7 +158,7 @@ pub async fn update_one_stock_change_pending(
     ))
 }
 
-// 打外部 API 取歷史收盤價 寫進 stock_closing_prices table
+/// 打外部 API 取歷史收盤價 寫進 stock_closing_prices table
 pub async fn get_stock_history_price(
     State(state): State<AppStateV2>,
     Query(payload): Query<GetStockHistoryPriceRequest>,
@@ -193,14 +193,14 @@ pub async fn get_stock_history_price(
     Ok(Json(new_stock_closing_prices))
 }
 
-// 取資料庫中所有歷史收盤價
+/// 取資料庫中所有歷史收盤價
 pub async fn get_all_stock_closing_prices(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockClosingPrice>>, AppError> {
     Ok(Json(stocks::get_all_stock_closing_prices(&state).await?))
 }
 
-// 打外部 API 取 start_date & end_date 的歷史收盤價 增加額外統計資訊
+/// 打外部 API 取 start_date & end_date 的歷史收盤價 增加額外統計資訊
 pub async fn fetch_stock_closing_price_pair_stats(
     State(state): State<AppStateV2>,
     Query(payload): Query<StockRequest>,
