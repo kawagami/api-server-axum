@@ -2,63 +2,13 @@ use crate::{
     errors::{AppError, RequestError},
     state::AppStateV2,
     structs::stocks::{
-        Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, StartPriceFilter, Stock,
+        Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, StartPriceFilter,
         StockBuybackInfo, StockBuybackMoreInfo, StockChange, StockChangeWithoutId,
         StockClosingPrice, StockDayAll, StockRequest,
     },
 };
 use chrono::NaiveDate;
 use sqlx::{QueryBuilder, Row};
-
-pub async fn fetch_stock_day_avg_all(state: &AppStateV2) -> Result<Vec<Stock>, AppError> {
-    let url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL";
-
-    Ok(state
-        .get_http_client()
-        .get(url)
-        .send()
-        .await?
-        .json::<Vec<Stock>>()
-        .await?)
-}
-
-pub async fn save_stock_day_avg_all(
-    state: &AppStateV2,
-    stocks: &[Stock],
-) -> Result<usize, AppError> {
-    let mut tx = state.get_pool().begin().await?;
-
-    let query = "
-        INSERT INTO stocks (code, name, closing_price, monthly_average_price)
-        SELECT * FROM UNNEST($1::text[], $2::text[], $3::float8[], $4::float8[])
-        ON CONFLICT (code) DO UPDATE 
-        SET name = EXCLUDED.name,
-            closing_price = EXCLUDED.closing_price,
-            monthly_average_price = EXCLUDED.monthly_average_price;
-    ";
-
-    let codes: Vec<&str> = stocks.iter().map(|s| s.code.as_str()).collect();
-    let names: Vec<&str> = stocks.iter().map(|s| s.name.as_str()).collect();
-    let closing_prices: Vec<f64> = stocks
-        .iter()
-        .map(|s| s.closing_price.parse().unwrap_or(0.0))
-        .collect();
-    let monthly_avg_prices: Vec<f64> = stocks
-        .iter()
-        .map(|s| s.monthly_average_price.parse().unwrap_or(0.0))
-        .collect();
-
-    sqlx::query(query)
-        .bind(&codes)
-        .bind(&names)
-        .bind(&closing_prices)
-        .bind(&monthly_avg_prices)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
-    Ok(stocks.len())
-}
 
 pub async fn save_request(state: &AppStateV2, payload: &StockRequest) -> Result<(), AppError> {
     let pool = state.get_pool();
