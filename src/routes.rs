@@ -6,7 +6,6 @@ mod root;
 mod stocks;
 mod tools;
 mod users;
-mod ws;
 
 use crate::{scheduler::initialize_scheduler, state::AppStateV2};
 use axum::{
@@ -30,7 +29,6 @@ pub async fn app() -> Router {
         .merge(root::new())
         .nest("/jwt", auth::new())
         .nest("/firebase", firebase::new(state.clone()))
-        .nest("/ws", ws::new())
         .nest("/blogs", blogs::new())
         .nest("/users", users::new(state.clone()))
         .nest("/tools", tools::new())

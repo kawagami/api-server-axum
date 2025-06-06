@@ -4,4 +4,3 @@ pub mod notes;
 pub mod redis;
 pub mod stocks;
 pub mod users;
-pub mod ws;

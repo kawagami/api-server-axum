@@ -6,4 +6,3 @@ pub mod notes;
 pub mod stocks;
 pub mod tools;
 pub mod users;
-pub mod ws;

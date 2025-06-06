@@ -32,9 +32,6 @@ pub enum AppError {
     // 系統錯誤
     #[error("系統錯誤: {0}")]
     SystemError(#[from] SystemError),
-
-    #[error("WebSocket錯誤: {0}")]
-    WebSocketError(#[from] WebSocketError),
 }
 
 #[derive(Error, Debug)]
@@ -91,21 +88,6 @@ pub enum SystemError {
     Internal(String),
 }
 
-#[derive(Error, Debug)]
-pub enum WebSocketError {
-    #[error("無效的Token")]
-    InvalidToken,
-
-    #[error("WebSocket連接失敗: {0}")]
-    ConnectionFailed(String),
-
-    #[error("訊息廣播失敗: {0}")]
-    BroadcastFailed(String),
-
-    #[error("在線用戶管理失敗: {0}")]
-    UserManagementFailed(String),
-}
-
 impl AppError {
     fn error_response(&self) -> ErrorResponse {
         let status = self.status_code();
@@ -137,12 +119,6 @@ impl AppError {
                 AuthError::InvalidPassword => StatusCode::UNAUTHORIZED,
             },
             Self::SystemError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::WebSocketError(err) => match err {
-                WebSocketError::InvalidToken => StatusCode::UNAUTHORIZED,
-                WebSocketError::ConnectionFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-                WebSocketError::BroadcastFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-                WebSocketError::UserManagementFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            },
         }
     }
 
@@ -172,9 +148,6 @@ impl IntoResponse for AppError {
             }
             AppError::RequestError(_) => {
                 tracing::debug!(?self, "Request error occurred");
-            }
-            AppError::WebSocketError(_) => {
-                tracing::debug!(?self, "WS error occurred");
             }
         }
 

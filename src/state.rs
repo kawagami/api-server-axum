@@ -3,11 +3,9 @@ use bb8_redis::RedisConnectionManager;
 use reqwest::Client;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::{sync::Arc, time::Duration};
-use tokio::sync::broadcast;
 
 pub struct AppState {
     pub pool: Pool<Postgres>,
-    pub tx: broadcast::Sender<String>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
     pub http_client: Client,
     pub fastapi_upload_host: String,
@@ -16,7 +14,6 @@ pub struct AppState {
 impl AppState {
     pub async fn new() -> Self {
         let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
-        let (tx, _rx) = broadcast::channel(64);
 
         let pool = PgPoolOptions::new()
             .max_connections(20)
@@ -47,7 +44,6 @@ impl AppState {
 
         Self {
             pool,
-            tx,
             redis_pool,
             http_client,
             fastapi_upload_host,
@@ -66,10 +62,6 @@ impl AppStateV2 {
 
     pub fn get_pool(&self) -> &Pool<Postgres> {
         &self.0.pool
-    }
-
-    pub fn get_tx(&self) -> broadcast::Sender<String> {
-        self.0.tx.clone()
     }
 
     pub fn get_redis_pool(&self) -> &RedisPool<RedisConnectionManager> {

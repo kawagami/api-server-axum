@@ -2,20 +2,20 @@ use crate::state::AppStateV2;
 use axum::response::Json;
 use redis::{AsyncCommands, RedisError};
 
-pub async fn redis_zadd(state: &AppStateV2, key: &str, member: &str) -> Result<(), RedisError> {
+pub async fn _redis_zadd(state: &AppStateV2, key: &str, member: &str) -> Result<(), RedisError> {
     let mut conn = state.get_redis_conn().await?;
     let score = chrono::Utc::now().timestamp_millis();
 
     conn.zadd(key, member, score).await
 }
 
-pub async fn redis_zrem(state: &AppStateV2, key: &str, members: &str) -> Result<(), RedisError> {
+pub async fn _redis_zrem(state: &AppStateV2, key: &str, members: &str) -> Result<(), RedisError> {
     let mut conn = state.get_redis_conn().await?;
 
     conn.zrem(key, members).await
 }
 
-pub async fn redis_zrange(state: &AppStateV2, key: &str) -> Result<Json<Vec<String>>, RedisError> {
+pub async fn _redis_zrange(state: &AppStateV2, key: &str) -> Result<Json<Vec<String>>, RedisError> {
     let mut conn = state.get_redis_conn().await?;
 
     Ok(Json(conn.zrange(key, 0, -1).await?))
@@ -30,7 +30,7 @@ pub async fn _redis_zrevrange(
     Ok(Json(conn.zrevrange(key, 0, -1).await?))
 }
 
-pub async fn check_member_exists(
+pub async fn _check_member_exists(
     state: &AppStateV2,
     key: &str,
     member: &str,
