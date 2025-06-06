@@ -1,5 +1,4 @@
 mod errors;
-mod games;
 mod image_processor;
 mod jobs;
 mod repositories;
