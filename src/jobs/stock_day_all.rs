@@ -7,7 +7,7 @@ pub struct StockDayAllJob;
 #[async_trait]
 impl AppJob for StockDayAllJob {
     fn cron_expression(&self) -> &str {
-        "0 0 17 * * *" // UTC+8 的 01:00 執行即可
+        "0 0 8,20 * * *" // UTC+8 的 16:00 & 04:00 執行
     }
 
     async fn run(&self, state: AppStateV2) {
