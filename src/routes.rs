@@ -6,6 +6,7 @@ mod root;
 mod stocks;
 mod tools;
 mod users;
+mod ws;
 
 use crate::{scheduler::initialize_scheduler, state::AppStateV2};
 use axum::{
@@ -34,6 +35,7 @@ pub async fn app() -> Router {
         .nest("/tools", tools::new())
         .nest("/notes", notes::new())
         .nest("/stocks", stocks::new(state.clone()))
+        .nest("/ws", ws::new(state.clone()))
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(

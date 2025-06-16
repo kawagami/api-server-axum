@@ -40,3 +40,5 @@ regex = "1"
 form_urlencoded = "1.2.1"
 scraper = "0.23.1"
 rust_decimal = { version = "1", features = ["serde"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+axum-extra = { version = "0.10.1", features = ["typed-header"] }
