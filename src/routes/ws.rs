@@ -12,6 +12,9 @@ use axum_extra::{headers, TypedHeader};
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::net::SocketAddr;
 use std::ops::ControlFlow;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::time::{Duration, Instant};
 
 pub fn new(_state: AppStateV2) -> Router<AppStateV2> {
     Router::new().route("/", get(ws_handler))
@@ -89,6 +92,10 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     // unsolicited messages to client based on some sort of server's internal event (i.e .timer).
     let (mut sender, mut receiver) = socket.split();
 
+    // 用於追踪最後一次收到 ping/pong 的時間
+    let last_ping_time = Arc::new(Mutex::new(Instant::now()));
+    let last_ping_time_clone = last_ping_time.clone();
+
     // Spawn a task that will push several messages to the client (does not matter what client does)
     let mut send_task = tokio::spawn(async move {
         let n_msg = 20;
@@ -123,12 +130,41 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
         let mut cnt = 0;
         while let Some(Ok(msg)) = receiver.next().await {
             cnt += 1;
+
+            // 如果收到 ping 或 pong，更新時間戳
+            match &msg {
+                Message::Ping(_) | Message::Pong(_) => {
+                    *last_ping_time_clone.lock().await = Instant::now();
+                    tracing::debug!("Updated last ping time for {who}");
+                }
+                _ => {}
+            }
+
             // print message and break if instructed to do so
             if process_message(msg, who).is_break() {
                 break;
             }
         }
         cnt
+    });
+
+    // 添加超時檢查任務
+    let mut timeout_task = tokio::spawn(async move {
+        let timeout_duration = Duration::from_secs(60); // 60 秒超時
+
+        loop {
+            tokio::time::sleep(Duration::from_secs(10)).await; // 每10秒檢查一次
+
+            let last_ping = *last_ping_time.lock().await;
+            let elapsed = last_ping.elapsed();
+
+            if elapsed > timeout_duration {
+                tracing::warn!(
+                    "Client {who} exceeded ping timeout ({elapsed:?}), closing connection"
+                );
+                return true; // 超時
+            }
+        }
     });
 
     // If any one of the tasks exit, abort the other.
@@ -139,6 +175,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
                 Err(a) => tracing::info!("Error sending messages {a:?}")
             }
             recv_task.abort();
+            timeout_task.abort();
         },
         rv_b = (&mut recv_task) => {
             match rv_b {
@@ -146,6 +183,16 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
                 Err(b) => tracing::info!("Error receiving messages {b:?}")
             }
             send_task.abort();
+            timeout_task.abort();
+        },
+        rv_c = (&mut timeout_task) => {
+            match rv_c {
+                Ok(true) => tracing::info!("Connection {who} timed out due to no ping"),
+                Ok(false) => tracing::info!("Timeout task completed normally"),
+                Err(e) => tracing::info!("Error in timeout task {e:?}")
+            }
+            send_task.abort();
+            recv_task.abort();
         }
     }
 
