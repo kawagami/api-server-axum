@@ -1,10 +1,9 @@
 use crate::state::AppStateV2;
 use axum::extract::connect_info::ConnectInfo;
-use axum::extract::ws::CloseFrame;
-use axum::routing::get;
+use axum::routing::any;
 use axum::{
     body::Bytes,
-    extract::ws::{Message, Utf8Bytes, WebSocket, WebSocketUpgrade},
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::IntoResponse,
     Router,
 };
@@ -17,7 +16,7 @@ use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant};
 
 pub fn new(_state: AppStateV2) -> Router<AppStateV2> {
-    Router::new().route("/", get(ws_handler))
+    Router::new().route("/", any(ws_handler))
 }
 
 /// The handler for the HTTP request (this gets called when the HTTP request lands at the start
@@ -76,17 +75,17 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     // when necessary to wait for some external event (in this case illustrated by sleeping).
     // Waiting for this client to finish getting its greetings does not prevent other clients from
     // connecting to server and receiving their greetings.
-    for i in 1..5 {
-        if socket
-            .send(Message::Text(format!("Hi {i} times!").into()))
-            .await
-            .is_err()
-        {
-            tracing::info!("client {who} abruptly disconnected");
-            return;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    }
+    // for i in 1..5 {
+    //     if socket
+    //         .send(Message::Text(format!("Hi {i} times!").into()))
+    //         .await
+    //         .is_err()
+    //     {
+    //         tracing::info!("client {who} abruptly disconnected");
+    //         return;
+    //     }
+    //     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    // }
 
     // By splitting socket we can send and receive at the same time. In this example we will send
     // unsolicited messages to client based on some sort of server's internal event (i.e .timer).
@@ -95,34 +94,35 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     // 用於追踪最後一次收到 ping/pong 的時間
     let last_ping_time = Arc::new(Mutex::new(Instant::now()));
     let last_ping_time_clone = last_ping_time.clone();
+    let last_ping_time_for_sender = last_ping_time.clone(); // 新增一個給 sender 任務用
 
     // Spawn a task that will push several messages to the client (does not matter what client does)
     let mut send_task = tokio::spawn(async move {
-        let n_msg = 20;
-        for i in 0..n_msg {
-            // In case of any websocket error, we exit.
+        // 這裡可以是一個無限循環，或者根據應用需求決定何時結束
+        loop {
+            // 範例：每 5 秒發送一次伺服器心跳訊息
+            tokio::time::sleep(Duration::from_secs(5)).await;
+
+            // // 也可以在這個地方加入更複雜的邏輯，例如從共享狀態讀取需要廣播的訊息
+            // let msg_to_send = format!("Server heartbeat for {who} at {:?}", Instant::now());
+            // if sender.send(Message::Text(msg_to_send.into())).await.is_err() {
+            //     tracing::info!("Client {who} disconnected during send_task heartbeat.");
+            //     break; // 如果無法發送，則認為客戶端已斷開
+            // }
+
+            // 你也可以在這裡主動發送 Ping，如果瀏覽器不主動發送的話
             if sender
-                .send(Message::Text(format!("Server message {i} ...").into()))
+                .send(Message::Ping(Bytes::from_static(&[1, 2, 3])))
                 .await
                 .is_err()
             {
-                return i;
+                tracing::info!("Client {who} disconnected during send_task ping.");
+                break;
             }
-
-            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            // 更新發送 ping 的時間戳，讓 timeout_task 知道連線仍活躍
+            *last_ping_time_for_sender.lock().await = Instant::now();
         }
-
-        tracing::info!("Sending close to {who}...");
-        if let Err(e) = sender
-            .send(Message::Close(Some(CloseFrame {
-                code: axum::extract::ws::close_code::NORMAL,
-                reason: Utf8Bytes::from_static("Goodbye"),
-            })))
-            .await
-        {
-            tracing::info!("Could not send Close due to {e}, probably it is ok?");
-        }
-        n_msg
+        tracing::info!("send_task for {who} finished."); // 通常只有在遇到錯誤時才結束
     });
 
     // This second task will receive messages from client and print them on server console
@@ -171,7 +171,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     tokio::select! {
         rv_a = (&mut send_task) => {
             match rv_a {
-                Ok(a) => tracing::info!("{a} messages sent to {who}"),
+                Ok(_) => tracing::info!("send_task end"),
                 Err(a) => tracing::info!("Error sending messages {a:?}")
             }
             recv_task.abort();

@@ -9,7 +9,7 @@ mod state;
 mod structs;
 mod utils;
 
-use std::env::var;
+use std::{env::var, net::SocketAddr};
 use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -40,10 +40,13 @@ async fn main() {
     tracing::debug!("listening on {}", listener.local_addr().unwrap()); // 記錄監聽的地址
 
     // 啟動 Axum 伺服器，並加入優雅關閉（graceful shutdown）機制
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .unwrap();
 }
 
 // 監聽系統訊號，實作優雅關閉機制
