@@ -3,7 +3,10 @@ use axum::extract::connect_info::ConnectInfo;
 use axum::routing::any;
 use axum::{
     body::Bytes,
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        State,
+    },
     response::IntoResponse,
     Router,
 };
@@ -26,6 +29,7 @@ pub fn new(_state: AppStateV2) -> Router<AppStateV2> {
 /// as well as things from HTTP headers such as user-agent of the browser etc.
 async fn ws_handler(
     ws: WebSocketUpgrade,
+    State(_state): State<AppStateV2>,
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
