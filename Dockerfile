@@ -1,10 +1,11 @@
-FROM rust:1.86.0-slim-bookworm AS builder
+FROM rust:1.87.0-slim-bookworm AS builder
 
 WORKDIR /app
 
 COPY migrations/ migrations/
 COPY src/ src/
 COPY Cargo.toml .
+COPY Cargo.lock .
 
 # 安裝 pkg-config 和其他必要的包
 RUN apt-get update && apt-get install -y pkg-config libssl-dev
