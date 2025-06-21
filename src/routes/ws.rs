@@ -18,7 +18,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant};
 
-pub fn new(_state: AppStateV2) -> Router<AppStateV2> {
+pub fn new() -> Router<AppStateV2> {
     Router::new().route("/", any(ws_handler))
 }
 

@@ -35,7 +35,7 @@ pub async fn app() -> Router {
         .nest("/tools", tools::new())
         .nest("/notes", notes::new())
         .nest("/stocks", stocks::new(state.clone()))
-        .nest("/ws", ws::new(state.clone()))
+        .nest("/ws", ws::new())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
