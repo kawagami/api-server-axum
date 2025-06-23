@@ -45,7 +45,7 @@ async fn ws_handler(
 }
 
 /// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: WebSocket, who: SocketAddr, _state: AppStateV2) {
+async fn handle_socket(mut socket: WebSocket, who: SocketAddr, state: AppStateV2) {
     // send a ping (unsupported by some browsers) just to kick things off and get a response
     if socket
         .send(Message::Ping(Bytes::from_static(&[1, 2, 3])))
@@ -60,74 +60,25 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, _state: AppStateV
         return;
     }
 
-    // receive single message from a client (we can either receive or send with socket).
-    // this will likely be the Pong for our Ping or a hello message from client.
-    // waiting for message from a client will block this task, but will not block other client's
-    // connections.
-    if let Some(msg) = socket.recv().await {
-        if let Ok(msg) = msg {
-            if process_message(msg, who).is_break() {
-                return;
-            }
-        } else {
-            tracing::info!("client {who} abruptly disconnected");
-            return;
-        }
-    }
-
-    // Since each client gets individual statemachine, we can pause handling
-    // when necessary to wait for some external event (in this case illustrated by sleeping).
-    // Waiting for this client to finish getting its greetings does not prevent other clients from
-    // connecting to server and receiving their greetings.
-    // for i in 1..5 {
-    //     if socket
-    //         .send(Message::Text(format!("Hi {i} times!").into()))
-    //         .await
-    //         .is_err()
-    //     {
-    //         tracing::info!("client {who} abruptly disconnected");
-    //         return;
-    //     }
-    //     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    // }
-
     // By splitting socket we can send and receive at the same time. In this example we will send
     // unsolicited messages to client based on some sort of server's internal event (i.e .timer).
     let (mut sender, mut receiver) = socket.split();
 
+    //
+    let mut rx = state.get_tx().subscribe();
+
+    let mut send_task = tokio::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            // In any websocket error, break loop.
+            if sender.send(Message::text(msg)).await.is_err() {
+                break;
+            }
+        }
+    });
+
     // 用於追踪最後一次收到 ping/pong 的時間
     let last_ping_time = Arc::new(Mutex::new(Instant::now()));
     let last_ping_time_clone = last_ping_time.clone();
-    let last_ping_time_for_sender = last_ping_time.clone(); // 新增一個給 sender 任務用
-
-    // Spawn a task that will push several messages to the client (does not matter what client does)
-    let mut send_task = tokio::spawn(async move {
-        // 這裡可以是一個無限循環，或者根據應用需求決定何時結束
-        loop {
-            // 範例：每 5 秒發送一次伺服器心跳訊息
-            tokio::time::sleep(Duration::from_secs(5)).await;
-
-            // // 也可以在這個地方加入更複雜的邏輯，例如從共享狀態讀取需要廣播的訊息
-            // let msg_to_send = format!("Server heartbeat for {who} at {:?}", Instant::now());
-            // if sender.send(Message::Text(msg_to_send.into())).await.is_err() {
-            //     tracing::info!("Client {who} disconnected during send_task heartbeat.");
-            //     break; // 如果無法發送，則認為客戶端已斷開
-            // }
-
-            // 你也可以在這裡主動發送 Ping，如果瀏覽器不主動發送的話
-            if sender
-                .send(Message::Ping(Bytes::from_static(&[1, 2, 3])))
-                .await
-                .is_err()
-            {
-                tracing::info!("Client {who} disconnected during send_task ping.");
-                break;
-            }
-            // 更新發送 ping 的時間戳，讓 timeout_task 知道連線仍活躍
-            *last_ping_time_for_sender.lock().await = Instant::now();
-        }
-        tracing::info!("send_task for {who} finished."); // 通常只有在遇到錯誤時才結束
-    });
 
     // This second task will receive messages from client and print them on server console
     let mut recv_task = tokio::spawn(async move {

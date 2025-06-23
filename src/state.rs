@@ -3,12 +3,14 @@ use bb8_redis::RedisConnectionManager;
 use reqwest::Client;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::{sync::Arc, time::Duration};
+use tokio::sync::broadcast;
 
 pub struct AppState {
     pub pool: Pool<Postgres>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
     pub http_client: Client,
     pub fastapi_upload_host: String,
+    pub tx: broadcast::Sender<String>,
 }
 
 impl AppState {
@@ -42,11 +44,14 @@ impl AppState {
         let fastapi_upload_host =
             std::env::var("FASTAPI_UPLOAD_HOST").expect("找不到 FASTAPI_UPLOAD_HOST");
 
+        let (tx, _rx) = broadcast::channel(100);
+
         Self {
             pool,
             redis_pool,
             http_client,
             fastapi_upload_host,
+            tx,
         }
     }
 }
@@ -83,5 +88,9 @@ impl AppStateV2 {
 
     pub fn get_fastapi_upload_host(&self) -> &str {
         &self.0.fastapi_upload_host
+    }
+
+    pub fn get_tx(&self) -> &broadcast::Sender<String> {
+        &self.0.tx
     }
 }
