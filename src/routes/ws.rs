@@ -96,7 +96,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, state: AppStateV2
             }
 
             // print message and break if instructed to do so
-            if process_message(msg, who).is_break() {
+            if process_message(msg, who, &state).is_break() {
                 break;
             }
         }
@@ -156,10 +156,10 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, state: AppStateV2
 }
 
 /// helper to print contents of messages to stdout. Has special treatment for Close.
-fn process_message(msg: Message, who: SocketAddr) -> ControlFlow<(), ()> {
+fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            tracing::info!(">>> {who} sent str: {t:?}");
+            let _ = state.get_tx().send(t.to_string());
         }
         Message::Binary(d) => {
             tracing::info!(">>> {who} sent {} bytes: {d:?}", d.len());
