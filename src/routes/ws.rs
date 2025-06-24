@@ -18,15 +18,14 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant};
 
+// --- WebSocket Ping-Pong 設定 ---
+const PING_INTERVAL_SECONDS: u64 = 30; // 伺服器每 30 秒發送一個 Ping
+const PONG_TIMEOUT_SECONDS: u64 = 10; // 收到 Ping 後，客戶端若在 10 秒內無回應，則視為斷線
+
 pub fn new() -> Router<AppStateV2> {
     Router::new().route("/", any(ws_handler))
 }
 
-/// The handler for the HTTP request (this gets called when the HTTP request lands at the start
-/// of websocket negotiation). After this completes, the actual switching from HTTP to
-/// websocket protocol will occur.
-/// This is the last point where we can extract TCP/IP metadata such as IP address of the client
-/// as well as things from HTTP headers such as user-agent of the browser etc.
 async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppStateV2>,
@@ -39,117 +38,121 @@ async fn ws_handler(
         String::from("Unknown browser")
     };
     tracing::info!("`{user_agent}` at {addr} connected.");
-    // finalize the upgrade process by returning upgrade callback.
-    // we can customize the callback by sending additional info such as address.
     ws.on_upgrade(move |socket| handle_socket(socket, addr, state))
 }
 
-/// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: WebSocket, who: SocketAddr, state: AppStateV2) {
-    // send a ping (unsupported by some browsers) just to kick things off and get a response
-    if socket
-        .send(Message::Ping(Bytes::from_static(&[1, 2, 3])))
-        .await
-        .is_ok()
-    {
-        tracing::info!("Pinged {who}...");
-    } else {
-        tracing::info!("Could not send ping {who}!");
-        // no Error here since the only thing we can do is to close the connection.
-        // If we can not send messages, there is no way to salvage the statemachine anyway.
-        return;
-    }
+async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
+    let (sender, receiver) = socket.split();
+    // 使用 Arc<Mutex> 包裝 sender，以便在多個任務間共享
+    let sender_arc = Arc::new(Mutex::new(sender));
 
-    // By splitting socket we can send and receive at the same time. In this example we will send
-    // unsolicited messages to client based on some sort of server's internal event (i.e .timer).
-    let (mut sender, mut receiver) = socket.split();
-
-    //
     let mut rx = state.get_tx().subscribe();
 
+    // 用於追蹤最後一次收到客戶端訊息（包括 ping/pong）的時間
+    let last_activity_time = Arc::new(Mutex::new(Instant::now()));
+
+    // --- send_task: 將 state 的訊息發送給客戶端 ---
+    let send_sender_clone = sender_arc.clone();
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
-            // In any websocket error, break loop.
-            if sender.send(Message::text(msg)).await.is_err() {
-                break;
+            // 鎖定 sender 並發送訊息
+            let mut sender_guard = send_sender_clone.lock().await;
+            if sender_guard.send(Message::text(msg)).await.is_err() {
+                break; // 如果發送失敗，表示連線可能已關閉
             }
         }
+        tracing::info!("send_task for {who} ended.");
     });
 
-    // 用於追踪最後一次收到 ping/pong 的時間
-    let last_ping_time = Arc::new(Mutex::new(Instant::now()));
-    let last_ping_time_clone = last_ping_time.clone();
-
-    // This second task will receive messages from client and print them on server console
+    // --- recv_task: 接收客戶端訊息並更新活動時間 ---
+    let last_activity_time_clone_recv = last_activity_time.clone();
     let mut recv_task = tokio::spawn(async move {
         let mut cnt = 0;
+        let mut receiver = receiver; // 獲取 receiver 的所有權
         while let Some(Ok(msg)) = receiver.next().await {
             cnt += 1;
 
-            // 如果收到 ping 或 pong，更新時間戳
-            match &msg {
-                Message::Ping(_) | Message::Pong(_) => {
-                    *last_ping_time_clone.lock().await = Instant::now();
-                    tracing::debug!("Updated last ping time for {who}");
-                }
-                _ => {}
-            }
+            // 只要收到任何訊息，就更新最後活動時間
+            *last_activity_time_clone_recv.lock().await = Instant::now();
+            tracing::debug!(
+                "Updated last activity time for {who} due to message: {:?}",
+                msg
+            );
 
-            // print message and break if instructed to do so
+            // 處理客戶端傳來的訊息
             if process_message(msg, who, &state).is_break() {
                 break;
             }
         }
+        tracing::info!("recv_task for {who} processed {cnt} messages, ending.");
         cnt
     });
 
-    // 添加超時檢查任務
-    let mut timeout_task = tokio::spawn(async move {
-        let timeout_duration = Duration::from_secs(60); // 60 秒超時
+    // --- ping_task: 後端主動發送 Ping 並檢查 Pong 回應 ---
+    let ping_sender_clone = sender_arc.clone();
+    let last_activity_time_clone_ping = last_activity_time.clone();
+    let mut ping_task = tokio::spawn(async move {
+        // 設定定時器，第一次立即執行，避免等待第一個間隔
+        let mut interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECONDS));
+        interval.tick().await;
 
         loop {
-            tokio::time::sleep(Duration::from_secs(10)).await; // 每10秒檢查一次
+            interval.tick().await; // 等待下一個 ping 間隔
 
-            let last_ping = *last_ping_time.lock().await;
-            let elapsed = last_ping.elapsed();
+            tracing::debug!("Sending ping to {who}...");
+            let mut sender_guard = ping_sender_clone.lock().await;
+            if sender_guard
+                .send(Message::Ping(Bytes::new()))
+                .await
+                .is_err()
+            {
+                tracing::warn!("Failed to send ping to {who}, connection might be closed.");
+                break; // 如果無法發送 ping，表示連線可能已關閉，終止任務
+            }
+            drop(sender_guard); // 盡快釋放鎖
 
-            if elapsed > timeout_duration {
+            // 檢查自上次活動以來是否超時
+            let last_activity = *last_activity_time_clone_ping.lock().await;
+            let elapsed = last_activity.elapsed();
+
+            if elapsed > Duration::from_secs(PONG_TIMEOUT_SECONDS) {
                 tracing::warn!(
-                    "Client {who} exceeded ping timeout ({elapsed:?}), closing connection"
+                    "Client {who} did not respond to ping/any message in time ({elapsed:?}), closing connection."
                 );
-                return true; // 超時
+                break; // 超時，終止任務以關閉連線
             }
         }
+        tracing::info!("ping_task for {who} ended.");
     });
 
-    // If any one of the tasks exit, abort the other.
+    // --- tokio::select!: 協調所有任務 ---
+    // 如果任何一個任務結束，就終止其他的任務。
     tokio::select! {
+        // send_task 結束
         rv_a = (&mut send_task) => {
-            match rv_a {
-                Ok(_) => tracing::info!("send_task end"),
-                Err(a) => tracing::info!("Error sending messages {a:?}")
+            if let Err(e) = rv_a {
+                tracing::error!("Error in send_task for {who}: {:?}", e);
             }
-            recv_task.abort();
-            timeout_task.abort();
         },
+        // recv_task 結束
         rv_b = (&mut recv_task) => {
-            match rv_b {
-                Ok(b) => tracing::info!("Received {b} messages"),
-                Err(b) => tracing::info!("Error receiving messages {b:?}")
+            if let Err(e) = rv_b {
+                tracing::error!("Error in recv_task for {who}: {:?}", e);
             }
-            send_task.abort();
-            timeout_task.abort();
         },
-        rv_c = (&mut timeout_task) => {
-            match rv_c {
-                Ok(true) => tracing::info!("Connection {who} timed out due to no ping"),
-                Ok(false) => tracing::info!("Timeout task completed normally"),
-                Err(e) => tracing::info!("Error in timeout task {e:?}")
+        // ping_task 結束 (通常是因為超時或發送失敗)
+        rv_c = (&mut ping_task) => {
+            if let Err(e) = rv_c {
+                tracing::error!("Error in ping_task for {who}: {:?}", e);
             }
-            send_task.abort();
-            recv_task.abort();
         }
     }
+
+    // 任何一個任務結束，都會導致 tokio::select! 塊完成，
+    // 然後我們在這裡手動中止所有 remaining tasks，確保資源被釋放。
+    send_task.abort();
+    recv_task.abort();
+    ping_task.abort();
 
     // returning from the handler closes the websocket connection
     tracing::info!("Websocket context {who} destroyed");
@@ -159,10 +162,10 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, state: AppStateV2
 fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            let _ = state.get_tx().send(t.to_string());
+            let _ = state.get_tx().send(format!("{} : {}", who, t.to_string()));
         }
         Message::Binary(d) => {
-            tracing::info!(">>> {who} sent {} bytes: {d:?}", d.len());
+            tracing::debug!(">>> {who} sent {} bytes: {d:?}", d.len());
         }
         Message::Close(c) => {
             if let Some(cf) = c {
@@ -176,16 +179,11 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> Control
             }
             return ControlFlow::Break(());
         }
-
-        Message::Pong(v) => {
-            tracing::info!(">>> {who} sent pong with {v:?}");
-        }
+        Message::Pong(_) => {}
         // You should never need to manually handle Message::Ping, as axum's websocket library
         // will do so for you automagically by replying with Pong and copying the v according to
         // spec. But if you need the contents of the pings you can see them here.
-        Message::Ping(v) => {
-            tracing::info!(">>> {who} sent ping with {v:?}");
-        }
+        Message::Ping(_) => {}
     }
     ControlFlow::Continue(())
 }
