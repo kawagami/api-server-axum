@@ -1,26 +1,22 @@
 use crate::state::AppStateV2;
-use axum::extract::connect_info::ConnectInfo;
-use axum::routing::any;
 use axum::{
     body::Bytes,
     extract::{
+        connect_info::ConnectInfo,
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
     response::IntoResponse,
+    routing::any,
     Router,
 };
 use axum_extra::{headers, TypedHeader};
 use futures_util::{sink::SinkExt, stream::StreamExt};
-use std::net::SocketAddr;
-use std::ops::ControlFlow;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio::time::{Duration, Instant};
+use std::{net::SocketAddr, ops::ControlFlow, sync::Arc};
+use tokio::{sync::Mutex, time::Duration};
 
 // --- WebSocket Ping-Pong 設定 ---
 const PING_INTERVAL_SECONDS: u64 = 30; // 伺服器每 30 秒發送一個 Ping
-const PONG_TIMEOUT_SECONDS: u64 = 10; // 收到 Ping 後，客戶端若在 10 秒內無回應，則視為斷線
 
 pub fn new() -> Router<AppStateV2> {
     Router::new().route("/", any(ws_handler))
@@ -48,9 +44,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
 
     let mut rx = state.get_tx().subscribe();
 
-    // 用於追蹤最後一次收到客戶端訊息（包括 ping/pong）的時間
-    let last_activity_time = Arc::new(Mutex::new(Instant::now()));
-
     // --- send_task: 將 state 的訊息發送給客戶端 ---
     let send_sender_clone = sender_arc.clone();
     let mut send_task = tokio::spawn(async move {
@@ -64,20 +57,12 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
         tracing::info!("send_task for {who} ended.");
     });
 
-    // --- recv_task: 接收客戶端訊息並更新活動時間 ---
-    let last_activity_time_clone_recv = last_activity_time.clone();
+    // --- recv_task: 接收客戶端訊息 ---
     let mut recv_task = tokio::spawn(async move {
         let mut cnt = 0;
         let mut receiver = receiver; // 獲取 receiver 的所有權
         while let Some(Ok(msg)) = receiver.next().await {
             cnt += 1;
-
-            // 只要收到任何訊息，就更新最後活動時間
-            *last_activity_time_clone_recv.lock().await = Instant::now();
-            tracing::debug!(
-                "Updated last activity time for {who} due to message: {:?}",
-                msg
-            );
 
             // 處理客戶端傳來的訊息
             if process_message(msg, who, &state).is_break() {
@@ -90,7 +75,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
 
     // --- ping_task: 後端主動發送 Ping 並檢查 Pong 回應 ---
     let ping_sender_clone = sender_arc.clone();
-    let last_activity_time_clone_ping = last_activity_time.clone();
     let mut ping_task = tokio::spawn(async move {
         // 設定定時器，第一次立即執行，避免等待第一個間隔
         let mut interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECONDS));
@@ -110,17 +94,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
                 break; // 如果無法發送 ping，表示連線可能已關閉，終止任務
             }
             drop(sender_guard); // 盡快釋放鎖
-
-            // 檢查自上次活動以來是否超時
-            let last_activity = *last_activity_time_clone_ping.lock().await;
-            let elapsed = last_activity.elapsed();
-
-            if elapsed > Duration::from_secs(PONG_TIMEOUT_SECONDS) {
-                tracing::warn!(
-                    "Client {who} did not respond to ping/any message in time ({elapsed:?}), closing connection."
-                );
-                break; // 超時，終止任務以關閉連線
-            }
         }
         tracing::info!("ping_task for {who} ended.");
     });
