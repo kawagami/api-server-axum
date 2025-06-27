@@ -135,7 +135,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
 fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            let _ = state.get_tx().send(format!("{} : {}", who, t.to_string()));
+            let _ = state.get_tx().send(format!("{} : {}", who, t));
         }
         Message::Binary(d) => {
             tracing::debug!(">>> {who} sent {} bytes: {d:?}", d.len());
@@ -153,9 +153,6 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> Control
             return ControlFlow::Break(());
         }
         Message::Pong(_) => {}
-        // You should never need to manually handle Message::Ping, as axum's websocket library
-        // will do so for you automagically by replying with Pong and copying the v according to
-        // spec. But if you need the contents of the pings you can see them here.
         Message::Ping(_) => {}
     }
     ControlFlow::Continue(())
