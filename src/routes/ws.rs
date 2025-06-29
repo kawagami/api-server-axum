@@ -1,4 +1,7 @@
-use crate::state::AppStateV2;
+use crate::{
+    errors::AppError,
+    state::{AppStateV2, DisplayTrackedConnection, TrackedConnection},
+};
 use axum::{
     body::Bytes,
     extract::{
@@ -7,8 +10,8 @@ use axum::{
         State,
     },
     response::IntoResponse,
-    routing::any,
-    Router,
+    routing::{any, get},
+    Json, Router,
 };
 use axum_extra::{headers, TypedHeader};
 use futures_util::{sink::SinkExt, stream::StreamExt};
@@ -19,7 +22,9 @@ use tokio::{sync::Mutex, time::Duration};
 const PING_INTERVAL_SECONDS: u64 = 30; // 伺服器每 30 秒發送一個 Ping
 
 pub fn new() -> Router<AppStateV2> {
-    Router::new().route("/", any(ws_handler))
+    Router::new()
+        .route("/", any(ws_handler))
+        .route("/", get(get_online_connections))
 }
 
 async fn ws_handler(
@@ -41,6 +46,17 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
     let (sender, receiver) = socket.split();
     // 使用 Arc<Mutex> 包裝 sender，以便在多個任務間共享
     let sender_arc = Arc::new(Mutex::new(sender));
+
+    let connection_info = TrackedConnection {
+        addr: who.to_string(),
+        connected_at: std::time::SystemTime::now(),
+        sender: sender_arc.clone(), // 存下控制 sender
+    };
+
+    {
+        let mut connections = state.get_connections().lock().await;
+        connections.insert(who, connection_info);
+    }
 
     let mut rx = state.get_tx().subscribe();
 
@@ -156,4 +172,20 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> Control
         Message::Ping(_) => {}
     }
     ControlFlow::Continue(())
+}
+
+async fn get_online_connections(
+    State(state): State<AppStateV2>,
+) -> Result<Json<Vec<DisplayTrackedConnection>>, AppError> {
+    let connections = state.get_connections().lock().await;
+
+    let result = connections
+        .iter()
+        .map(|(addr, info)| DisplayTrackedConnection {
+            addr: addr.to_string(),
+            connected_at: info.connected_at,
+        })
+        .collect();
+
+    Ok(Json(result))
 }

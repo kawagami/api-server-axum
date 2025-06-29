@@ -1,9 +1,12 @@
+use axum::extract::ws::{Message, WebSocket};
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
+use futures::stream::SplitSink;
 use reqwest::Client;
+use serde::Serialize;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
-use std::{sync::Arc, time::Duration};
-use tokio::sync::broadcast;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::sync::{broadcast, Mutex};
 
 pub struct AppState {
     pub pool: Pool<Postgres>,
@@ -11,6 +14,7 @@ pub struct AppState {
     pub http_client: Client,
     pub fastapi_upload_host: String,
     pub tx: broadcast::Sender<String>,
+    pub connections: ConnectionMap, // 追蹤連線
 }
 
 impl AppState {
@@ -52,8 +56,23 @@ impl AppState {
             http_client,
             fastapi_upload_host,
             tx,
+            connections: Arc::new(Mutex::new(HashMap::new())),
         }
     }
+}
+
+pub type ConnectionMap = Arc<Mutex<HashMap<SocketAddr, TrackedConnection>>>;
+
+pub struct TrackedConnection {
+    pub addr: String,
+    pub connected_at: std::time::SystemTime,
+    pub sender: Arc<Mutex<SplitSink<WebSocket, Message>>>, // 保留 sender
+}
+
+#[derive(Serialize)]
+pub struct DisplayTrackedConnection {
+    pub addr: String,
+    pub connected_at: std::time::SystemTime,
 }
 
 #[derive(Clone)]
@@ -92,5 +111,9 @@ impl AppStateV2 {
 
     pub fn get_tx(&self) -> &broadcast::Sender<String> {
         &self.0.tx
+    }
+
+    pub fn get_connections(&self) -> &ConnectionMap {
+        &self.0.connections
     }
 }
