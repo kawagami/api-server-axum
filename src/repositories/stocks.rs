@@ -541,6 +541,7 @@ pub async fn get_active_buyback_prices(
     let query = "
         SELECT
             p.stock_no,
+            latest_prices.stock_name,
             p.start_date,
             p.end_date,
             start_date_price.close_price AS price_on_start_date,
@@ -559,6 +560,7 @@ pub async fn get_active_buyback_prices(
             LEFT JOIN (
                 SELECT DISTINCT
                     ON (stock_code) stock_code,
+                    stock_name,
                     trade_date,
                     close_price
                 FROM

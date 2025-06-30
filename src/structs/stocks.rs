@@ -203,6 +203,7 @@ pub struct StockBuybackInfo {
 #[derive(Debug, FromRow, Serialize)]
 pub struct StockBuybackMoreInfo {
     pub stock_no: String,
+    pub stock_name: String,
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub price_on_start_date: Option<f64>,
