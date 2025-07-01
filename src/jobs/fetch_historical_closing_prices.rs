@@ -36,7 +36,11 @@ impl AppJob for FetchHistoricalClosingPricesJob {
                     &data.start_date.format("%Y%m%d").to_string(),
                 )
                 .await
-                .expect("FetchHistoricalClosingPricesJob get_stock_day_avg fail"),
+                .expect(&format!(
+                    "get_stock_day_avg fail, stock_no => {}, start_date => {}",
+                    &data.stock_no,
+                    &data.start_date.format("%Y%m%d").to_string()
+                )),
                 &data.stock_no,
             );
 

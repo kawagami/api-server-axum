@@ -649,7 +649,8 @@ pub async fn get_active_buyback_prices_v4(
             // 不添加額外條件
         }
         StartPriceFilter::MissingOnly => {
-            query_builder.push(" AND start_date_price.close_price IS NULL");
+            query_builder
+                .push(" AND start_date_price.close_price IS NULL AND p.start_date < CURRENT_DATE");
         }
         StartPriceFilter::ExistsOnly => {
             query_builder.push(" AND start_date_price.close_price IS NOT NULL");
