@@ -589,10 +589,7 @@ pub async fn get_active_buyback_prices(
             p.start_date ASC;
     ";
 
-    let response: Vec<StockBuybackMoreInfo> =
-        sqlx::query_as(query).fetch_all(state.get_pool()).await?;
-
-    Ok(response)
+    Ok(sqlx::query_as(query).fetch_all(state.get_pool()).await?)
 }
 
 /// 取 stock_buyback_periods 中包含未來日期的庫藏股 起始價格 & 當前價格
