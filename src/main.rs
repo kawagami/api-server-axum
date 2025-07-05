@@ -1,5 +1,4 @@
 mod errors;
-mod image_processor;
 mod jobs;
 mod repositories;
 mod routes;
