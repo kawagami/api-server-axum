@@ -1,15 +1,12 @@
 use crate::{errors::AppError, state::AppStateV2};
-use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Router};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 
 pub fn new() -> Router<AppStateV2> {
-    Router::new().route("/", get(health_check))
+    Router::new().route("/", get(index))
 }
 
-pub async fn health_check(State(state): State<AppStateV2>) -> Result<String, AppError> {
-    sqlx::query_scalar("select 'hello world from pg'")
-        .fetch_one(state.get_pool())
-        .await
-        .map_err(AppError::from)
+pub async fn index(State(_state): State<AppStateV2>) -> Result<Json<&'static str>, AppError> {
+    Ok(Json("api server index page"))
 }
 
 pub async fn handler_404() -> impl IntoResponse {
