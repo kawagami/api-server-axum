@@ -55,6 +55,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
 
     {
         let mut connections = state.get_connections().lock().await;
+        tracing::info!("connections add new user {}", connection_info.addr);
         connections.insert(who, connection_info);
     }
 
