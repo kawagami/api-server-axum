@@ -31,6 +31,7 @@ async fn get_users(State(state): State<AppStateV2>) -> Result<Json<Vec<User>>, A
     Ok(Json(result))
 }
 
+/// 需要通過 jwt 認證才能新增 user
 async fn create_user(
     State(state): State<AppStateV2>,
     Json(user): Json<NewUser>,
