@@ -26,7 +26,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
 }
 
 async fn get_users(State(state): State<AppStateV2>) -> Result<Json<Vec<User>>, AppError> {
-    let result = users::get_users(&state).await.map_err(AppError::from)?;
+    let result = users::get_users(&state).await?;
 
     Ok(Json(result))
 }
@@ -36,9 +36,7 @@ async fn create_user(
     State(state): State<AppStateV2>,
     Json(user): Json<NewUser>,
 ) -> Result<Json<bool>, AppError> {
-    let _result = users::create_user(&state, user)
-        .await
-        .map_err(AppError::from)?;
+    users::create_user(&state, user).await?;
 
     Ok(Json(true))
 }
@@ -47,7 +45,7 @@ async fn delete_user(
     State(_state): State<AppStateV2>,
     Json(_user): Json<User>,
 ) -> Result<Json<bool>, AppError> {
-    // let result = users::get_users(&state).await.map_err(AppError::from)?;
+    // let result = users::get_users(&state).await?;
 
     Ok(Json(true))
 }
