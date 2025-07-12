@@ -56,8 +56,7 @@ fn extract_token(req: &Request) -> Result<String, AppError> {
 // 驗證用戶是否已登入（透過 Redis 查詢）
 async fn verify_user_login(state: &AppStateV2, key: &str) -> Result<(), AppError> {
     redis::redis_check_key_exists(state, key)
-        .await
-        .map_err(|err| AppError::SystemError(SystemError::RedisError(err.to_string())))?
+        .await?
         .then_some(())
         .ok_or(AppError::AuthError(AuthError::Unauthorized))
 }
@@ -74,9 +73,7 @@ pub async fn sign_in(
     }
 
     let key = format!("user:login:{}", user.email);
-    redis::redis_set(&state, &key, &user.email) // 設定 Redis 登入狀態
-        .await
-        .map_err(|err| AppError::SystemError(SystemError::RedisError(err.to_string())))?;
+    redis::redis_set(&state, &key, &user.email).await?;
 
     let token = encode_jwt(user.email)?; // 生成 JWT token
 

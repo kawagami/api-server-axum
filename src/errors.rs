@@ -78,9 +78,6 @@ pub enum AuthError {
 
 #[derive(Error, Debug)]
 pub enum SystemError {
-    #[error("Redis 錯誤: {0}")]
-    RedisError(String),
-
     #[error("環境變數缺失: {0}")]
     EnvVarMissing(String),
 
@@ -182,6 +179,12 @@ impl From<reqwest::Error> for AppError {
 
 impl From<chrono::ParseError> for AppError {
     fn from(err: chrono::ParseError) -> Self {
+        Self::SystemError(SystemError::Internal(err.to_string()))
+    }
+}
+
+impl From<redis::RedisError> for AppError {
+    fn from(err: redis::RedisError) -> Self {
         Self::SystemError(SystemError::Internal(err.to_string()))
     }
 }
