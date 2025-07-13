@@ -1,17 +1,17 @@
 use crate::{
+    errors::AppError,
     state::AppStateV2,
     structs::users::{DbUser, NewUser, User},
 };
-use sqlx::Error;
 
-pub async fn get_users(state: &AppStateV2) -> Result<Vec<User>, Error> {
-    sqlx::query_as("SELECT id, name, email FROM users")
+pub async fn get_users(state: &AppStateV2) -> Result<Vec<User>, AppError> {
+    Ok(sqlx::query_as("SELECT id, name, email FROM users")
         .fetch_all(state.get_pool())
-        .await
+        .await?)
 }
 
-pub async fn check_email_exists(state: &AppStateV2, email: &str) -> Result<DbUser, Error> {
-    sqlx::query_as(
+pub async fn check_email_exists(state: &AppStateV2, email: &str) -> Result<DbUser, AppError> {
+    Ok(sqlx::query_as(
         r#"
             SELECT
                 id,
@@ -27,10 +27,10 @@ pub async fn check_email_exists(state: &AppStateV2, email: &str) -> Result<DbUse
     )
     .bind(email)
     .fetch_one(state.get_pool())
-    .await
+    .await?)
 }
 
-pub async fn create_user(state: &AppStateV2, new_user: NewUser) -> Result<(), Error> {
+pub async fn create_user(state: &AppStateV2, new_user: NewUser) -> Result<(), AppError> {
     let _ = sqlx::query(
         r#"
             INSERT INTO users (name, email, password)
