@@ -22,6 +22,7 @@ async fn main() {
         )
         .with(
             tracing_subscriber::fmt::layer()
+                .json()
                 .with_file(true) // 顯示檔案名稱
                 .with_line_number(true), // 顯示行號
         ) // 設定格式化日誌輸出
