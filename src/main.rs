@@ -17,12 +17,12 @@ async fn main() {
     // 初始化日誌系統，根據環境變數設定日誌層級，預設為 "template_axum=debug"
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "template_axum=debug".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                format!("{}=debug,tower_http=debug", env!("CARGO_CRATE_NAME")).into()
+            }),
         )
         .with(
             tracing_subscriber::fmt::layer()
-                .json()
                 .with_file(true) // 顯示檔案名稱
                 .with_line_number(true), // 顯示行號
         ) // 設定格式化日誌輸出
