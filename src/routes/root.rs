@@ -10,5 +10,5 @@ pub async fn index(State(_state): State<AppStateV2>) -> Result<Json<&'static str
 }
 
 pub async fn handler_404() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "nothing to see here")
+    (StatusCode::NOT_FOUND, "empty page")
 }
