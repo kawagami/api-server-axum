@@ -10,9 +10,9 @@ use crate::{
     state::AppStateV2,
     structs::stocks::{
         BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
-        NewStockClosingPrice, StockBuybackMoreInfo, StockChange, StockChangeId,
-        StockChangeWithoutId, StockClosingPrice, StockClosingPriceResponse, StockRequest,
-        StockStats,
+        NewStockClosingPrice, StartPriceFilter, StockBuybackInfo, StockBuybackMoreInfo,
+        StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
+        StockClosingPriceResponse, StockRequest, StockStats,
     },
 };
 use axum::{
@@ -52,6 +52,8 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             "/get_unfinished_buyback_price_gap",
             get(get_unfinished_buyback_price_gap),
         )
+        .route("/testing_api", get(testing_api))
+        .route("/testing_api2", get(testing_api2))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -270,6 +272,18 @@ pub async fn get_unfinished_buyback_price_gap(
 }
 
 /// 紀錄執行計畫中的 API
-pub async fn _aaa(State(_state): State<AppStateV2>) -> Result<Json<()>, AppError> {
-    todo!()
+pub async fn testing_api(
+    State(state): State<AppStateV2>,
+) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
+    let data = stocks::get_active_buyback_prices_v4(&state, StartPriceFilter::All).await?;
+
+    Ok(Json(data))
+}
+
+pub async fn testing_api2(
+    State(state): State<AppStateV2>,
+) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
+    let data = stocks::get_active_buyback_prices_v4(&state, StartPriceFilter::ExistsOnly).await?;
+
+    Ok(Json(data))
 }
