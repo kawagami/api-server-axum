@@ -7,7 +7,7 @@ use axum::{
     extract::{
         connect_info::ConnectInfo,
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Query, State,
     },
     response::IntoResponse,
     routing::{any, get},
@@ -24,7 +24,8 @@ const PING_INTERVAL_SECONDS: u64 = 30; // 伺服器每 30 秒發送一個 Ping
 pub fn new() -> Router<AppStateV2> {
     Router::new()
         .route("/", any(ws_handler))
-        .route("/", get(get_online_connections))
+        .route("/get_online_connections", get(get_online_connections))
+        .route("/say_something_to_someone", get(say_something_to_someone))
 }
 
 async fn ws_handler(
@@ -189,4 +190,52 @@ async fn get_online_connections(
         .collect();
 
     Ok(Json(result))
+}
+
+// 輸入參數結構
+#[derive(serde::Deserialize)]
+pub struct SendMessageParams {
+    pub addr: String, // 例如: "192.168.1.100:8080" 或只是 "192.168.1.100"
+    pub message: String,
+}
+
+async fn say_something_to_someone(
+    Query(params): Query<SendMessageParams>,
+    State(state): State<AppStateV2>,
+) -> Result<Json<()>, AppError> {
+    let connections = state.get_connections().lock().await;
+
+    // 尋找匹配的地址並發送 "hello" 消息
+    let mut message_sent = false;
+
+    for (socket_addr, tracked_conn) in connections.iter() {
+        // 檢查是否匹配目標地址 (可以是完整的 socket_addr 或只是 IP)
+        let addr_matches = socket_addr.to_string() == params.addr
+            || socket_addr.ip().to_string() == params.addr
+            || tracked_conn.addr == params.addr;
+
+        if addr_matches {
+            // 直接發送 "hello" 消息
+            let mut sender_guard = tracked_conn.sender.lock().await;
+            let hello_message = Message::Text(params.message.into());
+
+            match sender_guard.send(hello_message).await {
+                Ok(_) => {
+                    tracing::info!("Successfully sent 'hello' to {}", socket_addr);
+                    message_sent = true;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to send message to {}: {}", socket_addr, e);
+                }
+            }
+
+            break; // 找到第一個匹配的就停止
+        }
+    }
+
+    if !message_sent {
+        tracing::info!("No connection found for address: {}", params.addr);
+    }
+
+    Ok(Json(()))
 }
