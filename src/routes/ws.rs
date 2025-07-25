@@ -205,36 +205,30 @@ async fn say_something_to_someone(
 ) -> Result<Json<()>, AppError> {
     let connections = state.get_connections().lock().await;
 
-    // 尋找匹配的地址並發送 "hello" 消息
-    let mut message_sent = false;
+    // 嘗試將輸入的字串解析為 SocketAddr 輸入必須是完整的 socket address 格式（包含 port）
+    match params.addr.parse::<SocketAddr>() {
+        Ok(socket_addr) => {
+            // 直接用 HashMap 的 get 方法查找
+            if let Some(tracked_conn) = connections.get(&socket_addr) {
+                // 找到連接，發送消息
+                let mut sender_guard = tracked_conn.sender.lock().await;
+                let hello_message = Message::Text(params.message.into());
 
-    for (socket_addr, tracked_conn) in connections.iter() {
-        // 檢查是否匹配目標地址 (可以是完整的 socket_addr 或只是 IP)
-        let addr_matches = socket_addr.to_string() == params.addr
-            || socket_addr.ip().to_string() == params.addr
-            || tracked_conn.addr == params.addr;
-
-        if addr_matches {
-            // 直接發送 "hello" 消息
-            let mut sender_guard = tracked_conn.sender.lock().await;
-            let hello_message = Message::Text(params.message.into());
-
-            match sender_guard.send(hello_message).await {
-                Ok(_) => {
-                    tracing::info!("Successfully sent 'hello' to {}", socket_addr);
-                    message_sent = true;
+                match sender_guard.send(hello_message).await {
+                    Ok(_) => {
+                        tracing::info!("Successfully sent 'hello' to {}", socket_addr);
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to send message to {}: {}", socket_addr, e);
+                    }
                 }
-                Err(e) => {
-                    tracing::error!("Failed to send message to {}: {}", socket_addr, e);
-                }
+            } else {
+                tracing::info!("No connection found for address: {}", params.addr);
             }
-
-            break; // 找到第一個匹配的就停止
         }
-    }
-
-    if !message_sent {
-        tracing::info!("No connection found for address: {}", params.addr);
+        Err(_) => {
+            tracing::info!("Invalid socket address format: {}", params.addr);
+        }
     }
 
     Ok(Json(()))
