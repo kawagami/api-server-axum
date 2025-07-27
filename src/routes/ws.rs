@@ -15,7 +15,7 @@ use axum::{
 };
 use axum_extra::{headers, TypedHeader};
 use futures_util::{sink::SinkExt, stream::StreamExt};
-use std::{net::SocketAddr, ops::ControlFlow, sync::Arc};
+use std::{net::SocketAddr, ops::ControlFlow, sync::Arc, time::SystemTime};
 use tokio::{sync::Mutex, time::Duration};
 
 // --- WebSocket Ping-Pong 設定 ---
@@ -25,6 +25,7 @@ pub fn new() -> Router<AppStateV2> {
     Router::new()
         .route("/", any(ws_handler))
         .route("/get_online_connections", get(get_online_connections))
+        .route("/get_active_connections", get(get_active_connections)) // 新增：獲取真正活躍的連接
         .route("/say_something_to_someone", get(say_something_to_someone))
 }
 
@@ -45,15 +46,15 @@ async fn ws_handler(
 
 async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
     let (sender, receiver) = socket.split();
-    // 使用 Arc<Mutex> 包裝 sender，以便在多個任務間共享
     let sender_arc = Arc::new(Mutex::new(sender));
 
     let connection_info = TrackedConnection {
         addr: who.to_string(),
-        connected_at: std::time::SystemTime::now(),
-        sender: sender_arc.clone(), // 存下控制 sender
+        connected_at: SystemTime::now(),
+        sender: sender_arc.clone(),
     };
 
+    // 添加連接到狀態中
     {
         let mut connections = state.get_connections().lock().await;
         tracing::info!("connections add new user {}", connection_info.addr);
@@ -66,25 +67,32 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
     let send_sender_clone = sender_arc.clone();
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
-            // 鎖定 sender 並發送訊息
             let mut sender_guard = send_sender_clone.lock().await;
-            if sender_guard.send(Message::text(msg)).await.is_err() {
-                break; // 如果發送失敗，表示連線可能已關閉
+            if let Err(e) = sender_guard.send(Message::Text(msg.into())).await {
+                tracing::warn!("Failed to send message to {}: {}", who, e);
+                break; // 發送失敗時直接退出，讓 handle_socket 統一清理
             }
         }
         tracing::info!("send_task for {who} ended.");
     });
 
     // --- recv_task: 接收客戶端訊息 ---
+    let recv_state_clone = state.clone();
     let mut recv_task = tokio::spawn(async move {
         let mut cnt = 0;
-        let mut receiver = receiver; // 獲取 receiver 的所有權
-        while let Some(Ok(msg)) = receiver.next().await {
-            cnt += 1;
-
-            // 處理客戶端傳來的訊息
-            if process_message(msg, who, &state).is_break() {
-                break;
+        let mut receiver = receiver;
+        while let Some(msg_result) = receiver.next().await {
+            match msg_result {
+                Ok(msg) => {
+                    cnt += 1;
+                    if process_message(msg, who, &recv_state_clone).is_break() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Error receiving message from {}: {}", who, e);
+                    break;
+                }
             }
         }
         tracing::info!("recv_task for {who} processed {cnt} messages, ending.");
@@ -94,44 +102,36 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
     // --- ping_task: 後端主動發送 Ping 並檢查 Pong 回應 ---
     let ping_sender_clone = sender_arc.clone();
     let mut ping_task = tokio::spawn(async move {
-        // 設定定時器，第一次立即執行，避免等待第一個間隔
         let mut interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECONDS));
-        interval.tick().await;
+        interval.tick().await; // 跳過第一次立即觸發
 
         loop {
-            interval.tick().await; // 等待下一個 ping 間隔
+            interval.tick().await;
 
             tracing::debug!("Sending ping to {who}...");
-            let mut sender_guard = ping_sender_clone.lock().await;
-            if sender_guard
-                .send(Message::Ping(Bytes::new()))
-                .await
-                .is_err()
             {
-                tracing::warn!("Failed to send ping to {who}, connection might be closed.");
-                break; // 如果無法發送 ping，表示連線可能已關閉，終止任務
-            }
-            drop(sender_guard); // 盡快釋放鎖
+                let mut sender_guard = ping_sender_clone.lock().await;
+                if let Err(e) = sender_guard.send(Message::Ping(Bytes::new())).await {
+                    tracing::warn!("Failed to send ping to {who}: {}", e);
+                    break; // 發送失敗時直接退出，讓 handle_socket 統一清理
+                }
+            } // 立即釋放鎖
         }
         tracing::info!("ping_task for {who} ended.");
     });
 
     // --- tokio::select!: 協調所有任務 ---
-    // 如果任何一個任務結束，就終止其他的任務。
     tokio::select! {
-        // send_task 結束
         rv_a = (&mut send_task) => {
             if let Err(e) = rv_a {
                 tracing::error!("Error in send_task for {who}: {:?}", e);
             }
         },
-        // recv_task 結束
         rv_b = (&mut recv_task) => {
             if let Err(e) = rv_b {
                 tracing::error!("Error in recv_task for {who}: {:?}", e);
             }
         },
-        // ping_task 結束 (通常是因為超時或發送失敗)
         rv_c = (&mut ping_task) => {
             if let Err(e) = rv_c {
                 tracing::error!("Error in ping_task for {who}: {:?}", e);
@@ -139,17 +139,17 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
         }
     }
 
-    // 任何一個任務結束，都會導致 tokio::select! 塊完成，
-    // 然後我們在這裡手動中止所有 remaining tasks，確保資源被釋放。
+    // 清理工作
     send_task.abort();
     recv_task.abort();
     ping_task.abort();
 
-    // returning from the handler closes the websocket connection
+    // 最終清理連接
+    cleanup_connection(&state, who).await;
+
     tracing::info!("Websocket context {who} destroyed");
 }
 
-/// helper to print contents of messages to stdout. Has special treatment for Close.
 fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
@@ -170,12 +170,18 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> Control
             }
             return ControlFlow::Break(());
         }
-        Message::Pong(_) => {}
-        Message::Ping(_) => {}
+        Message::Pong(_) => {
+            tracing::debug!("Received pong from {who}");
+            // 可以在這裡更新最後 pong 時間
+        }
+        Message::Ping(_) => {
+            tracing::debug!("Received ping from {who}");
+        }
     }
     ControlFlow::Continue(())
 }
 
+// 原有的獲取所有連接的端點
 async fn get_online_connections(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<DisplayTrackedConnection>>, AppError> {
@@ -192,44 +198,122 @@ async fn get_online_connections(
     Ok(Json(result))
 }
 
-// 輸入參數結構
+// 新增：獲取真正活躍的連接（通過嘗試發送 ping 來檢測）
+async fn get_active_connections(
+    State(state): State<AppStateV2>,
+) -> Result<Json<Vec<DisplayTrackedConnection>>, AppError> {
+    let connections = state.get_connections().lock().await;
+    let mut active_connections = Vec::new();
+
+    for (addr, info) in connections.iter() {
+        // 嘗試發送一個 ping 來檢測連接是否真正活躍
+        let mut sender_guard = info.sender.lock().await;
+        if sender_guard.send(Message::Ping(Bytes::new())).await.is_ok() {
+            active_connections.push(DisplayTrackedConnection {
+                addr: addr.to_string(),
+                connected_at: info.connected_at,
+            });
+        } else {
+            cleanup_connection(&state, *addr).await;
+            tracing::debug!("Connection {} appears to be inactive", addr);
+        }
+    }
+
+    Ok(Json(active_connections))
+}
+
 #[derive(serde::Deserialize)]
 pub struct SendMessageParams {
-    pub addr: String, // 例如: "192.168.1.100:8080" 或只是 "192.168.1.100"
+    pub addr: String,
     pub message: String,
 }
 
 async fn say_something_to_someone(
     Query(params): Query<SendMessageParams>,
     State(state): State<AppStateV2>,
-) -> Result<Json<()>, AppError> {
+) -> Result<Json<String>, AppError> {
     let connections = state.get_connections().lock().await;
 
-    // 嘗試將輸入的字串解析為 SocketAddr 輸入必須是完整的 socket address 格式（包含 port）
     match params.addr.parse::<SocketAddr>() {
         Ok(socket_addr) => {
-            // 直接用 HashMap 的 get 方法查找
             if let Some(tracked_conn) = connections.get(&socket_addr) {
-                // 找到連接，發送消息
                 let mut sender_guard = tracked_conn.sender.lock().await;
-                let hello_message = Message::Text(params.message.into());
+                let message = Message::Text(params.message.into());
 
-                match sender_guard.send(hello_message).await {
+                match sender_guard.send(message).await {
                     Ok(_) => {
-                        tracing::info!("Successfully sent 'hello' to {}", socket_addr);
+                        tracing::info!("Successfully sent message to {}", socket_addr);
+                        Ok(Json("Message sent successfully".to_string()))
                     }
                     Err(e) => {
                         tracing::error!("Failed to send message to {}: {}", socket_addr, e);
+                        // 這裡不立即清理連接，讓 handle_socket 中的任務處理
+                        Ok(Json(format!("Failed to send message: {}", e)))
                     }
                 }
             } else {
                 tracing::info!("No connection found for address: {}", params.addr);
+                Ok(Json("Connection not found".to_string()))
             }
         }
         Err(_) => {
             tracing::info!("Invalid socket address format: {}", params.addr);
+            Ok(Json("Invalid address format".to_string()))
+        }
+    }
+}
+
+// 改進的清理函數
+async fn cleanup_connection(state: &AppStateV2, who: SocketAddr) {
+    let mut connections = state.get_connections().lock().await;
+    if let Some(_removed_conn) = connections.remove(&who) {
+        tracing::info!(
+            "Removed connection {} from connections map (remaining: {})",
+            who,
+            connections.len()
+        );
+    } else {
+        tracing::debug!(
+            "Connection {} was already removed from connections map",
+            who
+        );
+    }
+}
+
+// 新增：定期清理無效連接的背景任務（可選）
+pub async fn _start_connection_cleanup_task(state: AppStateV2) {
+    let mut interval = tokio::time::interval(Duration::from_secs(60)); // 每分鐘檢查一次
+
+    loop {
+        interval.tick().await;
+        _cleanup_inactive_connections(&state).await;
+    }
+}
+
+async fn _cleanup_inactive_connections(state: &AppStateV2) {
+    let mut connections = state.get_connections().lock().await;
+    let mut to_remove = Vec::new();
+
+    for (addr, info) in connections.iter() {
+        // 檢查連接是否超過一定時間沒有活動
+        if let Ok(duration) = SystemTime::now().duration_since(info.connected_at) {
+            if duration.as_secs() > 3600 {
+                // 超過 1 小時的連接
+                // 嘗試發送 ping 檢測
+                let mut sender_guard = info.sender.lock().await;
+                if sender_guard
+                    .send(Message::Ping(Bytes::new()))
+                    .await
+                    .is_err()
+                {
+                    to_remove.push(*addr);
+                }
+            }
         }
     }
 
-    Ok(Json(()))
+    for addr in to_remove {
+        connections.remove(&addr);
+        tracing::info!("Cleaned up inactive connection: {}", addr);
+    }
 }
