@@ -25,7 +25,6 @@ pub fn new() -> Router<AppStateV2> {
     Router::new()
         .route("/", any(ws_handler))
         .route("/get_online_connections", get(get_online_connections))
-        .route("/get_active_connections", get(get_active_connections)) // 新增：獲取真正活躍的連接
         .route("/say_something_to_someone", get(say_something_to_someone))
 }
 
@@ -198,30 +197,6 @@ async fn get_online_connections(
     Ok(Json(result))
 }
 
-// 新增：獲取真正活躍的連接（通過嘗試發送 ping 來檢測）
-async fn get_active_connections(
-    State(state): State<AppStateV2>,
-) -> Result<Json<Vec<DisplayTrackedConnection>>, AppError> {
-    let connections = state.get_connections().lock().await;
-    let mut active_connections = Vec::new();
-
-    for (addr, info) in connections.iter() {
-        // 嘗試發送一個 ping 來檢測連接是否真正活躍
-        let mut sender_guard = info.sender.lock().await;
-        if sender_guard.send(Message::Ping(Bytes::new())).await.is_ok() {
-            active_connections.push(DisplayTrackedConnection {
-                addr: addr.to_string(),
-                connected_at: info.connected_at,
-            });
-        } else {
-            cleanup_connection(&state, *addr).await;
-            tracing::debug!("Connection {} appears to be inactive", addr);
-        }
-    }
-
-    Ok(Json(active_connections))
-}
-
 #[derive(serde::Deserialize)]
 pub struct SendMessageParams {
     pub addr: String,
@@ -277,43 +252,5 @@ async fn cleanup_connection(state: &AppStateV2, who: SocketAddr) {
             "Connection {} was already removed from connections map",
             who
         );
-    }
-}
-
-// 新增：定期清理無效連接的背景任務（可選）
-pub async fn _start_connection_cleanup_task(state: AppStateV2) {
-    let mut interval = tokio::time::interval(Duration::from_secs(60)); // 每分鐘檢查一次
-
-    loop {
-        interval.tick().await;
-        _cleanup_inactive_connections(&state).await;
-    }
-}
-
-async fn _cleanup_inactive_connections(state: &AppStateV2) {
-    let mut connections = state.get_connections().lock().await;
-    let mut to_remove = Vec::new();
-
-    for (addr, info) in connections.iter() {
-        // 檢查連接是否超過一定時間沒有活動
-        if let Ok(duration) = SystemTime::now().duration_since(info.connected_at) {
-            if duration.as_secs() > 3600 {
-                // 超過 1 小時的連接
-                // 嘗試發送 ping 檢測
-                let mut sender_guard = info.sender.lock().await;
-                if sender_guard
-                    .send(Message::Ping(Bytes::new()))
-                    .await
-                    .is_err()
-                {
-                    to_remove.push(*addr);
-                }
-            }
-        }
-    }
-
-    for addr in to_remove {
-        connections.remove(&addr);
-        tracing::info!("Cleaned up inactive connection: {}", addr);
     }
 }
