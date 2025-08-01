@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     errors::{AppError, RequestError},
     repositories::stocks::{get_stock_closing_prices_by_date_range, upsert_stock_closing_prices},
@@ -10,6 +8,7 @@ use crate::{
 use chrono::{Duration, NaiveDate};
 use reqwest::Client;
 use scraper::{Html, Selector};
+use std::collections::HashMap;
 
 /// Parses HTML document to extract stock buyback information
 ///
