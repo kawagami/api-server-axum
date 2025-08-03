@@ -222,3 +222,14 @@ pub enum StartPriceFilter {
     /// 只有有起始價格的
     ExistsOnly,
 }
+
+/// 給 repository 的 fn get_stock_buyback_periods 接收 DB 資料用的結構
+#[derive(Debug, FromRow, Serialize)]
+pub struct StockBuybackPeriod {
+    /// 股票代號。
+    pub stock_no: String,
+    /// 庫藏股開始日期。
+    pub start_date: NaiveDate,
+    /// 庫藏股結束日期。
+    pub end_date: NaiveDate,
+}

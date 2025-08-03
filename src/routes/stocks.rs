@@ -11,7 +11,7 @@ use crate::{
     structs::stocks::{
         BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
         NewStockClosingPrice, StartPriceFilter, StockBuybackInfo, StockBuybackMoreInfo,
-        StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
+        StockBuybackPeriod, StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
         StockClosingPriceResponse, StockRequest, StockStats,
     },
 };
@@ -54,6 +54,10 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         )
         .route("/testing_api", get(testing_api))
         .route("/testing_api2", get(testing_api2))
+        .route(
+            "/get_stock_buyback_periods_v2",
+            get(get_stock_buyback_periods_v2),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
@@ -284,6 +288,15 @@ pub async fn testing_api2(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
     let data = stocks::get_active_buyback_prices_v4(&state, StartPriceFilter::ExistsOnly).await?;
+
+    Ok(Json(data))
+}
+
+/// 取得 DB 資料中的紀錄
+pub async fn get_stock_buyback_periods_v2(
+    State(state): State<AppStateV2>,
+) -> Result<Json<Vec<StockBuybackPeriod>>, AppError> {
+    let data = stocks::get_stock_buyback_periods(&state).await?;
 
     Ok(Json(data))
 }

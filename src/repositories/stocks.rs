@@ -3,8 +3,8 @@ use crate::{
     state::AppStateV2,
     structs::stocks::{
         Conditions, GetStockHistoryPriceRequest, NewStockClosingPrice, StartPriceFilter,
-        StockBuybackInfo, StockBuybackMoreInfo, StockChange, StockChangeWithoutId,
-        StockClosingPrice, StockDayAll, StockRequest,
+        StockBuybackInfo, StockBuybackMoreInfo, StockBuybackPeriod, StockChange,
+        StockChangeWithoutId, StockClosingPrice, StockDayAll, StockRequest,
     },
 };
 use chrono::NaiveDate;
@@ -686,4 +686,29 @@ fn roc_date_to_naive_date(roc_date: &str) -> Result<NaiveDate, AppError> {
     // 創建 NaiveDate
     chrono::NaiveDate::from_ymd_opt(gregorian_year, month, day)
         .ok_or_else(|| RequestError::InvalidContent(format!("創建 NaiveDate fail")).into())
+}
+
+/// 取得 stock_buyback_periods table 所有資料
+pub async fn get_stock_buyback_periods(
+    state: &AppStateV2,
+) -> Result<Vec<StockBuybackPeriod>, AppError> {
+    use sqlx::QueryBuilder;
+
+    let mut query_builder = QueryBuilder::new(
+        "
+        SELECT
+            *
+        FROM
+            stock_buyback_periods
+    ",
+    );
+
+    query_builder.push(" ORDER BY start_date ASC");
+
+    let response: Vec<StockBuybackPeriod> = query_builder
+        .build_query_as()
+        .fetch_all(state.get_pool())
+        .await?;
+
+    Ok(response)
 }
