@@ -279,8 +279,8 @@ pub fn round_to_n_decimal(value: f64, decimals: u32) -> f64 {
 pub async fn stock_day_all_service(
     state: &AppStateV2,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
+    // 打外部 API 取得 TwseApiResponse 資料
     let url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL";
-
     let resp: TwseApiResponse = state
         .get_http_client()
         .get(url)
@@ -289,6 +289,7 @@ pub async fn stock_day_all_service(
         .json()
         .await?;
 
+    // 將 TwseApiResponse 中的 date 資料解析成 NaiveDate
     let trade_date = chrono::NaiveDate::parse_from_str(&resp.date, "%Y%m%d")?;
 
     // 修改解析函數，處理空字符串和 "--" 情況
@@ -323,7 +324,9 @@ pub async fn stock_day_all_service(
     let mut price_changes = Vec::new();
     let mut transaction_counts = Vec::new();
 
+    // 整理 TwseApiResponse 中的 data
     for row in &resp.data {
+        // 不符合格式的就跳過
         if row.len() < 10 {
             continue;
         }
