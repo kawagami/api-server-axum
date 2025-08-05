@@ -458,9 +458,6 @@ pub async fn get_stock_closing_prices_by_date_range(
     Ok(results)
 }
 
-// let stock_code: Option<&str> = Some("00645");
-// let trade_date: Option<NaiveDate> = None;
-
 pub async fn get_stock_day_all(
     state: &AppStateV2,
     stock_code: Option<String>,
