@@ -275,7 +275,7 @@ pub async fn get_unfinished_buyback_price_gap(
     Ok(Json(stocks::get_active_buyback_prices(&state).await?))
 }
 
-/// 紀錄執行計畫中的 API
+/// get_active_buyback_prices_v4 API 取 All
 pub async fn testing_api(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
@@ -284,6 +284,7 @@ pub async fn testing_api(
     Ok(Json(data))
 }
 
+/// get_active_buyback_prices_v4 API 取 ExistsOnly
 pub async fn testing_api2(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
