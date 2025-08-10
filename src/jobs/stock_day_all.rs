@@ -26,6 +26,7 @@ impl AppJob for StockDayAllJob {
         }
 
         // 取當前日期字串 & 90 天後的日期字串 抓未來的庫藏股計畫
+        // 目前看起來沒有依照預期的運作 待修復
         let now = get_roc_now();
         let three_month_later = get_roc_three_month_later();
         match get_buyback_stock_raw_html_string(state.get_http_client(), &now, &three_month_later)
