@@ -49,10 +49,7 @@ pub async fn get_all_stock_changes(
     // Add the ordering at the end
     query.push(" ORDER BY s.start_date DESC");
 
-    // Execute the query with the arguments
-    let requests: Vec<StockChange> = query.build_query_as().fetch_all(state.get_pool()).await?;
-
-    Ok(requests)
+    Ok(query.build_query_as().fetch_all(state.get_pool()).await?)
 }
 
 // 預計改用 rust 實現的方式
