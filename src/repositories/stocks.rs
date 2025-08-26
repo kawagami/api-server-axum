@@ -529,6 +529,7 @@ pub async fn bulk_insert_stock_buyback_periods(
 }
 
 /// 取 stock_buyback_periods 中包含未來日期的庫藏股 起始價格 & 當前價格
+/// 目前這段取資料庫邏輯過於耦合 待修改中
 pub async fn get_active_buyback_prices(
     state: &AppStateV2,
 ) -> Result<Vec<StockBuybackMoreInfo>, AppError> {
