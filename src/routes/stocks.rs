@@ -53,7 +53,6 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
             get(get_unfinished_buyback_price_gap),
         )
         .route("/testing_api", get(testing_api))
-        .route("/testing_api2", get(testing_api2))
         .route(
             "/get_stock_buyback_periods_v2",
             get(get_stock_buyback_periods_v2),
@@ -280,15 +279,6 @@ pub async fn testing_api(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
     let data = stocks::get_active_buyback_prices_v4(&state, StartPriceFilter::All).await?;
-
-    Ok(Json(data))
-}
-
-/// get_active_buyback_prices_v4 API 取 ExistsOnly
-pub async fn testing_api2(
-    State(state): State<AppStateV2>,
-) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
-    let data = stocks::get_active_buyback_prices_v4(&state, StartPriceFilter::ExistsOnly).await?;
 
     Ok(Json(data))
 }
