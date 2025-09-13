@@ -54,6 +54,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         )
         .route("/testing_api", get(testing_api))
         .route("/testing_api2", get(testing_api2))
+        .route("/for_develop", post(for_develop))
         .route(
             "/get_stock_buyback_periods_v2",
             get(get_stock_buyback_periods_v2),
@@ -300,4 +301,39 @@ pub async fn get_stock_buyback_periods_v2(
     let data = stocks::get_stock_buyback_periods(&state).await?;
 
     Ok(Json(data))
+}
+
+/// 開發用 API
+// pub async fn for_develop(
+//     State(state): State<AppStateV2>,
+//     Json(payload): Json<BuybackDuration>,
+// ) -> Result<Json<String>, AppError> {
+//     let records = get_buyback_stock_raw_html_string(
+//         state.get_http_client(),
+//         &payload.start_date,
+//         &payload.end_date,
+//     )
+//     .await?;
+
+//     Ok(Json(records))
+// }
+pub async fn for_develop(
+    State(state): State<AppStateV2>,
+    Json(payload): Json<BuybackDuration>,
+) -> Result<Json<Vec<StockRequest>>, AppError> {
+    // 先取得庫藏股頁面 raw string => 解析成 Vec<StockRequest> 資料
+    let records = parse_buyback_stock_raw_html(
+        get_buyback_stock_raw_html_string(
+            state.get_http_client(),
+            &payload.start_date,
+            &payload.end_date,
+        )
+        .await?,
+    );
+    // bulk_insert_stock_buyback_periods
+    let affect_row = stocks::bulk_insert_stock_buyback_periods(&state, &records).await?;
+
+    tracing::info!("insert affect_row => {}", affect_row);
+
+    Ok(Json(records))
 }

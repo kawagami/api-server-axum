@@ -491,8 +491,8 @@ pub async fn get_stock_day_all(
 pub async fn bulk_insert_stock_buyback_periods(
     state: &AppStateV2,
     stocks: &[StockRequest],
-) -> Result<usize, AppError> {
-    let mut tx = state.get_pool().begin().await?;
+) -> Result<u64, AppError> {
+    let tx = state.get_pool();
 
     let query = "
         INSERT INTO stock_buyback_periods (stock_no, start_date, end_date)
@@ -517,15 +517,14 @@ pub async fn bulk_insert_stock_buyback_periods(
         .collect();
     let end_dates = end_dates?;
 
-    sqlx::query(query)
+    let result = sqlx::query(query)
         .bind(&stock_nos)
         .bind(&start_dates)
         .bind(&end_dates)
-        .execute(&mut *tx)
+        .execute(tx)
         .await?;
 
-    tx.commit().await?;
-    Ok(stocks.len())
+    Ok(result.rows_affected())
 }
 
 /// 取 stock_buyback_periods 中包含未來日期的庫藏股 起始價格 & 當前價格
