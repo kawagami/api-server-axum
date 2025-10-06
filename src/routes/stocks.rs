@@ -330,7 +330,7 @@ pub async fn for_develop(
         )
         .await?,
     );
-    // bulk_insert_stock_buyback_periods
+
     let affect_row = stocks::bulk_insert_stock_buyback_periods(&state, &records).await?;
 
     tracing::info!("insert affect_row => {}", affect_row);
