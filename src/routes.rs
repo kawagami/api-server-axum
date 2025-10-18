@@ -11,10 +11,7 @@ mod ws;
 use crate::{scheduler::initialize_scheduler, state::AppStateV2};
 use axum::{
     extract::DefaultBodyLimit,
-    http::{
-        header::{AUTHORIZATION, CONTENT_TYPE},
-        Method,
-    },
+    http::{header, Method},
     Router,
 };
 use tower_http::cors::CorsLayer;
@@ -42,7 +39,7 @@ pub async fn app() -> Router {
             CorsLayer::new()
                 .allow_methods([Method::GET, Method::POST])
                 .allow_origin(origins)
-                .allow_headers([AUTHORIZATION, CONTENT_TYPE]),
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
         )
         .with_state(state)
         .fallback(root::handler_404)
