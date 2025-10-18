@@ -51,3 +51,4 @@ futures-util = { version = "0.3", default-features = false, features = [
     "std",
 ] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
+lettre = "0.11"
