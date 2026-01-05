@@ -1,11 +1,15 @@
+use crate::structs::email::EmailParams;
 use crate::{
     errors::AppError,
     repositories::stocks,
     routes::auth,
-    services::stocks::{
-        fetch_stock_price_for_date, get_buyback_stock_raw_html_string, get_stock_day_avg,
-        parse_buyback_stock_raw_html, parse_stock_day_avg_response, round_to_n_decimal,
-        stock_day_all_service,
+    services::{
+        email::send_email_test,
+        stocks::{
+            fetch_stock_price_for_date, get_buyback_stock_raw_html_string, get_stock_day_avg,
+            parse_buyback_stock_raw_html, parse_stock_day_avg_response, round_to_n_decimal,
+            stock_day_all_service,
+        },
     },
     state::AppStateV2,
     structs::stocks::{
@@ -304,36 +308,11 @@ pub async fn get_stock_buyback_periods_v2(
 }
 
 /// 開發用 API
-// pub async fn for_develop(
-//     State(state): State<AppStateV2>,
-//     Json(payload): Json<BuybackDuration>,
-// ) -> Result<Json<String>, AppError> {
-//     let records = get_buyback_stock_raw_html_string(
-//         state.get_http_client(),
-//         &payload.start_date,
-//         &payload.end_date,
-//     )
-//     .await?;
-
-//     Ok(Json(records))
-// }
 pub async fn for_develop(
-    State(state): State<AppStateV2>,
-    Json(payload): Json<BuybackDuration>,
-) -> Result<Json<Vec<StockRequest>>, AppError> {
-    // 先取得庫藏股頁面 raw string => 解析成 Vec<StockRequest> 資料
-    let records = parse_buyback_stock_raw_html(
-        get_buyback_stock_raw_html_string(
-            state.get_http_client(),
-            &payload.start_date,
-            &payload.end_date,
-        )
-        .await?,
-    );
+    State(_state): State<AppStateV2>,
+    Json(params): Json<EmailParams>,
+) -> Result<(), AppError> {
+    send_email_test(params);
 
-    let affect_row = stocks::bulk_insert_stock_buyback_periods(&state, &records).await?;
-
-    tracing::info!("insert affect_row => {}", affect_row);
-
-    Ok(Json(records))
+    Ok(())
 }

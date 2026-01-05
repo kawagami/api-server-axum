@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod blogs;
+pub mod email;
 pub mod firebase;
 pub mod jobs;
 pub mod notes;
