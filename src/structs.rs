@@ -4,6 +4,7 @@ pub mod email;
 pub mod firebase;
 pub mod jobs;
 pub mod notes;
+pub mod roster;
 pub mod stocks;
 pub mod tools;
 pub mod users;

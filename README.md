@@ -11,3 +11,6 @@
 - `WebSocket 服務`
 
 以及多種 API 功能
+
+# 進行中的開發
+* [排班功能](https://gemini.google.com/app/ef48e11ed51e33f6?hl=zh-TW)
