@@ -1,11 +1,11 @@
 use crate::errors::AppError;
 use crate::state::AppStateV2;
-use crate::structs::roster::{RosterRequest, RosterResponse, StaffShift}; // 引用上面的結構
+use crate::structs::roster::{RosterRequest, RosterResponse, StaffShift};
 use axum::{routing::post, Json, Router};
 use std::collections::VecDeque;
 
 pub fn new() -> Router<AppStateV2> {
-    // 建議改用 post，因為 names 陣列可能很大
+    // 用 post 考量參數資料量可能很大
     Router::new().route("/", post(calculate_roster))
 }
 
@@ -25,7 +25,6 @@ pub async fn calculate_roster(
     };
 
     let mut roster_result = Vec::new();
-    // let num_staff = names.len();
 
     // 2. 為每位員工生成班表
     for (idx, name) in names.into_iter().enumerate() {
