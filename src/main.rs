@@ -5,6 +5,7 @@ mod routes;
 mod scheduler;
 mod services;
 mod state;
+mod storage;
 mod structs;
 mod utils;
 

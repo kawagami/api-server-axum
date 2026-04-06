@@ -8,6 +8,8 @@ use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 
+use crate::storage::Storage;
+
 pub struct AppState {
     pub pool: Pool<Postgres>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
@@ -15,6 +17,7 @@ pub struct AppState {
     pub fastapi_upload_host: String,
     pub tx: broadcast::Sender<String>,
     pub connections: ConnectionMap, // 追蹤連線
+    pub storage: Storage,
 }
 
 impl AppState {
@@ -57,6 +60,7 @@ impl AppState {
             fastapi_upload_host,
             tx,
             connections: Arc::new(Mutex::new(HashMap::new())),
+            storage: Storage::from_env(), // ← 新增這一行
         }
     }
 }
@@ -115,5 +119,9 @@ impl AppStateV2 {
 
     pub fn get_connections(&self) -> &ConnectionMap {
         &self.0.connections
+    }
+
+    pub fn get_storage(&self) -> &Storage {
+        &self.0.storage
     }
 }
