@@ -4,17 +4,28 @@ use axum::{
     http::StatusCode,
     middleware,
     response::IntoResponse,
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
 
 pub fn new(state: AppStateV2) -> Router<AppStateV2> {
     Router::new()
+        .route("/", get(get_images))
         .route("/upload", post(upload_image))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize,
         ))
+}
+
+async fn get_images(State(state): State<AppStateV2>) -> impl IntoResponse {
+    match images_repo::get_all_images(&state).await {
+        Ok(images) => Json(images).into_response(),
+        Err(e) => {
+            tracing::error!("get images failed: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response()
+        }
+    }
 }
 
 async fn upload_image(
