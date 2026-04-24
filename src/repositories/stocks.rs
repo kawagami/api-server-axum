@@ -85,7 +85,7 @@ pub async fn get_stock_change_info(
 
 pub async fn get_one_pending_stock_change(
     state: &AppStateV2,
-) -> anyhow::Result<Option<StockRequest>> {
+) -> Result<Option<StockRequest>, AppError> {
     let row = sqlx::query(
         r#"
         SELECT
@@ -97,7 +97,7 @@ pub async fn get_one_pending_stock_change(
         WHERE
             status = 'pending'
             AND TO_DATE(
-                (CAST((CAST(end_date AS TEXT)::INT + 19110000) AS TEXT)), 
+                (CAST((CAST(end_date AS TEXT)::INT + 19110000) AS TEXT)),
                 'YYYYMMDD'
             ) <= CURRENT_DATE
         LIMIT
