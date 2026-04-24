@@ -213,8 +213,9 @@ pub async fn insert_stock_data_batch(
     let stock_nos: Vec<&str> = stocks.iter().map(|s| s.stock_no.as_str()).collect();
     let start_dates: Vec<&str> = stocks.iter().map(|s| s.start_date.as_str()).collect();
     let end_dates: Vec<&str> = stocks.iter().map(|s| s.end_date.as_str()).collect();
-    let statuses: Vec<&str> = vec!["pending"; stocks.len()]; // 預設 'pending'
-    let timestamps: Vec<&str> = vec!["NOW()"; stocks.len()]; // `NOW()`
+    let statuses: Vec<&str> = vec!["pending"; stocks.len()];
+    let now = chrono::Utc::now().naive_utc();
+    let timestamps: Vec<chrono::NaiveDateTime> = vec![now; stocks.len()];
 
     sqlx::query(query)
         .bind(&stock_nos)
@@ -273,7 +274,7 @@ pub async fn reset_failed_stock_changes_to_pending(state: &AppStateV2) -> Result
                 "status" = 'failed';
         "#;
 
-    sqlx::query(query).fetch_all(&mut *tx).await?;
+    sqlx::query(query).execute(&mut *tx).await?;
 
     tx.commit().await?;
     Ok(())
@@ -282,7 +283,6 @@ pub async fn reset_failed_stock_changes_to_pending(state: &AppStateV2) -> Result
 pub async fn update_one_stock_change_pending(state: &AppStateV2, id: i32) -> Result<(), AppError> {
     let mut tx = state.get_pool().begin().await?;
 
-    // status 欄位改成 failed 的 update sql where
     let query = r#"
             UPDATE stock_changes
             SET
@@ -296,7 +296,7 @@ pub async fn update_one_stock_change_pending(state: &AppStateV2, id: i32) -> Res
                 id = $1;
         "#;
 
-    sqlx::query(query).bind(id).fetch_all(&mut *tx).await?;
+    sqlx::query(query).bind(id).execute(&mut *tx).await?;
 
     tx.commit().await?;
     Ok(())
@@ -669,10 +669,15 @@ fn roc_date_to_naive_date(roc_date: &str) -> Result<NaiveDate, AppError> {
     let month = &roc_date[3..5];
     let day = &roc_date[5..7];
 
-    // 轉換為數字
-    let roc_year: i32 = roc_year.parse().unwrap();
-    let month: u32 = month.parse().unwrap();
-    let day: u32 = day.parse().unwrap();
+    let roc_year: i32 = roc_year
+        .parse()
+        .map_err(|_| AppError::from(RequestError::InvalidContent(format!("民國年解析失敗: {}", roc_year))))?;
+    let month: u32 = month
+        .parse()
+        .map_err(|_| AppError::from(RequestError::InvalidContent(format!("月份解析失敗: {}", month))))?;
+    let day: u32 = day
+        .parse()
+        .map_err(|_| AppError::from(RequestError::InvalidContent(format!("日期解析失敗: {}", day))))?;
 
     // 民國年轉換為西元年 (民國年+1911=西元年)
     let gregorian_year = roc_year + 1911;
