@@ -14,7 +14,7 @@ use crate::{
     state::AppStateV2,
     structs::stocks::{
         BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
-        NewStockClosingPrice, StartPriceFilter, StockBuybackInfo, StockBuybackMoreInfo,
+        NewStockClosingPrice, Pagination, StartPriceFilter, StockBuybackInfo, StockBuybackMoreInfo,
         StockBuybackPeriod, StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
         StockClosingPriceResponse, StockRequest, StockStats,
     },
@@ -189,11 +189,14 @@ pub async fn get_stock_history_price(
     Ok(Json(new_stock_closing_prices))
 }
 
-/// 取資料庫中所有歷史收盤價
+/// 取資料庫中所有歷史收盤價（預設 limit=100、offset=0）
 pub async fn get_all_stock_closing_prices(
     State(state): State<AppStateV2>,
+    Query(pagination): Query<Pagination>,
 ) -> Result<Json<Vec<StockClosingPrice>>, AppError> {
-    Ok(Json(stocks::get_all_stock_closing_prices(&state).await?))
+    Ok(Json(
+        stocks::get_all_stock_closing_prices(&state, pagination.limit, pagination.offset).await?,
+    ))
 }
 
 /// 打外部 API 取 start_date & end_date 的歷史收盤價 增加額外統計資訊

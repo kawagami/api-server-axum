@@ -101,6 +101,18 @@ pub struct Conditions {
     pub status: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct Pagination {
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub offset: i64,
+}
+
+fn default_limit() -> i64 {
+    100
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct StockDayAvgResponse {
     pub stat: String,

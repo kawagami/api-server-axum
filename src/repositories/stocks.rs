@@ -306,29 +306,20 @@ pub async fn check_stock_change_pending_exist(
 
 pub async fn get_all_stock_closing_prices(
     state: &AppStateV2,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<StockClosingPrice>, AppError> {
-    let mut query = QueryBuilder::new(
+    let requests: Vec<StockClosingPrice> = sqlx::query_as(
         r#"
-        SELECT
-            *
-        FROM
-            stock_closing_prices s
-        WHERE 1=1
-    "#,
-    );
-
-    // // Add status condition if it exists
-    // if let Some(status) = &conditions.status {
-    //     query.push(" AND s.status = ");
-    //     query.push_bind(status);
-    // }
-
-    // Add the ordering at the end
-    query.push(" ORDER BY s.date DESC");
-
-    // Execute the query with the arguments
-    let requests: Vec<StockClosingPrice> =
-        query.build_query_as().fetch_all(state.get_pool()).await?;
+        SELECT * FROM stock_closing_prices
+        ORDER BY date DESC
+        LIMIT $1 OFFSET $2
+        "#,
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(state.get_pool())
+    .await?;
 
     Ok(requests)
 }
