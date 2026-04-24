@@ -315,7 +315,7 @@ pub async fn for_develop(
     State(_state): State<AppStateV2>,
     Json(params): Json<EmailParams>,
 ) -> Result<(), AppError> {
-    send_email_test(params);
+    send_email_test(params)?;
 
     Ok(())
 }
