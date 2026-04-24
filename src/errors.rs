@@ -161,7 +161,10 @@ impl From<anyhow::Error> for AppError {
 
 impl From<sqlx::Error> for AppError {
     fn from(err: sqlx::Error) -> Self {
-        Self::SystemError(SystemError::Internal(err.to_string()))
+        match err {
+            sqlx::Error::RowNotFound => RequestError::NotFound.into(),
+            e => Self::SystemError(SystemError::Internal(e.to_string())),
+        }
     }
 }
 

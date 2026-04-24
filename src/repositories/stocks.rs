@@ -231,59 +231,43 @@ pub async fn insert_stock_data_batch(
     Ok(stocks.len())
 }
 
-// 將打 fastapi 失敗的資料改成 failed
 pub async fn update_stock_change_failed(
     state: &AppStateV2,
     stock: &StockRequest,
 ) -> Result<(), AppError> {
-    let mut tx = state.get_pool().begin().await?;
-
-    // status 欄位改成 failed 的 update sql where
-    let query = r#"
+    sqlx::query(
+        r#"
             UPDATE stock_changes
-            SET
-                updated_at = NOW(),
-                status = 'failed'
-            WHERE
-                stock_no = $1
-                AND start_date = $2
-                AND end_date = $3
-        "#;
+            SET updated_at = NOW(), status = 'failed'
+            WHERE stock_no = $1 AND start_date = $2 AND end_date = $3
+        "#,
+    )
+    .bind(&stock.stock_no)
+    .bind(&stock.start_date)
+    .bind(&stock.end_date)
+    .execute(state.get_pool())
+    .await?;
 
-    sqlx::query(query)
-        .bind(&stock.stock_no)
-        .bind(&stock.start_date)
-        .bind(&stock.end_date)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
     Ok(())
 }
 
 pub async fn reset_failed_stock_changes_to_pending(state: &AppStateV2) -> Result<(), AppError> {
-    let mut tx = state.get_pool().begin().await?;
-
-    // status 欄位改成 failed 的 update sql where
-    let query = r#"
+    sqlx::query(
+        r#"
             UPDATE stock_changes
-            SET
-                "status" = 'pending',
-                updated_at = NOW ()
-            WHERE
-                "status" = 'failed';
-        "#;
+            SET "status" = 'pending', updated_at = NOW()
+            WHERE "status" = 'failed'
+        "#,
+    )
+    .execute(state.get_pool())
+    .await?;
 
-    sqlx::query(query).execute(&mut *tx).await?;
-
-    tx.commit().await?;
     Ok(())
 }
 
 pub async fn update_one_stock_change_pending(state: &AppStateV2, id: i32) -> Result<(), AppError> {
-    let mut tx = state.get_pool().begin().await?;
-
-    let query = r#"
+    sqlx::query(
+        r#"
             UPDATE stock_changes
             SET
                 "status" = 'pending',
@@ -291,14 +275,14 @@ pub async fn update_one_stock_change_pending(state: &AppStateV2, id: i32) -> Res
                 start_price = NULL,
                 end_price = NULL,
                 change = NULL,
-                updated_at = NOW ()
-            WHERE
-                id = $1;
-        "#;
+                updated_at = NOW()
+            WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .execute(state.get_pool())
+    .await?;
 
-    sqlx::query(query).bind(id).execute(&mut *tx).await?;
-
-    tx.commit().await?;
     Ok(())
 }
 
