@@ -1,7 +1,6 @@
 pub enum WsEvent {
     StockCompleted,
     StockFailed,
-    DataRefreshed,
 }
 
 impl WsEvent {
@@ -9,7 +8,6 @@ impl WsEvent {
         match self {
             Self::StockCompleted => "stock_completed",
             Self::StockFailed => "stock_failed",
-            Self::DataRefreshed => "data_refreshed",
         }
     }
 }

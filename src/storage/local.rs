@@ -48,6 +48,7 @@ impl LocalStorage {
         Ok((key, url))
     }
 
+    #[allow(dead_code)]
     pub async fn delete(&self, key: &str) -> Result<(), LocalStorageError> {
         if !key_is_valid(key) {
             return Err(LocalStorageError::InvalidKey(key.to_string()));
