@@ -1,6 +1,5 @@
 mod auth;
 mod blogs;
-mod firebase;
 mod images;
 mod notes;
 mod root;
@@ -30,7 +29,6 @@ pub async fn app() -> Router {
     Router::new()
         .merge(root::new())
         .nest("/jwt", auth::new())
-        .nest("/firebase", firebase::new(state.clone()))
         .nest("/blogs", blogs::new())
         .nest("/users", users::new(state.clone()))
         .nest("/tools", tools::new())

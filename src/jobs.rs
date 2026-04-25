@@ -1,4 +1,3 @@
-pub mod blogs;
 pub mod example;
 pub mod fetch_historical_closing_prices;
 pub mod notes;

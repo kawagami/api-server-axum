@@ -42,6 +42,7 @@ pub enum RequestError {
     #[error("無效的請求內容: {0}")]
     InvalidContent(String),
 
+    #[allow(dead_code)]
     #[error("無效的 JSON 格式: {0}")]
     InvalidJson(#[source] anyhow::Error),
 
