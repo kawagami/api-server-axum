@@ -9,6 +9,7 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 
 use crate::storage::Storage;
+use crate::structs::ws::WsEvent;
 
 pub struct AppState {
     pub pool: Pool<Postgres>,
@@ -123,5 +124,14 @@ impl AppStateV2 {
 
     pub fn get_storage(&self) -> &Storage {
         &self.0.storage
+    }
+
+    pub fn broadcast(&self, event: WsEvent, data: serde_json::Value) {
+        let msg = serde_json::json!({
+            "type": event.as_str(),
+            "data": data
+        })
+        .to_string();
+        let _ = self.get_tx().send(msg);
     }
 }

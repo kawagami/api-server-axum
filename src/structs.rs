@@ -8,3 +8,4 @@ pub mod roster;
 pub mod stocks;
 pub mod tools;
 pub mod users;
+pub mod ws;
