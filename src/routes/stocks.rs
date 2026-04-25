@@ -1,22 +1,18 @@
-use crate::structs::email::EmailParams;
 use crate::{
     errors::AppError,
-    repositories::stocks,
     middleware::auth,
-    services::{
-        email::send_email_test,
-        stocks::{
-            fetch_stock_price_for_date, get_buyback_stock_raw_html_string, get_stock_day_avg,
-            parse_buyback_stock_raw_html, parse_stock_day_avg_response, round_to_n_decimal,
-            stock_day_all_service,
-        },
+    repositories::stocks,
+    services::stocks::{
+        fetch_stock_price_for_date, get_buyback_stock_raw_html_string, get_stock_day_avg,
+        parse_buyback_stock_raw_html, parse_stock_day_avg_response, round_to_n_decimal,
+        stock_day_all_service,
     },
     state::AppStateV2,
     structs::stocks::{
         BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
-        NewStockClosingPrice, Pagination, StartPriceFilter, StockBuybackInfo, StockBuybackMoreInfo,
-        StockBuybackPeriod, StockChange, StockChangeId, StockChangeWithoutId, StockClosingPrice,
-        StockClosingPriceResponse, StockRequest, StockStats,
+        NewStockClosingPrice, Pagination, StockBuybackMoreInfo, StockBuybackPeriod, StockChange,
+        StockChangeId, StockChangeWithoutId, StockClosingPrice, StockClosingPriceResponse,
+        StockRequest, StockStats,
     },
 };
 use axum::{
@@ -51,14 +47,10 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         )
         .route("/bulk_insert_stock_day_all", get(bulk_insert_stock_day_all))
         .route("/get_stock_day_all", get(get_stock_day_all))
-        .route("/get_stock_buyback_periods", get(get_stock_buyback_periods))
         .route(
             "/get_unfinished_buyback_price_gap",
             get(get_unfinished_buyback_price_gap),
         )
-        .route("/testing_api", get(testing_api))
-        .route("/testing_api2", get(testing_api2))
-        .route("/for_develop", post(for_develop))
         .route(
             "/get_stock_buyback_periods_v2",
             get(get_stock_buyback_periods_v2),
@@ -254,51 +246,11 @@ pub async fn get_stock_day_all(
     Ok(Json(response))
 }
 
-/// 依照 input 的時間區間抓資料
-/// 只記錄庫藏股起訖時間資訊
-pub async fn get_stock_buyback_periods(
-    State(state): State<AppStateV2>,
-    Json(payload): Json<BuybackDuration>,
-) -> Result<Json<Vec<StockRequest>>, AppError> {
-    // 先取得庫藏股頁面 raw string => 解析成 Vec<StockRequest> 資料
-    let records = parse_buyback_stock_raw_html(
-        get_buyback_stock_raw_html_string(
-            state.get_http_client(),
-            &payload.start_date,
-            &payload.end_date,
-        )
-        .await?,
-    );
-
-    // 批次寫入取得的資料
-    stocks::bulk_insert_stock_buyback_periods(&state, &records).await?;
-
-    Ok(Json(records))
-}
-
 /// 取得未到結束日的庫藏股起始日到現在的價格差距 & 資訊
 pub async fn get_unfinished_buyback_price_gap(
     State(state): State<AppStateV2>,
 ) -> Result<Json<Vec<StockBuybackMoreInfo>>, AppError> {
     Ok(Json(stocks::get_active_buyback_prices(&state).await?))
-}
-
-/// get_active_buyback_prices_v4 API 取 All
-pub async fn testing_api(
-    State(state): State<AppStateV2>,
-) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
-    let data = stocks::get_active_buyback_prices_v4(&state, StartPriceFilter::All).await?;
-
-    Ok(Json(data))
-}
-
-/// get_active_buyback_prices_v4 API 取 ExistsOnly
-pub async fn testing_api2(
-    State(state): State<AppStateV2>,
-) -> Result<Json<Vec<StockBuybackInfo>>, AppError> {
-    let data = stocks::get_active_buyback_prices_v4(&state, StartPriceFilter::ExistsOnly).await?;
-
-    Ok(Json(data))
 }
 
 /// 取得 DB 資料中的紀錄
@@ -310,12 +262,3 @@ pub async fn get_stock_buyback_periods_v2(
     Ok(Json(data))
 }
 
-/// 開發用 API
-pub async fn for_develop(
-    State(_state): State<AppStateV2>,
-    Json(params): Json<EmailParams>,
-) -> Result<(), AppError> {
-    send_email_test(params)?;
-
-    Ok(())
-}

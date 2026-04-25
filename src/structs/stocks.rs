@@ -226,6 +226,7 @@ pub struct StockBuybackMoreInfo {
 
 /// 定義查詢篩選條件的枚舉
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum StartPriceFilter {
     /// 全部（不過濾）
     All,

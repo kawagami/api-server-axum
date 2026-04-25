@@ -18,8 +18,3 @@ pub struct SignInData {
     pub email: String,
     pub password: String,
 }
-
-#[derive(Deserialize)]
-pub struct PasswordInput {
-    pub password: String,
-}
