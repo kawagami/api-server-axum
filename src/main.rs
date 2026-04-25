@@ -1,5 +1,6 @@
 mod errors;
 mod jobs;
+mod middleware;
 mod repositories;
 mod routes;
 mod scheduler;

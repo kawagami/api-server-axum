@@ -1,7 +1,7 @@
 use crate::{
     errors::AppError,
     repositories::users,
-    routes::auth,
+    middleware::auth,
     state::AppStateV2,
     structs::users::{NewUser, User},
 };

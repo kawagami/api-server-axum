@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::firebase::{delete as repo_delete, images as repo_images, upload as repo_upload},
-    routes::auth,
+    middleware::auth,
     state::AppStateV2,
     structs::firebase::{DeleteImageRequest, FirebaseImage, Image},
 };

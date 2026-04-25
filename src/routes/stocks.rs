@@ -2,7 +2,7 @@ use crate::structs::email::EmailParams;
 use crate::{
     errors::AppError,
     repositories::stocks,
-    routes::auth,
+    middleware::auth,
     services::{
         email::send_email_test,
         stocks::{

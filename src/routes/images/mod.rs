@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::images as images_repo,
-    routes::auth,
+    middleware::auth,
     state::AppStateV2,
 };
 use axum::{
