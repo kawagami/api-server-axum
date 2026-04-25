@@ -239,9 +239,16 @@ pub async fn bulk_insert_stock_day_all(
 pub async fn get_stock_day_all(
     State(state): State<AppStateV2>,
     Query(payload): Query<GetStockDayAll>,
+    Query(pagination): Query<Pagination>,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
-    let response =
-        stocks::get_stock_day_all(&state, payload.stock_code, payload.trade_date).await?;
+    let response = stocks::get_stock_day_all(
+        &state,
+        payload.stock_code,
+        payload.trade_date,
+        pagination.limit,
+        pagination.offset,
+    )
+    .await?;
 
     Ok(Json(response))
 }

@@ -6,6 +6,8 @@ pub async fn get_stock_day_all(
     state: &AppStateV2,
     stock_code: Option<String>,
     trade_date: Option<NaiveDate>,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<StockDayAll>, AppError> {
     let mut builder = QueryBuilder::new("SELECT * FROM stock_day_all");
 
@@ -27,7 +29,9 @@ pub async fn get_stock_day_all(
         builder.push("trade_date = ").push_bind(date);
     }
 
-    builder.push(" ORDER BY trade_date DESC");
+    builder.push(" ORDER BY trade_date DESC, stock_code ASC");
+    builder.push(" LIMIT ").push_bind(limit);
+    builder.push(" OFFSET ").push_bind(offset);
 
     Ok(builder.build_query_as::<StockDayAll>().fetch_all(state.get_pool()).await?)
 }
