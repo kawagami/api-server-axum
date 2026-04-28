@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::{
     errors::AppError,
     repositories::blogs,
+    services::blogs as blogs_service,
     state::AppStateV2,
     structs::blogs::{DbBlog, Pagination, PutBlog},
 };
@@ -44,9 +45,9 @@ async fn delete_blog(
     State(state): State<AppStateV2>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<()>, AppError> {
-    let result = blogs::delete_blog(&state, id).await?;
+    blogs_service::delete_blog_with_images(&state, id).await?;
 
-    Ok(Json(result))
+    Ok(Json(()))
 }
 
 async fn put_blog(

@@ -1,6 +1,6 @@
 use crate::{errors::AppError, state::AppStateV2};
 use serde::Serialize;
-use sqlx::Row;
+use sqlx::{PgConnection, Row};
 
 #[derive(Serialize)]
 pub struct ImageRecord {
@@ -44,10 +44,32 @@ pub async fn insert_image(
     })
 }
 
-pub async fn _delete_image_by_key(state: &AppStateV2, storage_key: &str) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM images WHERE storage_key = $1")
-        .bind(storage_key)
-        .execute(state.get_pool())
+pub async fn get_images_by_urls(
+    state: &AppStateV2,
+    urls: &[String],
+) -> Result<Vec<ImageRecord>, AppError> {
+    let rows = sqlx::query("SELECT id, storage_key, url FROM images WHERE url = ANY($1)")
+        .bind(urls)
+        .fetch_all(state.get_pool())
+        .await?;
+
+    Ok(rows
+        .iter()
+        .map(|row| ImageRecord {
+            id: row.get("id"),
+            storage_key: row.get("storage_key"),
+            url: row.get("url"),
+        })
+        .collect())
+}
+
+pub async fn delete_images_in_tx(
+    conn: &mut PgConnection,
+    ids: &[i32],
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM images WHERE id = ANY($1)")
+        .bind(ids)
+        .execute(&mut *conn)
         .await?;
 
     Ok(())

@@ -1,4 +1,5 @@
 use crate::{errors::AppError, state::AppStateV2, structs::blogs::DbBlog};
+use sqlx::PgConnection;
 
 /// 取得帶分頁的 blogs
 pub async fn get_blogs_with_pagination(
@@ -36,17 +37,11 @@ pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog
     .map_err(AppError::from)
 }
 
-/// 刪除特定 blog
-pub async fn delete_blog(state: &AppStateV2, id: uuid::Uuid) -> Result<(), AppError> {
-    sqlx::query(
-        r#"
-            DELETE FROM blogs
-            WHERE id = $1
-            "#,
-    )
-    .bind(id)
-    .execute(state.get_pool())
-    .await?;
+pub async fn delete_blog_in_tx(conn: &mut PgConnection, id: uuid::Uuid) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM blogs WHERE id = $1")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
 
     Ok(())
 }
