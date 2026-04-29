@@ -1,4 +1,4 @@
-use crate::{errors::AppError, state::AppStateV2};
+use crate::{errors::{AppError, RequestError}, state::AppStateV2};
 use serde::Serialize;
 use sqlx::{PgConnection, Row};
 
@@ -61,6 +61,15 @@ pub async fn get_images_by_urls(
             url: row.get("url"),
         })
         .collect())
+}
+
+pub async fn delete_image_by_id(state: &AppStateV2, id: i32) -> Result<String, AppError> {
+    let row = sqlx::query("DELETE FROM images WHERE id = $1 RETURNING storage_key")
+        .bind(id)
+        .fetch_optional(state.get_pool())
+        .await?
+        .ok_or(RequestError::NotFound)?;
+    Ok(row.get("storage_key"))
 }
 
 pub async fn delete_images_in_tx(
