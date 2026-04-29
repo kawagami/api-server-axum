@@ -1,7 +1,7 @@
 use crate::{
     errors::AppError,
-    repositories::users,
     middleware::auth,
+    services::users as users_service,
     state::AppStateV2,
     structs::users::{NewUser, User},
 };
@@ -26,18 +26,14 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
 }
 
 async fn get_users(State(state): State<AppStateV2>) -> Result<Json<Vec<User>>, AppError> {
-    let result = users::get_users(&state).await?;
-
-    Ok(Json(result))
+    Ok(Json(users_service::get_users(&state).await?))
 }
 
-/// 需要通過 jwt 認證才能新增 user
 async fn create_user(
     State(state): State<AppStateV2>,
     Json(user): Json<NewUser>,
 ) -> Result<Json<bool>, AppError> {
-    users::create_user(&state, user).await?;
-
+    users_service::create_user(&state, user).await?;
     Ok(Json(true))
 }
 
@@ -45,7 +41,5 @@ async fn delete_user(
     State(_state): State<AppStateV2>,
     Json(_user): Json<User>,
 ) -> Result<Json<bool>, AppError> {
-    // let result = users::get_users(&state).await?;
-
     Ok(Json(true))
 }
