@@ -1,7 +1,8 @@
 use crate::{
     errors::{AppError, RequestError},
-    repositories::images as images_repo,
     middleware::auth,
+    repositories::images::ImageRecord,
+    services::images as images_service,
     state::AppStateV2,
 };
 use axum::{
@@ -24,8 +25,8 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
 
 async fn get_images(
     State(state): State<AppStateV2>,
-) -> Result<Json<Vec<images_repo::ImageRecord>>, AppError> {
-    Ok(Json(images_repo::get_all_images(&state).await?))
+) -> Result<Json<Vec<ImageRecord>>, AppError> {
+    Ok(Json(images_service::get_images(&state).await?))
 }
 
 async fn upload_image(
@@ -40,13 +41,7 @@ async fn upload_image(
 
     let content_type = field.content_type().unwrap_or("image/jpeg").to_string();
 
-    let (storage_key, url) = state
-        .get_storage()
-        .upload(field, &content_type)
-        .await
-        .map_err(|e| RequestError::MultipartError(e.into()))?;
-
-    let record = images_repo::insert_image(&state, &storage_key, &url).await?;
+    let record = images_service::upload_image(&state, field, &content_type).await?;
 
     Ok((
         StatusCode::CREATED,
