@@ -11,6 +11,21 @@ pub async fn get_images(state: &AppStateV2) -> Result<Vec<ImageRecord>, AppError
     images_repo::get_all_images(state).await
 }
 
+pub async fn cleanup_unused_images(state: &AppStateV2) {
+    let records = match images_repo::take_old_unused_images(state).await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!("cleanup_unused_images db error: {}", e);
+            return;
+        }
+    };
+    for r in &records {
+        if let Err(e) = state.get_storage().delete(&r.storage_key).await {
+            tracing::error!("cleanup_unused_images storage delete failed {}: {}", r.storage_key, e);
+        }
+    }
+}
+
 pub async fn delete_image(state: &AppStateV2, id: i32) -> Result<(), AppError> {
     let storage_key = images_repo::delete_image_by_id(state, id).await?;
     if let Err(e) = state.get_storage().delete(&storage_key).await {
