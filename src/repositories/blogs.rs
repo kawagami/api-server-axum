@@ -46,9 +46,8 @@ pub async fn delete_blog_in_tx(conn: &mut PgConnection, id: uuid::Uuid) -> Resul
     Ok(())
 }
 
-/// insert or update blog
-pub async fn upsert_blog(
-    state: &AppStateV2,
+pub async fn upsert_blog_in_tx(
+    conn: &mut PgConnection,
     id: uuid::Uuid,
     markdown: String,
     tocs: Vec<String>,
@@ -66,11 +65,11 @@ pub async fn upsert_blog(
         "#;
 
     sqlx::query(query)
-        .bind(id) // $1
-        .bind(markdown) // $2
-        .bind(tocs) // $3
-        .bind(tags) // $4
-        .execute(state.get_pool())
+        .bind(id)
+        .bind(markdown)
+        .bind(tocs)
+        .bind(tags)
+        .execute(&mut *conn)
         .await?;
 
     Ok(())
