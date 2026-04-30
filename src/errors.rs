@@ -70,6 +70,9 @@ pub enum AuthError {
     #[error("未授權的存取")]
     Unauthorized,
 
+    #[error("權限不足")]
+    Forbidden,
+
     #[error("使用者不存在")]
     UserNotFound,
 
@@ -112,7 +115,8 @@ impl AppError {
                 AuthError::InvalidHeader => StatusCode::BAD_REQUEST,
                 AuthError::TokenExpired => StatusCode::UNAUTHORIZED,
                 AuthError::InvalidToken => StatusCode::UNAUTHORIZED,
-                AuthError::Unauthorized => StatusCode::FORBIDDEN,
+                AuthError::Unauthorized => StatusCode::UNAUTHORIZED,
+                AuthError::Forbidden => StatusCode::FORBIDDEN,
                 AuthError::UserNotFound => StatusCode::NOT_FOUND,
                 AuthError::InvalidPassword => StatusCode::UNAUTHORIZED,
             },

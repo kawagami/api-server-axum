@@ -2,6 +2,8 @@ mod auth;
 mod blogs;
 mod images;
 mod notes;
+mod permissions;
+mod roles;
 mod root;
 mod roster;
 mod stocks;
@@ -28,7 +30,7 @@ pub async fn app() -> Router {
 
     Router::new()
         .merge(root::new())
-        .nest("/jwt", auth::new())
+        .nest("/jwt", auth::new(state.clone()))
         .nest("/blogs", blogs::new())
         .nest("/users", users::new(state.clone()))
         .nest("/tools", tools::new())
@@ -37,12 +39,20 @@ pub async fn app() -> Router {
         .nest("/ws", ws::new())
         .nest("/roster", roster::new())
         .nest("/images", images::new(state.clone()))
+        .nest("/roles", roles::new(state.clone()))
+        .nest("/permissions", permissions::new(state.clone()))
         .nest_service("/uploads", ServeDir::new(&upload_path))
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
             CorsLayer::new()
-                .allow_methods([Method::GET, Method::POST])
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::PATCH,
+                    Method::DELETE,
+                ])
                 .allow_origin(origins)
                 .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
         )

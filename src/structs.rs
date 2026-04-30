@@ -2,6 +2,7 @@ pub mod auth;
 pub mod blogs;
 pub mod jobs;
 pub mod notes;
+pub mod roles;
 pub mod roster;
 pub mod stocks;
 pub mod tools;

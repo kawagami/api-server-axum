@@ -1,6 +1,6 @@
 use crate::{
     errors::{AppError, AuthError, SystemError},
-    repositories::{redis, users},
+    repositories::{redis, roles as roles_repo, users},
     state::AppStateV2,
     structs::auth::{Claims, CurrentUser},
 };
@@ -13,20 +13,25 @@ pub async fn sign_in(
     email: &str,
     password: &str,
 ) -> Result<String, AppError> {
-    let user = users::check_email_exists(state, email)
+    let db_user = users::check_email_exists(state, email)
         .await
-        .map(|db_user| CurrentUser {
-            email: db_user.email,
-            password_hash: db_user.password,
-        })
         .map_err(|_| AppError::AuthError(AuthError::UserNotFound))?;
+
+    let user = CurrentUser {
+        email: db_user.email,
+        password_hash: db_user.password,
+    };
 
     if !verify_password(password, &user.password_hash)? {
         return Err(AppError::AuthError(AuthError::InvalidPassword));
     }
 
-    let key = format!("user:login:{}", user.email);
-    redis::redis_set(state, &key, &user.email).await?;
+    let login_key = format!("user:login:{}", user.email);
+    redis::redis_set(state, &login_key, &user.email).await?;
+
+    let permissions =
+        roles_repo::get_user_permission_strings_by_email(state, &user.email).await?;
+    redis::set_user_permissions(state, &user.email, &permissions).await?;
 
     encode_jwt(user.email)
 }

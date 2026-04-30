@@ -1,3 +1,4 @@
+use crate::errors::{AppError, AuthError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -17,4 +18,24 @@ pub struct CurrentUser {
 pub struct SignInData {
     pub email: String,
     pub password: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct AuthenticatedUser {
+    pub email: String,
+    pub permissions: Vec<String>,
+}
+
+impl AuthenticatedUser {
+    pub fn require_permission(&self, permission: &str) -> Result<(), AppError> {
+        if self.permissions.iter().any(|p| p == permission) {
+            Ok(())
+        } else {
+            Err(AppError::AuthError(AuthError::Forbidden))
+        }
+    }
+
+    pub fn has_permission(&self, permission: &str) -> bool {
+        self.permissions.iter().any(|p| p == permission)
+    }
 }

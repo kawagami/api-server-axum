@@ -1,6 +1,8 @@
 pub mod blogs;
 pub mod images;
 pub mod notes;
+pub mod permissions;
 pub mod redis;
+pub mod roles;
 pub mod stocks;
 pub mod users;

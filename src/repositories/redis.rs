@@ -56,3 +56,36 @@ pub async fn redis_check_key_exists(state: &AppStateV2, key: &str) -> Result<boo
     // 使用 EXISTS 命令檢查鍵是否存在 返回 true 表示鍵存在；false 表示鍵不存在
     Ok(conn.exists(key).await?)
 }
+
+pub async fn set_user_permissions(
+    state: &AppStateV2,
+    email: &str,
+    permissions: &[String],
+) -> Result<(), crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("user:permissions:{}", email);
+    let value = serde_json::to_string(permissions)
+        .map_err(|e| crate::errors::AppError::from(serde_json::Error::from(e)))?;
+    conn.set_ex::<_, _, ()>(key, value, 3600).await?;
+    Ok(())
+}
+
+pub async fn get_user_permissions(
+    state: &AppStateV2,
+    email: &str,
+) -> Result<Option<Vec<String>>, crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("user:permissions:{}", email);
+    let value: Option<String> = conn.get(key).await?;
+    Ok(value.and_then(|v| serde_json::from_str(&v).ok()))
+}
+
+pub async fn del_user_permissions(
+    state: &AppStateV2,
+    email: &str,
+) -> Result<(), crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("user:permissions:{}", email);
+    conn.del::<_, ()>(key).await?;
+    Ok(())
+}

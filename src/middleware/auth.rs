@@ -1,8 +1,8 @@
 use crate::{
     errors::{AppError, AuthError, SystemError},
-    repositories::redis,
+    repositories::{redis, roles as roles_repo},
     state::AppStateV2,
-    structs::auth::Claims,
+    structs::auth::{AuthenticatedUser, Claims},
 };
 use axum::{
     body::Body,
@@ -15,14 +15,44 @@ use jsonwebtoken::{decode, DecodingKey, TokenData, Validation};
 
 pub async fn authorize(
     State(state): State<AppStateV2>,
-    mut req: Request,
+    req: Request,
     next: Next,
 ) -> Result<Response<Body>, AppError> {
-    let token = extract_token(&mut req)?;
+    let token = extract_token(&req)?;
     let token_data = decode_jwt(token)?;
 
     let key = format!("user:login:{}", token_data.claims.email);
     verify_user_login(&state, &key).await?;
+
+    Ok(next.run(req).await)
+}
+
+/// 驗證 token 並將 AuthenticatedUser（含 permissions）注入 request extensions。
+/// 用於需要細粒度權限檢查的 route，取代 authorize middleware。
+pub async fn authorize_and_load(
+    State(state): State<AppStateV2>,
+    mut req: Request,
+    next: Next,
+) -> Result<Response<Body>, AppError> {
+    let token = extract_token(&req)?;
+    let token_data = decode_jwt(token)?;
+    let email = token_data.claims.email;
+
+    let login_key = format!("user:login:{}", email);
+    verify_user_login(&state, &login_key).await?;
+
+    let permissions = match redis::get_user_permissions(&state, &email).await? {
+        Some(perms) => perms,
+        None => {
+            // 快取失效：從 DB 重新載入並快取
+            let perms =
+                roles_repo::get_user_permission_strings_by_email(&state, &email).await?;
+            let _ = redis::set_user_permissions(&state, &email, &perms).await;
+            perms
+        }
+    };
+
+    req.extensions_mut().insert(AuthenticatedUser { email, permissions });
 
     Ok(next.run(req).await)
 }
