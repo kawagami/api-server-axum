@@ -42,15 +42,8 @@ pub enum RequestError {
     #[error("無效的請求內容: {0}")]
     InvalidContent(String),
 
-    #[allow(dead_code)]
-    #[error("無效的 JSON 格式: {0}")]
-    InvalidJson(#[source] anyhow::Error),
-
     #[error("找不到資源")]
     NotFound,
-
-    #[error("找不到符合條件的股價資料")]
-    StockPriceNotFound,
 }
 
 #[derive(Error, Debug)]
@@ -106,9 +99,7 @@ impl AppError {
             Self::RequestError(err) => match err {
                 RequestError::MultipartError(_) => StatusCode::BAD_REQUEST,
                 RequestError::InvalidContent(_) => StatusCode::BAD_REQUEST,
-                RequestError::InvalidJson(_) => StatusCode::UNPROCESSABLE_ENTITY,
                 RequestError::NotFound => StatusCode::NOT_FOUND,
-                RequestError::StockPriceNotFound => StatusCode::NOT_FOUND,
             },
             Self::AuthError(err) => match err {
                 AuthError::MissingToken => StatusCode::UNAUTHORIZED,
@@ -117,7 +108,7 @@ impl AppError {
                 AuthError::InvalidToken => StatusCode::UNAUTHORIZED,
                 AuthError::Unauthorized => StatusCode::UNAUTHORIZED,
                 AuthError::Forbidden => StatusCode::FORBIDDEN,
-                AuthError::UserNotFound => StatusCode::NOT_FOUND,
+                AuthError::UserNotFound => StatusCode::UNAUTHORIZED,
                 AuthError::InvalidPassword => StatusCode::UNAUTHORIZED,
             },
             Self::SystemError(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -181,7 +172,11 @@ impl From<serde_json::Error> for AppError {
 
 impl From<reqwest::Error> for AppError {
     fn from(err: reqwest::Error) -> Self {
-        Self::SystemError(SystemError::Internal(err.to_string()))
+        if err.is_timeout() || err.is_connect() {
+            Self::ConnectionError(err.into())
+        } else {
+            Self::SystemError(SystemError::Internal(err.to_string()))
+        }
     }
 }
 

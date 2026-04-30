@@ -13,7 +13,7 @@ static MD_IMAGE_RE: OnceLock<Regex> = OnceLock::new();
 
 fn extract_upload_urls(markdown: &str) -> Vec<String> {
     let re = MD_IMAGE_RE
-        .get_or_init(|| Regex::new(r"!\[[^\]]*\]\(([^)]+)\)").unwrap());
+        .get_or_init(|| Regex::new(r"!\[[^\]]*\]\(([^)]+)\)").expect("static regex is always valid"));
 
     re.captures_iter(markdown)
         .filter_map(|cap| {

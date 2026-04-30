@@ -218,7 +218,7 @@ pub fn get_stock_price_by_date(
     } else if let Some(price) = greater_than_target {
         Ok(price.clone())
     } else {
-        Err(RequestError::StockPriceNotFound.into())
+        Err(RequestError::NotFound.into())
     }
 }
 

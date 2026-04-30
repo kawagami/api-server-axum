@@ -26,7 +26,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         ));
 
     let role_routes = Router::new()
-        .route("/:id/roles", put(set_user_roles))
+        .route("/{id}/roles", put(set_user_roles))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize_and_load,

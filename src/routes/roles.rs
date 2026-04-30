@@ -19,8 +19,8 @@ use axum::{
 pub fn new(state: AppStateV2) -> Router<AppStateV2> {
     Router::new()
         .route("/", get(list_roles).post(create_role))
-        .route("/:id", get(get_role).delete(delete_role))
-        .route("/:id/permissions", put(set_permissions))
+        .route("/{id}", get(get_role).delete(delete_role))
+        .route("/{id}/permissions", put(set_permissions))
         .layer(middleware::from_fn_with_state(
             state,
             auth::authorize_and_load,
