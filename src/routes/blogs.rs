@@ -10,6 +10,7 @@ use crate::{
     services::blogs as blogs_service,
     state::AppStateV2,
     structs::blogs::{DbBlog, Pagination, PutBlog},
+    structs::ws::WsEvent,
 };
 
 pub fn new() -> Router<AppStateV2> {
@@ -47,6 +48,8 @@ async fn put_blog(
     Path(id): Path<Uuid>,
     Json(blog): Json<PutBlog>,
 ) -> Result<Json<()>, AppError> {
+    let title = blog.extract_toc_texts().into_iter().next().unwrap_or_default();
     blogs_service::upsert_blog(&state, id, blog).await?;
+    state.broadcast(WsEvent::BlogCreated, serde_json::json!({ "id": id, "title": title }));
     Ok(Json(()))
 }

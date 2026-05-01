@@ -1,6 +1,7 @@
 pub enum WsEvent {
     StockCompleted,
     StockFailed,
+    BlogCreated,
 }
 
 impl WsEvent {
@@ -8,6 +9,7 @@ impl WsEvent {
         match self {
             Self::StockCompleted => "stock_completed",
             Self::StockFailed => "stock_failed",
+            Self::BlogCreated => "blog_created",
         }
     }
 }
