@@ -39,7 +39,7 @@ async fn ws_handler(
     } else {
         String::from("Unknown browser")
     };
-    tracing::info!("`{user_agent}` at {addr} connected.");
+    tracing::info!("{addr} connected ({})", user_agent);
     ws.on_upgrade(move |socket| handle_socket(socket, addr, state))
 }
 
@@ -53,10 +53,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
         sender: sender_arc.clone(),
     };
 
-    // 添加連接到狀態中
     {
         let mut connections = state.get_connections().lock().await;
-        tracing::info!("connections add new user {}", connection_info.addr);
         connections.insert(who, connection_info);
     }
 
@@ -69,10 +67,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
             let mut sender_guard = send_sender_clone.lock().await;
             if let Err(e) = sender_guard.send(Message::Text(msg.into())).await {
                 tracing::warn!("Failed to send message to {}: {}", who, e);
-                break; // 發送失敗時直接退出，讓 handle_socket 統一清理
+                break;
             }
         }
-        tracing::info!("send_task for {who} ended.");
     });
 
     // --- recv_task: 接收客戶端訊息 ---
@@ -94,7 +91,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
                 }
             }
         }
-        tracing::info!("recv_task for {who} processed {cnt} messages, ending.");
         cnt
     });
 
@@ -107,16 +103,14 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
         loop {
             interval.tick().await;
 
-            tracing::debug!("Sending ping to {who}...");
             {
                 let mut sender_guard = ping_sender_clone.lock().await;
                 if let Err(e) = sender_guard.send(Message::Ping(Bytes::new())).await {
                     tracing::warn!("Failed to send ping to {who}: {}", e);
-                    break; // 發送失敗時直接退出，讓 handle_socket 統一清理
+                    break;
                 }
-            } // 立即釋放鎖
+            }
         }
-        tracing::info!("ping_task for {who} ended.");
     });
 
     // --- tokio::select!: 協調所有任務 ---
@@ -154,9 +148,7 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> Control
         Message::Text(t) => {
             let _ = state.get_tx().send(format!("{} : {}", who, t));
         }
-        Message::Binary(d) => {
-            tracing::debug!(">>> {who} sent {} bytes: {d:?}", d.len());
-        }
+        Message::Binary(_) => {}
         Message::Close(c) => {
             if let Some(cf) = c {
                 tracing::info!(
@@ -169,13 +161,8 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> Control
             }
             return ControlFlow::Break(());
         }
-        Message::Pong(_) => {
-            tracing::debug!("Received pong from {who}");
-            // 可以在這裡更新最後 pong 時間
-        }
-        Message::Ping(_) => {
-            tracing::debug!("Received ping from {who}");
-        }
+        Message::Pong(_) => {}
+        Message::Ping(_) => {}
     }
     ControlFlow::Continue(())
 }
@@ -216,10 +203,7 @@ async fn say_something_to_someone(
                 let message = Message::Text(params.message.into());
 
                 match sender_guard.send(message).await {
-                    Ok(_) => {
-                        tracing::info!("Successfully sent message to {}", socket_addr);
-                        Ok(Json("Message sent successfully".to_string()))
-                    }
+                    Ok(_) => Ok(Json("Message sent successfully".to_string())),
                     Err(e) => {
                         tracing::error!("Failed to send message to {}: {}", socket_addr, e);
                         // 這裡不立即清理連接，讓 handle_socket 中的任務處理
@@ -238,19 +222,7 @@ async fn say_something_to_someone(
     }
 }
 
-// 改進的清理函數
 async fn cleanup_connection(state: &AppStateV2, who: SocketAddr) {
     let mut connections = state.get_connections().lock().await;
-    if let Some(_removed_conn) = connections.remove(&who) {
-        tracing::info!(
-            "Removed connection {} from connections map (remaining: {})",
-            who,
-            connections.len()
-        );
-    } else {
-        tracing::debug!(
-            "Connection {} was already removed from connections map",
-            who
-        );
-    }
+    connections.remove(&who);
 }
