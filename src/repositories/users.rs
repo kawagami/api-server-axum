@@ -1,7 +1,7 @@
 use crate::{
     errors::AppError,
     state::AppState,
-    structs::users::{DbUser, NewUser, User},
+    structs::{roles::Role, users::{DbUser, NewUser, User}},
 };
 
 pub async fn get_users(state: &AppState) -> Result<Vec<User>, AppError> {
@@ -43,6 +43,19 @@ pub async fn create_user(
 
     tx.commit().await?;
     Ok(())
+}
+
+pub async fn get_user_roles(state: &AppState, user_id: i64) -> Result<Vec<Role>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT r.id, r.name, r.description
+         FROM roles r
+         JOIN user_roles ur ON ur.role_id = r.id
+         WHERE ur.user_id = $1
+         ORDER BY r.id",
+    )
+    .bind(user_id)
+    .fetch_all(state.get_pool())
+    .await?)
 }
 
 pub async fn get_email_by_id(state: &AppState, user_id: i64) -> Result<String, AppError> {

@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        roles::SetUserRoles,
+        roles::{Role, SetUserRoles},
         users::{NewUser, User},
     },
 };
@@ -26,7 +26,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         ));
 
     let role_routes = Router::new()
-        .route("/{id}/roles", put(set_user_roles))
+        .route("/{id}/roles", get(get_user_roles).put(set_user_roles))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize_and_load,
@@ -55,6 +55,15 @@ async fn delete_user(
     Json(_user): Json<User>,
 ) -> Result<Json<bool>, AppError> {
     Ok(Json(true))
+}
+
+async fn get_user_roles(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<AppState>,
+    Path(user_id): Path<i64>,
+) -> Result<Json<Vec<Role>>, AppError> {
+    auth_user.require_permission("role:read")?;
+    Ok(Json(users_service::get_user_roles(&state, user_id).await?))
 }
 
 async fn set_user_roles(
