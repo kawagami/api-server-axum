@@ -1,28 +1,28 @@
-use crate::state::AppStateV2;
+use crate::state::AppState;
 use axum::response::Json;
 use redis::{AsyncCommands, RedisError};
 
-pub async fn _redis_zadd(state: &AppStateV2, key: &str, member: &str) -> Result<(), RedisError> {
+pub async fn _redis_zadd(state: &AppState, key: &str, member: &str) -> Result<(), RedisError> {
     let mut conn = state.get_redis_conn().await?;
     let score = chrono::Utc::now().timestamp_millis();
 
     conn.zadd(key, member, score).await
 }
 
-pub async fn _redis_zrem(state: &AppStateV2, key: &str, members: &str) -> Result<(), RedisError> {
+pub async fn _redis_zrem(state: &AppState, key: &str, members: &str) -> Result<(), RedisError> {
     let mut conn = state.get_redis_conn().await?;
 
     conn.zrem(key, members).await
 }
 
-pub async fn _redis_zrange(state: &AppStateV2, key: &str) -> Result<Json<Vec<String>>, RedisError> {
+pub async fn _redis_zrange(state: &AppState, key: &str) -> Result<Json<Vec<String>>, RedisError> {
     let mut conn = state.get_redis_conn().await?;
 
     Ok(Json(conn.zrange(key, 0, -1).await?))
 }
 
 pub async fn _redis_zrevrange(
-    state: &AppStateV2,
+    state: &AppState,
     key: &str,
 ) -> Result<Json<Vec<String>>, RedisError> {
     let mut conn = state.get_redis_conn().await?;
@@ -31,7 +31,7 @@ pub async fn _redis_zrevrange(
 }
 
 pub async fn _check_member_exists(
-    state: &AppStateV2,
+    state: &AppState,
     key: &str,
     member: &str,
 ) -> Result<bool, RedisError> {
@@ -43,14 +43,14 @@ pub async fn _check_member_exists(
 }
 
 // 新增函數：設置有效時間 1 小時的鍵值對
-pub async fn redis_set(state: &AppStateV2, key: &str, value: &str) -> Result<(), RedisError> {
+pub async fn redis_set(state: &AppState, key: &str, value: &str) -> Result<(), RedisError> {
     let mut conn = state.get_redis_conn().await?;
 
     conn.set_ex(key, value, 3600).await
 }
 
 // 新增函數：檢查 Redis 中的鍵是否存在
-pub async fn redis_check_key_exists(state: &AppStateV2, key: &str) -> Result<bool, RedisError> {
+pub async fn redis_check_key_exists(state: &AppState, key: &str) -> Result<bool, RedisError> {
     let mut conn = state.get_redis_conn().await?;
 
     // 使用 EXISTS 命令檢查鍵是否存在 返回 true 表示鍵存在；false 表示鍵不存在
@@ -58,7 +58,7 @@ pub async fn redis_check_key_exists(state: &AppStateV2, key: &str) -> Result<boo
 }
 
 pub async fn set_user_permissions(
-    state: &AppStateV2,
+    state: &AppState,
     email: &str,
     permissions: &[String],
 ) -> Result<(), crate::errors::AppError> {
@@ -71,7 +71,7 @@ pub async fn set_user_permissions(
 }
 
 pub async fn get_user_permissions(
-    state: &AppStateV2,
+    state: &AppState,
     email: &str,
 ) -> Result<Option<Vec<String>>, crate::errors::AppError> {
     let mut conn = state.get_redis_conn().await?;
@@ -81,7 +81,7 @@ pub async fn get_user_permissions(
 }
 
 pub async fn del_user_permissions(
-    state: &AppStateV2,
+    state: &AppState,
     email: &str,
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = state.get_redis_conn().await?;

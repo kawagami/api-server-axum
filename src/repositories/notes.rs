@@ -1,11 +1,11 @@
 use crate::{
     errors::AppError, // 引入 AppError
-    state::AppStateV2,
+    state::AppState,
     structs::notes::{HackmdNoteListAndTag, Post, Tag},
 };
 use sqlx::QueryBuilder;
 
-pub async fn delete_posts(state: &AppStateV2) -> Result<(), AppError> {
+pub async fn delete_posts(state: &AppState) -> Result<(), AppError> {
     sqlx::query("DELETE FROM hackmd_posts;")
         .execute(state.get_pool())
         .await
@@ -15,7 +15,7 @@ pub async fn delete_posts(state: &AppStateV2) -> Result<(), AppError> {
 }
 
 // bulk insert
-pub async fn insert_posts_handler(state: &AppStateV2, posts: Vec<Post>) -> Result<(), AppError> {
+pub async fn insert_posts_handler(state: &AppState, posts: Vec<Post>) -> Result<(), AppError> {
     // 清除舊資料
     let _ = delete_posts(state).await;
 
@@ -60,7 +60,7 @@ pub async fn insert_posts_handler(state: &AppStateV2, posts: Vec<Post>) -> Resul
     Ok(())
 }
 
-pub async fn get_tags(state: &AppStateV2) -> Result<Vec<Tag>, AppError> {
+pub async fn get_tags(state: &AppState) -> Result<Vec<Tag>, AppError> {
     sqlx::query_as(
         r#"
             SELECT 
@@ -81,7 +81,7 @@ pub async fn get_tags(state: &AppStateV2) -> Result<Vec<Tag>, AppError> {
     .map_err(AppError::from) // 自動轉換 sqlx::Error 為 AppError
 }
 
-pub async fn get_lists(state: &AppStateV2) -> Result<Vec<HackmdNoteListAndTag>, AppError> {
+pub async fn get_lists(state: &AppState) -> Result<Vec<HackmdNoteListAndTag>, AppError> {
     sqlx::query_as(
         r#"
             SELECT

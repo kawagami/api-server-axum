@@ -1,16 +1,16 @@
 use crate::{
     errors::AppError,
-    state::AppStateV2,
+    state::AppState,
     structs::users::{DbUser, NewUser, User},
 };
 
-pub async fn get_users(state: &AppStateV2) -> Result<Vec<User>, AppError> {
+pub async fn get_users(state: &AppState) -> Result<Vec<User>, AppError> {
     Ok(sqlx::query_as("SELECT id, name, email FROM users")
         .fetch_all(state.get_pool())
         .await?)
 }
 
-pub async fn check_email_exists(state: &AppStateV2, email: &str) -> Result<DbUser, AppError> {
+pub async fn check_email_exists(state: &AppState, email: &str) -> Result<DbUser, AppError> {
     Ok(sqlx::query_as(
         "SELECT id, email, password FROM users WHERE email = $1 LIMIT 1",
     )
@@ -20,7 +20,7 @@ pub async fn check_email_exists(state: &AppStateV2, email: &str) -> Result<DbUse
 }
 
 pub async fn create_user(
-    state: &AppStateV2,
+    state: &AppState,
     new_user: NewUser,
     default_role_id: i32,
 ) -> Result<(), AppError> {
@@ -45,7 +45,7 @@ pub async fn create_user(
     Ok(())
 }
 
-pub async fn get_email_by_id(state: &AppStateV2, user_id: i64) -> Result<String, AppError> {
+pub async fn get_email_by_id(state: &AppState, user_id: i64) -> Result<String, AppError> {
     let (email,): (String,) =
         sqlx::query_as("SELECT email FROM users WHERE id = $1")
             .bind(user_id)
@@ -55,7 +55,7 @@ pub async fn get_email_by_id(state: &AppStateV2, user_id: i64) -> Result<String,
 }
 
 pub async fn set_user_roles(
-    state: &AppStateV2,
+    state: &AppState,
     user_id: i64,
     role_ids: &[i32],
 ) -> Result<(), AppError> {

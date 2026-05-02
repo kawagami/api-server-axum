@@ -1,4 +1,4 @@
-use crate::{errors::{AppError, RequestError}, state::AppStateV2};
+use crate::{errors::{AppError, RequestError}, state::AppState};
 use serde::Serialize;
 use sqlx::{PgConnection, Row};
 
@@ -10,7 +10,7 @@ pub struct ImageRecord {
     pub status: String,
 }
 
-pub async fn get_all_images(state: &AppStateV2) -> Result<Vec<ImageRecord>, AppError> {
+pub async fn get_all_images(state: &AppState) -> Result<Vec<ImageRecord>, AppError> {
     let rows = sqlx::query("SELECT id, storage_key, url, status FROM images ORDER BY id DESC")
         .fetch_all(state.get_pool())
         .await?;
@@ -27,7 +27,7 @@ pub async fn get_all_images(state: &AppStateV2) -> Result<Vec<ImageRecord>, AppE
 }
 
 pub async fn insert_image(
-    state: &AppStateV2,
+    state: &AppState,
     storage_key: &str,
     url: &str,
 ) -> Result<ImageRecord, AppError> {
@@ -48,7 +48,7 @@ pub async fn insert_image(
 }
 
 pub async fn get_images_by_urls(
-    state: &AppStateV2,
+    state: &AppState,
     urls: &[String],
 ) -> Result<Vec<ImageRecord>, AppError> {
     let rows = sqlx::query("SELECT id, storage_key, url, status FROM images WHERE url = ANY($1)")
@@ -89,7 +89,7 @@ pub async fn mark_images_unused_by_ids_in_tx(
     Ok(())
 }
 
-pub async fn delete_image_by_id(state: &AppStateV2, id: i32) -> Result<String, AppError> {
+pub async fn delete_image_by_id(state: &AppState, id: i32) -> Result<String, AppError> {
     let row = sqlx::query("DELETE FROM images WHERE id = $1 RETURNING storage_key")
         .bind(id)
         .fetch_optional(state.get_pool())
@@ -98,7 +98,7 @@ pub async fn delete_image_by_id(state: &AppStateV2, id: i32) -> Result<String, A
     Ok(row.get("storage_key"))
 }
 
-pub async fn take_old_unused_images(state: &AppStateV2) -> Result<Vec<ImageRecord>, AppError> {
+pub async fn take_old_unused_images(state: &AppState) -> Result<Vec<ImageRecord>, AppError> {
     let rows = sqlx::query(
         "DELETE FROM images WHERE status = 'unused' AND created_at < NOW() - INTERVAL '1 hour' RETURNING id, storage_key, url, status",
     )

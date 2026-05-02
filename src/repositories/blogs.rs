@@ -1,9 +1,9 @@
-use crate::{errors::AppError, state::AppStateV2, structs::blogs::DbBlog};
+use crate::{errors::AppError, state::AppState, structs::blogs::DbBlog};
 use sqlx::PgConnection;
 
 /// 取得帶分頁的 blogs
 pub async fn get_blogs_with_pagination(
-    state: &AppStateV2,
+    state: &AppState,
     limit: usize,
     offset: usize,
 ) -> Result<Vec<DbBlog>, AppError> {
@@ -23,7 +23,7 @@ pub async fn get_blogs_with_pagination(
 }
 
 /// 取得特定 blog
-pub async fn get_blog_by_id(state: &AppStateV2, id: uuid::Uuid) -> Result<DbBlog, AppError> {
+pub async fn get_blog_by_id(state: &AppState, id: uuid::Uuid) -> Result<DbBlog, AppError> {
     sqlx::query_as(
         r#"
             SELECT id, markdown, tocs, tags, created_at, updated_at

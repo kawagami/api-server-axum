@@ -1,10 +1,10 @@
 use crate::{
     errors::AppError,
-    state::AppStateV2,
+    state::AppState,
     structs::roles::{NewRole, Permission, Role, RoleWithPermissions},
 };
 
-pub async fn get_roles(state: &AppStateV2) -> Result<Vec<Role>, AppError> {
+pub async fn get_roles(state: &AppState) -> Result<Vec<Role>, AppError> {
     Ok(
         sqlx::query_as("SELECT id, name, description FROM roles ORDER BY id")
             .fetch_all(state.get_pool())
@@ -13,7 +13,7 @@ pub async fn get_roles(state: &AppStateV2) -> Result<Vec<Role>, AppError> {
 }
 
 pub async fn get_role_with_permissions(
-    state: &AppStateV2,
+    state: &AppState,
     role_id: i32,
 ) -> Result<RoleWithPermissions, AppError> {
     let role: Role =
@@ -43,7 +43,7 @@ pub async fn get_role_with_permissions(
     })
 }
 
-pub async fn get_role_id_by_name(state: &AppStateV2, name: &str) -> Result<i32, AppError> {
+pub async fn get_role_id_by_name(state: &AppState, name: &str) -> Result<i32, AppError> {
     let (id,): (i32,) = sqlx::query_as("SELECT id FROM roles WHERE name = $1")
         .bind(name)
         .fetch_one(state.get_pool())
@@ -52,7 +52,7 @@ pub async fn get_role_id_by_name(state: &AppStateV2, name: &str) -> Result<i32, 
 }
 
 pub async fn get_user_permission_strings_by_email(
-    state: &AppStateV2,
+    state: &AppState,
     email: &str,
 ) -> Result<Vec<String>, AppError> {
     let rows: Vec<(String, String)> = sqlx::query_as(
@@ -73,7 +73,7 @@ pub async fn get_user_permission_strings_by_email(
 }
 
 pub async fn get_emails_by_role_id(
-    state: &AppStateV2,
+    state: &AppState,
     role_id: i32,
 ) -> Result<Vec<String>, AppError> {
     let rows: Vec<(String,)> = sqlx::query_as(
@@ -85,7 +85,7 @@ pub async fn get_emails_by_role_id(
     Ok(rows.into_iter().map(|(e,)| e).collect())
 }
 
-pub async fn create_role(state: &AppStateV2, new_role: &NewRole) -> Result<Role, AppError> {
+pub async fn create_role(state: &AppState, new_role: &NewRole) -> Result<Role, AppError> {
     Ok(sqlx::query_as(
         "INSERT INTO roles (name, description) VALUES ($1, $2) RETURNING id, name, description",
     )
@@ -96,7 +96,7 @@ pub async fn create_role(state: &AppStateV2, new_role: &NewRole) -> Result<Role,
 }
 
 pub async fn set_role_permissions(
-    state: &AppStateV2,
+    state: &AppState,
     role_id: i32,
     permission_ids: &[i32],
 ) -> Result<(), AppError> {
@@ -121,7 +121,7 @@ pub async fn set_role_permissions(
     Ok(())
 }
 
-pub async fn delete_role(state: &AppStateV2, role_id: i32) -> Result<(), AppError> {
+pub async fn delete_role(state: &AppState, role_id: i32) -> Result<(), AppError> {
     let built_in = ["guest", "member", "admin", "super_admin"];
     let (name,): (String,) =
         sqlx::query_as("SELECT name FROM roles WHERE id = $1")

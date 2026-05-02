@@ -3,7 +3,7 @@ use crate::{
     services::stocks::{
         get_buyback_stock_raw_html_string, parse_buyback_stock_raw_html, stock_day_all_service,
     },
-    state::AppStateV2,
+    state::AppState,
     structs::jobs::AppJob,
 };
 use async_trait::async_trait;
@@ -18,7 +18,7 @@ impl AppJob for StockDayAllJob {
         "0 0 8,20 * * *" // UTC+8 的 16:00 & 04:00 執行
     }
 
-    async fn run(&self, state: AppStateV2) {
+    async fn run(&self, state: AppState) {
         // 每天抓一次 stock day all 的 API 資料進資料庫
         match stock_day_all_service(&state).await {
             Ok(_) => tracing::info!("job 抓 stock day all 的 API 資料進資料庫成功"),

@@ -1,6 +1,6 @@
 use crate::{
     repositories::notes,
-    state::AppStateV2,
+    state::AppState,
     structs::{jobs::AppJob, notes::Post},
 };
 use async_trait::async_trait;
@@ -20,7 +20,7 @@ impl AppJob for FetchNotesJob {
         "0 0 * * * *" // 每小時執行一次
     }
 
-    async fn run(&self, state: AppStateV2) {
+    async fn run(&self, state: AppState) {
         // 取得 HACKMD_TOKEN
         let token = env::var("HACKMD_TOKEN").unwrap_or_else(|_| {
             tracing::error!("HACKMD_TOKEN not set");

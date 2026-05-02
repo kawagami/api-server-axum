@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{redis, roles as roles_repo},
-    state::AppStateV2,
+    state::AppState,
     structs::auth::{AuthenticatedUser, Claims},
 };
 use axum::{
@@ -14,7 +14,7 @@ use axum::{
 use jsonwebtoken::{decode, DecodingKey, TokenData, Validation};
 
 pub async fn authorize(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     req: Request,
     next: Next,
 ) -> Result<Response<Body>, AppError> {
@@ -30,7 +30,7 @@ pub async fn authorize(
 /// 驗證 token 並將 AuthenticatedUser（含 permissions）注入 request extensions。
 /// 用於需要細粒度權限檢查的 route，取代 authorize middleware。
 pub async fn authorize_and_load(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     mut req: Request,
     next: Next,
 ) -> Result<Response<Body>, AppError> {
@@ -72,7 +72,7 @@ fn extract_token(req: &Request) -> Result<String, AppError> {
         .map(ToString::to_string)
 }
 
-async fn verify_user_login(state: &AppStateV2, key: &str) -> Result<(), AppError> {
+async fn verify_user_login(state: &AppState, key: &str) -> Result<(), AppError> {
     redis::redis_check_key_exists(state, key)
         .await?
         .then_some(())

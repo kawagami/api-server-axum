@@ -3,7 +3,7 @@ use crate::{
     middleware::auth,
     repositories::images::ImageRecord,
     services::images as images_service,
-    state::AppStateV2,
+    state::AppState,
 };
 use axum::{
     extract::{Multipart, Path, State},
@@ -13,7 +13,7 @@ use axum::{
     Json, Router,
 };
 
-pub fn new(state: AppStateV2) -> Router<AppStateV2> {
+pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(get_images))
         .route("/upload", post(upload_image))
@@ -25,13 +25,13 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
 }
 
 async fn get_images(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<ImageRecord>>, AppError> {
     Ok(Json(images_service::get_images(&state).await?))
 }
 
 async fn delete_image(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     images_service::delete_image(&state, id).await?;
@@ -39,7 +39,7 @@ async fn delete_image(
 }
 
 async fn upload_image(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
     let field = multipart

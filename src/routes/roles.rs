@@ -2,7 +2,7 @@ use crate::{
     errors::AppError,
     middleware::auth,
     services::roles as roles_service,
-    state::AppStateV2,
+    state::AppState,
     structs::{
         auth::AuthenticatedUser,
         roles::{NewRole, Role, RoleWithPermissions, SetRolePermissions},
@@ -16,7 +16,7 @@ use axum::{
     Json, Router,
 };
 
-pub fn new(state: AppStateV2) -> Router<AppStateV2> {
+pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(list_roles).post(create_role))
         .route("/{id}", get(get_role).delete(delete_role))
@@ -29,7 +29,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
 
 async fn list_roles(
     Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<Role>>, AppError> {
     auth_user.require_permission("role:read")?;
     Ok(Json(roles_service::get_roles(&state).await?))
@@ -37,7 +37,7 @@ async fn list_roles(
 
 async fn get_role(
     Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<RoleWithPermissions>, AppError> {
     auth_user.require_permission("role:read")?;
@@ -46,7 +46,7 @@ async fn get_role(
 
 async fn create_role(
     Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Json(body): Json<NewRole>,
 ) -> Result<Json<Role>, AppError> {
     auth_user.require_permission("role:create")?;
@@ -55,7 +55,7 @@ async fn create_role(
 
 async fn set_permissions(
     Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(body): Json<SetRolePermissions>,
 ) -> Result<StatusCode, AppError> {
@@ -66,7 +66,7 @@ async fn set_permissions(
 
 async fn delete_role(
     Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission("role:delete")?;

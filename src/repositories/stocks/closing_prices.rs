@@ -1,12 +1,12 @@
 use crate::{
     errors::AppError,
-    state::AppStateV2,
+    state::AppState,
     structs::stocks::{GetStockHistoryPriceRequest, NewStockClosingPrice, StockClosingPrice},
 };
 use sqlx::QueryBuilder;
 
 pub async fn get_all_stock_closing_prices(
-    state: &AppStateV2,
+    state: &AppState,
     limit: i64,
     offset: i64,
 ) -> Result<Vec<StockClosingPrice>, AppError> {
@@ -20,7 +20,7 @@ pub async fn get_all_stock_closing_prices(
 }
 
 pub async fn get_stock_closing_price(
-    state: &AppStateV2,
+    state: &AppState,
     query: &GetStockHistoryPriceRequest,
 ) -> Result<Vec<StockClosingPrice>, AppError> {
     let mut qb = QueryBuilder::new("SELECT * FROM stock_closing_prices s WHERE 1=1");
@@ -35,7 +35,7 @@ pub async fn get_stock_closing_price(
 }
 
 pub async fn upsert_stock_closing_prices(
-    state: &AppStateV2,
+    state: &AppState,
     data: &Vec<NewStockClosingPrice>,
 ) -> Result<(), AppError> {
     if data.is_empty() {
@@ -63,7 +63,7 @@ pub async fn upsert_stock_closing_prices(
 }
 
 pub async fn get_stock_closing_prices_by_date_range(
-    state: &AppStateV2,
+    state: &AppState,
     stock_no: &str,
     start_date: &str,
     end_date: &str,

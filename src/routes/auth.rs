@@ -2,7 +2,7 @@ use crate::{
     errors::AppError,
     middleware::auth,
     services::auth as auth_service,
-    state::AppStateV2,
+    state::AppState,
     structs::auth::{AuthenticatedUser, SignInData},
 };
 use axum::{
@@ -13,7 +13,7 @@ use axum::{
 };
 use serde::Serialize;
 
-pub fn new(state: AppStateV2) -> Router<AppStateV2> {
+pub fn new(state: AppState) -> Router<AppState> {
     let me_route = Router::new()
         .route("/me", get(me))
         .layer(middleware::from_fn_with_state(
@@ -33,7 +33,7 @@ struct MeResponse {
 }
 
 async fn sign_in(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Json(user_data): Json<SignInData>,
 ) -> Result<Json<String>, AppError> {
     let token = auth_service::sign_in(&state, &user_data.email, &user_data.password).await?;

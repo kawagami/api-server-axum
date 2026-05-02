@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::{blogs as blogs_repo, images as images_repo},
-    state::AppStateV2,
+    state::AppState,
     structs::blogs::{DbBlog, PutBlog},
 };
 use regex::Regex;
@@ -24,7 +24,7 @@ fn extract_upload_urls(markdown: &str) -> Vec<String> {
 }
 
 pub async fn get_blogs(
-    state: &AppStateV2,
+    state: &AppState,
     page: usize,
     per_page: usize,
 ) -> Result<Vec<DbBlog>, AppError> {
@@ -32,11 +32,11 @@ pub async fn get_blogs(
     blogs_repo::get_blogs_with_pagination(state, per_page, offset).await
 }
 
-pub async fn get_blog(state: &AppStateV2, id: Uuid) -> Result<DbBlog, AppError> {
+pub async fn get_blog(state: &AppState, id: Uuid) -> Result<DbBlog, AppError> {
     blogs_repo::get_blog_by_id(state, id).await
 }
 
-pub async fn upsert_blog(state: &AppStateV2, id: Uuid, blog: PutBlog) -> Result<(), AppError> {
+pub async fn upsert_blog(state: &AppState, id: Uuid, blog: PutBlog) -> Result<(), AppError> {
     let tocs = blog.extract_toc_texts();
 
     let old_urls = match blogs_repo::get_blog_by_id(state, id).await {
@@ -72,7 +72,7 @@ pub async fn upsert_blog(state: &AppStateV2, id: Uuid, blog: PutBlog) -> Result<
     Ok(())
 }
 
-pub async fn delete_blog_with_images(state: &AppStateV2, id: Uuid) -> Result<(), AppError> {
+pub async fn delete_blog_with_images(state: &AppState, id: Uuid) -> Result<(), AppError> {
     let blog = blogs_repo::get_blog_by_id(state, id).await?;
     let upload_urls = extract_upload_urls(&blog.markdown);
 

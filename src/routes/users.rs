@@ -2,7 +2,7 @@ use crate::{
     errors::AppError,
     middleware::auth,
     services::users as users_service,
-    state::AppStateV2,
+    state::AppState,
     structs::{
         auth::AuthenticatedUser,
         roles::SetUserRoles,
@@ -17,7 +17,7 @@ use axum::{
     Json, Router,
 };
 
-pub fn new(state: AppStateV2) -> Router<AppStateV2> {
+pub fn new(state: AppState) -> Router<AppState> {
     let protected_routes = Router::new()
         .route("/", axum::routing::post(create_user).delete(delete_user))
         .layer(middleware::from_fn_with_state(
@@ -38,12 +38,12 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
         .merge(role_routes)
 }
 
-async fn get_users(State(state): State<AppStateV2>) -> Result<Json<Vec<User>>, AppError> {
+async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<User>>, AppError> {
     Ok(Json(users_service::get_users(&state).await?))
 }
 
 async fn create_user(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Json(user): Json<NewUser>,
 ) -> Result<Json<bool>, AppError> {
     users_service::create_user(&state, user).await?;
@@ -51,7 +51,7 @@ async fn create_user(
 }
 
 async fn delete_user(
-    State(_state): State<AppStateV2>,
+    State(_state): State<AppState>,
     Json(_user): Json<User>,
 ) -> Result<Json<bool>, AppError> {
     Ok(Json(true))
@@ -59,7 +59,7 @@ async fn delete_user(
 
 async fn set_user_roles(
     Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Path(user_id): Path<i64>,
     Json(body): Json<SetUserRoles>,
 ) -> Result<StatusCode, AppError> {

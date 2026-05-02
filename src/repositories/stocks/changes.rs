@@ -1,11 +1,11 @@
 use crate::{
     errors::{AppError, RequestError},
-    state::AppStateV2,
+    state::AppState,
     structs::stocks::{Conditions, StockChange, StockChangeWithoutId, StockRequest},
 };
 use sqlx::{QueryBuilder, Row};
 
-pub async fn save_request(state: &AppStateV2, payload: &StockRequest) -> Result<(), AppError> {
+pub async fn save_request(state: &AppState, payload: &StockRequest) -> Result<(), AppError> {
     sqlx::query(
         "INSERT INTO stock_changes (stock_no, start_date, end_date, status, created_at, updated_at)
         VALUES ($1, $2, $3, 'pending', now(), now())",
@@ -20,7 +20,7 @@ pub async fn save_request(state: &AppStateV2, payload: &StockRequest) -> Result<
 }
 
 pub async fn get_all_stock_changes(
-    state: &AppStateV2,
+    state: &AppState,
     conditions: Conditions,
 ) -> Result<Vec<StockChange>, AppError> {
     let mut query = QueryBuilder::new(
@@ -38,7 +38,7 @@ pub async fn get_all_stock_changes(
 }
 
 pub async fn get_stock_change_info(
-    state: &AppStateV2,
+    state: &AppState,
     stock_form: &StockRequest,
 ) -> Result<StockChangeWithoutId, AppError> {
     let url = format!("{}{}", state.get_fastapi_upload_host(), "/stock-change");
@@ -63,7 +63,7 @@ pub async fn get_stock_change_info(
 }
 
 pub async fn get_one_pending_stock_change(
-    state: &AppStateV2,
+    state: &AppState,
 ) -> Result<Option<StockRequest>, AppError> {
     let row = sqlx::query(
         r#"
@@ -92,7 +92,7 @@ pub async fn get_one_pending_stock_change(
 }
 
 pub async fn upsert_stock_change(
-    state: &AppStateV2,
+    state: &AppState,
     info: &StockChangeWithoutId,
 ) -> Result<(), AppError> {
     sqlx::query(
@@ -126,7 +126,7 @@ pub async fn upsert_stock_change(
 }
 
 pub async fn get_existing_stock_change(
-    state: &AppStateV2,
+    state: &AppState,
     payload: &StockRequest,
 ) -> Result<Option<StockChangeWithoutId>, AppError> {
     Ok(sqlx::query_as::<_, StockChangeWithoutId>(
@@ -144,7 +144,7 @@ pub async fn get_existing_stock_change(
 }
 
 pub async fn insert_stock_data_batch(
-    state: &AppStateV2,
+    state: &AppState,
     stocks: &[StockRequest],
 ) -> Result<usize, AppError> {
     let mut tx = state.get_pool().begin().await?;
@@ -175,7 +175,7 @@ pub async fn insert_stock_data_batch(
 }
 
 pub async fn update_stock_change_failed(
-    state: &AppStateV2,
+    state: &AppState,
     stock: &StockRequest,
 ) -> Result<(), AppError> {
     sqlx::query(
@@ -191,7 +191,7 @@ pub async fn update_stock_change_failed(
     Ok(())
 }
 
-pub async fn reset_failed_stock_changes_to_pending(state: &AppStateV2) -> Result<(), AppError> {
+pub async fn reset_failed_stock_changes_to_pending(state: &AppState) -> Result<(), AppError> {
     sqlx::query(
         r#"UPDATE stock_changes SET "status" = 'pending', updated_at = NOW() WHERE "status" = 'failed'"#,
     )
@@ -201,7 +201,7 @@ pub async fn reset_failed_stock_changes_to_pending(state: &AppStateV2) -> Result
     Ok(())
 }
 
-pub async fn update_one_stock_change_pending(state: &AppStateV2, id: i32) -> Result<(), AppError> {
+pub async fn update_one_stock_change_pending(state: &AppState, id: i32) -> Result<(), AppError> {
     sqlx::query(
         r#"UPDATE stock_changes
         SET "status" = 'pending', stock_name = NULL, start_price = NULL,
@@ -216,7 +216,7 @@ pub async fn update_one_stock_change_pending(state: &AppStateV2, id: i32) -> Res
 }
 
 pub async fn check_stock_change_pending_exist(
-    state: &AppStateV2,
+    state: &AppState,
     payload: &StockRequest,
 ) -> Result<Option<StockChange>, AppError> {
     Ok(sqlx::query_as(

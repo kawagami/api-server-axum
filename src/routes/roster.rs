@@ -1,10 +1,10 @@
 use crate::errors::AppError;
-use crate::state::AppStateV2;
+use crate::state::AppState;
 use crate::structs::roster::{RosterRequest, RosterResponse, StaffShift};
 use axum::{routing::post, Json, Router};
 use std::collections::VecDeque;
 
-pub fn new() -> Router<AppStateV2> {
+pub fn new() -> Router<AppState> {
     // 用 post 考量參數資料量可能很大
     Router::new().route("/", post(calculate_roster))
 }

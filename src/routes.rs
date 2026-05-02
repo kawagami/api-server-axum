@@ -11,7 +11,7 @@ mod tools;
 mod users;
 mod ws;
 
-use crate::{scheduler::initialize_scheduler, state::AppStateV2};
+use crate::{scheduler::initialize_scheduler, state::AppState};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header, Method},
@@ -22,7 +22,7 @@ use tower_http::{cors::CorsLayer, services::ServeDir};
 
 pub async fn app() -> Router {
     let origins = ["https://kawa.homes".parse().unwrap()];
-    let state = AppStateV2::new().await;
+    let state = AppState::new().await;
 
     let _scheduler = initialize_scheduler(state.clone()).await;
 

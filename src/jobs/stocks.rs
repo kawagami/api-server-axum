@@ -3,7 +3,7 @@ use crate::{
         get_one_pending_stock_change, get_stock_change_info, update_stock_change_failed,
         upsert_stock_change,
     },
-    state::AppStateV2,
+    state::AppState,
     structs::{jobs::AppJob, ws::WsEvent},
 };
 use async_trait::async_trait;
@@ -17,7 +17,7 @@ impl AppJob for ConsumePendingStockChangeJob {
         "0 * * * * *" // 每分鐘執行一次
     }
 
-    async fn run(&self, state: AppStateV2) {
+    async fn run(&self, state: AppState) {
         let pending_stock = match get_one_pending_stock_change(&state).await {
             Ok(Some(stock)) => stock,
             Ok(None) => return,

@@ -1,9 +1,9 @@
-use crate::{errors::AppError, state::AppStateV2, structs::stocks::StockDayAll};
+use crate::{errors::AppError, state::AppState, structs::stocks::StockDayAll};
 use chrono::NaiveDate;
 use sqlx::QueryBuilder;
 
 pub async fn get_stock_day_all(
-    state: &AppStateV2,
+    state: &AppState,
     stock_code: Option<String>,
     trade_date: Option<NaiveDate>,
     limit: i64,

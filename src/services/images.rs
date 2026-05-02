@@ -2,16 +2,16 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::images as images_repo,
     repositories::images::ImageRecord,
-    state::AppStateV2,
+    state::AppState,
 };
 use axum::body::Bytes;
 use futures_util::Stream;
 
-pub async fn get_images(state: &AppStateV2) -> Result<Vec<ImageRecord>, AppError> {
+pub async fn get_images(state: &AppState) -> Result<Vec<ImageRecord>, AppError> {
     images_repo::get_all_images(state).await
 }
 
-pub async fn cleanup_unused_images(state: &AppStateV2) {
+pub async fn cleanup_unused_images(state: &AppState) {
     let records = match images_repo::take_old_unused_images(state).await {
         Ok(r) => r,
         Err(e) => {
@@ -26,7 +26,7 @@ pub async fn cleanup_unused_images(state: &AppStateV2) {
     }
 }
 
-pub async fn delete_image(state: &AppStateV2, id: i32) -> Result<(), AppError> {
+pub async fn delete_image(state: &AppState, id: i32) -> Result<(), AppError> {
     let storage_key = images_repo::delete_image_by_id(state, id).await?;
     if let Err(e) = state.get_storage().delete(&storage_key).await {
         tracing::error!("storage delete failed for key {}: {}", storage_key, e);
@@ -35,7 +35,7 @@ pub async fn delete_image(state: &AppStateV2, id: i32) -> Result<(), AppError> {
 }
 
 pub async fn upload_image<S, E>(
-    state: &AppStateV2,
+    state: &AppState,
     stream: S,
     content_type: &str,
 ) -> Result<ImageRecord, AppError>

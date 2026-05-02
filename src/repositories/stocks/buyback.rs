@@ -1,13 +1,13 @@
 use crate::{
     errors::{AppError, RequestError},
-    state::AppStateV2,
+    state::AppState,
     structs::stocks::{StartPriceFilter, StockBuybackInfo, StockBuybackMoreInfo, StockBuybackPeriod, StockRequest},
 };
 use chrono::NaiveDate;
 use sqlx::QueryBuilder;
 
 pub async fn bulk_insert_stock_buyback_periods(
-    state: &AppStateV2,
+    state: &AppState,
     stocks: &[StockRequest],
 ) -> Result<u64, AppError> {
     let stock_nos: Vec<&str> = stocks.iter().map(|s| s.stock_no.as_str()).collect();
@@ -39,7 +39,7 @@ pub async fn bulk_insert_stock_buyback_periods(
 }
 
 pub async fn get_active_buyback_prices(
-    state: &AppStateV2,
+    state: &AppState,
 ) -> Result<Vec<StockBuybackMoreInfo>, AppError> {
     Ok(sqlx::query_as(
         "SELECT
@@ -79,7 +79,7 @@ pub async fn get_active_buyback_prices(
 }
 
 pub async fn get_active_buyback_prices_v4(
-    state: &AppStateV2,
+    state: &AppState,
     filter: StartPriceFilter,
 ) -> Result<Vec<StockBuybackInfo>, AppError> {
     let mut qb = QueryBuilder::new(
@@ -120,7 +120,7 @@ pub async fn get_active_buyback_prices_v4(
 }
 
 pub async fn get_stock_buyback_periods(
-    state: &AppStateV2,
+    state: &AppState,
 ) -> Result<Vec<StockBuybackPeriod>, AppError> {
     Ok(
         sqlx::query_as("SELECT * FROM stock_buyback_periods ORDER BY start_date ASC")

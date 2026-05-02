@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{redis, roles as roles_repo, users},
-    state::AppStateV2,
+    state::AppState,
     structs::auth::{Claims, CurrentUser},
 };
 use bcrypt::verify;
@@ -9,7 +9,7 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 
 pub async fn sign_in(
-    state: &AppStateV2,
+    state: &AppState,
     email: &str,
     password: &str,
 ) -> Result<String, AppError> {

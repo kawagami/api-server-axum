@@ -1,7 +1,7 @@
 use crate::{
     errors::AppError,
     repositories::redis as redis_repo,
-    state::{AppStateV2, DisplayTrackedConnection, TrackedConnection},
+    state::{AppState, DisplayTrackedConnection, TrackedConnection},
     structs::auth::Claims,
 };
 use axum::{
@@ -29,7 +29,7 @@ struct WsQuery {
     jwt: Option<String>,
 }
 
-async fn validate_ws_token(state: &AppStateV2, token: String) -> Option<String> {
+async fn validate_ws_token(state: &AppState, token: String) -> Option<String> {
     let jwt_secret = std::env::var("JWT_SECRET").ok()?;
     let token_data = decode::<Claims>(
         &token,
@@ -45,7 +45,7 @@ async fn validate_ws_token(state: &AppStateV2, token: String) -> Option<String> 
     exists.then_some(email)
 }
 
-pub fn new() -> Router<AppStateV2> {
+pub fn new() -> Router<AppState> {
     Router::new()
         .route("/", any(ws_handler))
         .route("/get_online_connections", get(get_online_connections))
@@ -54,7 +54,7 @@ pub fn new() -> Router<AppStateV2> {
 
 async fn ws_handler(
     ws: WebSocketUpgrade,
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Query(query): Query<WsQuery>,
@@ -72,12 +72,11 @@ async fn ws_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email))
 }
 
-async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2, user_email: Option<String>) {
+async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_email: Option<String>) {
     let (sender, receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
 
     let connection_info = TrackedConnection {
-        addr: who.to_string(),
         connected_at: SystemTime::now(),
         sender: sender_arc.clone(),
         user_email: user_email.clone(),
@@ -178,7 +177,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2, us
     tracing::info!("Websocket context {who} destroyed");
 }
 
-fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> ControlFlow<(), ()> {
+fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
             let _ = state.get_tx().send(format!("{} : {}", who, t));
@@ -204,7 +203,7 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppStateV2) -> Control
 
 // 原有的獲取所有連接的端點
 async fn get_online_connections(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<DisplayTrackedConnection>>, AppError> {
     let connections = state.get_connections().lock().await;
 
@@ -228,7 +227,7 @@ pub struct SendMessageParams {
 
 async fn say_something_to_someone(
     Query(params): Query<SendMessageParams>,
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
 ) -> Result<Json<String>, AppError> {
     let connections = state.get_connections().lock().await;
 
@@ -258,7 +257,7 @@ async fn say_something_to_someone(
     }
 }
 
-async fn cleanup_connection(state: &AppStateV2, who: SocketAddr) {
+async fn cleanup_connection(state: &AppState, who: SocketAddr) {
     let user_email = {
         let mut connections = state.get_connections().lock().await;
         let email = connections.get(&who).and_then(|c| c.user_email.clone());

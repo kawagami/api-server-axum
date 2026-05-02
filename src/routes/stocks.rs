@@ -7,7 +7,7 @@ use crate::{
         parse_buyback_stock_raw_html, parse_stock_day_avg_response, round_to_n_decimal,
         stock_day_all_service,
     },
-    state::AppStateV2,
+    state::AppState,
     structs::stocks::{
         BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
         NewStockClosingPrice, Pagination, StockBuybackMoreInfo, StockBuybackPeriod, StockChange,
@@ -22,7 +22,7 @@ use axum::{
     Json, Router,
 };
 
-pub fn new(state: AppStateV2) -> Router<AppStateV2> {
+pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/new_pending_stock_change", post(new_pending_stock_change))
         .route("/get_all_stock_changes", get(get_all_stock_changes))
@@ -63,7 +63,7 @@ pub fn new(state: AppStateV2) -> Router<AppStateV2> {
 
 /// 新增 pending 的等待查詢的股票代號 & 時間區間
 pub async fn new_pending_stock_change(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Json(payload): Json<StockRequest>,
 ) -> Result<Json<StockChange>, AppError> {
     // 先查詢資料庫是否已有該筆資料
@@ -81,14 +81,14 @@ pub async fn new_pending_stock_change(
 }
 
 pub async fn get_all_stock_changes(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Query(payload): Query<Conditions>,
 ) -> Result<Json<Vec<StockChange>>, AppError> {
     Ok(Json(stocks::get_all_stock_changes(&state, payload).await?))
 }
 
 pub async fn get_stock_change_info(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Json(payload): Json<StockRequest>,
 ) -> Result<Json<StockChangeWithoutId>, AppError> {
     // 先查詢資料庫是否已有該筆資料
@@ -110,7 +110,7 @@ pub async fn get_stock_change_info(
 
 /// 依照 input 的時間區間抓資料
 pub async fn buyback_stock_record(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Json(payload): Json<BuybackDuration>,
 ) -> Result<Json<Vec<StockRequest>>, AppError> {
     let records = parse_buyback_stock_raw_html(
@@ -129,7 +129,7 @@ pub async fn buyback_stock_record(
 }
 
 pub async fn reset_failed_stock_changes_to_pending(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
 ) -> Result<Json<()>, AppError> {
     Ok(Json(
         stocks::reset_failed_stock_changes_to_pending(&state).await?,
@@ -138,7 +138,7 @@ pub async fn reset_failed_stock_changes_to_pending(
 
 // 將有資料的 stock_change 改成 pending
 pub async fn update_one_stock_change_pending(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Json(payload): Json<StockChangeId>,
 ) -> Result<Json<()>, AppError> {
     Ok(Json(
@@ -148,7 +148,7 @@ pub async fn update_one_stock_change_pending(
 
 /// 打外部 API 取歷史收盤價 寫進 stock_closing_prices table
 pub async fn get_stock_history_price(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Query(payload): Query<GetStockHistoryPriceRequest>,
 ) -> Result<Json<Vec<NewStockClosingPrice>>, AppError> {
     // 先看資料庫有沒有查詢那個日期的資料
@@ -183,7 +183,7 @@ pub async fn get_stock_history_price(
 
 /// 取資料庫中所有歷史收盤價（預設 limit=100、offset=0）
 pub async fn get_all_stock_closing_prices(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<Vec<StockClosingPrice>>, AppError> {
     Ok(Json(
@@ -193,7 +193,7 @@ pub async fn get_all_stock_closing_prices(
 
 /// 打外部 API 取 start_date & end_date 的歷史收盤價 增加額外統計資訊
 pub async fn fetch_stock_closing_price_pair_stats(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Query(payload): Query<StockRequest>,
 ) -> Result<Json<StockClosingPriceResponse>, AppError> {
     let (start_price, end_price) = tokio::try_join!(
@@ -229,7 +229,7 @@ pub async fn fetch_stock_closing_price_pair_stats(
 
 /// Job StockDayAllJob 會排程執行 可考慮移除
 pub async fn bulk_insert_stock_day_all(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
     stock_day_all_service(&state).await?;
 
@@ -237,7 +237,7 @@ pub async fn bulk_insert_stock_day_all(
 }
 
 pub async fn get_stock_day_all(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
     Query(payload): Query<GetStockDayAll>,
     Query(pagination): Query<Pagination>,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
@@ -255,14 +255,14 @@ pub async fn get_stock_day_all(
 
 /// 取得未到結束日的庫藏股起始日到現在的價格差距 & 資訊
 pub async fn get_unfinished_buyback_price_gap(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackMoreInfo>>, AppError> {
     Ok(Json(stocks::get_active_buyback_prices(&state).await?))
 }
 
 /// 取得 DB 資料中的紀錄
 pub async fn get_stock_buyback_periods_v2(
-    State(state): State<AppStateV2>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackPeriod>>, AppError> {
     let data = stocks::get_stock_buyback_periods(&state).await?;
 

@@ -7,14 +7,14 @@ use crate::{
         stock_day_all::StockDayAllJob,
         stocks::ConsumePendingStockChangeJob,
     },
-    state::AppStateV2,
+    state::AppState,
     structs::jobs::AppJob,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
 
-pub async fn initialize_scheduler(state: AppStateV2) -> Arc<Mutex<JobScheduler>> {
+pub async fn initialize_scheduler(state: AppState) -> Arc<Mutex<JobScheduler>> {
     let scheduler = Arc::new(Mutex::new(JobScheduler::new().await.unwrap()));
 
     add_job_if_enabled(scheduler.clone(), state.clone(), ExampleJob).await;
@@ -41,7 +41,7 @@ pub async fn initialize_scheduler(state: AppStateV2) -> Arc<Mutex<JobScheduler>>
 /// 預設會執行 檢查是否有設定不執行
 async fn add_job_if_enabled<J: AppJob + Clone + Send + Sync + 'static>(
     scheduler: Arc<Mutex<JobScheduler>>,
-    state: AppStateV2,
+    state: AppState,
     job_instance: J,
 ) {
     if job_instance.enabled() {
@@ -51,7 +51,7 @@ async fn add_job_if_enabled<J: AppJob + Clone + Send + Sync + 'static>(
 
 async fn add_job_to_scheduler<J: AppJob + Clone + Send + Sync + 'static>(
     scheduler: Arc<Mutex<JobScheduler>>,
-    state: AppStateV2,
+    state: AppState,
     job_instance: J,
 ) {
     let job = Job::new_async(job_instance.clone().cron_expression(), move |_uuid, _l| {

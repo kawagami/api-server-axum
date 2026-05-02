@@ -1,7 +1,7 @@
 use crate::{
     repositories::stocks::{get_active_buyback_prices_v4, upsert_stock_closing_prices},
     services::stocks::{get_stock_day_avg, parse_stock_day_avg_response},
-    state::AppStateV2,
+    state::AppState,
     structs::{jobs::AppJob, stocks::StartPriceFilter},
 };
 use async_trait::async_trait;
@@ -16,7 +16,7 @@ impl AppJob for FetchHistoricalClosingPricesJob {
     }
 
     /// 定時打外部 API 取歷史收盤價
-    async fn run(&self, state: AppStateV2) {
+    async fn run(&self, state: AppState) {
         // 取 stock_no date
         let mut no_start_price_data =
             match get_active_buyback_prices_v4(&state, StartPriceFilter::MissingOnly).await {

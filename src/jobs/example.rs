@@ -1,4 +1,4 @@
-use crate::{state::AppStateV2, structs::jobs::AppJob};
+use crate::{state::AppState, structs::jobs::AppJob};
 use async_trait::async_trait;
 
 #[derive(Clone)]
@@ -10,7 +10,7 @@ impl AppJob for ExampleJob {
         "0 * * * * *" // 每分鐘執行一次
     }
 
-    async fn run(&self, _state: AppStateV2) {
+    async fn run(&self, _state: AppState) {
         // 要執行的邏輯
     }
 }

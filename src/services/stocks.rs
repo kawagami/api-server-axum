@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::stocks::{get_stock_closing_prices_by_date_range, upsert_stock_closing_prices},
-    state::AppStateV2,
+    state::AppState,
     structs::stocks::{NewStockClosingPrice, StockDayAvgResponse, StockRequest, TwseApiResponse},
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
@@ -225,7 +225,7 @@ pub fn get_stock_price_by_date(
 /// 先查詢資料庫有沒有資料 沒有的話才會打外部 API 查詢
 /// 依照 指定時間點 > 小於指定時間點 > 大於指定時間點 的優先度取資料
 pub async fn fetch_stock_price_for_date(
-    state: &AppStateV2,
+    state: &AppState,
     stock_no: &str,
     date: &str,
 ) -> Result<NewStockClosingPrice, AppError> {
@@ -277,7 +277,7 @@ pub fn round_to_n_decimal(value: f64, decimals: u32) -> f64 {
 }
 
 pub async fn stock_day_all_service(
-    state: &AppStateV2,
+    state: &AppState,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
     // 打外部 API 取得 TwseApiResponse 資料
     let url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL";

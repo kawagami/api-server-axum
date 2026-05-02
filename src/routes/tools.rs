@@ -1,11 +1,11 @@
 use crate::errors::AppError;
 use crate::structs::tools::{CompleteTimeResponse, Troops};
-use crate::{state::AppStateV2, structs::tools::Params};
+use crate::{state::AppState, structs::tools::Params};
 use axum::{extract::Query, routing::get, Json, Router};
 use chrono::{Duration, Local};
 use rand::{distributions::Alphanumeric, Rng};
 
-pub fn new() -> Router<AppStateV2> {
+pub fn new() -> Router<AppState> {
     Router::new()
         .route("/new_password", get(new_password))
         .route("/caculate_complete_time", get(caculate_complete_time))

@@ -11,7 +11,7 @@ use tokio::sync::{broadcast, Mutex};
 use crate::storage::Storage;
 use crate::structs::ws::WsEvent;
 
-pub struct AppState {
+pub struct AppStateInner {
     pub pool: Pool<Postgres>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
     pub http_client: Client,
@@ -21,7 +21,7 @@ pub struct AppState {
     pub storage: Storage,
 }
 
-impl AppState {
+impl AppStateInner {
     pub async fn new() -> Self {
         let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
 
@@ -69,7 +69,6 @@ impl AppState {
 pub type ConnectionMap = Arc<Mutex<HashMap<SocketAddr, TrackedConnection>>>;
 
 pub struct TrackedConnection {
-    pub addr: String,
     pub connected_at: std::time::SystemTime,
     pub sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
     pub user_email: Option<String>,
@@ -83,12 +82,12 @@ pub struct DisplayTrackedConnection {
 }
 
 #[derive(Clone)]
-pub struct AppStateV2(Arc<AppState>);
+pub struct AppState(Arc<AppStateInner>);
 
-impl AppStateV2 {
+impl AppState {
     pub async fn new() -> Self {
-        let app_state = AppState::new().await;
-        AppStateV2(Arc::new(app_state))
+        let app_state = AppStateInner::new().await;
+        AppState(Arc::new(app_state))
     }
 
     pub fn get_pool(&self) -> &Pool<Postgres> {
@@ -104,7 +103,13 @@ impl AppStateV2 {
     ) -> Result<bb8::PooledConnection<'_, RedisConnectionManager>, redis::RedisError> {
         self.get_redis_pool().get().await.map_err(|e| {
             tracing::error!("Failed to get Redis connection: {:?}", e);
-            redis::RedisError::from((redis::ErrorKind::IoError, "Failed to get Redis connection"))
+            match e {
+                bb8::RunError::User(redis_err) => redis_err,
+                bb8::RunError::TimedOut => redis::RedisError::from((
+                    redis::ErrorKind::IoError,
+                    "Redis connection pool timed out",
+                )),
+            }
         })
     }
 
@@ -138,7 +143,6 @@ impl AppStateV2 {
     }
 
     pub async fn broadcast_to_admins(&self, event: WsEvent, data: serde_json::Value) {
-        use axum::extract::ws::Message;
         use futures_util::SinkExt;
         let msg = serde_json::json!({
             "type": event.as_str(),
