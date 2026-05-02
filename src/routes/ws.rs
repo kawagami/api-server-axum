@@ -88,6 +88,11 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2, us
         connections.insert(who, connection_info);
     }
 
+    state.broadcast(
+        crate::structs::ws::WsEvent::UserJoined,
+        serde_json::json!({ "addr": who.to_string(), "user_email": user_email }),
+    );
+
     let mut rx = state.get_tx().subscribe();
 
     // --- send_task: 將 state 的訊息發送給客戶端 ---
@@ -254,6 +259,14 @@ async fn say_something_to_someone(
 }
 
 async fn cleanup_connection(state: &AppStateV2, who: SocketAddr) {
-    let mut connections = state.get_connections().lock().await;
-    connections.remove(&who);
+    let user_email = {
+        let mut connections = state.get_connections().lock().await;
+        let email = connections.get(&who).and_then(|c| c.user_email.clone());
+        connections.remove(&who);
+        email
+    };
+    state.broadcast(
+        crate::structs::ws::WsEvent::UserLeft,
+        serde_json::json!({ "addr": who.to_string(), "user_email": user_email }),
+    );
 }

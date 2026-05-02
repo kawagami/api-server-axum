@@ -2,6 +2,8 @@ pub enum WsEvent {
     StockCompleted,
     StockFailed,
     BlogCreated,
+    UserJoined,
+    UserLeft,
 }
 
 impl WsEvent {
@@ -10,6 +12,8 @@ impl WsEvent {
             Self::StockCompleted => "stock_completed",
             Self::StockFailed => "stock_failed",
             Self::BlogCreated => "blog_created",
+            Self::UserJoined => "user_joined",
+            Self::UserLeft => "user_left",
         }
     }
 }
