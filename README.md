@@ -73,3 +73,8 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 bash build.sh       # Docker build
 bash up.sh          # Docker Compose 啟動
 ```
+
+## 在 VPS 環境中給予指定 user 角色(super_admin)的指令
+```
+docker exec -it database psql -U USER -d DATABASE -c "INSERT INTO user_roles (user_id, role_id) SELECT u.id, r.id FROM users u, roles r WHERE u.email = 'kawa@gmail.com' AND r.name = 'super_admin';"
+```
