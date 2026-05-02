@@ -17,7 +17,7 @@ pub struct AppState {
     pub http_client: Client,
     pub fastapi_upload_host: String,
     pub tx: broadcast::Sender<String>,
-    pub connections: ConnectionMap, // 追蹤連線
+    pub connections: ConnectionMap,
     pub storage: Storage,
 }
 
@@ -61,7 +61,7 @@ impl AppState {
             fastapi_upload_host,
             tx,
             connections: Arc::new(Mutex::new(HashMap::new())),
-            storage: Storage::from_env(), // ← 新增這一行
+            storage: Storage::from_env(),
         }
     }
 }
@@ -71,7 +71,8 @@ pub type ConnectionMap = Arc<Mutex<HashMap<SocketAddr, TrackedConnection>>>;
 pub struct TrackedConnection {
     pub addr: String,
     pub connected_at: std::time::SystemTime,
-    pub sender: Arc<Mutex<SplitSink<WebSocket, Message>>>, // 保留 sender
+    pub sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
+    pub user_email: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -133,5 +134,22 @@ impl AppStateV2 {
         })
         .to_string();
         let _ = self.get_tx().send(msg);
+    }
+
+    pub async fn broadcast_to_admins(&self, event: WsEvent, data: serde_json::Value) {
+        use axum::extract::ws::Message;
+        use futures_util::SinkExt;
+        let msg = serde_json::json!({
+            "type": event.as_str(),
+            "data": data
+        })
+        .to_string();
+        let connections = self.get_connections().lock().await;
+        for conn in connections.values() {
+            if conn.user_email.is_some() {
+                let mut sender = conn.sender.lock().await;
+                let _ = sender.send(Message::Text(msg.clone().into())).await;
+            }
+        }
     }
 }

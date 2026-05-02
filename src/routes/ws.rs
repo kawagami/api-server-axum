@@ -1,6 +1,8 @@
 use crate::{
     errors::AppError,
+    repositories::redis as redis_repo,
     state::{AppStateV2, DisplayTrackedConnection, TrackedConnection},
+    structs::auth::Claims,
 };
 use axum::{
     body::Bytes,
@@ -15,11 +17,33 @@ use axum::{
 };
 use axum_extra::{headers, TypedHeader};
 use futures_util::{sink::SinkExt, stream::StreamExt};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use std::{net::SocketAddr, ops::ControlFlow, sync::Arc, time::SystemTime};
 use tokio::{sync::Mutex, time::Duration};
 
 // --- WebSocket Ping-Pong 設定 ---
-const PING_INTERVAL_SECONDS: u64 = 30; // 伺服器每 30 秒發送一個 Ping
+const PING_INTERVAL_SECONDS: u64 = 30;
+
+#[derive(serde::Deserialize)]
+struct WsQuery {
+    token: Option<String>,
+}
+
+async fn validate_ws_token(state: &AppStateV2, token: String) -> Option<String> {
+    let jwt_secret = std::env::var("JWT_SECRET").ok()?;
+    let token_data = decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(jwt_secret.as_ref()),
+        &Validation::default(),
+    )
+    .ok()?;
+    let email = token_data.claims.email;
+    let key = format!("user:login:{}", email);
+    let exists = redis_repo::redis_check_key_exists(state, &key)
+        .await
+        .unwrap_or(false);
+    exists.then_some(email)
+}
 
 pub fn new() -> Router<AppStateV2> {
     Router::new()
@@ -33,17 +57,22 @@ async fn ws_handler(
     State(state): State<AppStateV2>,
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Query(query): Query<WsQuery>,
 ) -> impl IntoResponse {
     let user_agent = if let Some(TypedHeader(user_agent)) = user_agent {
         user_agent.to_string()
     } else {
         String::from("Unknown browser")
     };
-    tracing::info!("{addr} connected ({})", user_agent);
-    ws.on_upgrade(move |socket| handle_socket(socket, addr, state))
+    let user_email = match query.token {
+        Some(token) => validate_ws_token(&state, token).await,
+        None => None,
+    };
+    tracing::info!("{addr} connected ({}) email={:?}", user_agent, user_email);
+    ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email))
 }
 
-async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
+async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2, user_email: Option<String>) {
     let (sender, receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
 
@@ -51,6 +80,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppStateV2) {
         addr: who.to_string(),
         connected_at: SystemTime::now(),
         sender: sender_arc.clone(),
+        user_email: user_email.clone(),
     };
 
     {
