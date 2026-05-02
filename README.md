@@ -1,16 +1,75 @@
 # Rust Axum API Server
 
-本專案是一個基於 Rust 和 Axum 框架的 API 伺服器
+Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 
-目前於以下網址中
-- `https://kawa.homes`
+## 功能
 
-做為後端服務提供
-- `JWT 驗證`
-- `Firebase 整合`
-- `WebSocket 服務`
+- JWT 驗證（登入 / 登出 / Redis session）
+- WebSocket 即時推送（broadcast channel + 逐連線 sender）
+- 部落格 CRUD
+- HackMD 筆記同步
+- 股票資料（全市場行情、庫藏股計畫、股價變動追蹤）
+- 圖片上傳 / 管理（本機儲存）
+- 使用者 / 角色 / 權限管理
+- 排班（roster）
+- 排程 job（cron）
 
-以及多種 API 功能
+## API 路由
 
-# 進行中的開發
-* [排班功能](https://gemini.google.com/app/ef48e11ed51e33f6?hl=zh-TW)
+| 前綴 | 說明 |
+|------|------|
+| `GET /` | health check |
+| `/jwt` | 登入、登出、me、密碼變更 |
+| `/blogs` | 部落格 CRUD |
+| `/users` | 使用者管理 |
+| `/notes` | HackMD 筆記 tags / lists |
+| `/stocks` | 股票資料查詢、pending change 管理 |
+| `/ws` | WebSocket 連線、線上清單、點對點訊息 |
+| `/roster` | 排班 |
+| `/images` | 圖片上傳 / 刪除 / 清單 |
+| `/roles` | 角色管理 |
+| `/permissions` | 權限清單 |
+| `/uploads/*` | 本機靜態檔案 |
+| `/tools` | 工具 |
+
+## 排程 Job
+
+| Job | 週期 | 說明 |
+|-----|------|------|
+| `ConsumePendingStockChangeJob` | 每分鐘 | 消費一筆 pending stock_change，打 FastAPI 查詢 |
+| `FetchHistoricalClosingPricesJob` | 每分鐘 | 補缺起始日收盤價 |
+| `StockDayAllJob` | 每日 | 抓全市場行情 + 庫藏股計畫 |
+| `FetchNotesJob` | 每小時 | 同步 HackMD 筆記（需 `ENABLE_FETCH_NOTES_JOB=true`） |
+| `CleanupUnusedImagesJob` | 每小時 | 清除 status=unused 且逾時的孤立圖片 |
+
+## 技術棧
+
+- `axum 0.8` — router、multipart、WebSocket
+- `sqlx 0.8` — async PostgreSQL + 自動 migration
+- `bb8` + `bb8-redis` — Redis 連線池
+- `tokio-cron-scheduler` — cron job
+- `jsonwebtoken 9` — JWT
+- `reqwest 0.12` — 對外 HTTP 請求
+- `tower-http` — CORS、timeout、body limit（10 MB）
+
+## 環境變數
+
+| 變數 | 必填 | 預設值 |
+|------|------|--------|
+| `DATABASE_URL` | 是 | — |
+| `REDIS_HOST` | 是 | — |
+| `JWT_SECRET` | 是 | — |
+| `FASTAPI_UPLOAD_HOST` | 是 | — |
+| `APP_HOST` | 否 | `0.0.0.0` |
+| `APP_PORT` | 否 | `3000` |
+| `UPLOAD_PATH` | 否 | `./uploads` |
+| `UPLOAD_BASE_URL` | 否 | `https://kawa.homes/uploads` |
+| `HACKMD_TOKEN` | 否 | — |
+| `ENABLE_FETCH_NOTES_JOB` | 否 | `true` |
+
+## 常用指令
+
+```bash
+bash build.sh       # Docker build
+bash up.sh          # Docker Compose 啟動
+```
