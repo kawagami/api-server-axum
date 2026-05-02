@@ -26,7 +26,7 @@ const PING_INTERVAL_SECONDS: u64 = 30;
 
 #[derive(serde::Deserialize)]
 struct WsQuery {
-    token: Option<String>,
+    jwt: Option<String>,
 }
 
 async fn validate_ws_token(state: &AppStateV2, token: String) -> Option<String> {
@@ -64,8 +64,8 @@ async fn ws_handler(
     } else {
         String::from("Unknown browser")
     };
-    let user_email = match query.token {
-        Some(token) => validate_ws_token(&state, token).await,
+    let user_email = match query.jwt {
+        Some(jwt) => validate_ws_token(&state, jwt).await,
         None => None,
     };
     tracing::info!("{addr} connected ({}) email={:?}", user_agent, user_email);
@@ -208,6 +208,7 @@ async fn get_online_connections(
         .map(|(addr, info)| DisplayTrackedConnection {
             addr: addr.to_string(),
             connected_at: info.connected_at,
+            user_email: info.user_email.clone(),
         })
         .collect();
 

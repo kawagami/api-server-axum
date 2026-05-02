@@ -79,6 +79,7 @@ pub struct TrackedConnection {
 pub struct DisplayTrackedConnection {
     pub addr: String,
     pub connected_at: std::time::SystemTime,
+    pub user_email: Option<String>,
 }
 
 #[derive(Clone)]
