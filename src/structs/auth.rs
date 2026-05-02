@@ -1,4 +1,4 @@
-use crate::errors::{AppError, AuthError};
+use crate::{errors::{AppError, AuthError}, structs::roles::Perm};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -27,15 +27,15 @@ pub struct AuthenticatedUser {
 }
 
 impl AuthenticatedUser {
-    pub fn require_permission(&self, permission: &str) -> Result<(), AppError> {
-        if self.permissions.iter().any(|p| p == permission) {
+    pub fn require_permission(&self, perm: Perm) -> Result<(), AppError> {
+        if self.permissions.iter().any(|p| p == perm.as_str()) {
             Ok(())
         } else {
             Err(AppError::AuthError(AuthError::Forbidden))
         }
     }
 
-    pub fn has_permission(&self, permission: &str) -> bool {
-        self.permissions.iter().any(|p| p == permission)
+    pub fn has_permission(&self, perm: Perm) -> bool {
+        self.permissions.iter().any(|p| p == perm.as_str())
     }
 }

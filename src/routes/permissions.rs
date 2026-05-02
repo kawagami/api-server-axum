@@ -3,7 +3,7 @@ use crate::{
     middleware::auth,
     services::roles as roles_service,
     state::AppState,
-    structs::{auth::AuthenticatedUser, roles::Permission},
+    structs::{auth::AuthenticatedUser, roles::{Perm, Permission}},
 };
 use axum::{
     extract::{Extension, State},
@@ -25,6 +25,6 @@ async fn list_permissions(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Permission>>, AppError> {
-    auth_user.require_permission("role:read")?;
+    auth_user.require_permission(Perm::RoleRead)?;
     Ok(Json(roles_service::get_permissions(&state).await?))
 }

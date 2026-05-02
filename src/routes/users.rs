@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        roles::{Role, SetUserRoles},
+        roles::{Perm, Role, SetUserRoles},
         users::{NewUser, User},
     },
 };
@@ -62,7 +62,7 @@ async fn get_user_roles(
     State(state): State<AppState>,
     Path(user_id): Path<i64>,
 ) -> Result<Json<Vec<Role>>, AppError> {
-    auth_user.require_permission("role:read")?;
+    auth_user.require_permission(Perm::RoleRead)?;
     Ok(Json(users_service::get_user_roles(&state, user_id).await?))
 }
 
@@ -72,7 +72,7 @@ async fn set_user_roles(
     Path(user_id): Path<i64>,
     Json(body): Json<SetUserRoles>,
 ) -> Result<StatusCode, AppError> {
-    auth_user.require_permission("role:assign")?;
+    auth_user.require_permission(Perm::RoleAssign)?;
     users_service::set_user_roles(&state, user_id, body.role_ids).await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        roles::{NewRole, Role, RoleWithPermissions, SetRolePermissions},
+        roles::{NewRole, Perm, Role, RoleWithPermissions, SetRolePermissions},
     },
 };
 use axum::{
@@ -31,7 +31,7 @@ async fn list_roles(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Role>>, AppError> {
-    auth_user.require_permission("role:read")?;
+    auth_user.require_permission(Perm::RoleRead)?;
     Ok(Json(roles_service::get_roles(&state).await?))
 }
 
@@ -40,7 +40,7 @@ async fn get_role(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<RoleWithPermissions>, AppError> {
-    auth_user.require_permission("role:read")?;
+    auth_user.require_permission(Perm::RoleRead)?;
     Ok(Json(roles_service::get_role(&state, id).await?))
 }
 
@@ -49,7 +49,7 @@ async fn create_role(
     State(state): State<AppState>,
     Json(body): Json<NewRole>,
 ) -> Result<Json<Role>, AppError> {
-    auth_user.require_permission("role:create")?;
+    auth_user.require_permission(Perm::RoleCreate)?;
     Ok(Json(roles_service::create_role(&state, body).await?))
 }
 
@@ -59,7 +59,7 @@ async fn set_permissions(
     Path(id): Path<i32>,
     Json(body): Json<SetRolePermissions>,
 ) -> Result<StatusCode, AppError> {
-    auth_user.require_permission("role:update")?;
+    auth_user.require_permission(Perm::RoleUpdate)?;
     roles_service::set_role_permissions(&state, id, body).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -69,7 +69,7 @@ async fn delete_role(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
-    auth_user.require_permission("role:delete")?;
+    auth_user.require_permission(Perm::RoleDelete)?;
     roles_service::delete_role(&state, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

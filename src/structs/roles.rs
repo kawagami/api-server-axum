@@ -1,6 +1,26 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+pub enum Perm {
+    RoleRead,
+    RoleAssign,
+    RoleCreate,
+    RoleUpdate,
+    RoleDelete,
+}
+
+impl Perm {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::RoleRead   => "role:read",
+            Self::RoleAssign => "role:assign",
+            Self::RoleCreate => "role:create",
+            Self::RoleUpdate => "role:update",
+            Self::RoleDelete => "role:delete",
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, FromRow, Clone)]
 pub struct Role {
     pub id: i32,
