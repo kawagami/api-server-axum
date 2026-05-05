@@ -2,7 +2,10 @@ use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{redis, roles as roles_repo},
     state::AppState,
-    structs::auth::{AuthenticatedUser, Claims},
+    structs::{
+        auth::{AuthenticatedUser, Claims},
+        members::AuthenticatedMember,
+    },
 };
 use axum::{
     body::Body,
@@ -21,14 +24,16 @@ pub async fn authorize(
     let token = extract_token(&req)?;
     let token_data = decode_jwt(token)?;
 
-    let key = format!("user:login:{}", token_data.claims.email);
+    if token_data.claims.role != "admin" {
+        return Err(AppError::AuthError(AuthError::Forbidden));
+    }
+
+    let key = format!("user:login:{}", token_data.claims.sub);
     verify_user_login(&state, &key).await?;
 
     Ok(next.run(req).await)
 }
 
-/// 驗證 token 並將 AuthenticatedUser（含 permissions）注入 request extensions。
-/// 用於需要細粒度權限檢查的 route，取代 authorize middleware。
 pub async fn authorize_and_load(
     State(state): State<AppState>,
     mut req: Request,
@@ -36,15 +41,18 @@ pub async fn authorize_and_load(
 ) -> Result<Response<Body>, AppError> {
     let token = extract_token(&req)?;
     let token_data = decode_jwt(token)?;
-    let email = token_data.claims.email;
 
+    if token_data.claims.role != "admin" {
+        return Err(AppError::AuthError(AuthError::Forbidden));
+    }
+
+    let email = token_data.claims.sub;
     let login_key = format!("user:login:{}", email);
     verify_user_login(&state, &login_key).await?;
 
     let permissions = match redis::get_user_permissions(&state, &email).await? {
         Some(perms) => perms,
         None => {
-            // 快取失效：從 DB 重新載入並快取
             let perms =
                 roles_repo::get_user_permission_strings_by_email(&state, &email).await?;
             let _ = redis::set_user_permissions(&state, &email, &perms).await;
@@ -53,6 +61,28 @@ pub async fn authorize_and_load(
     };
 
     req.extensions_mut().insert(AuthenticatedUser { email, permissions });
+
+    Ok(next.run(req).await)
+}
+
+pub async fn authorize_member(
+    mut req: Request,
+    next: Next,
+) -> Result<Response<Body>, AppError> {
+    let token = extract_token(&req)?;
+    let token_data = decode_jwt(token)?;
+
+    if token_data.claims.role != "member" {
+        return Err(AppError::AuthError(AuthError::Forbidden));
+    }
+
+    let member_id: i64 = token_data
+        .claims
+        .sub
+        .parse()
+        .map_err(|_| AppError::AuthError(AuthError::InvalidToken))?;
+
+    req.extensions_mut().insert(AuthenticatedMember { member_id });
 
     Ok(next.run(req).await)
 }

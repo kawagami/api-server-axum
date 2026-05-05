@@ -89,3 +89,47 @@ pub async fn del_user_permissions(
     conn.del::<_, ()>(key).await?;
     Ok(())
 }
+
+pub async fn set_oauth_state(state: &AppState, state_value: &str) -> Result<(), crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("oauth:state:{}", state_value);
+    conn.set_ex::<_, _, ()>(key, "1", 300).await?;
+    Ok(())
+}
+
+pub async fn consume_oauth_state(state: &AppState, state_value: &str) -> Result<bool, crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("oauth:state:{}", state_value);
+    let deleted: i64 = conn.del(key).await?;
+    Ok(deleted > 0)
+}
+
+pub async fn set_member_refresh_token(
+    state: &AppState,
+    member_id: i64,
+    jti: &str,
+) -> Result<(), crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("member:refresh:{}", member_id);
+    conn.set_ex::<_, _, ()>(key, jti, 30 * 24 * 3600).await?;
+    Ok(())
+}
+
+pub async fn get_member_refresh_token(
+    state: &AppState,
+    member_id: i64,
+) -> Result<Option<String>, crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("member:refresh:{}", member_id);
+    Ok(conn.get(key).await?)
+}
+
+pub async fn del_member_refresh_token(
+    state: &AppState,
+    member_id: i64,
+) -> Result<(), crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("member:refresh:{}", member_id);
+    conn.del::<_, ()>(key).await?;
+    Ok(())
+}

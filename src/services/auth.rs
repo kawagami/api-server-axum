@@ -44,7 +44,7 @@ fn encode_jwt(email: String) -> Result<String, AppError> {
     let exp = (now + Duration::hours(1)).timestamp() as usize;
     let iat = now.timestamp() as usize;
 
-    let claim = Claims { iat, exp, email };
+    let claim = Claims { iat, exp, sub: email, role: "admin".to_string() };
 
     encode(
         &Header::default(),

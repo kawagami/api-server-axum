@@ -5,7 +5,16 @@ use serde::{Deserialize, Serialize};
 pub struct Claims {
     pub exp: usize,
     pub iat: usize,
-    pub email: String,
+    pub sub: String,
+    pub role: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RefreshClaims {
+    pub exp: usize,
+    pub iat: usize,
+    pub sub: String,
+    pub jti: String,
 }
 
 #[derive(Clone)]

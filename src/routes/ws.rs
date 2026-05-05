@@ -37,7 +37,7 @@ async fn validate_ws_token(state: &AppState, token: String) -> Option<String> {
         &Validation::default(),
     )
     .ok()?;
-    let email = token_data.claims.email;
+    let email = token_data.claims.sub;
     let key = format!("user:login:{}", email);
     let exists = redis_repo::redis_check_key_exists(state, &key)
         .await
