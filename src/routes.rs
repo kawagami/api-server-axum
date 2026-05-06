@@ -38,7 +38,7 @@ pub async fn app() -> Router {
         .nest("/tools", tools::new())
         .nest("/notes", notes::new())
         .nest("/stocks", stocks::new(state.clone()))
-        .nest("/ws", ws::new())
+        .nest("/ws", ws::new(state.clone()))
         .nest("/roster", roster::new())
         .nest("/images", images::new(state.clone()))
         .nest("/roles", roles::new(state.clone()))

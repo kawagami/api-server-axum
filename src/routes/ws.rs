@@ -1,17 +1,22 @@
 use crate::{
     errors::AppError,
+    middleware::auth,
     repositories::redis as redis_repo,
     state::{AppState, DisplayTrackedConnection, TrackedConnection},
-    structs::auth::Claims,
+    structs::{
+        auth::{AuthenticatedUser, Claims},
+        roles::Perm,
+    },
 };
 use axum::{
     body::Bytes,
     extract::{
         connect_info::ConnectInfo,
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Query, State,
+        Extension, Query, State,
     },
     http::HeaderMap,
+    middleware,
     response::IntoResponse,
     routing::{any, get},
     Json, Router,
@@ -46,11 +51,18 @@ async fn validate_ws_token(state: &AppState, token: String) -> Option<String> {
     exists.then_some(email)
 }
 
-pub fn new() -> Router<AppState> {
-    Router::new()
-        .route("/", any(ws_handler))
+pub fn new(state: AppState) -> Router<AppState> {
+    let admin_routes = Router::new()
         .route("/get_online_connections", get(get_online_connections))
         .route("/say_something_to_someone", get(say_something_to_someone))
+        .layer(middleware::from_fn_with_state(
+            state,
+            auth::authorize_and_load,
+        ));
+
+    Router::new()
+        .route("/", any(ws_handler))
+        .merge(admin_routes)
 }
 
 async fn ws_handler(
@@ -211,8 +223,10 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFl
 
 // 原有的獲取所有連接的端點
 async fn get_online_connections(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DisplayTrackedConnection>>, AppError> {
+    auth_user.require_permission(Perm::WsRead)?;
     let connections = state.get_connections().lock().await;
 
     let result = connections
@@ -235,9 +249,11 @@ pub struct SendMessageParams {
 }
 
 async fn say_something_to_someone(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Query(params): Query<SendMessageParams>,
     State(state): State<AppState>,
 ) -> Result<Json<String>, AppError> {
+    auth_user.require_permission(Perm::WsRead)?;
     let connections = state.get_connections().lock().await;
 
     match params.addr.parse::<SocketAddr>() {
