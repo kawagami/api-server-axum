@@ -55,6 +55,28 @@ pub async fn get_user_permission_strings_by_email(
     state: &AppState,
     email: &str,
 ) -> Result<Vec<String>, AppError> {
+    let is_super_admin: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM users u
+            JOIN user_roles ur ON u.id = ur.user_id
+            JOIN roles r ON ur.role_id = r.id
+            WHERE u.email = $1 AND r.name = 'super_admin'
+        )
+        "#,
+    )
+    .bind(email)
+    .fetch_one(state.get_pool())
+    .await?;
+
+    if is_super_admin {
+        let rows: Vec<(String, String)> =
+            sqlx::query_as("SELECT resource, action FROM permissions")
+                .fetch_all(state.get_pool())
+                .await?;
+        return Ok(rows.into_iter().map(|(r, a)| format!("{}:{}", r, a)).collect());
+    }
+
     let rows: Vec<(String, String)> = sqlx::query_as(
         r#"
         SELECT DISTINCT p.resource, p.action
