@@ -1,5 +1,5 @@
 [package]
-name = "template_axum"
+name = "api-server-axum"
 version = "0.1.0"
 edition = "2021"
 

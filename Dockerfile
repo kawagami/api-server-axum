@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev
 RUN cargo build --release
 
 # 減少 image size
-RUN strip -s /app/target/release/template_axum
+RUN strip -s /app/target/release/api-server-axum
 
 FROM gcr.io/distroless/cc-debian12
 
@@ -22,6 +22,6 @@ COPY --from=builder /usr/share/zoneinfo/Asia/Taipei /usr/share/zoneinfo/Asia/Tai
 ENV TZ=Asia/Taipei
 
 COPY --from=builder /app/migrations/ /app/migrations/
-COPY --from=builder /app/target/release/template_axum /app/template_axum
+COPY --from=builder /app/target/release/api-server-axum /app/api-server-axum
 
-CMD ["/app/template_axum"]
+CMD ["/app/api-server-axum"]
