@@ -260,7 +260,13 @@ async fn say_something_to_someone(
         Ok(socket_addr) => {
             if let Some(tracked_conn) = connections.get(&socket_addr) {
                 let mut sender_guard = tracked_conn.sender.lock().await;
-                let message = Message::Text(params.message.into());
+                let payload = serde_json::json!({
+                    "message_type": "AdminMessage",
+                    "content": params.message,
+                    "from": "admin",
+                    "to": "direct"
+                });
+                let message = Message::Text(payload.to_string().into());
 
                 match sender_guard.send(message).await {
                     Ok(_) => Ok(Json("Message sent successfully".to_string())),
