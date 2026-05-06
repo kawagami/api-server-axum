@@ -72,6 +72,7 @@ pub struct TrackedConnection {
     pub connected_at: std::time::SystemTime,
     pub sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
     pub user_email: Option<String>,
+    pub real_ip: String,
 }
 
 #[derive(Serialize)]
@@ -79,6 +80,7 @@ pub struct DisplayTrackedConnection {
     pub addr: String,
     pub connected_at: std::time::SystemTime,
     pub user_email: Option<String>,
+    pub real_ip: String,
 }
 
 #[derive(Clone)]

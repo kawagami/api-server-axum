@@ -11,6 +11,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
     },
+    http::HeaderMap,
     response::IntoResponse,
     routing::{any, get},
     Json, Router,
@@ -58,6 +59,7 @@ async fn ws_handler(
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Query(query): Query<WsQuery>,
+    req_headers: HeaderMap,
 ) -> impl IntoResponse {
     let user_agent = if let Some(TypedHeader(user_agent)) = user_agent {
         user_agent.to_string()
@@ -68,11 +70,16 @@ async fn ws_handler(
         Some(jwt) => validate_ws_token(&state, jwt).await,
         None => None,
     };
-    tracing::info!("{addr} connected ({}) email={:?}", user_agent, user_email);
-    ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email))
+    let real_ip = req_headers
+        .get("CF-Connecting-IP")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| addr.ip().to_string());
+    tracing::info!("{real_ip} connected ({}) email={:?}", user_agent, user_email);
+    ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email, real_ip))
 }
 
-async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_email: Option<String>) {
+async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_email: Option<String>, real_ip: String) {
     let (sender, receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
 
@@ -80,6 +87,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
         connected_at: SystemTime::now(),
         sender: sender_arc.clone(),
         user_email: user_email.clone(),
+        real_ip: real_ip.clone(),
     };
 
     {
@@ -89,7 +97,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
 
     state.broadcast(
         crate::structs::ws::WsEvent::UserJoined,
-        serde_json::json!({ "addr": who.to_string(), "user_email": user_email }),
+        serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_email": user_email }),
     );
 
     let mut rx = state.get_tx().subscribe();
@@ -174,7 +182,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     // 最終清理連接
     cleanup_connection(&state, who).await;
 
-    tracing::info!("Websocket context {who} destroyed");
+    tracing::info!("Websocket context {who} ({real_ip}) destroyed");
 }
 
 fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
@@ -213,6 +221,7 @@ async fn get_online_connections(
             addr: addr.to_string(),
             connected_at: info.connected_at,
             user_email: info.user_email.clone(),
+            real_ip: info.real_ip.clone(),
         })
         .collect();
 
@@ -258,14 +267,15 @@ async fn say_something_to_someone(
 }
 
 async fn cleanup_connection(state: &AppState, who: SocketAddr) {
-    let user_email = {
+    let (user_email, real_ip) = {
         let mut connections = state.get_connections().lock().await;
         let email = connections.get(&who).and_then(|c| c.user_email.clone());
+        let ip = connections.get(&who).map(|c| c.real_ip.clone()).unwrap_or_else(|| who.ip().to_string());
         connections.remove(&who);
-        email
+        (email, ip)
     };
     state.broadcast(
         crate::structs::ws::WsEvent::UserLeft,
-        serde_json::json!({ "addr": who.to_string(), "user_email": user_email }),
+        serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_email": user_email }),
     );
 }
