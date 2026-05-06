@@ -1,6 +1,7 @@
 mod auth;
 mod blogs;
 mod images;
+mod members;
 mod notes;
 mod oauth;
 mod permissions;
@@ -42,6 +43,7 @@ pub async fn app() -> Router {
         .nest("/images", images::new(state.clone()))
         .nest("/roles", roles::new(state.clone()))
         .nest("/permissions", permissions::new(state.clone()))
+        .nest("/members", members::new(state.clone()))
         .nest("/auth", oauth::new(state.clone()))
         .nest_service("/uploads", ServeDir::new(&upload_path))
         .layer(DefaultBodyLimit::disable())

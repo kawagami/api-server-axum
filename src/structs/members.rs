@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -7,6 +8,17 @@ pub struct Member {
     pub name: String,
     pub email: Option<String>,
     pub avatar_url: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+pub struct MemberDetail {
+    pub id: i64,
+    pub name: String,
+    pub email: Option<String>,
+    pub avatar_url: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub providers: Vec<String>,
 }
 
 #[derive(Clone, Debug)]

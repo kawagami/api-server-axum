@@ -7,6 +7,7 @@ pub enum Perm {
     RoleCreate,
     RoleUpdate,
     RoleDelete,
+    MemberRead,
 }
 
 impl Perm {
@@ -17,6 +18,7 @@ impl Perm {
             Self::RoleCreate => "role:create",
             Self::RoleUpdate => "role:update",
             Self::RoleDelete => "role:delete",
+            Self::MemberRead => "member:read",
         }
     }
 }
