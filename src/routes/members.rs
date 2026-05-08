@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        members::{Member, MemberDetail},
+        members::{AuthenticatedMember, Member, MemberDetail},
         roles::Perm,
     },
 };
@@ -17,13 +17,19 @@ use axum::{
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
-    Router::new()
+    let admin_routes = Router::new()
         .route("/", get(get_members))
         .route("/{id}", get(get_member_by_id))
         .layer(middleware::from_fn_with_state(
             state,
             auth::authorize_and_load,
-        ))
+        ));
+
+    let member_routes = Router::new()
+        .route("/me", get(get_me))
+        .layer(middleware::from_fn(auth::authorize_member));
+
+    admin_routes.merge(member_routes)
 }
 
 async fn get_members(
@@ -41,4 +47,11 @@ async fn get_member_by_id(
 ) -> Result<Json<Option<MemberDetail>>, AppError> {
     auth_user.require_permission(Perm::MemberRead)?;
     Ok(Json(members_service::get_member_by_id(&state, id).await?))
+}
+
+async fn get_me(
+    Extension(auth_member): Extension<AuthenticatedMember>,
+    State(state): State<AppState>,
+) -> Result<Json<Option<MemberDetail>>, AppError> {
+    Ok(Json(members_service::get_member_by_id(&state, auth_member.member_id).await?))
 }
