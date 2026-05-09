@@ -50,6 +50,7 @@ pub async fn get_one_pending_stock_change(
                 (CAST((CAST(end_date AS TEXT)::INT + 19110000) AS TEXT)),
                 'YYYYMMDD'
             ) <= CURRENT_DATE
+        ORDER BY created_at ASC
         LIMIT 1
         "#,
     )

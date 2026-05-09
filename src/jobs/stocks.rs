@@ -1,4 +1,5 @@
 use crate::{
+    errors::{AppError, RequestError},
     repositories::stocks::{
         get_one_pending_stock_change, update_stock_change_failed, upsert_stock_change,
     },
@@ -22,7 +23,7 @@ impl AppJob for ConsumePendingStockChangeJob {
             Ok(Some(stock)) => stock,
             Ok(None) => return,
             Err(err) => {
-                tracing::debug!("Error fetching pending stock change: {:?}", err);
+                tracing::error!("failed to fetch pending stock change: {:?}", err);
                 return;
             }
         };
@@ -30,22 +31,27 @@ impl AppJob for ConsumePendingStockChangeJob {
         let stock_info = match get_stock_change_info(&state, &pending_stock).await {
             Ok(info) => info,
             Err(err) => {
-                tracing::debug!(
-                    "Error fetching stock change info: {:?}, stock_no: {}",
-                    err,
-                    pending_stock.stock_no
-                );
-                let _ = update_stock_change_failed(&state, &pending_stock).await;
-                state.broadcast(
-                    WsEvent::StockFailed,
-                    serde_json::json!({ "stock_no": pending_stock.stock_no }),
-                );
+                let is_data_error =
+                    matches!(&err, AppError::RequestError(RequestError::InvalidContent(_)));
+                if is_data_error {
+                    let _ = update_stock_change_failed(&state, &pending_stock).await;
+                    state.broadcast(
+                        WsEvent::StockFailed,
+                        serde_json::json!({ "stock_no": pending_stock.stock_no }),
+                    );
+                } else {
+                    tracing::error!(
+                        "transient error for stock_no={}: {:?}",
+                        pending_stock.stock_no,
+                        err
+                    );
+                }
                 return;
             }
         };
 
         if let Err(err) = upsert_stock_change(&state, &stock_info).await {
-            tracing::debug!("Error updating stock_changes: {:?}", err);
+            tracing::error!("failed to upsert stock_change stock_no={}: {:?}", stock_info.stock_no, err);
             return;
         }
 

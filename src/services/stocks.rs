@@ -307,8 +307,10 @@ pub async fn get_stock_change_info(
     let start_date_ad = roc_to_ad(&stock_form.start_date)?;
     let end_date_ad = roc_to_ad(&stock_form.end_date)?;
 
-    let start_response =
-        get_stock_day_avg(state.get_http_client(), &stock_form.stock_no, &start_date_ad).await?;
+    let (start_response, end_price_data) = tokio::try_join!(
+        get_stock_day_avg(state.get_http_client(), &stock_form.stock_no, &start_date_ad),
+        fetch_stock_price_for_date(state, &stock_form.stock_no, &end_date_ad)
+    )?;
 
     let stock_name = extract_stock_name(&start_response.title, &stock_form.stock_no);
     let start_prices = parse_stock_day_avg_response(start_response, &stock_form.stock_no);
@@ -323,8 +325,6 @@ pub async fn get_stock_change_info(
 
     upsert_stock_closing_prices(state, &start_prices).await?;
     let start_price_data = get_stock_price_by_date(&start_prices, &start_date_ad)?;
-    let end_price_data =
-        fetch_stock_price_for_date(state, &stock_form.stock_no, &end_date_ad).await?;
 
     let start_price = round_to_n_decimal(start_price_data.close_price, 2);
     let end_price = round_to_n_decimal(end_price_data.close_price, 2);
