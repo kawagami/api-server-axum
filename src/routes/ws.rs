@@ -194,7 +194,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     // 最終清理連接
     cleanup_connection(&state, who).await;
 
-    tracing::info!("Websocket context {who} ({real_ip}) destroyed");
+    tracing::debug!("Websocket context {who} ({real_ip}) destroyed");
 }
 
 fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
@@ -205,13 +205,13 @@ fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFl
         Message::Binary(_) => {}
         Message::Close(c) => {
             if let Some(cf) = c {
-                tracing::info!(
+                tracing::debug!(
                     ">>> {who} sent close with code {} and reason `{}`",
                     cf.code,
                     cf.reason
                 );
             } else {
-                tracing::info!(">>> {who} somehow sent close message without CloseFrame");
+                tracing::debug!(">>> {who} somehow sent close message without CloseFrame");
             }
             return ControlFlow::Break(());
         }
