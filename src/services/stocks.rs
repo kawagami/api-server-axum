@@ -2,7 +2,10 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::stocks::{get_stock_closing_prices_by_date_range, upsert_stock_closing_prices},
     state::AppState,
-    structs::stocks::{NewStockClosingPrice, StockDayAvgResponse, StockRequest, TwseApiResponse},
+    structs::stocks::{
+        NewStockClosingPrice, StockChangeWithoutId, StockDayAvgResponse, StockRequest,
+        TwseApiResponse,
+    },
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
 use chrono::{Duration, NaiveDate};
@@ -274,6 +277,69 @@ pub async fn fetch_stock_price_for_date(
 pub fn round_to_n_decimal(value: f64, decimals: u32) -> f64 {
     let factor = 10_f64.powi(decimals as i32);
     (value * factor).round() / factor
+}
+
+fn roc_to_ad(roc_date: &str) -> Result<String, AppError> {
+    if roc_date.len() != 7 {
+        return Err(RequestError::InvalidContent(format!("invalid ROC date: {}", roc_date)).into());
+    }
+    let roc_year: u32 = roc_date[..3]
+        .parse()
+        .map_err(|_| RequestError::InvalidContent(format!("invalid ROC date: {}", roc_date)))?;
+    Ok(format!("{}{}", roc_year + 1911, &roc_date[3..]))
+}
+
+fn extract_stock_name(title: &str, stock_no: &str) -> String {
+    let marker = format!("{} ", stock_no);
+    title
+        .find(&marker)
+        .and_then(|pos| {
+            let after = &title[pos + marker.len()..];
+            after.split_whitespace().next().map(str::to_string)
+        })
+        .unwrap_or_else(|| "未知公司".to_string())
+}
+
+pub async fn get_stock_change_info(
+    state: &AppState,
+    stock_form: &StockRequest,
+) -> Result<StockChangeWithoutId, AppError> {
+    let start_date_ad = roc_to_ad(&stock_form.start_date)?;
+    let end_date_ad = roc_to_ad(&stock_form.end_date)?;
+
+    let start_response =
+        get_stock_day_avg(state.get_http_client(), &stock_form.stock_no, &start_date_ad).await?;
+
+    let stock_name = extract_stock_name(&start_response.title, &stock_form.stock_no);
+    let start_prices = parse_stock_day_avg_response(start_response, &stock_form.stock_no);
+
+    if start_prices.is_empty() {
+        return Err(RequestError::InvalidContent(format!(
+            "no price data for stock {} on {}",
+            stock_form.stock_no, stock_form.start_date
+        ))
+        .into());
+    }
+
+    upsert_stock_closing_prices(state, &start_prices).await?;
+    let start_price_data = get_stock_price_by_date(&start_prices, &start_date_ad)?;
+    let end_price_data =
+        fetch_stock_price_for_date(state, &stock_form.stock_no, &end_date_ad).await?;
+
+    let start_price = round_to_n_decimal(start_price_data.close_price, 2);
+    let end_price = round_to_n_decimal(end_price_data.close_price, 2);
+    let change = round_to_n_decimal((end_price - start_price) / start_price * 100.0, 2);
+
+    Ok(StockChangeWithoutId {
+        stock_no: stock_form.stock_no.clone(),
+        stock_name: Some(stock_name),
+        start_date: stock_form.start_date.clone(),
+        start_price: Some(start_price),
+        end_date: stock_form.end_date.clone(),
+        end_price: Some(end_price),
+        change: Some(change),
+        status: None,
+    })
 }
 
 pub async fn stock_day_all_service(

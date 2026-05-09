@@ -1,8 +1,8 @@
 use crate::{
     repositories::stocks::{
-        get_one_pending_stock_change, get_stock_change_info, update_stock_change_failed,
-        upsert_stock_change,
+        get_one_pending_stock_change, update_stock_change_failed, upsert_stock_change,
     },
+    services::stocks::get_stock_change_info,
     state::AppState,
     structs::{jobs::AppJob, ws::WsEvent},
 };

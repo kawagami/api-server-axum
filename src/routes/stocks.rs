@@ -99,8 +99,7 @@ pub async fn get_stock_change_info(
         return Ok(Json(info));
     }
 
-    // 沒有資料的話，向 FastAPI 查詢
-    let info = stocks::get_stock_change_info(&state, &payload).await?;
+    let info = crate::services::stocks::get_stock_change_info(&state, &payload).await?;
 
     // 更新新查詢到的資料到資料庫
     let _ = stocks::upsert_stock_change(&state, &info).await;

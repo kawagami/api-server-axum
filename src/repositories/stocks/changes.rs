@@ -1,5 +1,5 @@
 use crate::{
-    errors::{AppError, RequestError},
+    errors::AppError,
     state::AppState,
     structs::stocks::{Conditions, StockChange, StockChangeWithoutId, StockRequest},
 };
@@ -37,30 +37,6 @@ pub async fn get_all_stock_changes(
     Ok(query.build_query_as().fetch_all(state.get_pool()).await?)
 }
 
-pub async fn get_stock_change_info(
-    state: &AppState,
-    stock_form: &StockRequest,
-) -> Result<StockChangeWithoutId, AppError> {
-    let url = format!("{}{}", state.get_fastapi_upload_host(), "/stock-change");
-
-    let response = state
-        .get_http_client()
-        .post(url)
-        .json(&stock_form)
-        .send()
-        .await
-        .map_err(|err| AppError::ConnectionError(err.into()))?;
-
-    if !response.status().is_success() {
-        return Err(RequestError::InvalidContent(format!(
-            "Server returned status code: {}",
-            response.status()
-        ))
-        .into());
-    }
-
-    Ok(response.json::<StockChangeWithoutId>().await?)
-}
 
 pub async fn get_one_pending_stock_change(
     state: &AppState,
