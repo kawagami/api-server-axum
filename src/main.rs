@@ -1,5 +1,6 @@
 mod errors;
 mod jobs;
+mod logging;
 mod middleware;
 mod repositories;
 mod routes;
@@ -11,12 +12,13 @@ mod structs;
 mod utils;
 
 use std::{env::var, net::SocketAddr};
-use tokio::{net::TcpListener, signal};
+use tokio::{net::TcpListener, signal, sync::mpsc};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() {
-    // 初始化日誌系統，根據環境變數設定日誌層級，預設為 "template_axum=debug"
+    let (log_tx, log_rx) = mpsc::channel::<logging::LogEntry>(1000);
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -25,14 +27,15 @@ async fn main() {
         )
         .with(
             tracing_subscriber::fmt::layer()
-                .with_file(true) // 顯示檔案名稱
-                .with_line_number(true), // 顯示行號
-        ) // 設定格式化日誌輸出
+                .with_file(true)
+                .with_line_number(true),
+        )
+        .with(logging::DbLogLayer::new(log_tx))
         .init();
 
-    dotenvy::dotenv().ok(); // 載入 .env 環境變數檔案（若存在）
+    dotenvy::dotenv().ok();
 
-    let app = routes::app().await; // 初始化 Axum 應用程式
+    let app = routes::app(log_rx).await;
 
     // 設定伺服器監聽的主機與埠號
     let host = var("APP_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()); // 預設監聽所有 IP

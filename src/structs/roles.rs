@@ -9,6 +9,7 @@ pub enum Perm {
     RoleDelete,
     MemberRead,
     WsRead,
+    LogRead,
 }
 
 impl Perm {
@@ -21,6 +22,7 @@ impl Perm {
             Self::RoleDelete => "role:delete",
             Self::MemberRead => "member:read",
             Self::WsRead     => "ws:read",
+            Self::LogRead    => "log:read",
         }
     }
 }

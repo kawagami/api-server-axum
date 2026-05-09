@@ -1,5 +1,6 @@
 mod auth;
 mod blogs;
+mod logs;
 mod images;
 mod members;
 mod notes;
@@ -13,18 +14,21 @@ mod tools;
 mod users;
 mod ws;
 
-use crate::{scheduler::initialize_scheduler, state::AppState};
+use crate::{logging::LogEntry, scheduler::initialize_scheduler, state::AppState};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header, Method},
     Router,
 };
+use tokio::sync::mpsc;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
-pub async fn app() -> Router {
+pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
     let origins = ["https://kawa.homes".parse().unwrap()];
     let state = AppState::new().await;
+
+    tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone()));
 
     let _scheduler = initialize_scheduler(state.clone()).await;
 
@@ -45,6 +49,7 @@ pub async fn app() -> Router {
         .nest("/permissions", permissions::new(state.clone()))
         .nest("/members", members::new(state.clone()))
         .nest("/auth", oauth::new(state.clone()))
+        .nest("/logs", logs::new(state.clone()))
         .nest_service("/uploads", ServeDir::new(&upload_path))
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
