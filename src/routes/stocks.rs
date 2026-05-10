@@ -11,8 +11,8 @@ use crate::{
     structs::stocks::{
         BuybackDuration, Conditions, GetStockDayAll, GetStockHistoryPriceRequest,
         NewStockClosingPrice, Pagination, StockBuybackMoreInfo, StockBuybackPeriod, StockChange,
-        StockChangeId, StockChangeWithoutId, StockClosingPrice, StockClosingPriceResponse,
-        StockRequest, StockStats,
+        StockChangePaginatedResponse, StockChangeId, StockChangeWithoutId, StockClosingPrice,
+        StockClosingPriceResponse, StockRequest, StockStats,
     },
 };
 use axum::{
@@ -83,7 +83,7 @@ pub async fn new_pending_stock_change(
 pub async fn get_all_stock_changes(
     State(state): State<AppState>,
     Query(payload): Query<Conditions>,
-) -> Result<Json<Vec<StockChange>>, AppError> {
+) -> Result<Json<StockChangePaginatedResponse>, AppError> {
     Ok(Json(stocks::get_all_stock_changes(&state, payload).await?))
 }
 

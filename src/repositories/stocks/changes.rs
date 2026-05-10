@@ -1,7 +1,9 @@
 use crate::{
     errors::AppError,
     state::AppState,
-    structs::stocks::{Conditions, StockChange, StockChangeWithoutId, StockRequest},
+    structs::stocks::{
+        Conditions, StockChange, StockChangePaginatedResponse, StockChangeWithoutId, StockRequest,
+    },
 };
 use sqlx::{QueryBuilder, Row};
 
@@ -22,19 +24,34 @@ pub async fn save_request(state: &AppState, payload: &StockRequest) -> Result<()
 pub async fn get_all_stock_changes(
     state: &AppState,
     conditions: Conditions,
-) -> Result<Vec<StockChange>, AppError> {
-    let mut query = QueryBuilder::new(
-        "SELECT * FROM stock_changes s WHERE 1=1",
-    );
+) -> Result<StockChangePaginatedResponse, AppError> {
+    let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM stock_changes s WHERE 1=1");
+    let mut data_query = QueryBuilder::new("SELECT * FROM stock_changes s WHERE 1=1");
 
     if let Some(status) = &conditions.status {
-        query.push(" AND s.status = ");
-        query.push_bind(status);
+        count_query.push(" AND s.status = ");
+        count_query.push_bind(status);
+        data_query.push(" AND s.status = ");
+        data_query.push_bind(status);
     }
 
-    query.push(" ORDER BY s.start_date DESC");
+    data_query.push(" ORDER BY s.start_date DESC LIMIT ");
+    data_query.push_bind(conditions.limit);
+    data_query.push(" OFFSET ");
+    data_query.push_bind(conditions.offset);
 
-    Ok(query.build_query_as().fetch_all(state.get_pool()).await?)
+    let total: i64 = count_query
+        .build()
+        .fetch_one(state.get_pool())
+        .await?
+        .get(0);
+
+    let data = data_query
+        .build_query_as()
+        .fetch_all(state.get_pool())
+        .await?;
+
+    Ok(StockChangePaginatedResponse { data, total })
 }
 
 

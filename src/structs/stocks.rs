@@ -99,6 +99,20 @@ pub struct StockChangeId {
 #[derive(Deserialize)]
 pub struct Conditions {
     pub status: Option<String>,
+    #[serde(default = "default_changes_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub offset: i64,
+}
+
+fn default_changes_limit() -> i64 {
+    50
+}
+
+#[derive(Serialize)]
+pub struct StockChangePaginatedResponse {
+    pub data: Vec<StockChange>,
+    pub total: i64,
 }
 
 #[derive(Deserialize)]
