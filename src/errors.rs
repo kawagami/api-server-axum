@@ -174,6 +174,8 @@ impl From<reqwest::Error> for AppError {
     fn from(err: reqwest::Error) -> Self {
         if err.is_timeout() || err.is_connect() {
             Self::ConnectionError(err.into())
+        } else if err.is_decode() {
+            RequestError::InvalidContent(err.to_string()).into()
         } else {
             Self::SystemError(SystemError::Internal(err.to_string()))
         }

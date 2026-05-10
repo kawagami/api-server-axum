@@ -43,7 +43,7 @@ impl<S: Subscriber> Layer<S> for DbLogLayer {
         let meta = event.metadata();
 
         // skip DEBUG and TRACE
-        if *meta.level() < tracing::Level::INFO {
+        if *meta.level() > tracing::Level::INFO {
             return;
         }
 
