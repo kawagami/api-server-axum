@@ -36,7 +36,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 
 | Job | 週期 | 說明 |
 |-----|------|------|
-| `ConsumePendingStockChangeJob` | 每分鐘 | 消費一筆 pending stock_change，打 FastAPI 查詢 |
+| `ConsumePendingStockChangeJob` | 每分鐘 | 消費一筆 pending stock_change，查詢 TWSE 股價 |
 | `FetchHistoricalClosingPricesJob` | 每分鐘 | 補缺起始日收盤價 |
 | `StockDayAllJob` | 每日 | 抓全市場行情 + 庫藏股計畫 |
 | `FetchNotesJob` | 每小時 | 同步 HackMD 筆記（需 `ENABLE_FETCH_NOTES_JOB=true`） |
@@ -59,7 +59,6 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `DATABASE_URL` | 是 | — |
 | `REDIS_HOST` | 是 | — |
 | `JWT_SECRET` | 是 | — |
-| `FASTAPI_UPLOAD_HOST` | 是 | — |
 | `APP_HOST` | 否 | `0.0.0.0` |
 | `APP_PORT` | 否 | `3000` |
 | `UPLOAD_PATH` | 否 | `./uploads` |

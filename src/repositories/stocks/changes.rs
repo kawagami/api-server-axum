@@ -122,6 +122,24 @@ pub async fn update_stock_change_failed(
     Ok(())
 }
 
+pub async fn sync_buyback_periods_to_pending(state: &AppState) -> Result<u64, AppError> {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO stock_changes (stock_no, start_date, end_date)
+        SELECT
+            bp.stock_no,
+            LPAD((EXTRACT(YEAR FROM bp.start_date)::INT - 1911)::TEXT, 3, '0') || TO_CHAR(bp.start_date, 'MMDD'),
+            LPAD((EXTRACT(YEAR FROM bp.end_date)::INT - 1911)::TEXT, 3, '0') || TO_CHAR(bp.end_date, 'MMDD')
+        FROM stock_buyback_periods bp
+        ON CONFLICT (stock_no, start_date, end_date) DO NOTHING
+        "#,
+    )
+    .execute(state.get_pool())
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 pub async fn update_one_stock_change_pending(state: &AppState, id: i32) -> Result<(), AppError> {
     sqlx::query(
         r#"UPDATE stock_changes

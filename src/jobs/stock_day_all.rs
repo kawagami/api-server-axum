@@ -34,12 +34,11 @@ impl AppJob for StockDayAllJob {
         {
             Ok(html_string) => {
                 let records = parse_buyback_stock_raw_html(html_string);
-                let _ = stocks::bulk_insert_stock_buyback_periods(&state, &records).await;
-                tracing::info!(
-                    "job get_buyback_stock_raw_html_string 成功 執行時間 {} ~ {}",
-                    now,
-                    three_month_later
-                );
+                tracing::info!("parsed {} buyback records ({} ~ {})", records.len(), now, three_month_later);
+                match stocks::bulk_insert_stock_buyback_periods(&state, &records).await {
+                    Ok(n) => tracing::info!("bulk_insert_stock_buyback_periods inserted {} rows", n),
+                    Err(e) => tracing::error!("bulk_insert_stock_buyback_periods fail: {}", e),
+                }
             }
             Err(e) => tracing::error!("job get_buyback_stock_raw_html_string fail: {}", e),
         }

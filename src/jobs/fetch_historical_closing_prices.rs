@@ -15,9 +15,7 @@ impl AppJob for FetchHistoricalClosingPricesJob {
         "0 * * * * *" // 每分鐘執行一次
     }
 
-    /// 定時打外部 API 取歷史收盤價
     async fn run(&self, state: AppState) {
-        // 取 stock_no date
         let mut no_start_price_data =
             match get_active_buyback_prices_v4(&state, StartPriceFilter::MissingOnly).await {
                 Ok(data) => data,
@@ -29,31 +27,24 @@ impl AppJob for FetchHistoricalClosingPricesJob {
 
         //
         if let Some(data) = no_start_price_data.pop() {
-            let new_stock_closing_prices = parse_stock_day_avg_response(
-                get_stock_day_avg(
-                    state.get_http_client(),
-                    &data.stock_no,
-                    &data.start_date.format("%Y%m%d").to_string(),
-                )
-                .await
-                .expect(&format!(
-                    "get_stock_day_avg fail, stock_no => {}, start_date => {}",
-                    &data.stock_no,
-                    &data.start_date.format("%Y%m%d").to_string()
-                )),
-                &data.stock_no,
-            );
+            let date_str = data.start_date.format("%Y%m%d").to_string();
 
-            // 將歷史價寫進資料庫 stock_closing_prices 只記錄特定股票在特定日的收盤價
-            upsert_stock_closing_prices(&state, &new_stock_closing_prices)
-                .await
-                .expect("msg");
+            let avg_response = match get_stock_day_avg(state.get_http_client(), &data.stock_no, &date_str).await {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::error!("get_stock_day_avg fail stock_no={} date={}: {}", data.stock_no, date_str, e);
+                    return;
+                }
+            };
 
-            tracing::info!(
-                "{} {} upsert_stock_closing_prices success",
-                &data.stock_no,
-                &data.start_date.format("%Y%m%d").to_string()
-            );
+            let new_stock_closing_prices = parse_stock_day_avg_response(avg_response, &data.stock_no);
+
+            if let Err(e) = upsert_stock_closing_prices(&state, &new_stock_closing_prices).await {
+                tracing::error!("upsert_stock_closing_prices fail stock_no={} date={}: {}", data.stock_no, date_str, e);
+                return;
+            }
+
+            tracing::info!("{} {} upsert_stock_closing_prices success", data.stock_no, date_str);
         }
     }
 }

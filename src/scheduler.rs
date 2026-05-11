@@ -6,6 +6,7 @@ use crate::{
         notes::FetchNotesJob,
         stock_day_all::StockDayAllJob,
         stocks::ConsumePendingStockChangeJob,
+        sync_buyback_to_pending::SyncBuybackToPendingJob,
     },
     state::AppState,
     structs::jobs::AppJob,
@@ -31,6 +32,12 @@ pub async fn initialize_scheduler(state: AppState) -> Arc<Mutex<JobScheduler>> {
         scheduler.clone(),
         state.clone(),
         ConsumePendingStockChangeJob,
+    )
+    .await;
+    add_job_if_enabled(
+        scheduler.clone(),
+        state.clone(),
+        SyncBuybackToPendingJob,
     )
     .await;
 
