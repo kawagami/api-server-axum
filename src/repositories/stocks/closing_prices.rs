@@ -1,38 +1,9 @@
 use crate::{
     errors::AppError,
     state::AppState,
-    structs::stocks::{GetStockHistoryPriceRequest, NewStockClosingPrice, StockClosingPrice},
+    structs::stocks::NewStockClosingPrice,
 };
 use sqlx::QueryBuilder;
-
-pub async fn get_all_stock_closing_prices(
-    state: &AppState,
-    limit: i64,
-    offset: i64,
-) -> Result<Vec<StockClosingPrice>, AppError> {
-    Ok(sqlx::query_as(
-        "SELECT * FROM stock_closing_prices ORDER BY date DESC LIMIT $1 OFFSET $2",
-    )
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(state.get_pool())
-    .await?)
-}
-
-pub async fn get_stock_closing_price(
-    state: &AppState,
-    query: &GetStockHistoryPriceRequest,
-) -> Result<Vec<StockClosingPrice>, AppError> {
-    let mut qb = QueryBuilder::new("SELECT * FROM stock_closing_prices s WHERE 1=1");
-
-    qb.push(" AND s.stock_no = ");
-    qb.push_bind(&query.stock_no);
-    qb.push(" AND s.date = TO_DATE(");
-    qb.push_bind(&query.date);
-    qb.push(", 'YYYYMMDD')");
-
-    Ok(qb.build_query_as().fetch_all(state.get_pool()).await?)
-}
 
 pub async fn upsert_stock_closing_prices(
     state: &AppState,

@@ -2,24 +2,10 @@ use crate::{
     errors::AppError,
     state::AppState,
     structs::stocks::{
-        Conditions, StockChange, StockChangePaginatedResponse, StockChangeWithoutId, StockRequest,
+        Conditions, StockChangePaginatedResponse, StockChangeWithoutId, StockRequest,
     },
 };
 use sqlx::{QueryBuilder, Row};
-
-pub async fn save_request(state: &AppState, payload: &StockRequest) -> Result<(), AppError> {
-    sqlx::query(
-        "INSERT INTO stock_changes (stock_no, start_date, end_date, status, created_at, updated_at)
-        VALUES ($1, $2, $3, 'pending', now(), now())",
-    )
-    .bind(&payload.stock_no)
-    .bind(&payload.start_date)
-    .bind(&payload.end_date)
-    .execute(state.get_pool())
-    .await?;
-
-    Ok(())
-}
 
 pub async fn get_all_stock_changes(
     state: &AppState,
@@ -119,55 +105,6 @@ pub async fn upsert_stock_change(
     Ok(())
 }
 
-pub async fn get_existing_stock_change(
-    state: &AppState,
-    payload: &StockRequest,
-) -> Result<Option<StockChangeWithoutId>, AppError> {
-    Ok(sqlx::query_as::<_, StockChangeWithoutId>(
-        r#"
-        SELECT stock_no, start_date, end_date, status, stock_name, start_price, end_price, change
-        FROM stock_changes
-        WHERE stock_no = $1 AND start_date = $2 AND end_date = $3
-        "#,
-    )
-    .bind(&payload.stock_no)
-    .bind(&payload.start_date)
-    .bind(&payload.end_date)
-    .fetch_optional(state.get_pool())
-    .await?)
-}
-
-pub async fn insert_stock_data_batch(
-    state: &AppState,
-    stocks: &[StockRequest],
-) -> Result<usize, AppError> {
-    let mut tx = state.get_pool().begin().await?;
-
-    let stock_nos: Vec<&str> = stocks.iter().map(|s| s.stock_no.as_str()).collect();
-    let start_dates: Vec<&str> = stocks.iter().map(|s| s.start_date.as_str()).collect();
-    let end_dates: Vec<&str> = stocks.iter().map(|s| s.end_date.as_str()).collect();
-    let statuses: Vec<&str> = vec!["pending"; stocks.len()];
-    let now = chrono::Utc::now().naive_utc();
-    let timestamps: Vec<chrono::NaiveDateTime> = vec![now; stocks.len()];
-
-    sqlx::query(
-        "INSERT INTO stock_changes (stock_no, start_date, end_date, status, created_at, updated_at)
-        SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::timestamptz[], $6::timestamptz[])
-        ON CONFLICT (stock_no, start_date, end_date) DO NOTHING",
-    )
-    .bind(&stock_nos)
-    .bind(&start_dates)
-    .bind(&end_dates)
-    .bind(&statuses)
-    .bind(&timestamps)
-    .bind(&timestamps)
-    .execute(&mut *tx)
-    .await?;
-
-    tx.commit().await?;
-    Ok(stocks.len())
-}
-
 pub async fn update_stock_change_failed(
     state: &AppState,
     stock: &StockRequest,
@@ -179,16 +116,6 @@ pub async fn update_stock_change_failed(
     .bind(&stock.stock_no)
     .bind(&stock.start_date)
     .bind(&stock.end_date)
-    .execute(state.get_pool())
-    .await?;
-
-    Ok(())
-}
-
-pub async fn reset_failed_stock_changes_to_pending(state: &AppState) -> Result<(), AppError> {
-    sqlx::query(
-        r#"UPDATE stock_changes SET "status" = 'pending', updated_at = NOW() WHERE "status" = 'failed'"#,
-    )
     .execute(state.get_pool())
     .await?;
 
@@ -209,18 +136,3 @@ pub async fn update_one_stock_change_pending(state: &AppState, id: i32) -> Resul
     Ok(())
 }
 
-pub async fn check_stock_change_pending_exist(
-    state: &AppState,
-    payload: &StockRequest,
-) -> Result<Option<StockChange>, AppError> {
-    Ok(sqlx::query_as(
-        "SELECT stock_no, start_date, end_date, stock_name, start_price, end_price, change
-        FROM stock_changes
-        WHERE stock_no = $1 AND start_date = $2 AND end_date = $3 AND status = 'pending'",
-    )
-    .bind(&payload.stock_no)
-    .bind(&payload.start_date)
-    .bind(&payload.end_date)
-    .fetch_optional(state.get_pool())
-    .await?)
-}
