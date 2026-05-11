@@ -5,7 +5,7 @@ use crate::{
         images::CleanupUnusedImagesJob,
         notes::FetchNotesJob,
         stock_day_all::StockDayAllJob,
-        stocks::ConsumePendingStockChangeJob,
+        consume_pending_stock_change::ConsumePendingStockChangeJob,
         sync_buyback_to_pending::SyncBuybackToPendingJob,
     },
     state::AppState,
