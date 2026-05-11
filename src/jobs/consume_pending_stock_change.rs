@@ -34,7 +34,9 @@ impl AppJob for ConsumePendingStockChangeJob {
                 let is_data_error =
                     matches!(&err, AppError::RequestError(RequestError::InvalidContent(_)));
                 if is_data_error {
-                    let _ = update_stock_change_failed(&state, &pending_stock).await;
+                    if let Err(e) = update_stock_change_failed(&state, &pending_stock).await {
+                        tracing::error!("update_stock_change_failed stock_no={}: {:?}", pending_stock.stock_no, e);
+                    }
                     state.broadcast(
                         WsEvent::StockFailed,
                         serde_json::json!({ "stock_no": pending_stock.stock_no }),
@@ -55,6 +57,11 @@ impl AppJob for ConsumePendingStockChangeJob {
             return;
         }
 
+        tracing::info!(
+            "stock_change completed stock_no={} change={:?}",
+            stock_info.stock_no,
+            stock_info.change
+        );
         state.broadcast(
             WsEvent::StockCompleted,
             serde_json::json!({
