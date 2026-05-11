@@ -1,5 +1,5 @@
+pub mod cleanup_unused_images;
 pub mod example;
-pub mod images;
 pub mod fetch_historical_closing_prices;
 pub mod notes;
 pub mod consume_pending_stock_change;

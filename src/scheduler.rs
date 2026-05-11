@@ -2,7 +2,7 @@ use crate::{
     jobs::{
         example::ExampleJob,
         fetch_historical_closing_prices::FetchHistoricalClosingPricesJob,
-        images::CleanupUnusedImagesJob,
+        cleanup_unused_images::CleanupUnusedImagesJob,
         notes::FetchNotesJob,
         stock_day_all::StockDayAllJob,
         consume_pending_stock_change::ConsumePendingStockChangeJob,
