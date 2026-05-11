@@ -13,7 +13,7 @@ pub struct FetchBuybackPeriodsJob;
 #[async_trait]
 impl AppJob for FetchBuybackPeriodsJob {
     fn cron_expression(&self) -> &str {
-        "0 0 8,20 * * *"
+        "0 0 20 * * *"
     }
 
     async fn run(&self, state: AppState) {

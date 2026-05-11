@@ -11,7 +11,7 @@ pub struct SyncBuybackToPendingJob;
 #[async_trait]
 impl AppJob for SyncBuybackToPendingJob {
     fn cron_expression(&self) -> &str {
-        "0 10 8,20 * * *"
+        "0 10 20 * * *"
     }
 
     async fn run(&self, state: AppState) {

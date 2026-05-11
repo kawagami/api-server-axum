@@ -7,7 +7,7 @@ pub struct FetchStockDayAllJob;
 #[async_trait]
 impl AppJob for FetchStockDayAllJob {
     fn cron_expression(&self) -> &str {
-        "0 0 8,20 * * *"
+        "0 0 20 * * *"
     }
 
     async fn run(&self, state: AppState) {
