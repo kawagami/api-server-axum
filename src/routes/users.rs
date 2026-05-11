@@ -13,7 +13,7 @@ use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
     middleware,
-    routing::{get, put},
+    routing::get,
     Json, Router,
 };
 

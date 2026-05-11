@@ -4,7 +4,8 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 
 ## 功能
 
-- JWT 驗證（登入 / 登出 / Redis session）
+- JWT 驗證（admin 登入 / 登出 / token refresh / Redis session）
+- OAuth 登入（Google / GitHub / LINE）+ member token refresh
 - WebSocket 即時推送（broadcast channel + 逐連線 sender）
 - 部落格 CRUD
 - HackMD 筆記同步
@@ -19,7 +20,9 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | 前綴 | 說明 |
 |------|------|
 | `GET /` | health check |
-| `/jwt` | 登入、登出、me、密碼變更 |
+| `/jwt` | admin 登入、登出、me、密碼變更、token refresh |
+| `/auth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
+| `/members` | member 管理 |
 | `/blogs` | 部落格 CRUD |
 | `/users` | 使用者管理 |
 | `/notes` | HackMD 筆記 tags / lists |
@@ -29,6 +32,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/images` | 圖片上傳 / 刪除 / 清單 |
 | `/roles` | 角色管理 |
 | `/permissions` | 權限清單 |
+| `/logs` | 操作紀錄 |
 | `/uploads/*` | 本機靜態檔案 |
 | `/tools` | 工具 |
 

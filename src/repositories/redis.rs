@@ -124,7 +124,7 @@ pub async fn get_member_refresh_token(
     Ok(conn.get(key).await?)
 }
 
-pub async fn del_member_refresh_token(
+pub async fn _del_member_refresh_token(
     state: &AppState,
     member_id: i64,
 ) -> Result<(), crate::errors::AppError> {

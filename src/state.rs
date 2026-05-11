@@ -135,7 +135,7 @@ impl AppState {
         let _ = self.get_tx().send(msg);
     }
 
-    pub async fn broadcast_to_admins(&self, event: WsEvent, data: serde_json::Value) {
+    pub async fn _broadcast_to_admins(&self, event: WsEvent, data: serde_json::Value) {
         use futures_util::SinkExt;
         let msg = serde_json::json!({
             "type": event.as_str(),

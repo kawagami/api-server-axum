@@ -36,15 +36,15 @@ pub struct AuthenticatedUser {
 }
 
 impl AuthenticatedUser {
+    pub fn has_permission(&self, perm: Perm) -> bool {
+        self.permissions.iter().any(|p| p == perm.as_str())
+    }
+
     pub fn require_permission(&self, perm: Perm) -> Result<(), AppError> {
-        if self.permissions.iter().any(|p| p == perm.as_str()) {
+        if self.has_permission(perm) {
             Ok(())
         } else {
             Err(AppError::AuthError(AuthError::Forbidden))
         }
-    }
-
-    pub fn has_permission(&self, perm: Perm) -> bool {
-        self.permissions.iter().any(|p| p == perm.as_str())
     }
 }
