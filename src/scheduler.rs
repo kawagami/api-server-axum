@@ -4,7 +4,8 @@ use crate::{
         fetch_historical_closing_prices::FetchHistoricalClosingPricesJob,
         cleanup_unused_images::CleanupUnusedImagesJob,
         fetch_notes::FetchNotesJob,
-        stock_day_all::StockDayAllJob,
+        fetch_buyback_periods::FetchBuybackPeriodsJob,
+        fetch_stock_day_all::FetchStockDayAllJob,
         consume_pending_stock_change::ConsumePendingStockChangeJob,
         sync_buyback_to_pending::SyncBuybackToPendingJob,
     },
@@ -20,7 +21,8 @@ pub async fn initialize_scheduler(state: AppState) -> Arc<Mutex<JobScheduler>> {
 
     add_job_if_enabled(scheduler.clone(), state.clone(), ExampleJob).await;
     add_job_if_enabled(scheduler.clone(), state.clone(), CleanupUnusedImagesJob).await;
-    add_job_if_enabled(scheduler.clone(), state.clone(), StockDayAllJob).await;
+    add_job_if_enabled(scheduler.clone(), state.clone(), FetchStockDayAllJob).await;
+    add_job_if_enabled(scheduler.clone(), state.clone(), FetchBuybackPeriodsJob).await;
     add_job_if_enabled(scheduler.clone(), state.clone(), FetchNotesJob).await;
     add_job_if_enabled(
         scheduler.clone(),
