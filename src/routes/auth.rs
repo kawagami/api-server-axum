@@ -17,6 +17,13 @@ pub fn new(state: AppState) -> Router<AppState> {
     let me_route = Router::new()
         .route("/me", get(me))
         .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::authorize_and_load,
+        ));
+
+    let refresh_route = Router::new()
+        .route("/refresh", post(refresh))
+        .layer(middleware::from_fn_with_state(
             state,
             auth::authorize_and_load,
         ));
@@ -24,6 +31,7 @@ pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/", post(sign_in))
         .merge(me_route)
+        .merge(refresh_route)
 }
 
 #[derive(Serialize)]
@@ -47,4 +55,11 @@ async fn me(
         email: auth_user.email,
         permissions: auth_user.permissions,
     })
+}
+
+async fn refresh(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+) -> Result<Json<String>, AppError> {
+    let token = auth_service::refresh_admin_token(auth_user.email)?;
+    Ok(Json(token))
 }

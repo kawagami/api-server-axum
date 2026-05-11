@@ -36,6 +36,10 @@ pub async fn sign_in(
     encode_jwt(user.email)
 }
 
+pub fn refresh_admin_token(email: String) -> Result<String, AppError> {
+    encode_jwt(email)
+}
+
 fn encode_jwt(email: String) -> Result<String, AppError> {
     let jwt_secret = std::env::var("JWT_SECRET")
         .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing("JWT_SECRET".to_string())))?;
