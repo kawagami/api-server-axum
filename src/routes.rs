@@ -1,3 +1,4 @@
+mod audit_logs;
 mod auth;
 mod blogs;
 mod logs;
@@ -14,10 +15,11 @@ mod tools;
 mod users;
 mod ws;
 
-use crate::{logging::LogEntry, scheduler::initialize_scheduler, state::AppState};
+use crate::{logging::LogEntry, middleware::audit, scheduler::initialize_scheduler, state::AppState};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header, Method},
+    middleware,
     Router,
 };
 use tokio::sync::mpsc;
@@ -50,7 +52,9 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/members", members::new(state.clone()))
         .nest("/auth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))
+        .nest("/audit_logs", audit_logs::new(state.clone()))
         .nest_service("/uploads", ServeDir::new(&upload_path))
+        .layer(middleware::from_fn_with_state(state.clone(), audit::audit_log))
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
