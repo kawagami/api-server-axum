@@ -53,3 +53,22 @@ pub struct CompleteTimeResponse {
     pub complete_time: String,
     pub minutes: i64,
 }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConversionDirection {
+    T2s,
+    S2t,
+}
+
+#[derive(Deserialize)]
+pub struct ConvertTextRequest {
+    pub text: String,
+    pub direction: ConversionDirection,
+}
+
+#[derive(Serialize)]
+pub struct ConvertTextResponse {
+    pub original_text: String,
+    pub converted_text: String,
+}

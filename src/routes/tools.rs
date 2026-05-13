@@ -1,14 +1,18 @@
 use crate::errors::AppError;
-use crate::structs::tools::{CompleteTimeResponse, Troops};
+use crate::structs::tools::{
+    CompleteTimeResponse, ConvertTextRequest, ConvertTextResponse, ConversionDirection, Troops,
+};
 use crate::{state::AppState, structs::tools::Params};
-use axum::{extract::Query, routing::get, Json, Router};
+use axum::{extract::Query, routing::get, routing::post, Json, Router};
 use chrono::{Duration, Local};
 use rand::{distributions::Alphanumeric, Rng};
+use zhconv::{zhconv, Variant};
 
 pub fn new() -> Router<AppState> {
     Router::new()
         .route("/new_password", get(new_password))
         .route("/caculate_complete_time", get(caculate_complete_time))
+        .route("/convert_text", post(convert_text))
 }
 
 pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<String>>, AppError> {
@@ -24,6 +28,20 @@ pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<Strin
         .collect();
 
     Ok(Json(result))
+}
+
+pub async fn convert_text(
+    Json(req): Json<ConvertTextRequest>,
+) -> Result<Json<ConvertTextResponse>, AppError> {
+    let variant = match req.direction {
+        ConversionDirection::T2s => Variant::ZhCN,
+        ConversionDirection::S2t => Variant::ZhHant,
+    };
+    let converted_text = zhconv(&req.text, variant);
+    Ok(Json(ConvertTextResponse {
+        original_text: req.text,
+        converted_text,
+    }))
 }
 
 pub async fn caculate_complete_time(
