@@ -1,4 +1,5 @@
 mod admin;
+mod admin_blogs;
 mod audit_logs;
 mod auth;
 mod blogs;

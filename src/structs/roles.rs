@@ -11,6 +11,7 @@ pub enum Perm {
     WsRead,
     LogRead,
     AuditRead,
+    BlogWrite,
 }
 
 impl Perm {
@@ -25,6 +26,7 @@ impl Perm {
             Self::WsRead     => "ws:read",
             Self::LogRead    => "log:read",
             Self::AuditRead  => "audit:read",
+            Self::BlogWrite  => "blog:write",
         }
     }
 }
