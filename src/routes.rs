@@ -1,3 +1,4 @@
+mod admin;
 mod audit_logs;
 mod auth;
 mod blogs;
@@ -38,11 +39,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
 
     Router::new()
         .merge(root::new())
-        .nest("/admin/auth", auth::new(state.clone()))
-        .nest("/admin/users", users::new(state.clone()))
-        .nest("/admin/roles", roles::new(state.clone()))
-        .nest("/admin/permissions", permissions::new(state.clone()))
-        .nest("/admin/audit_logs", audit_logs::new(state.clone()))
+        .nest("/admin", admin::new(state.clone()))
         .nest("/blogs", blogs::new())
         .nest("/tools", tools::new())
         .nest("/notes", notes::new())
