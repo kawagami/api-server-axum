@@ -9,7 +9,6 @@ mod notes;
 mod oauth;
 mod permissions;
 mod roles;
-mod root;
 mod roster;
 mod stocks;
 mod tools;
@@ -19,7 +18,7 @@ mod ws;
 use crate::{logging::LogEntry, middleware::audit, scheduler::initialize_scheduler, state::AppState};
 use axum::{
     extract::DefaultBodyLimit,
-    http::{header, Method},
+    http::{header, Method, StatusCode},
     middleware,
     Router,
 };
@@ -38,7 +37,6 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
     let upload_path = std::env::var("UPLOAD_PATH").unwrap_or_else(|_| "./uploads".to_string());
 
     Router::new()
-        .merge(root::new())
         .nest("/admin", admin::new(state.clone()))
         .nest("/blogs", blogs::new())
         .nest("/tools", tools::new())
@@ -67,5 +65,5 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
                 .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
         )
         .with_state(state)
-        .fallback(root::handler_404)
+        .fallback(|| async { (StatusCode::NOT_FOUND, "empty page") })
 }
