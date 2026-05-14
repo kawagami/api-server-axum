@@ -20,18 +20,19 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | 前綴 | 說明 |
 |------|------|
 | `GET /` | health check |
-| `/jwt` | admin 登入、登出、me、密碼變更、token refresh |
-| `/auth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
+| `/admin/auth` | admin 登入、me、token refresh |
+| `/admin/users` | 使用者管理 |
+| `/admin/roles` | 角色管理 |
+| `/admin/permissions` | 權限清單 |
+| `/admin/audit_logs` | 操作稽核紀錄 |
+| `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
 | `/blogs` | 部落格 CRUD |
-| `/users` | 使用者管理 |
 | `/notes` | HackMD 筆記 tags / lists |
 | `/stocks` | 股票資料查詢、pending change 管理 |
 | `/ws` | WebSocket 連線、線上清單、點對點訊息 |
 | `/roster` | 排班 |
 | `/images` | 圖片上傳 / 刪除 / 清單 |
-| `/roles` | 角色管理 |
-| `/permissions` | 權限清單 |
 | `/logs` | 操作紀錄 |
 | `/uploads/*` | 本機靜態檔案 |
 | `/tools` | 工具 |
