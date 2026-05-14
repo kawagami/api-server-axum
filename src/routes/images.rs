@@ -1,5 +1,5 @@
 use crate::{
-    errors::{AppError, RequestError},
+    errors::AppError,
     middleware::auth,
     repositories::images::ImageRecord,
     services::images as images_service,
@@ -40,18 +40,9 @@ async fn delete_image(
 
 async fn upload_image(
     State(state): State<AppState>,
-    mut multipart: Multipart,
+    multipart: Multipart,
 ) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
-    let field = multipart
-        .next_field()
-        .await
-        .map_err(|e| RequestError::MultipartError(e.into()))?
-        .ok_or(RequestError::InvalidContent("no file provided".into()))?;
-
-    let content_type = field.content_type().unwrap_or("image/jpeg").to_string();
-
-    let record = images_service::upload_image(&state, field, &content_type).await?;
-
+    let record = images_service::upload_image(&state, multipart).await?;
     Ok((
         StatusCode::CREATED,
         Json(serde_json::json!({ "id": record.id, "url": record.url })),

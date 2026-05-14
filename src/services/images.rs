@@ -4,8 +4,7 @@ use crate::{
     repositories::images::ImageRecord,
     state::AppState,
 };
-use axum::body::Bytes;
-use futures_util::Stream;
+use axum::extract::Multipart;
 
 pub async fn get_images(state: &AppState) -> Result<Vec<ImageRecord>, AppError> {
     images_repo::get_all_images(state).await
@@ -34,18 +33,18 @@ pub async fn delete_image(state: &AppState, id: i32) -> Result<(), AppError> {
     Ok(())
 }
 
-pub async fn upload_image<S, E>(
-    state: &AppState,
-    stream: S,
-    content_type: &str,
-) -> Result<ImageRecord, AppError>
-where
-    S: Stream<Item = Result<Bytes, E>>,
-    E: Into<axum::BoxError>,
-{
+pub async fn upload_image(state: &AppState, mut multipart: Multipart) -> Result<ImageRecord, AppError> {
+    let field = multipart
+        .next_field()
+        .await
+        .map_err(|e| RequestError::MultipartError(e.into()))?
+        .ok_or(RequestError::InvalidContent("no file provided".into()))?;
+
+    let content_type = field.content_type().unwrap_or("image/jpeg").to_string();
+
     let (storage_key, url) = state
         .get_storage()
-        .upload(stream, content_type)
+        .upload(field, &content_type)
         .await
         .map_err(|e| RequestError::MultipartError(e.into()))?;
 
