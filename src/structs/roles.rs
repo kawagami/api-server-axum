@@ -12,21 +12,31 @@ pub enum Perm {
     LogRead,
     AuditRead,
     BlogWrite,
+    ImageRead,
+    ImageWrite,
+    ImageDelete,
+    StockRead,
+    StockWrite,
 }
 
 impl Perm {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::RoleRead   => "role:read",
-            Self::RoleAssign => "role:assign",
-            Self::RoleCreate => "role:create",
-            Self::RoleUpdate => "role:update",
-            Self::RoleDelete => "role:delete",
-            Self::MemberRead => "member:read",
-            Self::WsRead     => "ws:read",
-            Self::LogRead    => "log:read",
-            Self::AuditRead  => "audit:read",
-            Self::BlogWrite  => "blog:write",
+            Self::RoleRead    => "role:read",
+            Self::RoleAssign  => "role:assign",
+            Self::RoleCreate  => "role:create",
+            Self::RoleUpdate  => "role:update",
+            Self::RoleDelete  => "role:delete",
+            Self::MemberRead  => "member:read",
+            Self::WsRead      => "ws:read",
+            Self::LogRead     => "log:read",
+            Self::AuditRead   => "audit:read",
+            Self::BlogWrite   => "blog:write",
+            Self::ImageRead   => "image:read",
+            Self::ImageWrite  => "image:write",
+            Self::ImageDelete => "image:delete",
+            Self::StockRead   => "stock:read",
+            Self::StockWrite  => "stock:write",
         }
     }
 }

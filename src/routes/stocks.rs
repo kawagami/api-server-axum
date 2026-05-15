@@ -4,14 +4,18 @@ use crate::{
     repositories::stocks,
     services::stocks::{fetch_stock_price_for_date, round_to_n_decimal},
     state::AppState,
-    structs::stocks::{
-        Conditions, GetStockDayAll, Pagination, StockBuybackMoreInfo, StockBuybackPeriod,
-        StockChangePaginatedResponse, StockChangeId, StockClosingPriceResponse, StockRequest,
-        StockStats,
+    structs::{
+        auth::AuthenticatedUser,
+        roles::Perm,
+        stocks::{
+            Conditions, GetStockDayAll, Pagination, StockBuybackMoreInfo, StockBuybackPeriod,
+            StockChangePaginatedResponse, StockChangeId, StockClosingPriceResponse, StockRequest,
+            StockStats,
+        },
     },
 };
 use axum::{
-    extract::{Query, State},
+    extract::{Extension, Query, State},
     middleware,
     routing::{get, patch},
     Json, Router,
@@ -39,31 +43,36 @@ pub fn new(state: AppState) -> Router<AppState> {
         )
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth::authorize,
+            auth::authorize_and_load,
         ))
 }
 
 pub async fn get_all_stock_changes(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(payload): Query<Conditions>,
 ) -> Result<Json<StockChangePaginatedResponse>, AppError> {
+    auth_user.require_permission(Perm::StockRead)?;
     Ok(Json(stocks::get_all_stock_changes(&state, payload).await?))
 }
 
 pub async fn update_one_stock_change_pending(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Json(payload): Json<StockChangeId>,
 ) -> Result<Json<()>, AppError> {
+    auth_user.require_permission(Perm::StockWrite)?;
     Ok(Json(
         stocks::update_one_stock_change_pending(&state, payload.id).await?,
     ))
 }
 
-/// 打外部 API 取 start_date & end_date 的歷史收盤價 增加額外統計資訊
 pub async fn fetch_stock_closing_price_pair_stats(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(payload): Query<StockRequest>,
 ) -> Result<Json<StockClosingPriceResponse>, AppError> {
+    auth_user.require_permission(Perm::StockRead)?;
     let (start_price, end_price) = tokio::try_join!(
         fetch_stock_price_for_date(&state, &payload.stock_no, &payload.start_date),
         fetch_stock_price_for_date(&state, &payload.stock_no, &payload.end_date)
@@ -96,10 +105,12 @@ pub async fn fetch_stock_closing_price_pair_stats(
 }
 
 pub async fn get_stock_day_all(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(payload): Query<GetStockDayAll>,
     Query(pagination): Query<Pagination>,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
+    auth_user.require_permission(Perm::StockRead)?;
     let response = stocks::get_stock_day_all(
         &state,
         payload.stock_code,
@@ -112,19 +123,20 @@ pub async fn get_stock_day_all(
     Ok(Json(response))
 }
 
-/// 取得未到結束日的庫藏股起始日到現在的價格差距 & 資訊
 pub async fn get_unfinished_buyback_price_gap(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackMoreInfo>>, AppError> {
+    auth_user.require_permission(Perm::StockRead)?;
     Ok(Json(stocks::get_active_buyback_prices(&state).await?))
 }
 
-/// 取得 DB 資料中的紀錄
 pub async fn get_stock_buyback_periods_v2(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackPeriod>>, AppError> {
+    auth_user.require_permission(Perm::StockRead)?;
     let data = stocks::get_stock_buyback_periods(&state).await?;
 
     Ok(Json(data))
 }
-
