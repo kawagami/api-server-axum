@@ -89,6 +89,16 @@ pub async fn get_member_refresh_token(
     Ok(conn.get(key).await?)
 }
 
+pub async fn del_user_login(
+    state: &AppState,
+    email: &str,
+) -> Result<(), crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let key = format!("user:login:{}", email);
+    conn.del::<_, ()>(key).await?;
+    Ok(())
+}
+
 pub async fn _del_member_refresh_token(
     state: &AppState,
     member_id: i64,

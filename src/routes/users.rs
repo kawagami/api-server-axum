@@ -22,7 +22,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         .route("/", axum::routing::post(create_user).delete(delete_user))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth::authorize,
+            auth::authorize_and_load,
         ));
 
     let role_routes = Router::new()
@@ -43,18 +43,23 @@ async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<User>>, App
 }
 
 async fn create_user(
+    Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Json(user): Json<NewUser>,
 ) -> Result<Json<bool>, AppError> {
+    auth_user.require_permission(Perm::UserCreate)?;
     users_service::create_user(&state, user).await?;
     Ok(Json(true))
 }
 
 async fn delete_user(
-    State(_state): State<AppState>,
-    Json(_user): Json<User>,
-) -> Result<Json<bool>, AppError> {
-    Ok(Json(true))
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<AppState>,
+    Json(user): Json<User>,
+) -> Result<StatusCode, AppError> {
+    auth_user.require_permission(Perm::UserDelete)?;
+    users_service::delete_user(&state, user.id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn get_user_roles(

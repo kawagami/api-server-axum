@@ -14,6 +14,13 @@ pub async fn create_user(state: &AppState, user: NewUser) -> Result<(), AppError
     users_repo::create_user(state, user, role_id).await
 }
 
+pub async fn delete_user(state: &AppState, user_id: i64) -> Result<(), AppError> {
+    let email = users_repo::delete_user(state, user_id).await?;
+    let _ = redis::del_user_permissions(state, &email).await;
+    let _ = redis::del_user_login(state, &email).await;
+    Ok(())
+}
+
 pub async fn get_user_roles(state: &AppState, user_id: i64) -> Result<Vec<Role>, AppError> {
     users_repo::get_user_roles(state, user_id).await
 }

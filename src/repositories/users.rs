@@ -45,6 +45,28 @@ pub async fn create_user(
     Ok(())
 }
 
+pub async fn delete_user(state: &AppState, user_id: i64) -> Result<String, AppError> {
+    let mut tx = state.get_pool().begin().await?;
+
+    let (email,): (String,) = sqlx::query_as("SELECT email FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+    sqlx::query("DELETE FROM user_roles WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("DELETE FROM users WHERE id = $1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(email)
+}
+
 pub async fn get_user_roles(state: &AppState, user_id: i64) -> Result<Vec<Role>, AppError> {
     Ok(sqlx::query_as(
         "SELECT r.id, r.name, r.description

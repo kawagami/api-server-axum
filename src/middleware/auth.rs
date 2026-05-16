@@ -16,24 +16,6 @@ use axum::{
 };
 use jsonwebtoken::{decode, DecodingKey, TokenData, Validation};
 
-pub async fn authorize(
-    State(state): State<AppState>,
-    req: Request,
-    next: Next,
-) -> Result<Response<Body>, AppError> {
-    let token = extract_token(&req)?;
-    let token_data = decode_jwt(token)?;
-
-    if token_data.claims.role != "admin" {
-        return Err(AppError::AuthError(AuthError::Forbidden));
-    }
-
-    let key = format!("user:login:{}", token_data.claims.sub);
-    verify_user_login(&state, &key).await?;
-
-    Ok(next.run(req).await)
-}
-
 pub async fn authorize_and_load(
     State(state): State<AppState>,
     mut req: Request,
