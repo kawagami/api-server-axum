@@ -1,7 +1,32 @@
 use crate::errors::{AppError, RequestError};
-use reqwest::{Client, Method};
+use reqwest::{Client, Method, RequestBuilder};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
+
+fn build_request<'a>(
+    client: &Client,
+    method: Method,
+    url: &str,
+    headers: Option<HashMap<String, String>>,
+    form_data_pairs: Option<Vec<(&'a str, &'a str)>>,
+    json_body: Option<&serde_json::Value>,
+) -> RequestBuilder {
+    let mut builder = client.request(method, url);
+
+    if let Some(headers_map) = headers {
+        builder = headers_map
+            .iter()
+            .fold(builder, |b, (key, value)| b.header(key, value));
+    }
+
+    if let Some(form_pairs) = form_data_pairs {
+        builder = builder.form(&form_pairs);
+    } else if let Some(json) = json_body {
+        builder = builder.json(json);
+    }
+
+    builder
+}
 
 /// 通用的網頁 HTML 獲取函數
 pub async fn get_raw_html_string(
@@ -11,40 +36,10 @@ pub async fn get_raw_html_string(
     headers: Option<HashMap<String, String>>,
     form_data_pairs: Option<Vec<(&str, &str)>>,
 ) -> Result<String, AppError> {
-    // 建立基本請求
-    let mut request_builder = request_client.request(method, url);
+    let response = build_request(request_client, method, url, headers, form_data_pairs, None)
+        .send()
+        .await?;
 
-    // 添加自訂標頭
-    if let Some(headers_map) = headers {
-        request_builder = headers_map
-            .iter()
-            .fold(request_builder, |builder, (key, value)| {
-                builder.header(key, value)
-            });
-    }
-
-    // 添加表單數據（若有提供）
-    if let Some(form_pairs) = form_data_pairs {
-        let form_data = form_pairs
-            .iter()
-            .fold(
-                form_urlencoded::Serializer::new(String::new()),
-                |mut serializer, &(key, value)| {
-                    serializer.append_pair(key, value);
-                    serializer
-                },
-            )
-            .finish();
-
-        request_builder = request_builder
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(form_data);
-    }
-
-    // 發送請求獲取數據
-    let response = request_builder.send().await?;
-
-    // 檢查請求是否成功
     if !response.status().is_success() {
         return Err(RequestError::InvalidContent(format!(
             "獲取 {} 頁面數據失敗，狀態碼: {}",
@@ -69,44 +64,17 @@ pub async fn get_json_data<T>(
 where
     T: DeserializeOwned,
 {
-    // 建立基本請求
-    let mut request_builder = request_client.request(method, url);
+    let response = build_request(
+        request_client,
+        method,
+        url,
+        headers,
+        form_data_pairs,
+        json_body,
+    )
+    .send()
+    .await?;
 
-    // 添加自訂標頭
-    if let Some(headers_map) = headers {
-        request_builder = headers_map
-            .iter()
-            .fold(request_builder, |builder, (key, value)| {
-                builder.header(key, value)
-            });
-    }
-
-    // 處理請求內容 (form data 或 json)
-    if let Some(form_pairs) = form_data_pairs {
-        let form_data = form_pairs
-            .iter()
-            .fold(
-                form_urlencoded::Serializer::new(String::new()),
-                |mut serializer, &(key, value)| {
-                    serializer.append_pair(key, value);
-                    serializer
-                },
-            )
-            .finish();
-
-        request_builder = request_builder
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(form_data);
-    } else if let Some(json) = json_body {
-        request_builder = request_builder
-            .header("Content-Type", "application/json")
-            .json(json);
-    }
-
-    // 發送請求獲取數據
-    let response = request_builder.send().await?;
-
-    // 檢查請求是否成功
     if !response.status().is_success() {
         return Err(RequestError::InvalidContent(format!(
             "獲取 {} 數據失敗，狀態碼: {}",
@@ -116,9 +84,5 @@ where
         .into());
     }
 
-    // 解析 JSON 數據
-    match response.json::<T>().await {
-        Ok(data) => Ok(data),
-        Err(e) => Err(e.into()),
-    }
+    Ok(response.json::<T>().await?)
 }
