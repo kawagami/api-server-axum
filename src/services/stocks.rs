@@ -1,10 +1,15 @@
 use crate::{
     errors::{AppError, RequestError},
-    repositories::stocks::{get_stock_closing_prices_by_date_range, upsert_stock_closing_prices},
+    repositories::stocks::{
+        get_stock_closing_prices_by_date_range, insert_stock_day_all_batch,
+        upsert_stock_closing_prices,
+    },
+    repositories::stocks as stocks_repo,
     state::AppState,
     structs::stocks::{
-        NewStockClosingPrice, StockChangeWithoutId, StockDayAvgResponse, StockRequest,
-        TwseApiResponse,
+        Conditions, GetStockDayAll, NewStockClosingPrice, Pagination, StockBuybackMoreInfo,
+        StockBuybackPeriod, StockChangePaginatedResponse, StockChangeWithoutId, StockClosingPriceResponse,
+        StockDayAll, StockDayAvgResponse, StockRequest, StockStats, TwseApiResponse,
     },
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
@@ -342,10 +347,7 @@ pub async fn get_stock_change_info(
     })
 }
 
-pub async fn stock_day_all_service(
-    state: &AppState,
-) -> Result<impl axum::response::IntoResponse, AppError> {
-    // 打外部 API 取得 TwseApiResponse 資料
+pub async fn stock_day_all_service(state: &AppState) -> Result<(), AppError> {
     let url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL";
     let resp: TwseApiResponse = state
         .get_http_client()
@@ -355,16 +357,13 @@ pub async fn stock_day_all_service(
         .json()
         .await?;
 
-    // 將 TwseApiResponse 中的 date 資料解析成 NaiveDate
     let trade_date = chrono::NaiveDate::parse_from_str(&resp.date, "%Y%m%d")?;
 
-    // 修改解析函數，處理空字符串和 "--" 情況
     let parse_i64 = |s: &str| {
         if s.is_empty() || s == "--" {
             None
         } else {
-            let cleaned = s.trim().replace(",", "");
-            cleaned.parse::<i64>().ok()
+            s.trim().replace(",", "").parse::<i64>().ok()
         }
     };
 
@@ -372,15 +371,13 @@ pub async fn stock_day_all_service(
         if s.is_empty() || s == "--" {
             None
         } else {
-            let cleaned = s.trim().replace(",", "");
-            cleaned.parse::<f64>().ok()
+            s.trim().replace(",", "").parse::<f64>().ok()
         }
     };
 
-    // 收集欄位資料（每欄一個 Vec）
     let mut trade_dates = Vec::new();
-    let mut stock_codes = Vec::new();
-    let mut stock_names = Vec::new();
+    let mut stock_codes: Vec<String> = Vec::new();
+    let mut stock_names: Vec<String> = Vec::new();
     let mut trade_volumes = Vec::new();
     let mut trade_amounts = Vec::new();
     let mut open_prices = Vec::new();
@@ -390,9 +387,7 @@ pub async fn stock_day_all_service(
     let mut price_changes = Vec::new();
     let mut transaction_counts = Vec::new();
 
-    // 整理 TwseApiResponse 中的 data
     for row in &resp.data {
-        // 不符合格式的就跳過
         if row.len() < 10 {
             continue;
         }
@@ -417,8 +412,8 @@ pub async fn stock_day_all_service(
             let transaction_count = parse_i64(&row[9]).unwrap_or(0) as i32;
 
             trade_dates.push(trade_date);
-            stock_codes.push(row[0].as_str());
-            stock_names.push(row[1].as_str());
+            stock_codes.push(row[0].clone());
+            stock_names.push(row[1].clone());
             trade_volumes.push(trade_volume);
             trade_amounts.push(trade_amount);
             open_prices.push(open_price);
@@ -430,36 +425,87 @@ pub async fn stock_day_all_service(
         }
     }
 
-    let query = r#"
-        INSERT INTO stock_day_all (
-            trade_date, stock_code, stock_name,
-            trade_volume, trade_amount, open_price,
-            high_price, low_price, close_price,
-            price_change, transaction_count
-        )
-        SELECT * FROM UNNEST(
-            $1::date[], $2::text[], $3::text[],
-            $4::bigint[], $5::bigint[], $6::double precision[],
-            $7::double precision[], $8::double precision[], $9::double precision[],
-            $10::double precision[], $11::int[]
-        )
-        ON CONFLICT (trade_date, stock_code) DO NOTHING;
-    "#;
+    insert_stock_day_all_batch(
+        state,
+        &trade_dates,
+        &stock_codes,
+        &stock_names,
+        &trade_volumes,
+        &trade_amounts,
+        &open_prices,
+        &high_prices,
+        &low_prices,
+        &close_prices,
+        &price_changes,
+        &transaction_counts,
+    )
+    .await
+}
 
-    sqlx::query(query)
-        .bind(&trade_dates)
-        .bind(&stock_codes)
-        .bind(&stock_names)
-        .bind(&trade_volumes)
-        .bind(&trade_amounts)
-        .bind(&open_prices)
-        .bind(&high_prices)
-        .bind(&low_prices)
-        .bind(&close_prices)
-        .bind(&price_changes)
-        .bind(&transaction_counts)
-        .execute(state.get_pool())
-        .await?;
+pub async fn get_all_stock_changes(
+    state: &AppState,
+    conditions: Conditions,
+) -> Result<StockChangePaginatedResponse, AppError> {
+    stocks_repo::get_all_stock_changes(state, conditions).await
+}
 
-    Ok(())
+pub async fn update_one_stock_change_pending(state: &AppState, id: i32) -> Result<(), AppError> {
+    stocks_repo::update_one_stock_change_pending(state, id).await
+}
+
+pub async fn get_stock_day_all_list(
+    state: &AppState,
+    params: GetStockDayAll,
+    pagination: Pagination,
+) -> Result<Vec<StockDayAll>, AppError> {
+    stocks_repo::get_stock_day_all(
+        state,
+        params.stock_code,
+        params.trade_date,
+        pagination.limit,
+        pagination.offset,
+    )
+    .await
+}
+
+pub async fn get_active_buyback_prices(
+    state: &AppState,
+) -> Result<Vec<StockBuybackMoreInfo>, AppError> {
+    stocks_repo::get_active_buyback_prices(state).await
+}
+
+pub async fn get_stock_buyback_periods(
+    state: &AppState,
+) -> Result<Vec<StockBuybackPeriod>, AppError> {
+    stocks_repo::get_stock_buyback_periods(state).await
+}
+
+pub async fn get_closing_price_pair_stats(
+    state: &AppState,
+    payload: &StockRequest,
+) -> Result<StockClosingPriceResponse, AppError> {
+    let (start_price, end_price) = tokio::try_join!(
+        fetch_stock_price_for_date(state, &payload.stock_no, &payload.start_date),
+        fetch_stock_price_for_date(state, &payload.stock_no, &payload.end_date)
+    )?;
+
+    let price_diff = round_to_n_decimal(end_price.close_price - start_price.close_price, 2);
+    let raw_percent_change = if start_price.close_price != 0.0 {
+        (price_diff / start_price.close_price) * 100.0
+    } else {
+        0.0
+    };
+    let percent_change = round_to_n_decimal(raw_percent_change, 2);
+    let is_increase = price_diff > 0.0;
+    let day_span = (end_price.date - start_price.date).num_days();
+
+    Ok(StockClosingPriceResponse {
+        prices: (start_price, end_price),
+        stats: StockStats {
+            price_diff,
+            percent_change,
+            is_increase,
+            day_span,
+        },
+    })
 }

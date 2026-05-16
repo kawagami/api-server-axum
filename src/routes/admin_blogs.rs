@@ -32,8 +32,7 @@ async fn put_blog(
     Json(blog): Json<PutBlog>,
 ) -> Result<Json<()>, AppError> {
     auth_user.require_permission(Perm::BlogUpdate)?;
-    let title = blog.extract_toc_texts().into_iter().next().unwrap_or_default();
-    blogs_service::upsert_blog(&state, id, blog).await?;
+    let title = blogs_service::upsert_blog(&state, id, blog).await?;
     state.broadcast(WsEvent::BlogCreated, serde_json::json!({ "id": id, "title": title }));
     Ok(Json(()))
 }

@@ -36,8 +36,9 @@ pub async fn get_blog(state: &AppState, id: Uuid) -> Result<DbBlog, AppError> {
     blogs_repo::get_blog_by_id(state, id).await
 }
 
-pub async fn upsert_blog(state: &AppState, id: Uuid, blog: PutBlog) -> Result<(), AppError> {
+pub async fn upsert_blog(state: &AppState, id: Uuid, blog: PutBlog) -> Result<String, AppError> {
     let tocs = blog.extract_toc_texts();
+    let title = tocs.first().cloned().unwrap_or_default();
 
     let old_urls = match blogs_repo::get_blog_by_id(state, id).await {
         Ok(old_blog) => extract_upload_urls(&old_blog.markdown),
@@ -69,7 +70,7 @@ pub async fn upsert_blog(state: &AppState, id: Uuid, blog: PutBlog) -> Result<()
     }
     tx.commit().await?;
 
-    Ok(())
+    Ok(title)
 }
 
 pub async fn delete_blog_with_images(state: &AppState, id: Uuid) -> Result<(), AppError> {

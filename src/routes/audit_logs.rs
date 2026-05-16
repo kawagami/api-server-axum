@@ -1,7 +1,7 @@
 use crate::{
     errors::AppError,
     middleware::auth,
-    repositories::audit_logs::{get_audit_logs, AuditLog},
+    services::audit_logs::{get_audit_logs, AuditLog},
     state::AppState,
     structs::{auth::AuthenticatedUser, roles::Perm},
 };
@@ -47,7 +47,7 @@ async fn get_audit_logs_handler(
 ) -> Result<Json<Vec<AuditLog>>, AppError> {
     auth_user.require_permission(Perm::AuditRead)?;
     let logs = get_audit_logs(
-        state.get_pool(),
+        &state,
         query.user_email,
         query.method,
         query.path,

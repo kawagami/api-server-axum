@@ -35,3 +35,51 @@ pub async fn get_stock_day_all(
 
     Ok(builder.build_query_as::<StockDayAll>().fetch_all(state.get_pool()).await?)
 }
+
+pub async fn insert_stock_day_all_batch(
+    state: &AppState,
+    trade_dates: &[NaiveDate],
+    stock_codes: &[String],
+    stock_names: &[String],
+    trade_volumes: &[i64],
+    trade_amounts: &[i64],
+    open_prices: &[f64],
+    high_prices: &[f64],
+    low_prices: &[f64],
+    close_prices: &[f64],
+    price_changes: &[f64],
+    transaction_counts: &[i32],
+) -> Result<(), AppError> {
+    let query = r#"
+        INSERT INTO stock_day_all (
+            trade_date, stock_code, stock_name,
+            trade_volume, trade_amount, open_price,
+            high_price, low_price, close_price,
+            price_change, transaction_count
+        )
+        SELECT * FROM UNNEST(
+            $1::date[], $2::text[], $3::text[],
+            $4::bigint[], $5::bigint[], $6::double precision[],
+            $7::double precision[], $8::double precision[], $9::double precision[],
+            $10::double precision[], $11::int[]
+        )
+        ON CONFLICT (trade_date, stock_code) DO NOTHING;
+    "#;
+
+    sqlx::query(query)
+        .bind(trade_dates)
+        .bind(stock_codes)
+        .bind(stock_names)
+        .bind(trade_volumes)
+        .bind(trade_amounts)
+        .bind(open_prices)
+        .bind(high_prices)
+        .bind(low_prices)
+        .bind(close_prices)
+        .bind(price_changes)
+        .bind(transaction_counts)
+        .execute(state.get_pool())
+        .await?;
+
+    Ok(())
+}
