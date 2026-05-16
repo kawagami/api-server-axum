@@ -58,8 +58,9 @@ async fn me(
 }
 
 async fn refresh(
+    State(state): State<AppState>,
     Extension(auth_user): Extension<AuthenticatedUser>,
 ) -> Result<Json<String>, AppError> {
-    let token = auth_service::refresh_admin_token(auth_user.email)?;
+    let token = auth_service::refresh_admin_token(&state, auth_user.email).await?;
     Ok(Json(token))
 }

@@ -36,7 +36,9 @@ pub async fn sign_in(
     encode_jwt(user.email)
 }
 
-pub fn refresh_admin_token(email: String) -> Result<String, AppError> {
+pub async fn refresh_admin_token(state: &AppState, email: String) -> Result<String, AppError> {
+    let login_key = format!("user:login:{}", email);
+    redis::redis_set(state, &login_key, &email).await?;
     encode_jwt(email)
 }
 
