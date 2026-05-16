@@ -61,7 +61,7 @@ pub async fn update_one_stock_change_pending(
     State(state): State<AppState>,
     Json(payload): Json<StockChangeId>,
 ) -> Result<Json<()>, AppError> {
-    auth_user.require_permission(Perm::StockWrite)?;
+    auth_user.require_permission(Perm::StockUpdate)?;
     Ok(Json(
         stocks::update_one_stock_change_pending(&state, payload.id).await?,
     ))

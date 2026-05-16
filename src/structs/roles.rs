@@ -11,12 +11,13 @@ pub enum Perm {
     WsRead,
     LogRead,
     AuditRead,
-    BlogWrite,
+    BlogUpdate,
+    BlogDelete,
     ImageRead,
-    ImageWrite,
+    ImageCreate,
     ImageDelete,
     StockRead,
-    StockWrite,
+    StockUpdate,
 }
 
 impl Perm {
@@ -31,12 +32,13 @@ impl Perm {
             Self::WsRead      => "ws:read",
             Self::LogRead     => "log:read",
             Self::AuditRead   => "audit:read",
-            Self::BlogWrite   => "blog:write",
+            Self::BlogUpdate  => "blog:update",
+            Self::BlogDelete  => "blog:delete",
             Self::ImageRead   => "image:read",
-            Self::ImageWrite  => "image:write",
+            Self::ImageCreate => "image:create",
             Self::ImageDelete => "image:delete",
             Self::StockRead   => "stock:read",
-            Self::StockWrite  => "stock:write",
+            Self::StockUpdate => "stock:update",
         }
     }
 }

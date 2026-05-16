@@ -48,7 +48,7 @@ async fn upload_image(
     State(state): State<AppState>,
     multipart: Multipart,
 ) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
-    auth_user.require_permission(Perm::ImageWrite)?;
+    auth_user.require_permission(Perm::ImageCreate)?;
     let record = images_service::upload_image(&state, multipart).await?;
     Ok((
         StatusCode::CREATED,

@@ -31,7 +31,7 @@ async fn put_blog(
     Path(id): Path<Uuid>,
     Json(blog): Json<PutBlog>,
 ) -> Result<Json<()>, AppError> {
-    auth_user.require_permission(Perm::BlogWrite)?;
+    auth_user.require_permission(Perm::BlogUpdate)?;
     let title = blog.extract_toc_texts().into_iter().next().unwrap_or_default();
     blogs_service::upsert_blog(&state, id, blog).await?;
     state.broadcast(WsEvent::BlogCreated, serde_json::json!({ "id": id, "title": title }));
@@ -43,7 +43,7 @@ async fn delete_blog(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<()>, AppError> {
-    auth_user.require_permission(Perm::BlogWrite)?;
+    auth_user.require_permission(Perm::BlogDelete)?;
     blogs_service::delete_blog_with_images(&state, id).await?;
     Ok(Json(()))
 }
