@@ -7,7 +7,6 @@ use crate::{
 use async_trait::async_trait;
 use chrono::{Datelike, Local, Months, NaiveDate};
 
-#[derive(Clone)]
 pub struct FetchBuybackPeriodsJob;
 
 #[async_trait]

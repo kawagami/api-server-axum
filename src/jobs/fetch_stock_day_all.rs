@@ -1,7 +1,6 @@
 use crate::{services::stocks::stock_day_all_service, state::AppState, structs::jobs::AppJob};
 use async_trait::async_trait;
 
-#[derive(Clone)]
 pub struct FetchStockDayAllJob;
 
 #[async_trait]

@@ -1,7 +1,6 @@
 use crate::{services::images as images_service, state::AppState, structs::jobs::AppJob};
 use async_trait::async_trait;
 
-#[derive(Clone)]
 pub struct CleanupUnusedImagesJob;
 
 #[async_trait]

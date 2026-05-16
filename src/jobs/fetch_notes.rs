@@ -6,7 +6,6 @@ use crate::{
 use async_trait::async_trait;
 use std::env;
 
-#[derive(Clone)]
 pub struct FetchNotesJob;
 
 #[async_trait]

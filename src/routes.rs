@@ -33,7 +33,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
 
     tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone()));
 
-    let _scheduler = initialize_scheduler(state.clone()).await;
+    initialize_scheduler(state.clone()).await;
 
     let upload_path = std::env::var("UPLOAD_PATH").unwrap_or_else(|_| "./uploads".to_string());
 

@@ -6,7 +6,6 @@ use crate::{
 };
 use async_trait::async_trait;
 
-#[derive(Clone)]
 pub struct FetchHistoricalClosingPricesJob;
 
 #[async_trait]
