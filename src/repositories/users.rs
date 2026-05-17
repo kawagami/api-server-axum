@@ -89,6 +89,19 @@ pub async fn get_email_by_id(state: &AppState, user_id: i64) -> Result<String, A
     Ok(email)
 }
 
+pub async fn update_password(
+    state: &AppState,
+    email: &str,
+    new_hash: &str,
+) -> Result<(), AppError> {
+    sqlx::query("UPDATE users SET password = $1 WHERE email = $2")
+        .bind(new_hash)
+        .bind(email)
+        .execute(state.get_pool())
+        .await?;
+    Ok(())
+}
+
 pub async fn set_user_roles(
     state: &AppState,
     user_id: i64,

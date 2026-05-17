@@ -3,7 +3,7 @@ use crate::{
     middleware::auth,
     services::auth as auth_service,
     state::AppState,
-    structs::auth::{AuthenticatedUser, SignInData},
+    structs::auth::{AuthenticatedUser, ChangePasswordData, SignInData},
 };
 use axum::{
     extract::{Extension, Json, State},
@@ -24,6 +24,13 @@ pub fn new(state: AppState) -> Router<AppState> {
     let refresh_route = Router::new()
         .route("/refresh", post(refresh))
         .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::authorize_and_load,
+        ));
+
+    let change_password_route = Router::new()
+        .route("/change_password", post(change_password))
+        .layer(middleware::from_fn_with_state(
             state,
             auth::authorize_and_load,
         ));
@@ -32,6 +39,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         .route("/", post(sign_in))
         .merge(me_route)
         .merge(refresh_route)
+        .merge(change_password_route)
 }
 
 #[derive(Serialize)]
@@ -63,4 +71,12 @@ async fn refresh(
 ) -> Result<Json<String>, AppError> {
     let token = auth_service::refresh_admin_token(&state, auth_user.email).await?;
     Ok(Json(token))
+}
+
+async fn change_password(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Json(body): Json<ChangePasswordData>,
+) -> Result<(), AppError> {
+    auth_service::change_password(&state, &auth_user.email, &body.current_password, &body.new_password).await
 }

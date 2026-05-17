@@ -29,6 +29,12 @@ pub struct SignInData {
     pub password: String,
 }
 
+#[derive(Deserialize)]
+pub struct ChangePasswordData {
+    pub current_password: String,
+    pub new_password: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct AuthenticatedUser {
     pub email: String,

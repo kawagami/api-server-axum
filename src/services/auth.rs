@@ -4,7 +4,7 @@ use crate::{
     state::AppState,
     structs::auth::{Claims, CurrentUser},
 };
-use bcrypt::verify;
+use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 
@@ -40,6 +40,26 @@ pub async fn refresh_admin_token(state: &AppState, email: String) -> Result<Stri
     let login_key = format!("user:login:{}", email);
     redis::redis_set(state, &login_key, &email).await?;
     encode_jwt(email)
+}
+
+pub async fn change_password(
+    state: &AppState,
+    email: &str,
+    current_password: &str,
+    new_password: &str,
+) -> Result<(), AppError> {
+    let db_user = users::check_email_exists(state, email)
+        .await
+        .map_err(|_| AppError::AuthError(AuthError::UserNotFound))?;
+
+    if !verify_password(current_password, &db_user.password)? {
+        return Err(AppError::AuthError(AuthError::InvalidPassword));
+    }
+
+    let new_hash = hash(new_password, DEFAULT_COST)
+        .map_err(|_| AppError::SystemError(SystemError::Internal("密碼 hash 失敗".to_string())))?;
+
+    users::update_password(state, email, &new_hash).await
 }
 
 fn encode_jwt(email: String) -> Result<String, AppError> {
