@@ -13,9 +13,10 @@ pub struct PutBlog {
 #[derive(Deserialize)]
 pub struct Pagination {
     #[serde(default = "default_page")]
-    pub page: usize, // 第幾頁
+    pub page: usize,
     #[serde(default = "default_per_page")]
-    pub per_page: usize, // 每頁的數量
+    pub per_page: usize,
+    pub tag: Option<String>,
 }
 
 // 預設值函式
@@ -39,6 +40,14 @@ pub struct Toc {
     id: String,
     level: u32,
     text: String,
+}
+
+#[derive(Serialize)]
+pub struct BlogsResponse {
+    pub total: i64,
+    pub page: usize,
+    pub per_page: usize,
+    pub data: Vec<DbBlog>,
 }
 
 #[derive(Serialize, Deserialize, FromRow, Default)]

@@ -2,7 +2,7 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::{blogs as blogs_repo, images as images_repo},
     state::AppState,
-    structs::blogs::{DbBlog, PutBlog},
+    structs::blogs::{BlogsResponse, DbBlog, PutBlog},
 };
 use regex::Regex;
 use std::collections::HashSet;
@@ -27,13 +27,23 @@ pub async fn get_blogs(
     state: &AppState,
     page: usize,
     per_page: usize,
-) -> Result<Vec<DbBlog>, AppError> {
+    tag: Option<String>,
+) -> Result<BlogsResponse, AppError> {
     let offset = (page.saturating_sub(1)) * per_page;
-    blogs_repo::get_blogs_with_pagination(state, per_page, offset).await
+    let tag_ref = tag.as_deref();
+    let (total, data) = tokio::try_join!(
+        blogs_repo::count_blogs(state, tag_ref),
+        blogs_repo::get_blogs_with_pagination(state, per_page, offset, tag_ref),
+    )?;
+    Ok(BlogsResponse { total, page, per_page, data })
 }
 
 pub async fn get_blog(state: &AppState, id: Uuid) -> Result<DbBlog, AppError> {
     blogs_repo::get_blog_by_id(state, id).await
+}
+
+pub async fn get_tags(state: &AppState) -> Result<Vec<String>, AppError> {
+    blogs_repo::get_all_tags(state).await
 }
 
 pub async fn upsert_blog(state: &AppState, id: Uuid, blog: PutBlog) -> Result<String, AppError> {
