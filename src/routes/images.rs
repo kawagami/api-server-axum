@@ -18,6 +18,7 @@ pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(get_images))
         .route("/upload", post(upload_image))
+        .route("/upload_multiple", post(upload_multiple))
         .route("/{id}", delete(delete_image))
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -41,6 +42,20 @@ async fn delete_image(
     auth_user.require_permission(Perm::ImageDelete)?;
     images_service::delete_image(&state, id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn upload_multiple(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<AppState>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
+    auth_user.require_permission(Perm::ImageCreate)?;
+    let records = images_service::upload_images(&state, multipart).await?;
+    let body: Vec<_> = records
+        .iter()
+        .map(|r| serde_json::json!({ "id": r.id, "url": r.url }))
+        .collect();
+    Ok((StatusCode::CREATED, Json(serde_json::json!(body))))
 }
 
 async fn upload_image(
