@@ -17,7 +17,6 @@ use axum::{
 pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(get_images))
-        .route("/upload", post(upload_image))
         .route("/upload_multiple", post(upload_multiple))
         .route("/{id}", delete(delete_image))
         .layer(middleware::from_fn_with_state(
@@ -56,17 +55,4 @@ async fn upload_multiple(
         .map(|r| serde_json::json!({ "id": r.id, "url": r.url }))
         .collect();
     Ok((StatusCode::CREATED, Json(serde_json::json!(body))))
-}
-
-async fn upload_image(
-    Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppState>,
-    multipart: Multipart,
-) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
-    auth_user.require_permission(Perm::ImageCreate)?;
-    let record = images_service::upload_image(&state, multipart).await?;
-    Ok((
-        StatusCode::CREATED,
-        Json(serde_json::json!({ "id": record.id, "url": record.url })),
-    ))
 }
