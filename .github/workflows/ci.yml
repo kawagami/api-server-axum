@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        name: Checkout
+        uses: actions/checkout@v4
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -27,6 +27,8 @@ jobs:
         with:
           push: true
           tags: kawagami77/api-server:axum
+          cache-from: type=registry,ref=kawagami77/api-server:buildcache
+          cache-to: type=registry,ref=kawagami77/api-server:buildcache,mode=max
       -
         name: Update Vultr VPS Docker Service
         uses: appleboy/ssh-action@master
