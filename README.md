@@ -44,7 +44,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `ConsumePendingStockChangeJob` | 每分鐘 | 消費一筆 pending stock_change，查詢 TWSE 股價 |
 | `FetchHistoricalClosingPricesJob` | 每分鐘 | 補缺起始日收盤價 |
 | `CleanupUnusedImagesJob` | 每小時 | 清除 status=unused 且逾時的孤立圖片 |
-| `FetchNotesJob` | 每小時 | 同步 HackMD 筆記（需 `ENABLE_FETCH_NOTES_JOB=true`） |
+| `FetchNotesJob` | 每日 UTC+8 03:00 | 同步 HackMD 筆記（需 `ENABLE_FETCH_NOTES_JOB=true`） |
 | `FetchStockDayAllJob` | 每日 UTC 20:00 | 抓全市場行情寫入 `stock_day_all` |
 | `FetchBuybackPeriodsJob` | 每日 UTC 20:00 | 抓庫藏股計畫 HTML 寫入 `stock_buyback_periods` |
 | `SyncBuybackToPendingJob` | 每日 UTC 20:10 | 將 `stock_buyback_periods` 同步為 pending stock_changes |
