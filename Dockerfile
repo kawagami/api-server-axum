@@ -2,22 +2,23 @@ FROM rust:1.88-slim-bookworm AS builder
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release --locked
+RUN rm -rf src
+
 COPY migrations/ migrations/
 COPY src/ src/
-COPY Cargo.toml .
-COPY Cargo.lock .
+RUN cargo build --release --locked
 
-# 安裝 pkg-config 和其他必要的包
-RUN apt-get update && apt-get install -y pkg-config libssl-dev
-
-RUN cargo build --release
-
-# 減少 image size
 RUN strip -s /app/target/release/api-server-axum
 
 FROM gcr.io/distroless/cc-debian12
 
-# 時區設置 - 從 builder 階段複製時區文件到 distroless 映像
 COPY --from=builder /usr/share/zoneinfo/Asia/Taipei /usr/share/zoneinfo/Asia/Taipei
 ENV TZ=Asia/Taipei
 
