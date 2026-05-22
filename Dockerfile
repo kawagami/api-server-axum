@@ -13,7 +13,7 @@ RUN rm -rf src
 
 COPY migrations/ migrations/
 COPY src/ src/
-RUN cargo build --release --locked
+RUN touch src/main.rs && cargo build --release --locked
 
 RUN strip -s /app/target/release/api-server-axum
 
