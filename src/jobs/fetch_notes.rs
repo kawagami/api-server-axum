@@ -17,7 +17,7 @@ impl AppJob for FetchNotesJob {
     }
 
     fn cron_expression(&self) -> &str {
-        "0 0 * * * *" // 每小時執行一次
+        "0 0 19 * * *" // 每日 UTC 19:00（UTC+8 03:00）
     }
 
     async fn run(&self, state: AppState) {
