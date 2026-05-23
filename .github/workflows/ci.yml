@@ -25,6 +25,7 @@ jobs:
         name: Build and push
         uses: docker/build-push-action@v5
         with:
+          context: .
           push: true
           tags: kawagami77/api-server:axum
           cache-from: type=registry,ref=kawagami77/api-server:buildcache
