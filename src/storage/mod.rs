@@ -31,7 +31,6 @@ impl Storage {
         }
     }
 
-    #[allow(dead_code)]
     pub async fn delete(&self, key: &str) -> Result<(), LocalStorageError> {
         match self {
             Storage::Local(s) => s.delete(key).await,
