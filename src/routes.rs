@@ -31,6 +31,11 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
     let origins = ["https://kawa.homes".parse().unwrap()];
     let state = AppState::new().await;
 
+    sqlx::migrate!("./migrations")
+        .run(state.get_pool())
+        .await
+        .expect("migration failed");
+
     tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone()));
 
     initialize_scheduler(state.clone()).await;

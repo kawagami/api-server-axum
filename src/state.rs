@@ -31,14 +31,6 @@ impl AppStateInner {
             .await
             .expect("can't connect to database");
 
-        // migration
-        sqlx::migrate::Migrator::new(std::path::Path::new("./migrations"))
-            .await
-            .expect("Migrator new fail")
-            .run(&pool)
-            .await
-            .expect("Migrator run fail");
-
         let redis_host = std::env::var("REDIS_HOST").expect("找不到 REDIS_HOST");
         let manager = RedisConnectionManager::new(format!("redis://{}:6379", redis_host)).unwrap();
         let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
@@ -91,14 +83,10 @@ impl AppState {
         &self.0.pool
     }
 
-    pub fn get_redis_pool(&self) -> &RedisPool<RedisConnectionManager> {
-        &self.0.redis_pool
-    }
-
     pub async fn get_redis_conn(
         &self,
     ) -> Result<bb8::PooledConnection<'_, RedisConnectionManager>, redis::RedisError> {
-        self.get_redis_pool().get().await.map_err(|e| {
+        self.0.redis_pool.get().await.map_err(|e| {
             tracing::error!("Failed to get Redis connection: {:?}", e);
             match e {
                 bb8::RunError::User(redis_err) => redis_err,
@@ -135,19 +123,5 @@ impl AppState {
         let _ = self.get_tx().send(msg);
     }
 
-    pub async fn _broadcast_to_admins(&self, event: WsEvent, data: serde_json::Value) {
-        use futures_util::SinkExt;
-        let msg = serde_json::json!({
-            "type": event.as_str(),
-            "data": data
-        })
-        .to_string();
-        let connections = self.get_connections().lock().await;
-        for conn in connections.values() {
-            if conn.user_email.is_some() {
-                let mut sender = conn.sender.lock().await;
-                let _ = sender.send(Message::Text(msg.clone().into())).await;
-            }
-        }
-    }
+
 }
