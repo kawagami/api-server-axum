@@ -36,7 +36,7 @@ impl AppStateInner {
         let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
 
         let http_client = Client::builder()
-            .timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
             .build()
             .expect("Failed to build HTTP client");
 
