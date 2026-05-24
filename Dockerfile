@@ -1,10 +1,8 @@
-FROM rust:1.88-slim-bookworm AS builder
+FROM rust:1.88-alpine AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev \
-  && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache musl-dev pkgconfig
 
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -17,7 +15,7 @@ RUN touch src/main.rs && cargo build --release --locked
 
 RUN strip -s /app/target/release/api-server-axum
 
-FROM gcr.io/distroless/cc-debian12
+FROM scratch
 
 COPY --from=builder /usr/share/zoneinfo/Asia/Taipei /usr/share/zoneinfo/Asia/Taipei
 ENV TZ=Asia/Taipei
