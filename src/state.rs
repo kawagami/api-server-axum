@@ -12,7 +12,7 @@ use crate::storage::Storage;
 use crate::structs::ws::WsEvent;
 
 pub struct AppStateInner {
-    pub pool: Pool<Postgres>,
+    pub pg_pool: Pool<Postgres>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
     pub http_client: Client,
     pub tx: broadcast::Sender<String>,
@@ -43,7 +43,7 @@ impl AppStateInner {
         let (tx, _rx) = broadcast::channel(100);
 
         Self {
-            pool,
+            pg_pool: pool,
             redis_pool,
             http_client,
             tx,
@@ -80,7 +80,7 @@ impl AppState {
     }
 
     pub fn get_pool(&self) -> &Pool<Postgres> {
-        &self.0.pool
+        &self.0.pg_pool
     }
 
     pub async fn get_redis_conn(
