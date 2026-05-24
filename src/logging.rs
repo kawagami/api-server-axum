@@ -62,17 +62,56 @@ impl<S: Subscriber> Layer<S> for DbLogLayer {
     }
 }
 
+const BATCH_SIZE: usize = 50;
+const FLUSH_INTERVAL_MS: u64 = 500;
+
 pub async fn log_writer(mut rx: mpsc::Receiver<LogEntry>, pool: Pool<Postgres>) {
-    while let Some(entry) = rx.recv().await {
-        let _ = sqlx::query(
-            "INSERT INTO logs (level, message, target, file, line) VALUES ($1, $2, $3, $4, $5)",
-        )
-        .bind(entry.level)
-        .bind(entry.message)
-        .bind(entry.target)
-        .bind(entry.file)
-        .bind(entry.line.map(|l| l as i32))
-        .execute(&pool)
-        .await;
+    let mut buf: Vec<LogEntry> = Vec::with_capacity(BATCH_SIZE);
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(FLUSH_INTERVAL_MS));
+
+    loop {
+        tokio::select! {
+            entry = rx.recv() => {
+                match entry {
+                    Some(e) => {
+                        buf.push(e);
+                        if buf.len() >= BATCH_SIZE {
+                            flush(&pool, &mut buf).await;
+                        }
+                    }
+                    None => {
+                        flush(&pool, &mut buf).await;
+                        return;
+                    }
+                }
+            }
+            _ = interval.tick() => {
+                if !buf.is_empty() {
+                    flush(&pool, &mut buf).await;
+                }
+            }
+        }
     }
+}
+
+async fn flush(pool: &Pool<Postgres>, buf: &mut Vec<LogEntry>) {
+    let levels: Vec<&str> = buf.iter().map(|e| e.level.as_str()).collect();
+    let messages: Vec<&str> = buf.iter().map(|e| e.message.as_str()).collect();
+    let targets: Vec<&str> = buf.iter().map(|e| e.target.as_str()).collect();
+    let files: Vec<Option<&str>> = buf.iter().map(|e| e.file.as_deref()).collect();
+    let lines: Vec<Option<i32>> = buf.iter().map(|e| e.line.map(|l| l as i32)).collect();
+
+    let _ = sqlx::query(
+        "INSERT INTO logs (level, message, target, file, line)
+         SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::int[])",
+    )
+    .bind(&levels)
+    .bind(&messages)
+    .bind(&targets)
+    .bind(&files)
+    .bind(&lines)
+    .execute(pool)
+    .await;
+
+    buf.clear();
 }
