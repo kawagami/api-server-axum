@@ -72,6 +72,15 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `UPLOAD_BASE_URL` | 否 | `https://kawa.homes/uploads` |
 | `HACKMD_TOKEN` | 否 | — |
 | `ENABLE_FETCH_NOTES_JOB` | 否 | `true` |
+| `GOOGLE_CLIENT_ID` | 否 | — |
+| `GOOGLE_CLIENT_SECRET` | 否 | — |
+| `GOOGLE_REDIRECT_URL` | 否 | — |
+| `GITHUB_CLIENT_ID` | 否 | — |
+| `GITHUB_CLIENT_SECRET` | 否 | — |
+| `GITHUB_REDIRECT_URL` | 否 | — |
+| `LINE_CLIENT_ID` | 否 | — |
+| `LINE_CLIENT_SECRET` | 否 | — |
+| `LINE_REDIRECT_URL` | 否 | — |
 
 ## 常用指令
 
