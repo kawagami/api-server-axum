@@ -36,10 +36,9 @@ struct WsQuery {
 }
 
 async fn validate_ws_token(state: &AppState, token: String) -> Option<String> {
-    let jwt_secret = std::env::var("JWT_SECRET").ok()?;
     let token_data = decode::<Claims>(
         &token,
-        &DecodingKey::from_secret(jwt_secret.as_ref()),
+        &DecodingKey::from_secret(state.get_config().jwt_secret.as_ref()),
         &Validation::default(),
     )
     .ok()?;

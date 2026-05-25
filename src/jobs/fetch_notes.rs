@@ -4,16 +4,14 @@ use crate::{
     structs::{jobs::AppJob, notes::Post},
 };
 use async_trait::async_trait;
-use std::env;
 
 pub struct FetchNotesJob;
 
 #[async_trait]
 impl AppJob for FetchNotesJob {
-    fn enabled(&self) -> bool {
-        let has_token = env::var("HACKMD_TOKEN").is_ok();
-        let flag = env::var("ENABLE_FETCH_NOTES_JOB").unwrap_or_else(|_| "true".to_string()) == "true";
-        has_token && flag
+    fn enabled(&self, state: &AppState) -> bool {
+        let cfg = state.get_config();
+        cfg.hackmd_token.is_some() && cfg.enable_fetch_notes_job
     }
 
     fn cron_expression(&self) -> &str {
@@ -21,9 +19,9 @@ impl AppJob for FetchNotesJob {
     }
 
     async fn run(&self, state: AppState) {
-        let token = match env::var("HACKMD_TOKEN") {
-            Ok(t) => t,
-            Err(_) => return,
+        let token = match state.get_config().hackmd_token.as_deref() {
+            Some(t) => t.to_string(),
+            None => return,
         };
 
         const HACKMD_URL: &str = "https://api.hackmd.io/v1/notes";

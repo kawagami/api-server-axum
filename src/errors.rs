@@ -75,9 +75,6 @@ pub enum AuthError {
 
 #[derive(Error, Debug)]
 pub enum SystemError {
-    #[error("環境變數缺失: {0}")]
-    EnvVarMissing(String),
-
     #[error("內部錯誤: {0}")]
     Internal(String),
 }

@@ -2,6 +2,7 @@ use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{members, redis},
     state::AppState,
+    structs::config::AppConfig,
     structs::auth::{Claims, RefreshClaims},
 };
 use chrono::{Duration, Utc};
@@ -9,10 +10,10 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::Deserialize;
 use uuid::Uuid;
 
-struct OAuthConfig {
-    client_id: String,
-    client_secret: String,
-    redirect_url: String,
+struct OAuthConfig<'a> {
+    client_id: &'a str,
+    client_secret: &'a str,
+    redirect_url: &'a str,
     auth_url: &'static str,
     token_url: &'static str,
 }
@@ -33,41 +34,31 @@ impl OAuthProvider {
         }
     }
 
-    fn config(&self) -> Result<OAuthConfig, AppError> {
-        let (id_var, secret_var, redirect_var, auth_url, token_url) = match self {
+    fn config_from<'a>(&self, cfg: &'a AppConfig) -> OAuthConfig<'a> {
+        let (provider_cfg, auth_url, token_url) = match self {
             Self::Google => (
-                "GOOGLE_CLIENT_ID",
-                "GOOGLE_CLIENT_SECRET",
-                "GOOGLE_REDIRECT_URL",
+                &cfg.oauth_google,
                 "https://accounts.google.com/o/oauth2/v2/auth",
                 "https://oauth2.googleapis.com/token",
             ),
             Self::GitHub => (
-                "GITHUB_CLIENT_ID",
-                "GITHUB_CLIENT_SECRET",
-                "GITHUB_REDIRECT_URL",
+                &cfg.oauth_github,
                 "https://github.com/login/oauth/authorize",
                 "https://github.com/login/oauth/access_token",
             ),
             Self::Line => (
-                "LINE_CLIENT_ID",
-                "LINE_CLIENT_SECRET",
-                "LINE_REDIRECT_URL",
+                &cfg.oauth_line,
                 "https://access.line.me/oauth2/v2.1/authorize",
                 "https://api.line.me/oauth2/v2.1/token",
             ),
         };
-
-        Ok(OAuthConfig {
-            client_id: std::env::var(id_var)
-                .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing(id_var.to_string())))?,
-            client_secret: std::env::var(secret_var)
-                .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing(secret_var.to_string())))?,
-            redirect_url: std::env::var(redirect_var)
-                .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing(redirect_var.to_string())))?,
+        OAuthConfig {
+            client_id: &provider_cfg.client_id,
+            client_secret: &provider_cfg.client_secret,
+            redirect_url: &provider_cfg.redirect_url,
             auth_url,
             token_url,
-        })
+        }
     }
 
     pub fn name(&self) -> &'static str {
@@ -79,8 +70,8 @@ impl OAuthProvider {
     }
 }
 
-pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider) -> Result<String, AppError> {
-    let cfg = provider.config()?;
+pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider, app_config: &AppConfig) -> String {
+    let cfg = provider.config_from(app_config);
 
     let scope = match provider {
         OAuthProvider::Google => "openid email profile",
@@ -90,16 +81,14 @@ pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider) -> Result<Stri
 
     let encode = |s: &str| form_urlencoded::byte_serialize(s.as_bytes()).collect::<String>();
 
-    let url = format!(
+    format!(
         "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}",
         cfg.auth_url,
-        encode(&cfg.client_id),
-        encode(&cfg.redirect_url),
+        encode(cfg.client_id),
+        encode(cfg.redirect_url),
         encode(scope),
         encode(state_value),
-    );
-
-    Ok(url)
+    )
 }
 
 pub async fn generate_oauth_url(
@@ -108,7 +97,7 @@ pub async fn generate_oauth_url(
 ) -> Result<String, AppError> {
     let state_value = Uuid::new_v4().to_string();
     redis::set_oauth_state(state, &state_value).await?;
-    get_oauth_url(&state_value, provider)
+    Ok(get_oauth_url(&state_value, provider, state.get_config()))
 }
 
 pub async fn exchange_code(
@@ -122,7 +111,7 @@ pub async fn exchange_code(
         return Err(AppError::AuthError(AuthError::InvalidToken));
     }
 
-    let cfg = provider.config()?;
+    let cfg = provider.config_from(state.get_config());
     let client = state.get_http_client();
 
     let token_res = exchange_code_for_token(client, provider, &cfg, code).await?;
@@ -145,7 +134,7 @@ pub async fn refresh_member_token(
     state: &AppState,
     refresh_token_jwt: &str,
 ) -> Result<(String, String), AppError> {
-    let refresh_claims = decode_refresh_jwt(refresh_token_jwt)?;
+    let refresh_claims = decode_refresh_jwt(refresh_token_jwt, &state.get_config().jwt_secret)?;
     let member_id: i64 = refresh_claims
         .sub
         .parse()
@@ -166,16 +155,13 @@ async fn issue_tokens(state: &AppState, member_id: i64) -> Result<(String, Strin
     let jti = Uuid::new_v4().to_string();
     redis::set_member_refresh_token(state, member_id, &jti).await?;
 
-    let access_token = encode_member_jwt(member_id)?;
-    let refresh_token = encode_refresh_jwt(member_id, &jti)?;
+    let access_token = encode_member_jwt(member_id, &state.get_config().jwt_secret)?;
+    let refresh_token = encode_refresh_jwt(member_id, &jti, &state.get_config().jwt_secret)?;
 
     Ok((access_token, refresh_token))
 }
 
-fn encode_member_jwt(member_id: i64) -> Result<String, AppError> {
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing("JWT_SECRET".to_string())))?;
-
+fn encode_member_jwt(member_id: i64, jwt_secret: &str) -> Result<String, AppError> {
     let now = Utc::now();
     let claim = Claims {
         iat: now.timestamp() as usize,
@@ -188,10 +174,7 @@ fn encode_member_jwt(member_id: i64) -> Result<String, AppError> {
         .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
 }
 
-fn encode_refresh_jwt(member_id: i64, jti: &str) -> Result<String, AppError> {
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing("JWT_SECRET".to_string())))?;
-
+fn encode_refresh_jwt(member_id: i64, jti: &str, jwt_secret: &str) -> Result<String, AppError> {
     let now = Utc::now();
     let claim = RefreshClaims {
         iat: now.timestamp() as usize,
@@ -204,10 +187,7 @@ fn encode_refresh_jwt(member_id: i64, jti: &str) -> Result<String, AppError> {
         .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
 }
 
-fn decode_refresh_jwt(jwt: &str) -> Result<RefreshClaims, AppError> {
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing("JWT_SECRET".to_string())))?;
-
+fn decode_refresh_jwt(jwt: &str, jwt_secret: &str) -> Result<RefreshClaims, AppError> {
     decode::<RefreshClaims>(
         jwt,
         &DecodingKey::from_secret(jwt_secret.as_ref()),
@@ -234,14 +214,14 @@ struct OAuthUserInfo {
 async fn exchange_code_for_token(
     client: &reqwest::Client,
     _provider: &OAuthProvider,
-    cfg: &OAuthConfig,
+    cfg: &OAuthConfig<'_>,
     code: &str,
 ) -> Result<ProviderTokenResponse, AppError> {
     let params = [
-        ("client_id", cfg.client_id.as_str()),
-        ("client_secret", cfg.client_secret.as_str()),
+        ("client_id", cfg.client_id),
+        ("client_secret", cfg.client_secret),
         ("code", code),
-        ("redirect_uri", cfg.redirect_url.as_str()),
+        ("redirect_uri", cfg.redirect_url),
         ("grant_type", "authorization_code"),
     ];
 

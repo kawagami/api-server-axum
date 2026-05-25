@@ -21,13 +21,13 @@ pub fn new(state: AppState) -> Router<AppState> {
         .route("/", get(get_members))
         .route("/{id}", get(get_member_by_id))
         .layer(middleware::from_fn_with_state(
-            state,
+            state.clone(),
             auth::authorize_and_load,
         ));
 
     let member_routes = Router::new()
         .route("/me", get(get_me))
-        .layer(middleware::from_fn(auth::authorize_member));
+        .layer(middleware::from_fn_with_state(state, auth::authorize_member));
 
     admin_routes.merge(member_routes)
 }

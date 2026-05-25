@@ -1,5 +1,5 @@
 use crate::{
-    errors::{AppError, AuthError, SystemError},
+    errors::{AppError, AuthError},
     repositories::{redis, roles as roles_repo},
     state::AppState,
     structs::{
@@ -22,7 +22,7 @@ pub async fn authorize_and_load(
     next: Next,
 ) -> Result<Response<Body>, AppError> {
     let token = extract_token(&req)?;
-    let token_data = decode_jwt(token)?;
+    let token_data = decode_jwt(token, &state.get_config().jwt_secret)?;
 
     if token_data.claims.role != "admin" {
         return Err(AppError::AuthError(AuthError::Forbidden));
@@ -48,11 +48,12 @@ pub async fn authorize_and_load(
 }
 
 pub async fn authorize_member(
+    State(state): State<AppState>,
     mut req: Request,
     next: Next,
 ) -> Result<Response<Body>, AppError> {
     let token = extract_token(&req)?;
-    let token_data = decode_jwt(token)?;
+    let token_data = decode_jwt(token, &state.get_config().jwt_secret)?;
 
     if token_data.claims.role != "member" {
         return Err(AppError::AuthError(AuthError::Forbidden));
@@ -91,13 +92,10 @@ async fn verify_user_login(state: &AppState, key: &str) -> Result<(), AppError> 
         .ok_or(AppError::AuthError(AuthError::Unauthorized))
 }
 
-fn decode_jwt(jwt: String) -> Result<TokenData<Claims>, AppError> {
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing("JWT_SECRET".to_string())))?;
-
+fn decode_jwt(jwt: String, secret: &str) -> Result<TokenData<Claims>, AppError> {
     decode(
         &jwt,
-        &DecodingKey::from_secret(jwt_secret.as_ref()),
+        &DecodingKey::from_secret(secret.as_ref()),
         &Validation::default(),
     )
     .map_err(|e| match e.kind() {

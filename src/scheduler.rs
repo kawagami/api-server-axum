@@ -33,7 +33,7 @@ async fn add_job_if_enabled<J: AppJob + Send + Sync + 'static>(
     state: AppState,
     job_instance: J,
 ) {
-    if !job_instance.enabled() {
+    if !job_instance.enabled(&state) {
         return;
     }
 

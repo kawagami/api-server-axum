@@ -9,6 +9,7 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 
 use crate::storage::Storage;
+use crate::structs::config::AppConfig;
 use crate::structs::ws::WsEvent;
 
 pub struct AppStateInner {
@@ -18,6 +19,7 @@ pub struct AppStateInner {
     pub tx: broadcast::Sender<String>,
     pub connections: ConnectionMap,
     pub storage: Storage,
+    pub config: AppConfig,
 }
 
 impl AppStateInner {
@@ -49,6 +51,7 @@ impl AppStateInner {
             tx,
             connections: Arc::new(Mutex::new(HashMap::new())),
             storage: Storage::from_env(),
+            config: AppConfig::from_env(),
         }
     }
 }
@@ -112,6 +115,10 @@ impl AppState {
 
     pub fn get_storage(&self) -> &Storage {
         &self.0.storage
+    }
+
+    pub fn get_config(&self) -> &AppConfig {
+        &self.0.config
     }
 
     pub fn broadcast(&self, event: WsEvent, data: serde_json::Value) {

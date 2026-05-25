@@ -7,7 +7,7 @@ pub async fn audit_log(
     req: Request,
     next: Next,
 ) -> Response<Body> {
-    let user_email = extract_admin_email(&req);
+    let user_email = extract_admin_email(&req, &state.get_config().jwt_secret);
 
     let method = req.method().to_string();
     let path = req.uri().path().to_string();
@@ -36,8 +36,7 @@ pub async fn audit_log(
     response
 }
 
-fn extract_admin_email(req: &Request) -> Option<String> {
-    let jwt_secret = std::env::var("JWT_SECRET").ok()?;
+fn extract_admin_email(req: &Request, jwt_secret: &str) -> Option<String> {
 
     let auth_header = req.headers().get(axum::http::header::AUTHORIZATION)?;
     let token = auth_header.to_str().ok()?.split_whitespace().nth(1)?;

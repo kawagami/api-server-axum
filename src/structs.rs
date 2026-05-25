@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod config;
 pub mod blogs;
 pub mod jobs;
 pub mod members;

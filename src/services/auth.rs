@@ -33,13 +33,13 @@ pub async fn sign_in(
         roles_repo::get_user_permission_strings_by_email(state, &user.email).await?;
     redis::set_user_permissions(state, &user.email, &permissions).await?;
 
-    encode_jwt(user.email)
+    encode_jwt(user.email, &state.get_config().jwt_secret)
 }
 
 pub async fn refresh_admin_token(state: &AppState, email: String) -> Result<String, AppError> {
     let login_key = format!("user:login:{}", email);
     redis::redis_set(state, &login_key, &email).await?;
-    encode_jwt(email)
+    encode_jwt(email, &state.get_config().jwt_secret)
 }
 
 pub async fn change_password(
@@ -62,10 +62,7 @@ pub async fn change_password(
     users::update_password(state, email, &new_hash).await
 }
 
-fn encode_jwt(email: String) -> Result<String, AppError> {
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .map_err(|_| AppError::SystemError(SystemError::EnvVarMissing("JWT_SECRET".to_string())))?;
-
+fn encode_jwt(email: String, jwt_secret: &str) -> Result<String, AppError> {
     let now = Utc::now();
     let exp = (now + Duration::hours(1)).timestamp() as usize;
     let iat = now.timestamp() as usize;
