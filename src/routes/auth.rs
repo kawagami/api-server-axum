@@ -1,45 +1,26 @@
 use crate::{
     errors::AppError,
-    middleware::auth,
     services::auth as auth_service,
     state::AppState,
     structs::auth::{AuthenticatedUser, ChangePasswordData, SignInData},
 };
 use axum::{
     extract::{Extension, Json, State},
-    middleware,
     routing::{get, post},
     Router,
 };
 use serde::Serialize;
 
 pub fn new(state: AppState) -> Router<AppState> {
-    let me_route = Router::new()
-        .route("/me", get(me))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::authorize_and_load,
-        ));
+    let protected = super::with_auth(
+        state,
+        Router::new()
+            .route("/me", get(me))
+            .route("/refresh", post(refresh))
+            .route("/change_password", post(change_password)),
+    );
 
-    let refresh_route = Router::new()
-        .route("/refresh", post(refresh))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::authorize_and_load,
-        ));
-
-    let change_password_route = Router::new()
-        .route("/change_password", post(change_password))
-        .layer(middleware::from_fn_with_state(
-            state,
-            auth::authorize_and_load,
-        ));
-
-    Router::new()
-        .route("/", post(sign_in))
-        .merge(me_route)
-        .merge(refresh_route)
-        .merge(change_password_route)
+    Router::new().route("/", post(sign_in)).merge(protected)
 }
 
 #[derive(Serialize)]

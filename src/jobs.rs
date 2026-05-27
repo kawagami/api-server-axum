@@ -5,3 +5,44 @@ pub mod fetch_historical_closing_prices;
 pub mod fetch_notes;
 pub mod fetch_stock_day_all;
 pub mod sync_buyback_to_pending;
+
+pub(super) async fn run_with_retries<F, Fut, E>(
+    label: &str,
+    max_attempts: u32,
+    retry_delay: std::time::Duration,
+    mut make_future: F,
+) where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<(), E>>,
+    E: std::fmt::Display,
+{
+    for attempt in 1..=max_attempts {
+        match make_future().await {
+            Ok(_) => {
+                tracing::info!("{} success", label);
+                return;
+            }
+            Err(e) => {
+                if attempt < max_attempts {
+                    tracing::warn!(
+                        "{} fail (attempt {}/{}): {}, retry in {:?}",
+                        label,
+                        attempt,
+                        max_attempts,
+                        e,
+                        retry_delay
+                    );
+                    tokio::time::sleep(retry_delay).await;
+                } else {
+                    tracing::error!(
+                        "{} fail (attempt {}/{}): {}",
+                        label,
+                        attempt,
+                        max_attempts,
+                        e
+                    );
+                }
+            }
+        }
+    }
+}

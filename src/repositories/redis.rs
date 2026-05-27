@@ -89,6 +89,12 @@ pub async fn get_member_refresh_token(
     Ok(conn.get(key).await?)
 }
 
+pub async fn invalidate_permissions_for_emails(state: &AppState, emails: &[String]) {
+    for email in emails {
+        let _ = del_user_permissions(state, email).await;
+    }
+}
+
 pub async fn del_user_login(
     state: &AppState,
     email: &str,

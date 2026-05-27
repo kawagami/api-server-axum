@@ -27,6 +27,13 @@ use tokio::sync::mpsc;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
+pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<AppState> {
+    router.layer(middleware::from_fn_with_state(
+        state,
+        crate::middleware::auth::authorize_and_load,
+    ))
+}
+
 pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
     let origins = ["https://kawa.homes".parse().unwrap()];
     let state = AppState::new().await;

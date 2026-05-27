@@ -24,18 +24,14 @@ pub async fn set_role_permissions(
 ) -> Result<(), AppError> {
     let emails = roles_repo::get_emails_by_role_id(state, role_id).await?;
     roles_repo::set_role_permissions(state, role_id, &body.permission_ids).await?;
-    for email in &emails {
-        let _ = redis::del_user_permissions(state, email).await;
-    }
+    redis::invalidate_permissions_for_emails(state, &emails).await;
     Ok(())
 }
 
 pub async fn delete_role(state: &AppState, role_id: i32) -> Result<(), AppError> {
     let emails = roles_repo::get_emails_by_role_id(state, role_id).await?;
     roles_repo::delete_role(state, role_id).await?;
-    for email in &emails {
-        let _ = redis::del_user_permissions(state, email).await;
-    }
+    redis::invalidate_permissions_for_emails(state, &emails).await;
     Ok(())
 }
 

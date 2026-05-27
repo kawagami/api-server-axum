@@ -1,6 +1,5 @@
 use crate::{
     errors::AppError,
-    middleware::auth,
     services::users as users_service,
     state::AppState,
     structs::{
@@ -12,30 +11,19 @@ use crate::{
 use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
-    middleware,
     routing::get,
     Json, Router,
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
-    let protected_routes = Router::new()
-        .route("/", axum::routing::post(create_user).delete(delete_user))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::authorize_and_load,
-        ));
+    let protected = super::with_auth(
+        state,
+        Router::new()
+            .route("/", axum::routing::post(create_user).delete(delete_user))
+            .route("/{id}/roles", get(get_user_roles).put(set_user_roles)),
+    );
 
-    let role_routes = Router::new()
-        .route("/{id}/roles", get(get_user_roles).put(set_user_roles))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::authorize_and_load,
-        ));
-
-    Router::new()
-        .route("/", get(get_users))
-        .merge(protected_routes)
-        .merge(role_routes)
+    Router::new().route("/", get(get_users)).merge(protected)
 }
 
 async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<User>>, AppError> {

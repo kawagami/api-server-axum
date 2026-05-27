@@ -1,6 +1,5 @@
 use crate::{
     errors::AppError,
-    middleware::auth,
     repositories::images::ImageRecord,
     services::images as images_service,
     state::AppState,
@@ -9,20 +8,18 @@ use crate::{
 use axum::{
     extract::{Extension, Multipart, Path, State},
     http::StatusCode,
-    middleware,
     routing::{delete, get, post},
     Json, Router,
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/", get(get_images))
-        .route("/upload_multiple", post(upload_multiple))
-        .route("/{id}", delete(delete_image))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::authorize_and_load,
-        ))
+    super::with_auth(
+        state,
+        Router::new()
+            .route("/", get(get_images))
+            .route("/upload_multiple", post(upload_multiple))
+            .route("/{id}", delete(delete_image)),
+    )
 }
 
 async fn get_images(

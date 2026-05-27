@@ -1,6 +1,5 @@
 use axum::{
     extract::{Extension, Path, State},
-    middleware,
     routing::put,
     Json, Router,
 };
@@ -8,7 +7,6 @@ use uuid::Uuid;
 
 use crate::{
     errors::AppError,
-    middleware::auth,
     services::blogs as blogs_service,
     state::AppState,
     structs::{
@@ -20,9 +18,10 @@ use crate::{
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/{id}", put(put_blog).delete(delete_blog))
-        .layer(middleware::from_fn_with_state(state, auth::authorize_and_load))
+    super::with_auth(
+        state,
+        Router::new().route("/{id}", put(put_blog).delete(delete_blog)),
+    )
 }
 
 async fn put_blog(

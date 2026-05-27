@@ -1,6 +1,5 @@
 use crate::{
     errors::AppError,
-    middleware::auth,
     services::roles as roles_service,
     state::AppState,
     structs::{
@@ -11,20 +10,18 @@ use crate::{
 use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
-    middleware,
     routing::{get, put},
     Json, Router,
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/", get(list_roles).post(create_role))
-        .route("/{id}", get(get_role).delete(delete_role))
-        .route("/{id}/permissions", put(set_permissions))
-        .layer(middleware::from_fn_with_state(
-            state,
-            auth::authorize_and_load,
-        ))
+    super::with_auth(
+        state,
+        Router::new()
+            .route("/", get(list_roles).post(create_role))
+            .route("/{id}", get(get_role).delete(delete_role))
+            .route("/{id}/permissions", put(set_permissions)),
+    )
 }
 
 async fn list_roles(
