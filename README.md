@@ -9,6 +9,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - WebSocket 即時推送（broadcast channel + 逐連線 sender）
 - 部落格 CRUD
 - HackMD 筆記同步
+- Runtime 設定管理（admin 頁面熱更新，不需重啟）
 - 股票資料（全市場行情、庫藏股計畫、股價變動追蹤）
 - 圖片上傳 / 管理（本機儲存）
 - 使用者 / 角色 / 權限管理
@@ -24,6 +25,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/admin/users` | 使用者管理 |
 | `/admin/roles` | 角色管理 |
 | `/admin/permissions` | 權限清單 |
+| `/admin/settings` | Runtime 設定（讀取 / 更新） |
 | `/admin/audit_logs` | 操作稽核紀錄 |
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
@@ -44,7 +46,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `ConsumePendingStockChangeJob` | 每分鐘 | 消費一筆 pending stock_change，查詢 TWSE 股價 |
 | `FetchHistoricalClosingPricesJob` | 每分鐘 | 補缺起始日收盤價 |
 | `CleanupUnusedImagesJob` | 每小時 | 清除 status=unused 且逾時的孤立圖片 |
-| `FetchNotesJob` | 每日 UTC+8 03:00 | 同步 HackMD 筆記（需 `ENABLE_FETCH_NOTES_JOB=true`） |
+| `FetchNotesJob` | 每日 UTC+8 03:00 | 同步 HackMD 筆記（需 DB 設定 `hackmd_token`） |
 | `FetchStockDayAllJob` | 每日 UTC 20:00 | 抓全市場行情寫入 `stock_day_all` |
 | `FetchBuybackPeriodsJob` | 每日 UTC 20:00 | 抓庫藏股計畫 HTML 寫入 `stock_buyback_periods` |
 | `SyncBuybackToPendingJob` | 每日 UTC 20:10 | 將 `stock_buyback_periods` 同步為 pending stock_changes |
@@ -70,8 +72,6 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `APP_PORT` | 否 | `3000` |
 | `UPLOAD_PATH` | 否 | `./uploads` |
 | `UPLOAD_BASE_URL` | 否 | `https://kawa.homes/uploads` |
-| `HACKMD_TOKEN` | 否 | — |
-| `ENABLE_FETCH_NOTES_JOB` | 否 | `true` |
 | `GOOGLE_CLIENT_ID` | 否 | — |
 | `GOOGLE_CLIENT_SECRET` | 否 | — |
 | `GOOGLE_REDIRECT_URL` | 否 | — |
