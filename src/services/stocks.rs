@@ -9,7 +9,7 @@ use crate::{
     structs::stocks::{
         Conditions, GetStockDayAll, NewStockClosingPrice, Pagination, StockBuybackMoreInfo,
         StockBuybackPeriod, StockChangePaginatedResponse, StockChangeWithoutId, StockClosingPriceResponse,
-        StockDayAll, StockDayAvgResponse, StockRequest, StockStats, TwseApiResponse,
+        StockDayAll, StockDayAllInsertRow, StockDayAvgResponse, StockRequest, StockStats, TwseApiResponse,
     },
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
@@ -260,7 +260,6 @@ pub async fn fetch_stock_price_for_date(
     if !db_prices.is_empty() {
         // 嘗試從資料集合中按優先順序找出合適的價格
         if let Ok(price) = get_stock_price_by_date(&db_prices, date) {
-            // tracing::info!("從資料庫中找到適合的資料 {:#?}", price);
             return Ok(price);
         }
     }
@@ -359,87 +358,34 @@ pub async fn stock_day_all_service(state: &AppState) -> Result<(), AppError> {
 
     let trade_date = chrono::NaiveDate::parse_from_str(&resp.date, "%Y%m%d")?;
 
-    let parse_i64 = |s: &str| {
-        if s.is_empty() || s == "--" {
-            None
-        } else {
-            s.trim().replace(",", "").parse::<i64>().ok()
-        }
+    let parse_i64 = |s: &str| -> Option<i64> {
+        if s.is_empty() || s == "--" { None } else { s.trim().replace(",", "").parse().ok() }
     };
 
-    let parse_f64 = |s: &str| {
-        if s.is_empty() || s == "--" {
-            None
-        } else {
-            s.trim().replace(",", "").parse::<f64>().ok()
-        }
+    let parse_f64 = |s: &str| -> Option<f64> {
+        if s.is_empty() || s == "--" { None } else { s.trim().replace(",", "").parse().ok() }
     };
 
-    let mut trade_dates = Vec::new();
-    let mut stock_codes: Vec<String> = Vec::new();
-    let mut stock_names: Vec<String> = Vec::new();
-    let mut trade_volumes = Vec::new();
-    let mut trade_amounts = Vec::new();
-    let mut open_prices = Vec::new();
-    let mut high_prices = Vec::new();
-    let mut low_prices = Vec::new();
-    let mut close_prices = Vec::new();
-    let mut price_changes = Vec::new();
-    let mut transaction_counts = Vec::new();
+    let rows: Vec<StockDayAllInsertRow> = resp.data.iter()
+        .filter(|row| row.len() >= 10)
+        .filter_map(|row| {
+            Some(StockDayAllInsertRow {
+                trade_date,
+                stock_code: row[0].clone(),
+                stock_name: row[1].clone(),
+                trade_volume: parse_i64(&row[2])?,
+                trade_amount: parse_i64(&row[3])?,
+                open_price: parse_f64(&row[4])?,
+                high_price: parse_f64(&row[5])?,
+                low_price: parse_f64(&row[6])?,
+                close_price: parse_f64(&row[7])?,
+                price_change: parse_f64(&row[8])?,
+                transaction_count: parse_i64(&row[9]).unwrap_or(0) as i32,
+            })
+        })
+        .collect();
 
-    for row in &resp.data {
-        if row.len() < 10 {
-            continue;
-        }
-
-        if let (
-            Some(trade_volume),
-            Some(trade_amount),
-            Some(open_price),
-            Some(high_price),
-            Some(low_price),
-            Some(close_price),
-            Some(price_change),
-        ) = (
-            parse_i64(&row[2]),
-            parse_i64(&row[3]),
-            parse_f64(&row[4]),
-            parse_f64(&row[5]),
-            parse_f64(&row[6]),
-            parse_f64(&row[7]),
-            parse_f64(&row[8]),
-        ) {
-            let transaction_count = parse_i64(&row[9]).unwrap_or(0) as i32;
-
-            trade_dates.push(trade_date);
-            stock_codes.push(row[0].clone());
-            stock_names.push(row[1].clone());
-            trade_volumes.push(trade_volume);
-            trade_amounts.push(trade_amount);
-            open_prices.push(open_price);
-            high_prices.push(high_price);
-            low_prices.push(low_price);
-            close_prices.push(close_price);
-            price_changes.push(price_change);
-            transaction_counts.push(transaction_count);
-        }
-    }
-
-    insert_stock_day_all_batch(
-        state,
-        &trade_dates,
-        &stock_codes,
-        &stock_names,
-        &trade_volumes,
-        &trade_amounts,
-        &open_prices,
-        &high_prices,
-        &low_prices,
-        &close_prices,
-        &price_changes,
-        &transaction_counts,
-    )
-    .await
+    insert_stock_day_all_batch(state, &rows).await
 }
 
 pub async fn get_all_stock_changes(

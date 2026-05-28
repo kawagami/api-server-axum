@@ -16,8 +16,12 @@ pub async fn create_user(state: &AppState, user: NewUser) -> Result<(), AppError
 
 pub async fn delete_user(state: &AppState, user_id: i64) -> Result<(), AppError> {
     let email = users_repo::delete_user(state, user_id).await?;
-    let _ = redis::del_user_permissions(state, &email).await;
-    let _ = redis::del_user_login(state, &email).await;
+    if let Err(e) = redis::del_user_permissions(state, &email).await {
+        tracing::warn!("Failed to invalidate permissions cache for {}: {}", email, e);
+    }
+    if let Err(e) = redis::del_user_login(state, &email).await {
+        tracing::warn!("Failed to invalidate login cache for {}: {}", email, e);
+    }
     Ok(())
 }
 
@@ -32,6 +36,8 @@ pub async fn set_user_roles(
 ) -> Result<(), AppError> {
     let email = users_repo::get_email_by_id(state, user_id).await?;
     users_repo::set_user_roles(state, user_id, &role_ids).await?;
-    let _ = redis::del_user_permissions(state, &email).await;
+    if let Err(e) = redis::del_user_permissions(state, &email).await {
+        tracing::warn!("Failed to invalidate permissions cache for {}: {}", email, e);
+    }
     Ok(())
 }

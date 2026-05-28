@@ -1,6 +1,5 @@
 use crate::state::AppState;
 use axum::{body::Body, extract::{Request, State}, middleware::Next, response::Response};
-use jsonwebtoken::{decode, DecodingKey, Validation};
 
 pub async fn audit_log(
     State(state): State<AppState>,
@@ -37,16 +36,8 @@ pub async fn audit_log(
 }
 
 fn extract_admin_email(req: &Request, jwt_secret: &str) -> Option<String> {
-
-    let auth_header = req.headers().get(axum::http::header::AUTHORIZATION)?;
-    let token = auth_header.to_str().ok()?.split_whitespace().nth(1)?;
-
-    let token_data = decode::<crate::structs::auth::Claims>(
-        token,
-        &DecodingKey::from_secret(jwt_secret.as_ref()),
-        &Validation::default(),
-    )
-    .ok()?;
+    let token = super::auth::extract_token(req).ok()?;
+    let token_data = super::auth::decode_jwt(token, jwt_secret).ok()?;
 
     if token_data.claims.role != "admin" {
         return None;

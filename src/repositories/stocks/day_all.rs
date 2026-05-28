@@ -1,4 +1,4 @@
-use crate::{errors::AppError, state::AppState, structs::stocks::StockDayAll};
+use crate::{errors::AppError, state::AppState, structs::stocks::{StockDayAll, StockDayAllInsertRow}};
 use chrono::NaiveDate;
 use sqlx::QueryBuilder;
 
@@ -38,18 +38,24 @@ pub async fn get_stock_day_all(
 
 pub async fn insert_stock_day_all_batch(
     state: &AppState,
-    trade_dates: &[NaiveDate],
-    stock_codes: &[String],
-    stock_names: &[String],
-    trade_volumes: &[i64],
-    trade_amounts: &[i64],
-    open_prices: &[f64],
-    high_prices: &[f64],
-    low_prices: &[f64],
-    close_prices: &[f64],
-    price_changes: &[f64],
-    transaction_counts: &[i32],
+    rows: &[StockDayAllInsertRow],
 ) -> Result<(), AppError> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+
+    let trade_dates: Vec<NaiveDate> = rows.iter().map(|r| r.trade_date).collect();
+    let stock_codes: Vec<&str> = rows.iter().map(|r| r.stock_code.as_str()).collect();
+    let stock_names: Vec<&str> = rows.iter().map(|r| r.stock_name.as_str()).collect();
+    let trade_volumes: Vec<i64> = rows.iter().map(|r| r.trade_volume).collect();
+    let trade_amounts: Vec<i64> = rows.iter().map(|r| r.trade_amount).collect();
+    let open_prices: Vec<f64> = rows.iter().map(|r| r.open_price).collect();
+    let high_prices: Vec<f64> = rows.iter().map(|r| r.high_price).collect();
+    let low_prices: Vec<f64> = rows.iter().map(|r| r.low_price).collect();
+    let close_prices: Vec<f64> = rows.iter().map(|r| r.close_price).collect();
+    let price_changes: Vec<f64> = rows.iter().map(|r| r.price_change).collect();
+    let transaction_counts: Vec<i32> = rows.iter().map(|r| r.transaction_count).collect();
+
     let query = r#"
         INSERT INTO stock_day_all (
             trade_date, stock_code, stock_name,
@@ -67,17 +73,17 @@ pub async fn insert_stock_day_all_batch(
     "#;
 
     sqlx::query(query)
-        .bind(trade_dates)
-        .bind(stock_codes)
-        .bind(stock_names)
-        .bind(trade_volumes)
-        .bind(trade_amounts)
-        .bind(open_prices)
-        .bind(high_prices)
-        .bind(low_prices)
-        .bind(close_prices)
-        .bind(price_changes)
-        .bind(transaction_counts)
+        .bind(&trade_dates)
+        .bind(&stock_codes)
+        .bind(&stock_names)
+        .bind(&trade_volumes)
+        .bind(&trade_amounts)
+        .bind(&open_prices)
+        .bind(&high_prices)
+        .bind(&low_prices)
+        .bind(&close_prices)
+        .bind(&price_changes)
+        .bind(&transaction_counts)
         .execute(state.get_pool())
         .await?;
 

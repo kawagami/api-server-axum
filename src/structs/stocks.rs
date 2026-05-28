@@ -129,6 +129,20 @@ pub struct StockDayAll {
     pub transaction_count: Option<i32>,
 }
 
+pub struct StockDayAllInsertRow {
+    pub trade_date: NaiveDate,
+    pub stock_code: String,
+    pub stock_name: String,
+    pub trade_volume: i64,
+    pub trade_amount: i64,
+    pub open_price: f64,
+    pub high_price: f64,
+    pub low_price: f64,
+    pub close_price: f64,
+    pub price_change: f64,
+    pub transaction_count: i32,
+}
+
 /// 給 repository 的 fn get_active_buyback_prices 接收 DB 資料用的結構
 ///
 /// 包含股票代號、庫藏股起訖日期，以及起始日價格與最新價格等資訊

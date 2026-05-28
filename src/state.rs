@@ -34,8 +34,12 @@ impl AppStateInner {
             .expect("can't connect to database");
 
         let redis_host = std::env::var("REDIS_HOST").expect("找不到 REDIS_HOST");
-        let manager = RedisConnectionManager::new(format!("redis://{}:6379", redis_host)).unwrap();
-        let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
+        let manager = RedisConnectionManager::new(format!("redis://{}:6379", redis_host))
+            .expect("Failed to create Redis connection manager");
+        let redis_pool = bb8::Pool::builder()
+            .build(manager)
+            .await
+            .expect("Failed to build Redis connection pool");
 
         let http_client = Client::builder()
             .timeout(Duration::from_secs(30))

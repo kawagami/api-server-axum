@@ -70,7 +70,7 @@ pub async fn authorize_member(
     Ok(next.run(req).await)
 }
 
-fn extract_token(req: &Request) -> Result<String, AppError> {
+pub(crate) fn extract_token(req: &Request) -> Result<String, AppError> {
     let auth_header = req
         .headers()
         .get(http::header::AUTHORIZATION)
@@ -92,7 +92,7 @@ async fn verify_user_login(state: &AppState, key: &str) -> Result<(), AppError> 
         .ok_or(AppError::AuthError(AuthError::Unauthorized))
 }
 
-fn decode_jwt(jwt: String, secret: &str) -> Result<TokenData<Claims>, AppError> {
+pub(crate) fn decode_jwt(jwt: String, secret: &str) -> Result<TokenData<Claims>, AppError> {
     decode(
         &jwt,
         &DecodingKey::from_secret(secret.as_ref()),
