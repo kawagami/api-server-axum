@@ -19,7 +19,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         state,
         Router::new()
             .route("/", get(get_all))
-            .route("/:key", patch(update)),
+            .route("/{key}", patch(update)),
     )
 }
 
