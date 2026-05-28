@@ -20,11 +20,12 @@ mod ws;
 use crate::{logging::LogEntry, middleware::audit, scheduler::initialize_scheduler, state::AppState};
 use axum::{
     extract::DefaultBodyLimit,
-    http::{header, Method, StatusCode},
+    http::{header, HeaderValue, Method, StatusCode},
     middleware,
     Router,
 };
 use tokio::sync::mpsc;
+use tower_http::cors::AllowOrigin;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
@@ -36,7 +37,6 @@ pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<App
 }
 
 pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
-    let origins = ["https://kawa.homes".parse().unwrap()];
     let state = AppState::new().await;
 
     sqlx::migrate!("./migrations")
@@ -45,6 +45,13 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .expect("migration failed");
 
     state.reload_settings().await;
+
+    let cors_origins: Vec<HeaderValue> = state
+        .get_setting("cors_allowed_origins")
+        .unwrap_or_else(|| "https://kawa.homes".to_string())
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
 
     tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone()));
 
@@ -75,7 +82,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
                     Method::PATCH,
                     Method::DELETE,
                 ])
-                .allow_origin(origins)
+                .allow_origin(AllowOrigin::list(cors_origins))
                 .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
         )
         .with_state(state)

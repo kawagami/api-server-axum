@@ -5,6 +5,7 @@ use tokio::{fs, fs::File, io::BufWriter};
 use tokio_util::io::StreamReader;
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct LocalStorage {
     pub base_path: PathBuf,
     pub base_url: String,

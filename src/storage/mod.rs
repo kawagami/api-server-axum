@@ -3,6 +3,7 @@ use axum::body::Bytes;
 use futures_util::Stream;
 pub use local::{LocalStorage, LocalStorageError};
 
+#[derive(Clone)]
 pub enum Storage {
     Local(LocalStorage),
     // Firebase(FirebaseStorage),
@@ -34,6 +35,12 @@ impl Storage {
     pub async fn delete(&self, key: &str) -> Result<(), LocalStorageError> {
         match self {
             Storage::Local(s) => s.delete(key).await,
+        }
+    }
+
+    pub fn set_base_url(&mut self, url: &str) {
+        match self {
+            Storage::Local(s) => s.base_url = url.to_string(),
         }
     }
 }

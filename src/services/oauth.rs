@@ -2,7 +2,6 @@ use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{members, redis},
     state::AppState,
-    structs::config::AppConfig,
     structs::auth::{Claims, RefreshClaims},
 };
 use chrono::{Duration, Utc};
@@ -10,10 +9,10 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::Deserialize;
 use uuid::Uuid;
 
-struct OAuthConfig<'a> {
-    client_id: &'a str,
-    client_secret: &'a str,
-    redirect_url: &'a str,
+struct OAuthConfig {
+    client_id: String,
+    client_secret: String,
+    redirect_url: String,
     auth_url: &'static str,
     token_url: &'static str,
 }
@@ -34,31 +33,56 @@ impl OAuthProvider {
         }
     }
 
-    fn config_from<'a>(&self, cfg: &'a AppConfig) -> OAuthConfig<'a> {
-        let (provider_cfg, auth_url, token_url) = match self {
+    fn config_from(&self, state: &AppState) -> Result<OAuthConfig, AppError> {
+        let cfg = state.get_config();
+        let (client_secret, id_key, redirect_key, auth_url, token_url) = match self {
             Self::Google => (
-                &cfg.oauth_google,
+                &cfg.oauth_google.client_secret,
+                "google_client_id",
+                "google_redirect_url",
                 "https://accounts.google.com/o/oauth2/v2/auth",
                 "https://oauth2.googleapis.com/token",
             ),
             Self::GitHub => (
-                &cfg.oauth_github,
+                &cfg.oauth_github.client_secret,
+                "github_client_id",
+                "github_redirect_url",
                 "https://github.com/login/oauth/authorize",
                 "https://github.com/login/oauth/access_token",
             ),
             Self::Line => (
-                &cfg.oauth_line,
+                &cfg.oauth_line.client_secret,
+                "line_client_id",
+                "line_redirect_url",
                 "https://access.line.me/oauth2/v2.1/authorize",
                 "https://api.line.me/oauth2/v2.1/token",
             ),
         };
-        OAuthConfig {
-            client_id: &provider_cfg.client_id,
-            client_secret: &provider_cfg.client_secret,
-            redirect_url: &provider_cfg.redirect_url,
+
+        let client_id = state
+            .get_setting(id_key)
+            .filter(|v| !v.is_empty())
+            .ok_or_else(|| {
+                AppError::SystemError(SystemError::Internal(format!("{} not configured", id_key)))
+            })?;
+
+        let redirect_url = state
+            .get_setting(redirect_key)
+            .filter(|v| !v.is_empty())
+            .ok_or_else(|| {
+                AppError::SystemError(SystemError::Internal(format!(
+                    "{} not configured",
+                    redirect_key
+                )))
+            })?;
+
+        Ok(OAuthConfig {
+            client_id,
+            client_secret: client_secret.clone(),
+            redirect_url,
             auth_url,
             token_url,
-        }
+        })
     }
 
     pub fn name(&self) -> &'static str {
@@ -70,8 +94,8 @@ impl OAuthProvider {
     }
 }
 
-pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider, app_config: &AppConfig) -> String {
-    let cfg = provider.config_from(app_config);
+pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider, state: &AppState) -> Result<String, AppError> {
+    let cfg = provider.config_from(state)?;
 
     let scope = match provider {
         OAuthProvider::Google => "openid email profile",
@@ -81,14 +105,14 @@ pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider, app_config: &A
 
     let encode = |s: &str| form_urlencoded::byte_serialize(s.as_bytes()).collect::<String>();
 
-    format!(
+    Ok(format!(
         "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}",
         cfg.auth_url,
-        encode(cfg.client_id),
-        encode(cfg.redirect_url),
+        encode(&cfg.client_id),
+        encode(&cfg.redirect_url),
         encode(scope),
         encode(state_value),
-    )
+    ))
 }
 
 pub async fn generate_oauth_url(
@@ -97,7 +121,7 @@ pub async fn generate_oauth_url(
 ) -> Result<String, AppError> {
     let state_value = Uuid::new_v4().to_string();
     redis::set_oauth_state(state, &state_value).await?;
-    Ok(get_oauth_url(&state_value, provider, state.get_config()))
+    get_oauth_url(&state_value, provider, state)
 }
 
 pub async fn exchange_code(
@@ -111,7 +135,7 @@ pub async fn exchange_code(
         return Err(AppError::AuthError(AuthError::InvalidToken));
     }
 
-    let cfg = provider.config_from(state.get_config());
+    let cfg = provider.config_from(state)?;
     let client = state.get_http_client();
 
     let token_res = exchange_code_for_token(client, provider, &cfg, code).await?;
@@ -214,14 +238,14 @@ struct OAuthUserInfo {
 async fn exchange_code_for_token(
     client: &reqwest::Client,
     _provider: &OAuthProvider,
-    cfg: &OAuthConfig<'_>,
+    cfg: &OAuthConfig,
     code: &str,
 ) -> Result<ProviderTokenResponse, AppError> {
     let params = [
-        ("client_id", cfg.client_id),
-        ("client_secret", cfg.client_secret),
+        ("client_id", cfg.client_id.as_str()),
+        ("client_secret", cfg.client_secret.as_str()),
         ("code", code),
-        ("redirect_uri", cfg.redirect_url),
+        ("redirect_uri", cfg.redirect_url.as_str()),
         ("grant_type", "authorization_code"),
     ];
 
