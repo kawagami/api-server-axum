@@ -1,4 +1,5 @@
 mod admin;
+mod app_settings;
 mod admin_blogs;
 mod audit_logs;
 mod auth;
@@ -42,6 +43,8 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .run(state.get_pool())
         .await
         .expect("migration failed");
+
+    state.reload_settings().await;
 
     tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone()));
 

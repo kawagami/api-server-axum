@@ -5,7 +5,12 @@ use futures::stream::SplitSink;
 use reqwest::Client;
 use serde::Serialize;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 use tokio::sync::{broadcast, Mutex};
 
 use crate::storage::Storage;
@@ -20,6 +25,7 @@ pub struct AppStateInner {
     pub connections: ConnectionMap,
     pub storage: Storage,
     pub config: AppConfig,
+    pub settings: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl AppStateInner {
@@ -56,6 +62,7 @@ impl AppStateInner {
             connections: Arc::new(Mutex::new(HashMap::new())),
             storage: Storage::from_env(),
             config: AppConfig::from_env(),
+            settings: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -125,6 +132,22 @@ impl AppState {
         &self.0.config
     }
 
+    pub fn get_setting(&self, key: &str) -> Option<String> {
+        self.0.settings.read().unwrap().get(key).cloned()
+    }
+
+    pub async fn reload_settings(&self) {
+        match crate::repositories::app_settings::get_all(self.get_pool()).await {
+            Ok(rows) => {
+                let mut map = self.0.settings.write().unwrap();
+                *map = rows.into_iter().map(|s| (s.key, s.value)).collect();
+            }
+            Err(e) => {
+                tracing::error!("Failed to reload app_settings: {:?}", e);
+            }
+        }
+    }
+
     pub fn broadcast(&self, event: WsEvent, data: serde_json::Value) {
         let msg = serde_json::json!({
             "type": event.as_str(),
@@ -133,6 +156,4 @@ impl AppState {
         .to_string();
         let _ = self.get_tx().send(msg);
     }
-
-
 }

@@ -1,3 +1,4 @@
+pub mod app_settings;
 pub mod audit_logs;
 pub mod blogs;
 pub mod logs;

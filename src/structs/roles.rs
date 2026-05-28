@@ -20,6 +20,8 @@ pub enum Perm {
     StockUpdate,
     UserCreate,
     UserDelete,
+    SettingRead,
+    SettingUpdate,
 }
 
 impl Perm {
@@ -41,8 +43,10 @@ impl Perm {
             Self::ImageDelete => "image:delete",
             Self::StockRead   => "stock:read",
             Self::StockUpdate => "stock:update",
-            Self::UserCreate  => "user:create",
-            Self::UserDelete  => "user:delete",
+            Self::UserCreate     => "user:create",
+            Self::UserDelete     => "user:delete",
+            Self::SettingRead    => "setting:read",
+            Self::SettingUpdate  => "setting:update",
         }
     }
 }

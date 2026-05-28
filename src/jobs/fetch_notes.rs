@@ -9,19 +9,14 @@ pub struct FetchNotesJob;
 
 #[async_trait]
 impl AppJob for FetchNotesJob {
-    fn enabled(&self, state: &AppState) -> bool {
-        let cfg = state.get_config();
-        cfg.hackmd_token.is_some() && cfg.enable_fetch_notes_job
-    }
-
     fn cron_expression(&self) -> &str {
         "0 0 19 * * *" // 每日 UTC 19:00（UTC+8 03:00）
     }
 
     async fn run(&self, state: AppState) {
-        let token = match state.get_config().hackmd_token.as_deref() {
-            Some(t) => t.to_string(),
-            None => return,
+        let token = match state.get_setting("hackmd_token") {
+            Some(t) if !t.is_empty() => t,
+            _ => return,
         };
 
         const HACKMD_URL: &str = "https://api.hackmd.io/v1/notes";
