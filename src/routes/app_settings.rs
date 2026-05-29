@@ -13,6 +13,7 @@ use axum::{
     routing::{get, patch},
     Json, Router,
 };
+use std::collections::HashMap;
 
 pub fn new(state: AppState) -> Router<AppState> {
     super::with_auth(
@@ -26,7 +27,7 @@ pub fn new(state: AppState) -> Router<AppState> {
 async fn get_all(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
-) -> Result<Json<Vec<AppSetting>>, AppError> {
+) -> Result<Json<HashMap<String, Vec<AppSetting>>>, AppError> {
     auth_user.require_permission(Perm::SettingRead)?;
     Ok(Json(settings_service::get_all(&state).await?))
 }

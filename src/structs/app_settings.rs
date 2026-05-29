@@ -6,6 +6,7 @@ pub struct AppSetting {
     pub key: String,
     pub value: String,
     pub description: String,
+    pub category: String,
 }
 
 #[derive(Deserialize)]

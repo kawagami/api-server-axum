@@ -4,9 +4,15 @@ use crate::{
     state::AppState,
     structs::app_settings::AppSetting,
 };
+use std::collections::HashMap;
 
-pub async fn get_all(state: &AppState) -> Result<Vec<AppSetting>, AppError> {
-    repo::get_all(state.get_pool()).await
+pub async fn get_all(state: &AppState) -> Result<HashMap<String, Vec<AppSetting>>, AppError> {
+    let rows = repo::get_all(state.get_pool()).await?;
+    let mut grouped: HashMap<String, Vec<AppSetting>> = HashMap::new();
+    for setting in rows {
+        grouped.entry(setting.category.clone()).or_default().push(setting);
+    }
+    Ok(grouped)
 }
 
 pub async fn update(state: &AppState, key: &str, value: &str) -> Result<AppSetting, AppError> {

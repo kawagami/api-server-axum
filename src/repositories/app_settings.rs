@@ -3,16 +3,18 @@ use sqlx::{Pool, Postgres};
 
 pub async fn get_all(pool: &Pool<Postgres>) -> Result<Vec<AppSetting>, AppError> {
     Ok(
-        sqlx::query_as("SELECT key, value, description FROM app_settings ORDER BY key")
-            .fetch_all(pool)
-            .await?,
+        sqlx::query_as(
+            "SELECT key, value, description, category FROM app_settings ORDER BY category, key",
+        )
+        .fetch_all(pool)
+        .await?,
     )
 }
 
 pub async fn update(pool: &Pool<Postgres>, key: &str, value: &str) -> Result<AppSetting, AppError> {
     Ok(
         sqlx::query_as(
-            "UPDATE app_settings SET value = $2 WHERE key = $1 RETURNING key, value, description",
+            "UPDATE app_settings SET value = $2 WHERE key = $1 RETURNING key, value, description, category",
         )
         .bind(key)
         .bind(value)
