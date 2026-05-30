@@ -8,14 +8,12 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct LocalStorage {
     pub base_path: PathBuf,
-    pub base_url: String,
 }
 
 impl LocalStorage {
-    pub fn new(base_path: &str, base_url: &str) -> Self {
+    pub fn new(base_path: &str) -> Self {
         Self {
             base_path: PathBuf::from(base_path),
-            base_url: base_url.to_string(),
         }
     }
 
@@ -23,6 +21,7 @@ impl LocalStorage {
         &self,
         stream: S,
         content_type: &str,
+        base_url: &str,
     ) -> Result<(String, String), LocalStorageError>
     where
         S: Stream<Item = Result<Bytes, E>>,
@@ -45,7 +44,7 @@ impl LocalStorage {
         let mut file = BufWriter::new(File::create(&path).await?);
         tokio::io::copy(&mut body_reader, &mut file).await?;
 
-        let url = format!("{}/{}", self.base_url, key);
+        let url = format!("{}/{}", base_url, key);
         Ok((key, url))
     }
 

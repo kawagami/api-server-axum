@@ -23,7 +23,7 @@ pub struct AppStateInner {
     pub http_client: Client,
     pub tx: broadcast::Sender<String>,
     pub connections: ConnectionMap,
-    pub storage: RwLock<Storage>,
+    pub storage: Storage,
     pub config: AppConfig,
     pub settings: RwLock<HashMap<String, String>>,
 }
@@ -60,7 +60,7 @@ impl AppStateInner {
             http_client,
             tx,
             connections: Arc::new(Mutex::new(HashMap::new())),
-            storage: RwLock::new(Storage::from_env()),
+            storage: Storage::from_env(),
             config: AppConfig::from_env(),
             settings: RwLock::new(HashMap::new()),
         }
@@ -124,8 +124,8 @@ impl AppState {
         &self.0.connections
     }
 
-    pub fn get_storage(&self) -> Storage {
-        self.0.storage.read().unwrap().clone()
+    pub fn get_storage(&self) -> &Storage {
+        &self.0.storage
     }
 
     pub fn get_config(&self) -> &AppConfig {
@@ -139,15 +139,6 @@ impl AppState {
     pub async fn reload_settings(&self) {
         match crate::repositories::app_settings::get_all(self.get_pool()).await {
             Ok(rows) => {
-                if let Some(url) = rows
-                    .iter()
-                    .find(|r| r.key == "upload_base_url")
-                    .map(|r| &r.value)
-                    .filter(|v| !v.is_empty())
-                {
-                    self.0.storage.write().unwrap().set_base_url(url);
-                }
-
                 *self.0.settings.write().unwrap() =
                     rows.into_iter().map(|s| (s.key, s.value)).collect();
             }
