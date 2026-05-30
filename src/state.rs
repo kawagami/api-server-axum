@@ -32,7 +32,7 @@ impl AppStateInner {
     pub async fn new() -> Self {
         let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
 
-        let pool = PgPoolOptions::new()
+        let pg_pool = PgPoolOptions::new()
             .max_connections(20)
             .acquire_timeout(Duration::from_secs(3))
             .connect(&db_connection_str)
@@ -55,7 +55,7 @@ impl AppStateInner {
         let (tx, _rx) = broadcast::channel(100);
 
         Self {
-            pg_pool: pool,
+            pg_pool,
             redis_pool,
             http_client,
             tx,
