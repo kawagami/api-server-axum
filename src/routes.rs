@@ -62,7 +62,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
     Router::new()
         .nest("/admin", admin::new(state.clone()))
         .nest("/blogs", blogs::new())
-        .nest("/tools", tools::new())
+        .nest("/tools", tools::new(state.clone()))
         .nest("/notes", notes::new())
         .nest("/ws", ws::new(state.clone()))
         .nest("/roster", roster::new())
