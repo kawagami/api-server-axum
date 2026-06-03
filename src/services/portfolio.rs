@@ -3,11 +3,11 @@ use crate::{
     repositories::{
         portfolio as portfolio_repo,
         redis as redis_repo,
-        stocks::{get_ex_rights_by_range, get_stock_closing_prices_by_date_range, upsert_ex_rights, upsert_stock_closing_prices},
+        stocks::{get_ex_rights_by_range, get_stock_closing_prices_by_date_range, get_stock_name_by_code, upsert_ex_rights, upsert_stock_closing_prices},
     },
     state::AppState,
     structs::{
-        portfolio::{HistoryRecord, PortfolioEntry, PortfolioRequest},
+        portfolio::{HistoryRecord, PortfolioEntry, PortfolioRequest, PortfolioSummaryEntry},
         stocks::{NewStockClosingPrice, StockExRight},
     },
     utils::reqwest::get_json_data,
@@ -80,6 +80,51 @@ pub async fn get_history(
     let ex_events = fetch_ex_events(state, &entry.stock_code, entry.buy_date, today).await?;
 
     Ok(build_history(entry.cost_per_share, entry.shares, closes, ex_events))
+}
+
+pub async fn get_summary(
+    state: &AppState,
+    member_id: i64,
+) -> Result<Vec<PortfolioSummaryEntry>, AppError> {
+    let entries = portfolio_repo::get_by_member(state, member_id).await?;
+    let today = Local::now().date_naive();
+
+    let mut results = Vec::with_capacity(entries.len());
+    for entry in &entries {
+        let closes =
+            fetch_all_closing_prices(state, &entry.stock_code, entry.buy_date, today).await?;
+        let ex_events =
+            fetch_ex_events(state, &entry.stock_code, entry.buy_date, today).await?;
+        let history = build_history(entry.cost_per_share, entry.shares, closes, ex_events);
+
+        let latest = history.last();
+        let current_price = latest.map(|r| r.close);
+        let current_value = latest.map(|r| r.close * entry.shares as f64);
+        let pnl = latest.map(|r| r.pnl);
+        let pnl_pct = latest.map(|r| r.pnl_pct);
+
+        let stock_name = get_stock_name_by_code(state, &entry.stock_code)
+            .await
+            .unwrap_or(None);
+
+        results.push(PortfolioSummaryEntry {
+            id: entry.id,
+            member_id: entry.member_id,
+            stock_code: entry.stock_code.clone(),
+            stock_name,
+            buy_date: entry.buy_date,
+            cost_per_share: entry.cost_per_share,
+            shares: entry.shares,
+            current_price,
+            current_value,
+            pnl,
+            pnl_pct,
+            created_at: entry.created_at,
+            updated_at: entry.updated_at,
+        });
+    }
+
+    Ok(results)
 }
 
 fn twse_headers() -> HashMap<String, String> {

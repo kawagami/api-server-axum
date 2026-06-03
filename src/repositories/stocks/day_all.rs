@@ -36,6 +36,19 @@ pub async fn get_stock_day_all(
     Ok(builder.build_query_as::<StockDayAll>().fetch_all(state.get_pool()).await?)
 }
 
+pub async fn get_stock_name_by_code(
+    state: &AppState,
+    stock_code: &str,
+) -> Result<Option<String>, AppError> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT stock_name FROM stock_day_all WHERE stock_code = $1 ORDER BY trade_date DESC LIMIT 1",
+    )
+    .bind(stock_code)
+    .fetch_optional(state.get_pool())
+    .await?;
+    Ok(row.map(|(name,)| name))
+}
+
 pub async fn insert_stock_day_all_batch(
     state: &AppState,
     rows: &[StockDayAllInsertRow],
