@@ -192,6 +192,15 @@ pub enum StartPriceFilter {
     ExistsOnly,
 }
 
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct StockExRight {
+    pub stock_no: String,
+    pub ex_date: NaiveDate,
+    pub close_before: f64,
+    pub cash_div: f64,
+    pub stock_rate: f64,
+}
+
 /// 給 repository 的 fn get_stock_buyback_periods 接收 DB 資料用的結構
 #[derive(Debug, FromRow, Serialize)]
 pub struct StockBuybackPeriod {
