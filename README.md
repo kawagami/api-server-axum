@@ -13,6 +13,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - 股票資料（全市場行情、庫藏股計畫、股價變動追蹤）
 - 圖片上傳 / 管理（本機儲存）
 - 使用者 / 角色 / 權限管理
+- 投資組合管理（member 持股 CRUD）
 - 排班（roster）
 - 排程 job（cron）
 
@@ -29,6 +30,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/admin/audit_logs` | 操作稽核紀錄 |
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
+| `/member/portfolio` | member 投資組合 CRUD（需 Bearer token） |
 | `/blogs` | 部落格 CRUD |
 | `/notes` | HackMD 筆記 tags / lists |
 | `/stocks` | 股票資料查詢、pending change 管理 |

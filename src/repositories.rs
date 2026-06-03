@@ -6,6 +6,7 @@ pub mod images;
 pub mod members;
 pub mod notes;
 pub mod permissions;
+pub mod portfolio;
 pub mod redis;
 pub mod roles;
 pub mod stocks;

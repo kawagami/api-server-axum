@@ -6,6 +6,7 @@ pub mod images;
 pub mod members;
 pub mod notes;
 pub mod oauth;
+pub mod portfolio;
 pub mod roles;
 pub mod stocks;
 pub mod users;

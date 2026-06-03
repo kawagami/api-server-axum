@@ -10,6 +10,7 @@ mod members;
 mod notes;
 mod oauth;
 mod permissions;
+mod portfolio;
 mod roles;
 mod roster;
 mod stocks;
@@ -67,6 +68,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/ws", ws::new(state.clone()))
         .nest("/roster", roster::new())
         .nest("/members", members::new(state.clone()))
+        .nest("/member/portfolio", portfolio::new(state.clone()))
         .nest("/oauth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))
         .nest_service("/uploads", ServeDir::new(&upload_path))
