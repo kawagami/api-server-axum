@@ -1,10 +1,40 @@
 use crate::{
     errors::AppError,
-    repositories::portfolio as portfolio_repo,
+    repositories::{portfolio as portfolio_repo, redis as redis_repo},
     state::AppState,
-    structs::portfolio::{PortfolioEntry, PortfolioRequest},
+    structs::portfolio::{HistoryRecord, PortfolioEntry, PortfolioRequest},
+    utils::reqwest::get_json_data,
 };
+use chrono::{Datelike, Local, Months, NaiveDate};
+use reqwest::Method;
+use serde::Deserialize;
+use std::collections::HashMap;
 use uuid::Uuid;
+
+// TWT49U field indices — adjust here if TWSE changes column order
+const EX_IDX_CODE: usize = 0;
+const EX_IDX_DATE: usize = 2;
+const EX_IDX_CLOSE_BEFORE: usize = 3;
+const EX_IDX_STOCK_RATE: usize = 4;
+const EX_IDX_CASH_DIV: usize = 5;
+
+#[derive(Deserialize)]
+struct TwseResponse {
+    stat: String,
+    data: Option<Vec<Vec<String>>>,
+}
+
+struct DayClose {
+    date: NaiveDate,
+    close: f64,
+}
+
+struct ExEvent {
+    date: NaiveDate,
+    close_before: f64,
+    cash_div: f64,
+    stock_rate: f64,
+}
 
 pub async fn get_by_member(state: &AppState, member_id: i64) -> Result<Vec<PortfolioEntry>, AppError> {
     portfolio_repo::get_by_member(state, member_id).await
@@ -29,4 +59,267 @@ pub async fn update(
 
 pub async fn delete(state: &AppState, id: Uuid, member_id: i64) -> Result<(), AppError> {
     portfolio_repo::delete(state, id, member_id).await
+}
+
+pub async fn get_history(
+    state: &AppState,
+    id: Uuid,
+    member_id: i64,
+) -> Result<Vec<HistoryRecord>, AppError> {
+    let entry = portfolio_repo::get_by_id_for_member(state, id, member_id).await?;
+    let today = Local::now().date_naive();
+
+    let closes = fetch_all_closing_prices(state, &entry.stock_code, entry.buy_date, today).await?;
+    let ex_events = fetch_ex_events(state, &entry.stock_code, entry.buy_date, today).await?;
+
+    Ok(build_history(entry.cost_per_share, entry.shares, closes, ex_events))
+}
+
+fn twse_headers() -> HashMap<String, String> {
+    let mut h = HashMap::new();
+    h.insert("User-Agent".into(), "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36".into());
+    h.insert("Accept".into(), "application/json, text/javascript, */*; q=0.01".into());
+    h.insert("Accept-Language".into(), "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7".into());
+    h.insert("Referer".into(), "https://www.twse.com.tw/".into());
+    h
+}
+
+fn parse_roc_date(s: &str) -> Option<NaiveDate> {
+    let parts: Vec<&str> = s.trim().split('/').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let year: i32 = parts[0].trim().parse().ok()?;
+    let month: u32 = parts[1].trim().parse().ok()?;
+    let day: u32 = parts[2].trim().parse().ok()?;
+    NaiveDate::from_ymd_opt(year + 1911, month, day)
+}
+
+fn parse_twse_f64(s: &str) -> Option<f64> {
+    let clean = s.trim().replace(",", "");
+    if clean.is_empty() || clean == "--" || clean == "-" {
+        return None;
+    }
+    clean.parse().ok()
+}
+
+async fn fetch_closing_month(
+    state: &AppState,
+    stock_code: &str,
+    month: NaiveDate,
+) -> Result<Vec<DayClose>, AppError> {
+    let cache_key = format!("twse:stock_day:{}:{}", stock_code, month.format("%Y%m"));
+    let today = Local::now().date_naive();
+    let is_current = month.year() == today.year() && month.month() == today.month();
+    let ttl = if is_current { 3600u64 } else { 604800u64 };
+
+    if let Ok(Some(cached)) = redis_repo::cache_get(state, &cache_key).await {
+        if let Ok(rows) = serde_json::from_str::<Vec<(String, f64)>>(&cached) {
+            return Ok(rows
+                .into_iter()
+                .filter_map(|(d, c)| {
+                    NaiveDate::parse_from_str(&d, "%Y-%m-%d")
+                        .ok()
+                        .map(|date| DayClose { date, close: c })
+                })
+                .collect());
+        }
+    }
+
+    let date_str = month.format("%Y%m01").to_string();
+    let url = format!(
+        "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date={}&stockNo={}&response=json",
+        date_str, stock_code
+    );
+
+    let resp: TwseResponse = match get_json_data(
+        state.get_http_client(),
+        &url,
+        Method::GET,
+        Some(twse_headers()),
+        None,
+        None,
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!("TWSE STOCK_DAY fetch failed {}/{}: {}", stock_code, date_str, e);
+            return Ok(vec![]);
+        }
+    };
+
+    let closes: Vec<DayClose> = if resp.stat == "OK" {
+        resp.data
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|row| {
+                if row.len() < 7 {
+                    return None;
+                }
+                let date = parse_roc_date(&row[0])?;
+                let close = parse_twse_f64(&row[6])?;
+                Some(DayClose { date, close })
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+
+    let cacheable: Vec<(String, f64)> = closes
+        .iter()
+        .map(|d| (d.date.format("%Y-%m-%d").to_string(), d.close))
+        .collect();
+    if let Ok(json) = serde_json::to_string(&cacheable) {
+        let _ = redis_repo::cache_set(state, &cache_key, &json, ttl).await;
+    }
+
+    Ok(closes)
+}
+
+async fn fetch_all_closing_prices(
+    state: &AppState,
+    stock_code: &str,
+    from: NaiveDate,
+    to: NaiveDate,
+) -> Result<Vec<DayClose>, AppError> {
+    let mut all: Vec<DayClose> = Vec::new();
+    let mut current = NaiveDate::from_ymd_opt(from.year(), from.month(), 1).unwrap();
+    let end_month = NaiveDate::from_ymd_opt(to.year(), to.month(), 1).unwrap();
+
+    while current <= end_month {
+        let mut month_data = fetch_closing_month(state, stock_code, current).await?;
+        all.append(&mut month_data);
+        current = current.checked_add_months(Months::new(1)).unwrap();
+    }
+
+    all.retain(|d| d.date >= from);
+    all.sort_by_key(|d| d.date);
+    Ok(all)
+}
+
+async fn fetch_ex_events(
+    state: &AppState,
+    stock_code: &str,
+    from: NaiveDate,
+    to: NaiveDate,
+) -> Result<Vec<ExEvent>, AppError> {
+    let start_str = from.format("%Y%m%d").to_string();
+    let end_str = to.format("%Y%m%d").to_string();
+    let cache_key = format!("twse:exright:{}:{}:{}", stock_code, start_str, end_str);
+
+    if let Ok(Some(cached)) = redis_repo::cache_get(state, &cache_key).await {
+        if let Ok(rows) = serde_json::from_str::<Vec<(String, f64, f64, f64)>>(&cached) {
+            return Ok(rows
+                .into_iter()
+                .filter_map(|(d, cb, cd, sr)| {
+                    NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok().map(|date| ExEvent {
+                        date,
+                        close_before: cb,
+                        cash_div: cd,
+                        stock_rate: sr,
+                    })
+                })
+                .collect());
+        }
+    }
+
+    let url = format!(
+        "https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate={}&endDate={}&response=json",
+        start_str, end_str
+    );
+
+    let resp: TwseResponse = match get_json_data(
+        state.get_http_client(),
+        &url,
+        Method::GET,
+        Some(twse_headers()),
+        None,
+        None,
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!("TWSE TWT49U fetch failed {}/{}-{}: {}", stock_code, start_str, end_str, e);
+            return Ok(vec![]);
+        }
+    };
+
+    let events: Vec<ExEvent> = if resp.stat == "OK" {
+        resp.data
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|row| {
+                let min_len = EX_IDX_CASH_DIV + 1;
+                if row.len() < min_len {
+                    return None;
+                }
+                if row[EX_IDX_CODE].trim() != stock_code {
+                    return None;
+                }
+                let date = parse_roc_date(&row[EX_IDX_DATE])?;
+                let close_before = parse_twse_f64(&row[EX_IDX_CLOSE_BEFORE]).unwrap_or(0.0);
+                let stock_rate = parse_twse_f64(&row[EX_IDX_STOCK_RATE]).unwrap_or(0.0);
+                let cash_div = parse_twse_f64(&row[EX_IDX_CASH_DIV]).unwrap_or(0.0);
+                Some(ExEvent { date, close_before, cash_div, stock_rate })
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+
+    let cacheable: Vec<(String, f64, f64, f64)> = events
+        .iter()
+        .map(|e| (e.date.format("%Y-%m-%d").to_string(), e.close_before, e.cash_div, e.stock_rate))
+        .collect();
+    if let Ok(json) = serde_json::to_string(&cacheable) {
+        let _ = redis_repo::cache_set(state, &cache_key, &json, 86400).await;
+    }
+
+    Ok(events)
+}
+
+fn build_history(
+    cost: f64,
+    shares: i64,
+    closes: Vec<DayClose>,
+    mut ex_events: Vec<ExEvent>,
+) -> Vec<HistoryRecord> {
+    ex_events.sort_by_key(|e| e.date);
+
+    let mut adjusted_cost = cost;
+    let mut applied = 0usize;
+    let mut records = Vec::with_capacity(closes.len());
+
+    for day in &closes {
+        while applied < ex_events.len() && ex_events[applied].date <= day.date {
+            let ev = &ex_events[applied];
+            if ev.close_before > 0.0 {
+                let numer = ev.close_before - ev.cash_div;
+                let denom = ev.close_before * (1.0 + ev.stock_rate / 1000.0);
+                if denom > 0.0 {
+                    adjusted_cost = adjusted_cost * numer / denom;
+                }
+            }
+            applied += 1;
+        }
+
+        let pnl = (day.close - adjusted_cost) * shares as f64;
+        let pnl_pct = if adjusted_cost != 0.0 {
+            (day.close - adjusted_cost) / adjusted_cost * 100.0
+        } else {
+            0.0
+        };
+
+        records.push(HistoryRecord {
+            date: day.date,
+            close: day.close,
+            adjusted_cost,
+            pnl,
+            pnl_pct,
+        });
+    }
+
+    records
 }

@@ -105,3 +105,23 @@ pub async fn del_user_login(
     Ok(())
 }
 
+pub async fn cache_get(
+    state: &AppState,
+    key: &str,
+) -> Result<Option<String>, crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    let value: Option<String> = conn.get(key).await?;
+    Ok(value)
+}
+
+pub async fn cache_set(
+    state: &AppState,
+    key: &str,
+    value: &str,
+    ttl_secs: u64,
+) -> Result<(), crate::errors::AppError> {
+    let mut conn = state.get_redis_conn().await?;
+    conn.set_ex::<_, _, ()>(key, value, ttl_secs).await?;
+    Ok(())
+}
+

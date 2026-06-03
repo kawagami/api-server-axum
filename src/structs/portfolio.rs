@@ -22,3 +22,12 @@ pub struct PortfolioRequest {
     pub cost_per_share: f64,
     pub shares: i64,
 }
+
+#[derive(Serialize)]
+pub struct HistoryRecord {
+    pub date: NaiveDate,
+    pub close: f64,
+    pub adjusted_cost: f64,
+    pub pnl: f64,
+    pub pnl_pct: f64,
+}

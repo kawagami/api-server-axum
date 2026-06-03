@@ -5,6 +5,24 @@ use crate::{
 };
 use uuid::Uuid;
 
+pub async fn get_by_id_for_member(
+    state: &AppState,
+    id: Uuid,
+    member_id: i64,
+) -> Result<PortfolioEntry, AppError> {
+    let row: Option<PortfolioEntry> = sqlx::query_as(
+        "SELECT id, member_id, stock_code, buy_date, cost_per_share, shares, created_at, updated_at
+         FROM portfolio
+         WHERE id = $1 AND member_id = $2",
+    )
+    .bind(id)
+    .bind(member_id)
+    .fetch_optional(state.get_pool())
+    .await?;
+
+    row.ok_or(AppError::RequestError(RequestError::NotFound))
+}
+
 pub async fn get_by_member(state: &AppState, member_id: i64) -> Result<Vec<PortfolioEntry>, AppError> {
     let rows = sqlx::query_as(
         "SELECT id, member_id, stock_code, buy_date, cost_per_share, shares, created_at, updated_at

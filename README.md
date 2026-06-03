@@ -30,7 +30,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/admin/audit_logs` | 操作稽核紀錄 |
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
-| `/member/portfolio` | member 投資組合 CRUD（需 Bearer token） |
+| `/member/portfolio` | member 投資組合 CRUD + 歷史價格 / 還原成本（需 Bearer token） |
 | `/blogs` | 部落格 CRUD |
 | `/notes` | HackMD 筆記 tags / lists |
 | `/stocks` | 股票資料查詢、pending change 管理 |

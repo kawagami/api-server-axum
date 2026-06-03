@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
     structs::{
         members::AuthenticatedMember,
-        portfolio::{PortfolioEntry, PortfolioRequest},
+        portfolio::{HistoryRecord, PortfolioEntry, PortfolioRequest},
     },
 };
 use axum::{
@@ -21,6 +21,7 @@ pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(list).post(create))
         .route("/{id}", axum::routing::put(update).delete(delete))
+        .route("/{id}/history", get(history))
         .layer(middleware::from_fn_with_state(state, auth::authorize_member))
 }
 
@@ -55,4 +56,12 @@ async fn delete(
 ) -> Result<StatusCode, AppError> {
     portfolio_service::delete(&state, id, auth_member.member_id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn history(
+    Extension(auth_member): Extension<AuthenticatedMember>,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<HistoryRecord>>, AppError> {
+    Ok(Json(portfolio_service::get_history(&state, id, auth_member.member_id).await?))
 }
