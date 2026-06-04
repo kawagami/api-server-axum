@@ -93,36 +93,25 @@ pub async fn get_summary(
     let result = try_join_all(entries.into_iter().map(|entry| {
         let state = state.clone();
         async move {
-            let (closes, ex_events) = tokio::try_join!(
+            let (closes, ex_events, stock_name) = tokio::try_join!(
                 fetch_all_closing_prices(&state, &entry.stock_code, entry.buy_date, today),
                 fetch_ex_events(&state, &entry.stock_code, entry.buy_date, today),
+                async { Ok::<_, AppError>(get_stock_name_by_code(&state, &entry.stock_code).await.unwrap_or(None)) },
             )?;
-            let history = build_history(entry.cost_per_share, entry.shares, closes, ex_events);
 
-            let latest = history.last();
-            let current_price = latest.map(|r| r.close);
-            let current_value = latest.map(|r| r.close * entry.shares as f64);
-            let pnl = latest.map(|r| r.pnl);
-            let pnl_pct = latest.map(|r| r.pnl_pct);
-
-            let stock_name = get_stock_name_by_code(&state, &entry.stock_code)
-                .await
-                .unwrap_or(None);
+            let (current_price, current_value, pnl, pnl_pct) =
+                match compute_latest(entry.cost_per_share, entry.shares, &closes, ex_events) {
+                    Some((cp, cv, p, pp)) => (Some(cp), Some(cv), Some(p), Some(pp)),
+                    None => (None, None, None, None),
+                };
 
             Ok::<_, AppError>(PortfolioSummaryEntry {
-                id: entry.id,
-                member_id: entry.member_id,
-                stock_code: entry.stock_code,
+                base: entry,
                 stock_name,
-                buy_date: entry.buy_date,
-                cost_per_share: entry.cost_per_share,
-                shares: entry.shares,
                 current_price,
                 current_value,
                 pnl,
                 pnl_pct,
-                created_at: entry.created_at,
-                updated_at: entry.updated_at,
             })
         }
     }))
@@ -409,6 +398,39 @@ async fn cache_ex_events(state: &AppState, key: &str, events: &[ExEvent]) {
     if let Ok(json) = serde_json::to_string(&v) {
         let _ = redis_repo::cache_set(state, key, &json, 86400).await;
     }
+}
+
+fn compute_latest(
+    cost: f64,
+    shares: i64,
+    closes: &[DayClose],
+    mut ex_events: Vec<ExEvent>,
+) -> Option<(f64, f64, f64, f64)> {
+    let last = closes.last()?;
+    ex_events.sort_by_key(|e| e.date);
+
+    let mut adjusted_cost = cost;
+    for ev in &ex_events {
+        if ev.date > last.date {
+            break;
+        }
+        if ev.close_before > 0.0 {
+            let numer = ev.close_before - ev.cash_div;
+            let denom = ev.close_before * (1.0 + ev.stock_rate / 1000.0);
+            if denom > 0.0 {
+                adjusted_cost = adjusted_cost * numer / denom;
+            }
+        }
+    }
+
+    let pnl = (last.close - adjusted_cost) * shares as f64;
+    let pnl_pct = if adjusted_cost != 0.0 {
+        (last.close - adjusted_cost) / adjusted_cost * 100.0
+    } else {
+        0.0
+    };
+
+    Some((last.close, last.close * shares as f64, pnl, pnl_pct))
 }
 
 fn build_history(
