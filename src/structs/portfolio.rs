@@ -20,7 +20,7 @@ pub struct PortfolioSummaryEntry {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, FromRow)]
+#[derive(Clone, Serialize, FromRow)]
 pub struct PortfolioEntry {
     pub id: Uuid,
     pub member_id: i64,

@@ -13,9 +13,11 @@ use crate::{
     utils::reqwest::get_json_data,
 };
 use chrono::{Datelike, Local, Months, NaiveDate};
+use futures::future::try_join_all;
 use reqwest::Method;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::time::Instant;
 use uuid::Uuid;
 
 // TWT49U field indices — adjust here if TWSE changes column order
@@ -86,45 +88,53 @@ pub async fn get_summary(
     state: &AppState,
     member_id: i64,
 ) -> Result<Vec<PortfolioSummaryEntry>, AppError> {
+    let t = Instant::now();
     let entries = portfolio_repo::get_by_member(state, member_id).await?;
+    let entry_count = entries.len();
     let today = Local::now().date_naive();
 
-    let mut results = Vec::with_capacity(entries.len());
-    for entry in &entries {
-        let closes =
-            fetch_all_closing_prices(state, &entry.stock_code, entry.buy_date, today).await?;
-        let ex_events =
-            fetch_ex_events(state, &entry.stock_code, entry.buy_date, today).await?;
-        let history = build_history(entry.cost_per_share, entry.shares, closes, ex_events);
+    let result = try_join_all(entries.into_iter().map(|entry| {
+        let state = state.clone();
+        async move {
+            let t_entry = Instant::now();
+            let (closes, ex_events) = tokio::try_join!(
+                fetch_all_closing_prices(&state, &entry.stock_code, entry.buy_date, today),
+                fetch_ex_events(&state, &entry.stock_code, entry.buy_date, today),
+            )?;
+            tracing::info!("portfolio summary entry {}: {}ms", entry.stock_code, t_entry.elapsed().as_millis());
+            let history = build_history(entry.cost_per_share, entry.shares, closes, ex_events);
 
-        let latest = history.last();
-        let current_price = latest.map(|r| r.close);
-        let current_value = latest.map(|r| r.close * entry.shares as f64);
-        let pnl = latest.map(|r| r.pnl);
-        let pnl_pct = latest.map(|r| r.pnl_pct);
+            let latest = history.last();
+            let current_price = latest.map(|r| r.close);
+            let current_value = latest.map(|r| r.close * entry.shares as f64);
+            let pnl = latest.map(|r| r.pnl);
+            let pnl_pct = latest.map(|r| r.pnl_pct);
 
-        let stock_name = get_stock_name_by_code(state, &entry.stock_code)
-            .await
-            .unwrap_or(None);
+            let stock_name = get_stock_name_by_code(&state, &entry.stock_code)
+                .await
+                .unwrap_or(None);
 
-        results.push(PortfolioSummaryEntry {
-            id: entry.id,
-            member_id: entry.member_id,
-            stock_code: entry.stock_code.clone(),
-            stock_name,
-            buy_date: entry.buy_date,
-            cost_per_share: entry.cost_per_share,
-            shares: entry.shares,
-            current_price,
-            current_value,
-            pnl,
-            pnl_pct,
-            created_at: entry.created_at,
-            updated_at: entry.updated_at,
-        });
-    }
+            Ok::<_, AppError>(PortfolioSummaryEntry {
+                id: entry.id,
+                member_id: entry.member_id,
+                stock_code: entry.stock_code,
+                stock_name,
+                buy_date: entry.buy_date,
+                cost_per_share: entry.cost_per_share,
+                shares: entry.shares,
+                current_price,
+                current_value,
+                pnl,
+                pnl_pct,
+                created_at: entry.created_at,
+                updated_at: entry.updated_at,
+            })
+        }
+    }))
+    .await?;
 
-    Ok(results)
+    tracing::info!("portfolio summary member={}: {} entries, {}ms total", member_id, entry_count, t.elapsed().as_millis());
+    Ok(result)
 }
 
 fn twse_headers() -> HashMap<String, String> {
@@ -175,7 +185,9 @@ async fn fetch_closing_month(
     stock_code: &str,
     month: NaiveDate,
 ) -> Result<Vec<DayClose>, AppError> {
-    let cache_key = format!("twse:stock_day:{}:{}", stock_code, month.format("%Y%m"));
+    let t = Instant::now();
+    let month_str = month.format("%Y%m").to_string();
+    let cache_key = format!("twse:stock_day:{}:{}", stock_code, month_str);
     let today = Local::now().date_naive();
     let is_current = month.year() == today.year() && month.month() == today.month();
     let ttl = if is_current { 3600u64 } else { 604800u64 };
@@ -183,6 +195,7 @@ async fn fetch_closing_month(
     // 1. Redis
     if let Ok(Some(cached)) = redis_repo::cache_get(state, &cache_key).await {
         if let Some(data) = redis_deserialize_closes(&cached) {
+            tracing::info!("portfolio close {}/{}: redis hit {}ms", stock_code, month_str, t.elapsed().as_millis());
             return Ok(data);
         }
     }
@@ -202,6 +215,7 @@ async fn fetch_closing_month(
             if let Some(json) = redis_serialize_closes(&closes) {
                 let _ = redis_repo::cache_set(state, &cache_key, &json, ttl).await;
             }
+            tracing::info!("portfolio close {}/{}: db hit {}ms", stock_code, month_str, t.elapsed().as_millis());
             return Ok(closes);
         }
     }
@@ -245,6 +259,8 @@ async fn fetch_closing_month(
         vec![]
     };
 
+    tracing::info!("portfolio close {}/{}: twse hit {}ms ({} rows)", stock_code, month_str, t.elapsed().as_millis(), closes.len());
+
     // 4. Write DB
     if !closes.is_empty() {
         let prices: Vec<NewStockClosingPrice> = closes
@@ -270,18 +286,21 @@ async fn fetch_all_closing_prices(
     from: NaiveDate,
     to: NaiveDate,
 ) -> Result<Vec<DayClose>, AppError> {
+    let t = Instant::now();
     let mut all: Vec<DayClose> = Vec::new();
     let mut current = NaiveDate::from_ymd_opt(from.year(), from.month(), 1).unwrap();
     let end_month = NaiveDate::from_ymd_opt(to.year(), to.month(), 1).unwrap();
-
+    let mut month_count = 0usize;
     while current <= end_month {
         let mut month_data = fetch_closing_month(state, stock_code, current).await?;
         all.append(&mut month_data);
         current = current.checked_add_months(Months::new(1)).unwrap();
+        month_count += 1;
     }
-
     all.retain(|d| d.date >= from);
     all.sort_by_key(|d| d.date);
+
+    tracing::info!("portfolio closes {}: {} months, {} days, {}ms total", stock_code, month_count, all.len(), t.elapsed().as_millis());
     Ok(all)
 }
 
@@ -291,6 +310,7 @@ async fn fetch_ex_events(
     from: NaiveDate,
     to: NaiveDate,
 ) -> Result<Vec<ExEvent>, AppError> {
+    let t = Instant::now();
     let start_str = from.format("%Y%m%d").to_string();
     let end_str = to.format("%Y%m%d").to_string();
     let cache_key = format!("twse:exright:{}:{}:{}", stock_code, start_str, end_str);
@@ -298,7 +318,7 @@ async fn fetch_ex_events(
     // 1. Redis
     if let Ok(Some(cached)) = redis_repo::cache_get(state, &cache_key).await {
         if let Ok(rows) = serde_json::from_str::<Vec<(String, f64, f64, f64)>>(&cached) {
-            let events = rows
+            let events: Vec<ExEvent> = rows
                 .into_iter()
                 .filter_map(|(d, cb, cd, sr)| {
                     NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok().map(|date| ExEvent {
@@ -309,6 +329,7 @@ async fn fetch_ex_events(
                     })
                 })
                 .collect();
+            tracing::info!("portfolio exright {}: redis hit {}ms ({} events)", stock_code, t.elapsed().as_millis(), events.len());
             return Ok(events);
         }
     }
@@ -320,6 +341,7 @@ async fn fetch_ex_events(
             .iter()
             .map(|r| ExEvent { date: r.ex_date, close_before: r.close_before, cash_div: r.cash_div, stock_rate: r.stock_rate })
             .collect();
+        tracing::info!("portfolio exright {}: db hit {}ms ({} events)", stock_code, t.elapsed().as_millis(), events.len());
         cache_ex_events(state, &cache_key, &events).await;
         return Ok(events);
     }
@@ -365,6 +387,8 @@ async fn fetch_ex_events(
     } else {
         vec![]
     };
+
+    tracing::info!("portfolio exright {}: twse hit {}ms ({} events)", stock_code, t.elapsed().as_millis(), events.len());
 
     // 4. Write DB
     if !events.is_empty() {
