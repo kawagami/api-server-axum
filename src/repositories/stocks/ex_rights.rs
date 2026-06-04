@@ -1,5 +1,5 @@
 use crate::{errors::AppError, state::AppState, structs::stocks::StockExRight};
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::QueryBuilder;
 
 pub async fn upsert_ex_rights(state: &AppState, data: &[StockExRight]) -> Result<(), AppError> {
@@ -32,6 +32,39 @@ pub async fn upsert_ex_rights(state: &AppState, data: &[StockExRight]) -> Result
     qb.build().execute(state.get_pool()).await?;
 
     Ok(())
+}
+
+pub async fn upsert_ex_rights_checked(
+    state: &AppState,
+    stock_no: &str,
+    from_date: NaiveDate,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO stock_ex_rights_checked (stock_no, from_date, checked_at) \
+         VALUES ($1, $2, NOW()) \
+         ON CONFLICT (stock_no, from_date) DO UPDATE SET checked_at = NOW()",
+    )
+    .bind(stock_no)
+    .bind(from_date)
+    .execute(state.get_pool())
+    .await?;
+    Ok(())
+}
+
+pub async fn find_ex_rights_checked(
+    state: &AppState,
+    stock_no: &str,
+    from_date: NaiveDate,
+) -> Result<Option<DateTime<Utc>>, AppError> {
+    let row: Option<(DateTime<Utc>,)> = sqlx::query_as(
+        "SELECT checked_at FROM stock_ex_rights_checked \
+         WHERE stock_no = $1 AND from_date = $2",
+    )
+    .bind(stock_no)
+    .bind(from_date)
+    .fetch_optional(state.get_pool())
+    .await?;
+    Ok(row.map(|(t,)| t))
 }
 
 pub async fn get_ex_rights_by_range(

@@ -3,7 +3,7 @@ use crate::{
     repositories::{
         portfolio as portfolio_repo,
         redis as redis_repo,
-        stocks::{get_ex_rights_by_range, get_stock_closing_prices_by_date_range, get_stock_name_by_code, upsert_ex_rights, upsert_stock_closing_prices},
+        stocks::{find_ex_rights_checked, get_ex_rights_by_range, get_stock_closing_prices_by_date_range, get_stock_name_by_code, upsert_ex_rights, upsert_ex_rights_checked, upsert_stock_closing_prices},
     },
     state::AppState,
     structs::{
@@ -313,7 +313,7 @@ async fn fetch_ex_events(
     let t = Instant::now();
     let start_str = from.format("%Y%m%d").to_string();
     let end_str = to.format("%Y%m%d").to_string();
-    let cache_key = format!("twse:exright:{}:{}:{}", stock_code, start_str, end_str);
+    let cache_key = format!("twse:exright:{}:{}", stock_code, start_str);
 
     // 1. Redis
     if let Ok(Some(cached)) = redis_repo::cache_get(state, &cache_key).await {
@@ -334,7 +334,7 @@ async fn fetch_ex_events(
         }
     }
 
-    // 2. DB
+    // 2. DB (ex-rights rows)
     let db_rows = get_ex_rights_by_range(state, stock_code, from, to).await?;
     if !db_rows.is_empty() {
         let events: Vec<ExEvent> = db_rows
@@ -344,6 +344,16 @@ async fn fetch_ex_events(
         tracing::info!("portfolio exright {}: db hit {}ms ({} events)", stock_code, t.elapsed().as_millis(), events.len());
         cache_ex_events(state, &cache_key, &events).await;
         return Ok(events);
+    }
+
+    // 2.5. DB (checked table) — confirmed no ex-rights within 30 days
+    if let Ok(Some(checked_at)) = find_ex_rights_checked(state, stock_code, from).await {
+        let age_days = (chrono::Utc::now() - checked_at).num_days();
+        if age_days < 30 {
+            tracing::info!("portfolio exright {}: checked hit {}ms (0 events, age={}d)", stock_code, t.elapsed().as_millis(), age_days);
+            cache_ex_events(state, &cache_key, &[]).await;
+            return Ok(vec![]);
+        }
     }
 
     // 3. TWSE
@@ -399,6 +409,11 @@ async fn fetch_ex_events(
         if let Err(e) = upsert_ex_rights(state, &rows).await {
             tracing::warn!("upsert_ex_rights failed {}: {}", stock_code, e);
         }
+    }
+
+    // 4.5. Write checked record (regardless of result, marks TWSE was queried)
+    if let Err(e) = upsert_ex_rights_checked(state, stock_code, from).await {
+        tracing::warn!("upsert_ex_rights_checked failed {}: {}", stock_code, e);
     }
 
     // 5. Write Redis
