@@ -78,7 +78,7 @@ pub async fn get_active_buyback_prices(
     .await?)
 }
 
-pub async fn get_active_buyback_prices_v4(
+pub async fn get_active_buyback_prices_filtered(
     state: &AppState,
     filter: StartPriceFilter,
 ) -> Result<Vec<StockBuybackInfo>, AppError> {

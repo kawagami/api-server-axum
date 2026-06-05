@@ -3,6 +3,7 @@ use crate::{
     state::AppState,
     structs::stocks::NewStockClosingPrice,
 };
+use chrono::NaiveDate;
 use sqlx::QueryBuilder;
 
 pub async fn upsert_stock_closing_prices(
@@ -36,18 +37,16 @@ pub async fn upsert_stock_closing_prices(
 pub async fn get_stock_closing_prices_by_date_range(
     state: &AppState,
     stock_no: &str,
-    start_date: &str,
-    end_date: &str,
+    start_date: NaiveDate,
+    end_date: NaiveDate,
 ) -> Result<Vec<NewStockClosingPrice>, AppError> {
-    let mut qb = QueryBuilder::new("SELECT * FROM stock_closing_prices s WHERE 1=1");
-
-    qb.push(" AND s.stock_no = ");
-    qb.push_bind(stock_no);
-    qb.push(" AND s.date BETWEEN TO_DATE(");
-    qb.push_bind(start_date);
-    qb.push(", 'YYYYMMDD') AND TO_DATE(");
-    qb.push_bind(end_date);
-    qb.push(", 'YYYYMMDD')");
-
-    Ok(qb.build_query_as().fetch_all(state.get_pool()).await?)
+    Ok(sqlx::query_as(
+        "SELECT stock_no, date, close_price FROM stock_closing_prices
+        WHERE stock_no = $1 AND date BETWEEN $2 AND $3",
+    )
+    .bind(stock_no)
+    .bind(start_date)
+    .bind(end_date)
+    .fetch_all(state.get_pool())
+    .await?)
 }

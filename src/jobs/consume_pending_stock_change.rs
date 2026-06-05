@@ -14,7 +14,7 @@ pub struct ConsumePendingStockChangeJob;
 #[async_trait]
 impl AppJob for ConsumePendingStockChangeJob {
     fn cron_expression(&self) -> &str {
-        "0 * * * * *" // 每分鐘執行一次
+        "0 * * * * *"
     }
 
     async fn run(&self, state: AppState) {

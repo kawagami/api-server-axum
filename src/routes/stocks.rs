@@ -37,8 +37,8 @@ pub fn new(state: AppState) -> Router<AppState> {
                 get(get_unfinished_buyback_price_gap),
             )
             .route(
-                "/get_stock_buyback_periods_v2",
-                get(get_stock_buyback_periods_v2),
+                "/get_stock_buyback_periods",
+                get(get_stock_buyback_periods),
             ),
     )
 }
@@ -90,7 +90,7 @@ pub async fn get_unfinished_buyback_price_gap(
     Ok(Json(stocks_service::get_active_buyback_prices(&state).await?))
 }
 
-pub async fn get_stock_buyback_periods_v2(
+pub async fn get_stock_buyback_periods(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackPeriod>>, AppError> {

@@ -182,14 +182,13 @@ async fn fetch_closing_month(
 
     // 2. DB — past months only (historical data is complete; current month may be partial)
     if !is_current {
-        let first_day = month.format("%Y%m%d").to_string();
+        let first_day = month;
         let last_day = month
             .checked_add_months(Months::new(1))
             .and_then(|d| d.pred_opt())
-            .map(|d| d.format("%Y%m%d").to_string())
-            .unwrap_or_default();
+            .unwrap_or(month);
 
-        let db_rows = get_stock_closing_prices_by_date_range(state, stock_code, &first_day, &last_day).await?;
+        let db_rows = get_stock_closing_prices_by_date_range(state, stock_code, first_day, last_day).await?;
         if !db_rows.is_empty() {
             let closes: Vec<DayClose> = db_rows.iter().map(|r| DayClose { date: r.date, close: r.close_price }).collect();
             if let Some(json) = redis_serialize_closes(&closes) {

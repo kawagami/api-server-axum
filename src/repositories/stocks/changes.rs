@@ -2,7 +2,7 @@ use crate::{
     errors::AppError,
     state::AppState,
     structs::stocks::{
-        Conditions, StockChangePaginatedResponse, StockChangeWithoutId, StockRequest,
+        Conditions, StockChange, StockChangePaginatedResponse, StockChangeRef,
     },
 };
 use sqlx::{QueryBuilder, Row};
@@ -40,19 +40,15 @@ pub async fn get_all_stock_changes(
     Ok(StockChangePaginatedResponse { data, total })
 }
 
-
 pub async fn get_one_pending_stock_change(
     state: &AppState,
-) -> Result<Option<StockRequest>, AppError> {
+) -> Result<Option<StockChangeRef>, AppError> {
     let row = sqlx::query(
         r#"
         SELECT stock_no, start_date, end_date
         FROM stock_changes
         WHERE status = 'pending'
-            AND TO_DATE(
-                (CAST((CAST(end_date AS TEXT)::INT + 19110000) AS TEXT)),
-                'YYYYMMDD'
-            ) <= CURRENT_DATE
+            AND end_date <= CURRENT_DATE
         ORDER BY created_at ASC
         LIMIT 1
         "#,
@@ -61,7 +57,7 @@ pub async fn get_one_pending_stock_change(
     .await?;
 
     if let Some(row) = row {
-        Ok(Some(StockRequest {
+        Ok(Some(StockChangeRef {
             stock_no: row.get("stock_no"),
             start_date: row.get("start_date"),
             end_date: row.get("end_date"),
@@ -73,7 +69,7 @@ pub async fn get_one_pending_stock_change(
 
 pub async fn upsert_stock_change(
     state: &AppState,
-    info: &StockChangeWithoutId,
+    info: &StockChange,
 ) -> Result<(), AppError> {
     sqlx::query(
         r#"
@@ -94,9 +90,9 @@ pub async fn upsert_stock_change(
     )
     .bind(&info.stock_no)
     .bind(&info.stock_name)
-    .bind(&info.start_date)
+    .bind(info.start_date)
     .bind(&info.start_price)
-    .bind(&info.end_date)
+    .bind(info.end_date)
     .bind(&info.end_price)
     .bind(&info.change)
     .execute(state.get_pool())
@@ -107,15 +103,15 @@ pub async fn upsert_stock_change(
 
 pub async fn update_stock_change_failed(
     state: &AppState,
-    stock: &StockRequest,
+    stock: &StockChangeRef,
 ) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE stock_changes SET updated_at = NOW(), status = 'failed'
         WHERE stock_no = $1 AND start_date = $2 AND end_date = $3",
     )
     .bind(&stock.stock_no)
-    .bind(&stock.start_date)
-    .bind(&stock.end_date)
+    .bind(stock.start_date)
+    .bind(stock.end_date)
     .execute(state.get_pool())
     .await?;
 
@@ -126,10 +122,7 @@ pub async fn sync_buyback_periods_to_pending(state: &AppState) -> Result<u64, Ap
     let result = sqlx::query(
         r#"
         INSERT INTO stock_changes (stock_no, start_date, end_date)
-        SELECT
-            bp.stock_no,
-            LPAD((EXTRACT(YEAR FROM bp.start_date)::INT - 1911)::TEXT, 3, '0') || TO_CHAR(bp.start_date, 'MMDD'),
-            LPAD((EXTRACT(YEAR FROM bp.end_date)::INT - 1911)::TEXT, 3, '0') || TO_CHAR(bp.end_date, 'MMDD')
+        SELECT bp.stock_no, bp.start_date, bp.end_date
         FROM stock_buyback_periods bp
         ON CONFLICT (stock_no, start_date, end_date) DO NOTHING
         "#,
@@ -153,4 +146,3 @@ pub async fn update_one_stock_change_pending(state: &AppState, id: i32) -> Resul
 
     Ok(())
 }
-

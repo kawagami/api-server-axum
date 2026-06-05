@@ -3,6 +3,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+/// HTML 解析 / buyback API 輸入用（民國日期字串）
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct StockRequest {
     pub stock_no: String,
@@ -10,24 +11,20 @@ pub struct StockRequest {
     pub end_date: String,
 }
 
-#[derive(Serialize, Deserialize, FromRow, Default)]
-pub struct StockChange {
-    pub id: i32,
+/// stock_changes 資料列的識別 key（西元 NaiveDate）
+#[derive(Debug, Clone)]
+pub struct StockChangeRef {
     pub stock_no: String,
-    pub start_date: String,
-    pub end_date: String,
-    pub status: Option<String>,
-    pub stock_name: Option<String>,
-    pub start_price: Option<f64>,
-    pub end_price: Option<f64>,
-    pub change: Option<f64>,
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
 }
 
 #[derive(Serialize, Deserialize, FromRow, Default)]
-pub struct StockChangeWithoutId {
+pub struct StockChange {
+    pub id: Option<i32>,
     pub stock_no: String,
-    pub start_date: String,
-    pub end_date: String,
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
     pub status: Option<String>,
     pub stock_name: Option<String>,
     pub start_price: Option<f64>,
@@ -95,10 +92,10 @@ pub struct StockClosingPriceResponse {
 
 #[derive(Serialize)]
 pub struct StockStats {
-    pub price_diff: f64,     // end - start
-    pub percent_change: f64, // %
+    pub price_diff: f64,
+    pub percent_change: f64,
     pub is_increase: bool,
-    pub day_span: i64, // 天數 (可正可負)
+    pub day_span: i64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -143,28 +140,12 @@ pub struct StockDayAllInsertRow {
     pub transaction_count: i32,
 }
 
-/// 給 repository 的 fn get_active_buyback_prices 接收 DB 資料用的結構
-///
-/// 包含股票代號、庫藏股起訖日期，以及起始日價格與最新價格等資訊
 #[derive(Debug, FromRow, Serialize)]
 pub struct StockBuybackInfo {
-    /// 股票代號。
     pub stock_no: String,
-
-    /// 庫藏股開始日期。
     pub start_date: NaiveDate,
-
-    /// 庫藏股結束日期。
     pub end_date: NaiveDate,
-
-    /// 庫藏股開始當日的股價。
-    ///
-    /// 若資料缺漏則為 `None`。
     pub price_on_start_date: Option<f64>,
-
-    /// 最新的股價。
-    ///
-    /// 若資料尚未更新則為 `None`。
     pub latest_price: Option<Decimal>,
 }
 
@@ -180,15 +161,11 @@ pub struct StockBuybackMoreInfo {
     pub diff_percent: Option<Decimal>,
 }
 
-/// 定義查詢篩選條件的枚舉
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub enum StartPriceFilter {
-    /// 全部（不過濾）
     All,
-    /// 只有沒起始價格的
     MissingOnly,
-    /// 只有有起始價格的
     ExistsOnly,
 }
 
@@ -201,13 +178,9 @@ pub struct StockExRight {
     pub stock_rate: f64,
 }
 
-/// 給 repository 的 fn get_stock_buyback_periods 接收 DB 資料用的結構
 #[derive(Debug, FromRow, Serialize)]
 pub struct StockBuybackPeriod {
-    /// 股票代號。
     pub stock_no: String,
-    /// 庫藏股開始日期。
     pub start_date: NaiveDate,
-    /// 庫藏股結束日期。
     pub end_date: NaiveDate,
 }
