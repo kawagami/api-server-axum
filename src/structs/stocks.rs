@@ -11,6 +11,13 @@ pub struct StockRequest {
     pub end_date: String,
 }
 
+/// HTML 解析庫藏股結果（已轉換為西元 NaiveDate）
+pub struct BuybackRecord {
+    pub stock_no: String,
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
+}
+
 /// stock_changes 資料列的識別 key（西元 NaiveDate）
 #[derive(Debug, Clone)]
 pub struct StockChangeRef {

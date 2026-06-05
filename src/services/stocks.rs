@@ -10,7 +10,7 @@ use crate::{
         Conditions, GetStockDayAll, NewStockClosingPrice, Pagination, StockBuybackMoreInfo,
         StockBuybackPeriod, StockChange, StockChangePaginatedResponse, StockChangeRef,
         StockClosingPriceResponse, StockDayAll, StockDayAllInsertRow, StockDayAvgResponse,
-        StockRequest, StockStats, TwseApiResponse,
+        BuybackRecord, StockRequest, StockStats, TwseApiResponse,
     },
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
@@ -19,18 +19,21 @@ use reqwest::Client;
 use scraper::{Html, Selector};
 use std::collections::HashMap;
 
-pub fn parse_buyback_stock_raw_html(html: String) -> Vec<StockRequest> {
+fn parse_roc_date(s: &str) -> Option<NaiveDate> {
+    let parts: Vec<&str> = s.split('/').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let year = parts[0].parse::<i32>().ok()? + 1911;
+    let month = parts[1].parse::<u32>().ok()?;
+    let day = parts[2].parse::<u32>().ok()?;
+    NaiveDate::from_ymd_opt(year, month, day)
+}
+
+pub fn parse_buyback_stock_raw_html(html: String) -> Vec<BuybackRecord> {
     let document = Html::parse_document(&html);
-
-    let row_selector = Selector::parse("tr.odd, tr.even").unwrap_or_else(|e| {
-        tracing::error!("Failed to parse row selector: {}", e);
-        Selector::parse("tr").unwrap()
-    });
-
-    let cell_selector = Selector::parse("td").unwrap_or_else(|e| {
-        tracing::error!("Failed to parse cell selector: {}", e);
-        Selector::parse("td").unwrap()
-    });
+    let row_selector = Selector::parse("tr.odd, tr.even").unwrap();
+    let cell_selector = Selector::parse("td").unwrap();
 
     document
         .select(&row_selector)
@@ -49,17 +52,24 @@ pub fn parse_buyback_stock_raw_html(html: String) -> Vec<StockRequest> {
             };
 
             let stock_no = get_cell_text(1);
-            let start_date = get_cell_text(9).replace("/", "");
-            let end_date = get_cell_text(10).replace("/", "");
+            let start_raw = get_cell_text(9);
+            let end_raw = get_cell_text(10);
 
-            if stock_no.is_empty() || start_date.is_empty() || end_date.is_empty() {
+            let start_date = parse_roc_date(&start_raw);
+            let end_date = parse_roc_date(&end_raw);
+
+            if stock_no.is_empty() || start_date.is_none() || end_date.is_none() {
+                tracing::warn!(
+                    "parse_buyback_stock_raw_html: skipped row stock_no={:?} start={:?} end={:?}",
+                    stock_no, start_raw, end_raw
+                );
                 return None;
             }
 
-            Some(StockRequest {
+            Some(BuybackRecord {
                 stock_no,
-                start_date,
-                end_date,
+                start_date: start_date.unwrap(),
+                end_date: end_date.unwrap(),
             })
         })
         .collect()
