@@ -5,7 +5,7 @@ use crate::{
     structs::jobs::AppJob,
 };
 use async_trait::async_trait;
-use chrono::{Datelike, Local, Months, NaiveDate};
+use chrono::{Datelike, Duration, Local, Months, NaiveDate};
 
 pub struct FetchBuybackPeriodsJob;
 
@@ -17,11 +17,12 @@ impl AppJob for FetchBuybackPeriodsJob {
 
     async fn run(&self, state: AppState) {
         let today = Local::now().naive_local().date();
+        let six_months_ago = today - Duration::days(180);
         let three_months_later = today
             .checked_add_months(Months::new(3))
             .expect("overflow adding 3 months");
 
-        let start = date_to_roc_string(today);
+        let start = date_to_roc_string(six_months_ago);
         let end = date_to_roc_string(three_months_later);
 
         match get_buyback_stock_raw_html_string(state.get_http_client(), &start, &end).await {
