@@ -1,11 +1,12 @@
 use crate::{
     jobs::{
-        fetch_historical_closing_prices::FetchHistoricalClosingPricesJob,
+        cleanup_stock_change_duplicates::CleanupStockChangeDuplicatesJob,
         cleanup_unused_images::CleanupUnusedImagesJob,
-        fetch_notes::FetchNotesJob,
-        fetch_buyback_periods::FetchBuybackPeriodsJob,
-        fetch_stock_day_all::FetchStockDayAllJob,
         consume_pending_stock_change::ConsumePendingStockChangeJob,
+        fetch_buyback_periods::FetchBuybackPeriodsJob,
+        fetch_historical_closing_prices::FetchHistoricalClosingPricesJob,
+        fetch_notes::FetchNotesJob,
+        fetch_stock_day_all::FetchStockDayAllJob,
         sync_buyback_to_pending::SyncBuybackToPendingJob,
     },
     state::AppState,
@@ -24,6 +25,7 @@ pub async fn initialize_scheduler(state: AppState) {
     add_job(&scheduler, state.clone(), FetchHistoricalClosingPricesJob).await;
     add_job(&scheduler, state.clone(), ConsumePendingStockChangeJob).await;
     add_job(&scheduler, state.clone(), SyncBuybackToPendingJob).await;
+    add_job(&scheduler, state.clone(), CleanupStockChangeDuplicatesJob).await;
 
     scheduler.start().await.expect("failed to start scheduler");
 }

@@ -20,7 +20,7 @@ pub async fn bulk_insert_stock_buyback_periods(
     let result = sqlx::query(
         "INSERT INTO stock_buyback_periods (stock_no, start_date, end_date)
         SELECT * FROM UNNEST($1::text[], $2::date[], $3::date[])
-        ON CONFLICT (stock_no, start_date, end_date) DO NOTHING",
+        ON CONFLICT (stock_no, start_date) DO UPDATE SET end_date = EXCLUDED.end_date",
     )
     .bind(&stock_nos)
     .bind(&start_dates)
