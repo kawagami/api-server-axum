@@ -53,3 +53,4 @@ futures-util = { version = "0.3", default-features = false, features = [
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
 tokio-util = { version = "0.7.18", features = ["io"] }
 zhconv = "0.4.1"
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder", "hostname"] }

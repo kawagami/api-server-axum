@@ -112,6 +112,20 @@ pub async fn get_active_buyback_prices_filtered(
     Ok(qb.build_query_as().fetch_all(state.get_pool()).await?)
 }
 
+pub async fn get_new_future_buybacks(
+    state: &AppState,
+) -> Result<Vec<StockBuybackPeriod>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT stock_no, start_date, end_date
+         FROM stock_buyback_periods
+         WHERE start_date > CURRENT_DATE
+           AND created_at::date = CURRENT_DATE
+         ORDER BY start_date ASC",
+    )
+    .fetch_all(state.get_pool())
+    .await?)
+}
+
 pub async fn get_stock_buyback_periods(
     state: &AppState,
 ) -> Result<Vec<StockBuybackPeriod>, AppError> {

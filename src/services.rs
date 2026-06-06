@@ -1,4 +1,5 @@
 pub mod app_settings;
+pub mod email;
 pub mod audit_logs;
 pub mod auth;
 pub mod blogs;

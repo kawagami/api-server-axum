@@ -1,6 +1,9 @@
 use crate::{
     repositories::stocks,
-    services::stocks::{get_buyback_stock_raw_html_string, parse_buyback_stock_raw_html},
+    services::{
+        email::send_notification,
+        stocks::{get_buyback_stock_raw_html_string, parse_buyback_stock_raw_html},
+    },
     state::AppState,
     structs::jobs::AppJob,
 };
@@ -30,13 +33,38 @@ impl AppJob for FetchBuybackPeriodsJob {
                 let records = parse_buyback_stock_raw_html(html_string);
                 tracing::info!("parsed {} buyback records ({} ~ {})", records.len(), start, end);
                 match stocks::bulk_insert_stock_buyback_periods(&state, &records).await {
-                    Ok(n) => tracing::info!("bulk_insert_stock_buyback_periods inserted {} rows", n),
+                    Ok(n) => {
+                        tracing::info!("bulk_insert_stock_buyback_periods inserted {} rows", n);
+                        notify_new_future_buybacks(&state).await;
+                    }
                     Err(e) => tracing::error!("bulk_insert_stock_buyback_periods fail: {}", e),
                 }
             }
             Err(e) => tracing::error!("get_buyback_stock_raw_html_string fail: {}", e),
         }
     }
+}
+
+async fn notify_new_future_buybacks(state: &AppState) {
+    let new_records = match stocks::get_new_future_buybacks(state).await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!("get_new_future_buybacks fail: {}", e);
+            return;
+        }
+    };
+
+    if new_records.is_empty() {
+        return;
+    }
+
+    let lines: Vec<String> = new_records
+        .iter()
+        .map(|r| format!("{}: {} ~ {}", r.stock_no, r.start_date, r.end_date))
+        .collect();
+    let body = format!("新增 {} 筆未來庫藏股：\n\n{}", new_records.len(), lines.join("\n"));
+
+    send_notification(state, "新庫藏股通知", body).await;
 }
 
 fn date_to_roc_string(date: NaiveDate) -> String {
