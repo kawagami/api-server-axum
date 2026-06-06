@@ -52,6 +52,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `FetchStockDayAllJob` | 每日 UTC 20:00 | 抓全市場行情寫入 `stock_day_all` |
 | `FetchBuybackPeriodsJob` | 每日 UTC 20:00 | 抓庫藏股計畫 HTML 寫入 `stock_buyback_periods` |
 | `SyncBuybackToPendingJob` | 每日 UTC 20:10 | 將 `stock_buyback_periods` 同步為 pending stock_changes |
+| `CleanupStockChangeDuplicatesJob` | 每日 UTC 21:00 | 清除 end_date 與 `stock_buyback_periods` 不符的重複 stock_changes |
 
 ## 技術棧
 
