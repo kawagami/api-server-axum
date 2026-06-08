@@ -1,4 +1,3 @@
-pub mod cleanup_stock_change_duplicates;
 pub mod cleanup_unused_images;
 pub mod consume_pending_stock_change;
 pub mod fetch_buyback_periods;

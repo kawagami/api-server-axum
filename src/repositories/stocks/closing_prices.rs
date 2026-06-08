@@ -8,7 +8,7 @@ use sqlx::QueryBuilder;
 
 pub async fn upsert_stock_closing_prices(
     state: &AppState,
-    data: &Vec<NewStockClosingPrice>,
+    data: &[NewStockClosingPrice],
 ) -> Result<(), AppError> {
     if data.is_empty() {
         return Ok(());

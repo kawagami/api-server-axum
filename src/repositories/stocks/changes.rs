@@ -78,11 +78,12 @@ pub async fn upsert_stock_change(
             end_date, end_price, change, status, created_at, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', now(), now())
-        ON CONFLICT (stock_no, start_date, end_date)
+        ON CONFLICT (stock_no, start_date)
         DO UPDATE SET
             status = 'completed',
             stock_name = EXCLUDED.stock_name,
             start_price = EXCLUDED.start_price,
+            end_date = EXCLUDED.end_date,
             end_price = EXCLUDED.end_price,
             change = EXCLUDED.change,
             updated_at = now()
@@ -124,7 +125,9 @@ pub async fn sync_buyback_periods_to_pending(state: &AppState) -> Result<u64, Ap
         INSERT INTO stock_changes (stock_no, start_date, end_date)
         SELECT bp.stock_no, bp.start_date, bp.end_date
         FROM stock_buyback_periods bp
-        ON CONFLICT (stock_no, start_date, end_date) DO NOTHING
+        ON CONFLICT (stock_no, start_date)
+        DO UPDATE SET end_date = EXCLUDED.end_date
+        WHERE stock_changes.status = 'pending'
         "#,
     )
     .execute(state.get_pool())

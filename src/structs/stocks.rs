@@ -139,11 +139,11 @@ pub struct StockDayAllInsertRow {
     pub stock_name: String,
     pub trade_volume: i64,
     pub trade_amount: i64,
-    pub open_price: f64,
-    pub high_price: f64,
-    pub low_price: f64,
-    pub close_price: f64,
-    pub price_change: f64,
+    pub open_price: Decimal,
+    pub high_price: Decimal,
+    pub low_price: Decimal,
+    pub close_price: Decimal,
+    pub price_change: Decimal,
     pub transaction_count: i32,
 }
 
@@ -153,7 +153,7 @@ pub struct StockBuybackInfo {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub price_on_start_date: Option<f64>,
-    pub latest_price: Option<Decimal>,
+    pub latest_price: Option<f64>,
 }
 
 #[derive(Debug, FromRow, Serialize)]
@@ -163,9 +163,9 @@ pub struct StockBuybackMoreInfo {
     pub start_date: NaiveDate,
     pub end_date: NaiveDate,
     pub price_on_start_date: Option<f64>,
-    pub latest_price: Option<Decimal>,
-    pub diff: Option<Decimal>,
-    pub diff_percent: Option<Decimal>,
+    pub latest_price: Option<f64>,
+    pub diff: Option<f64>,
+    pub diff_percent: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy)]

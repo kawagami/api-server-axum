@@ -16,8 +16,13 @@ use crate::{
 };
 use chrono::{Duration, NaiveDate};
 use reqwest::Client;
+use rust_decimal::Decimal;
 use scraper::{Html, Selector};
 use std::collections::HashMap;
+use std::sync::LazyLock;
+use tokio::sync::Semaphore;
+
+static TWSE_SEMAPHORE: LazyLock<Semaphore> = LazyLock::new(|| Semaphore::new(1));
 
 fn parse_roc_date(s: &str) -> Option<NaiveDate> {
     let parts: Vec<&str> = s.split('/').collect();
@@ -106,6 +111,7 @@ pub async fn get_stock_day_avg(
     stock_no: &str,
     date: NaiveDate,
 ) -> Result<StockDayAvgResponse, AppError> {
+    let _permit = TWSE_SEMAPHORE.acquire().await.unwrap();
     let date_str = date.format("%Y%m%d").to_string();
     let url = format!(
         "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY_AVG?date={}&stockNo={}&response=json&_={}",
@@ -289,7 +295,7 @@ pub async fn stock_day_all_service(state: &AppState) -> Result<(), AppError> {
         if s.is_empty() || s == "--" { None } else { s.trim().replace(",", "").parse().ok() }
     };
 
-    let parse_f64 = |s: &str| -> Option<f64> {
+    let parse_decimal = |s: &str| -> Option<Decimal> {
         if s.is_empty() || s == "--" { None } else { s.trim().replace(",", "").parse().ok() }
     };
 
@@ -302,11 +308,11 @@ pub async fn stock_day_all_service(state: &AppState) -> Result<(), AppError> {
                 stock_name: row[1].clone(),
                 trade_volume: parse_i64(&row[2])?,
                 trade_amount: parse_i64(&row[3])?,
-                open_price: parse_f64(&row[4])?,
-                high_price: parse_f64(&row[5])?,
-                low_price: parse_f64(&row[6])?,
-                close_price: parse_f64(&row[7])?,
-                price_change: parse_f64(&row[8])?,
+                open_price: parse_decimal(&row[4])?,
+                high_price: parse_decimal(&row[5])?,
+                low_price: parse_decimal(&row[6])?,
+                close_price: parse_decimal(&row[7])?,
+                price_change: parse_decimal(&row[8])?,
                 transaction_count: parse_i64(&row[9]).unwrap_or(0) as i32,
             })
         })

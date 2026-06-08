@@ -1,5 +1,6 @@
 use crate::{errors::AppError, state::AppState, structs::stocks::{StockDayAll, StockDayAllInsertRow}};
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use sqlx::QueryBuilder;
 
 pub async fn get_stock_day_all(
@@ -62,11 +63,11 @@ pub async fn insert_stock_day_all_batch(
     let stock_names: Vec<&str> = rows.iter().map(|r| r.stock_name.as_str()).collect();
     let trade_volumes: Vec<i64> = rows.iter().map(|r| r.trade_volume).collect();
     let trade_amounts: Vec<i64> = rows.iter().map(|r| r.trade_amount).collect();
-    let open_prices: Vec<f64> = rows.iter().map(|r| r.open_price).collect();
-    let high_prices: Vec<f64> = rows.iter().map(|r| r.high_price).collect();
-    let low_prices: Vec<f64> = rows.iter().map(|r| r.low_price).collect();
-    let close_prices: Vec<f64> = rows.iter().map(|r| r.close_price).collect();
-    let price_changes: Vec<f64> = rows.iter().map(|r| r.price_change).collect();
+    let open_prices: Vec<Decimal> = rows.iter().map(|r| r.open_price).collect();
+    let high_prices: Vec<Decimal> = rows.iter().map(|r| r.high_price).collect();
+    let low_prices: Vec<Decimal> = rows.iter().map(|r| r.low_price).collect();
+    let close_prices: Vec<Decimal> = rows.iter().map(|r| r.close_price).collect();
+    let price_changes: Vec<Decimal> = rows.iter().map(|r| r.price_change).collect();
     let transaction_counts: Vec<i32> = rows.iter().map(|r| r.transaction_count).collect();
 
     let query = r#"
@@ -78,9 +79,9 @@ pub async fn insert_stock_day_all_batch(
         )
         SELECT * FROM UNNEST(
             $1::date[], $2::text[], $3::text[],
-            $4::bigint[], $5::bigint[], $6::double precision[],
-            $7::double precision[], $8::double precision[], $9::double precision[],
-            $10::double precision[], $11::int[]
+            $4::bigint[], $5::bigint[], $6::numeric[],
+            $7::numeric[], $8::numeric[], $9::numeric[],
+            $10::numeric[], $11::int[]
         )
         ON CONFLICT (trade_date, stock_code) DO NOTHING;
     "#;

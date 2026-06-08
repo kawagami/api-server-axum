@@ -41,8 +41,8 @@ pub async fn get_active_buyback_prices(
             p.start_date,
             p.end_date,
             start_date_price.close_price AS price_on_start_date,
-            latest_prices.close_price AS latest_price,
-            ROUND((latest_prices.close_price - start_date_price.close_price)::numeric, 2) AS diff,
+            latest_prices.close_price::double precision AS latest_price,
+            ROUND((latest_prices.close_price - start_date_price.close_price)::numeric, 2)::double precision AS diff,
             ROUND(
                 CASE
                     WHEN start_date_price.close_price IS NOT NULL AND start_date_price.close_price <> 0
@@ -50,7 +50,7 @@ pub async fn get_active_buyback_prices(
                     ELSE NULL
                 END,
                 2
-            ) AS diff_percent
+            )::double precision AS diff_percent
         FROM stock_buyback_periods p
         LEFT JOIN (
             SELECT DISTINCT ON (stock_code) stock_code, stock_name, trade_date, close_price
@@ -81,7 +81,7 @@ pub async fn get_active_buyback_prices_filtered(
             p.start_date,
             p.end_date,
             start_date_price.close_price AS price_on_start_date,
-            latest_prices.close_price AS latest_price
+            latest_prices.close_price::double precision AS latest_price
         FROM stock_buyback_periods p
         LEFT JOIN (
             SELECT DISTINCT ON (stock_code) stock_code, trade_date, close_price
