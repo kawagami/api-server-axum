@@ -5,7 +5,6 @@ use crate::{
         upsert_stock_closing_prices,
     },
     repositories::stocks as stocks_repo,
-    state::AppState,
     structs::stocks::{
         Conditions, GetStockDayAll, NewStockClosingPrice, Pagination, StockBuybackMoreInfo,
         StockBuybackPeriod, StockChange, StockChangePaginatedResponse, StockChangeRef,
@@ -18,6 +17,7 @@ use chrono::{Duration, NaiveDate};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use scraper::{Html, Selector};
+use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
 use std::sync::LazyLock;
 use tokio::sync::Semaphore;
@@ -212,7 +212,8 @@ pub fn get_stock_price_by_date(
 
 /// DB 優先，cache miss 才打 TWSE
 pub async fn fetch_stock_price_for_date(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    client: &Client,
     stock_no: &str,
     date: NaiveDate,
 ) -> Result<NewStockClosingPrice, AppError> {
@@ -229,7 +230,7 @@ pub async fn fetch_stock_price_for_date(
     let range_end = date + Duration::days(3);
 
     let db_prices =
-        get_stock_closing_prices_by_date_range(state, stock_no, range_start, range_end).await?;
+        get_stock_closing_prices_by_date_range(pool, stock_no, range_start, range_end).await?;
 
     if !db_prices.is_empty() {
         if let Ok(price) = get_stock_price_by_date(&db_prices, date) {
@@ -237,22 +238,23 @@ pub async fn fetch_stock_price_for_date(
         }
     }
 
-    let response = get_stock_day_avg(state.get_http_client(), stock_no, date).await?;
+    let response = get_stock_day_avg(client, stock_no, date).await?;
     let closing_prices = parse_stock_day_avg_response(response, stock_no);
-    upsert_stock_closing_prices(state, &closing_prices).await?;
+    upsert_stock_closing_prices(pool, &closing_prices).await?;
     get_stock_price_by_date(&closing_prices, date)
 }
 
 pub async fn get_stock_change_info(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    client: &Client,
     stock_ref: &StockChangeRef,
 ) -> Result<StockChange, AppError> {
     let (start_price_data, end_price_data) = tokio::try_join!(
-        fetch_stock_price_for_date(state, &stock_ref.stock_no, stock_ref.start_date),
-        fetch_stock_price_for_date(state, &stock_ref.stock_no, stock_ref.end_date)
+        fetch_stock_price_for_date(pool, client, &stock_ref.stock_no, stock_ref.start_date),
+        fetch_stock_price_for_date(pool, client, &stock_ref.stock_no, stock_ref.end_date)
     )?;
 
-    let stock_name = stocks_repo::get_stock_name_by_code(state, &stock_ref.stock_no)
+    let stock_name = stocks_repo::get_stock_name_by_code(pool, &stock_ref.stock_no)
         .await
         .ok()
         .flatten();
@@ -279,10 +281,9 @@ pub fn round_to_n_decimal(value: f64, decimals: u32) -> f64 {
     (value * factor).round() / factor
 }
 
-pub async fn stock_day_all_service(state: &AppState) -> Result<(), AppError> {
+pub async fn stock_day_all_service(pool: &Pool<Postgres>, client: &Client) -> Result<(), AppError> {
     let url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL";
-    let resp: TwseApiResponse = state
-        .get_http_client()
+    let resp: TwseApiResponse = client
         .get(url)
         .send()
         .await?
@@ -318,27 +319,27 @@ pub async fn stock_day_all_service(state: &AppState) -> Result<(), AppError> {
         })
         .collect();
 
-    insert_stock_day_all_batch(state, &rows).await
+    insert_stock_day_all_batch(pool, &rows).await
 }
 
 pub async fn get_all_stock_changes(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     conditions: Conditions,
 ) -> Result<StockChangePaginatedResponse, AppError> {
-    stocks_repo::get_all_stock_changes(state, conditions).await
+    stocks_repo::get_all_stock_changes(pool, conditions).await
 }
 
-pub async fn update_one_stock_change_pending(state: &AppState, id: i32) -> Result<(), AppError> {
-    stocks_repo::update_one_stock_change_pending(state, id).await
+pub async fn update_one_stock_change_pending(pool: &Pool<Postgres>, id: i32) -> Result<(), AppError> {
+    stocks_repo::update_one_stock_change_pending(pool, id).await
 }
 
 pub async fn get_stock_day_all_list(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     params: GetStockDayAll,
     pagination: Pagination,
 ) -> Result<Vec<StockDayAll>, AppError> {
     stocks_repo::get_stock_day_all(
-        state,
+        pool,
         params.stock_code,
         params.trade_date,
         pagination.limit,
@@ -348,19 +349,20 @@ pub async fn get_stock_day_all_list(
 }
 
 pub async fn get_active_buyback_prices(
-    state: &AppState,
+    pool: &Pool<Postgres>,
 ) -> Result<Vec<StockBuybackMoreInfo>, AppError> {
-    stocks_repo::get_active_buyback_prices(state).await
+    stocks_repo::get_active_buyback_prices(pool).await
 }
 
 pub async fn get_stock_buyback_periods(
-    state: &AppState,
+    pool: &Pool<Postgres>,
 ) -> Result<Vec<StockBuybackPeriod>, AppError> {
-    stocks_repo::get_stock_buyback_periods(state).await
+    stocks_repo::get_stock_buyback_periods(pool).await
 }
 
 pub async fn get_closing_price_pair_stats(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    client: &Client,
     payload: &StockRequest,
 ) -> Result<StockClosingPriceResponse, AppError> {
     let start_date = NaiveDate::parse_from_str(&payload.start_date, "%Y%m%d")
@@ -369,8 +371,8 @@ pub async fn get_closing_price_pair_stats(
         .map_err(|_| RequestError::InvalidContent(format!("invalid end_date: {}", payload.end_date)))?;
 
     let (start_price, end_price) = tokio::try_join!(
-        fetch_stock_price_for_date(state, &payload.stock_no, start_date),
-        fetch_stock_price_for_date(state, &payload.stock_no, end_date)
+        fetch_stock_price_for_date(pool, client, &payload.stock_no, start_date),
+        fetch_stock_price_for_date(pool, client, &payload.stock_no, end_date)
     )?;
 
     let price_diff = round_to_n_decimal(end_price.close_price - start_price.close_price, 2);

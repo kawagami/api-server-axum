@@ -49,7 +49,7 @@ pub async fn get_all_stock_changes(
     Query(payload): Query<Conditions>,
 ) -> Result<Json<StockChangePaginatedResponse>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
-    Ok(Json(stocks_service::get_all_stock_changes(&state, payload).await?))
+    Ok(Json(stocks_service::get_all_stock_changes(state.get_pool(), payload).await?))
 }
 
 pub async fn update_one_stock_change_pending(
@@ -59,7 +59,7 @@ pub async fn update_one_stock_change_pending(
 ) -> Result<Json<()>, AppError> {
     auth_user.require_permission(Perm::StockUpdate)?;
     Ok(Json(
-        stocks_service::update_one_stock_change_pending(&state, payload.id).await?,
+        stocks_service::update_one_stock_change_pending(state.get_pool(), payload.id).await?,
     ))
 }
 
@@ -69,7 +69,7 @@ pub async fn fetch_stock_closing_price_pair_stats(
     Query(payload): Query<StockRequest>,
 ) -> Result<Json<StockClosingPriceResponse>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
-    Ok(Json(stocks_service::get_closing_price_pair_stats(&state, &payload).await?))
+    Ok(Json(stocks_service::get_closing_price_pair_stats(state.get_pool(), state.get_http_client(), &payload).await?))
 }
 
 pub async fn get_stock_day_all(
@@ -79,7 +79,7 @@ pub async fn get_stock_day_all(
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<Vec<StockDayAll>>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
-    Ok(Json(stocks_service::get_stock_day_all_list(&state, payload, pagination).await?))
+    Ok(Json(stocks_service::get_stock_day_all_list(state.get_pool(), payload, pagination).await?))
 }
 
 pub async fn get_unfinished_buyback_price_gap(
@@ -87,7 +87,7 @@ pub async fn get_unfinished_buyback_price_gap(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackMoreInfo>>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
-    Ok(Json(stocks_service::get_active_buyback_prices(&state).await?))
+    Ok(Json(stocks_service::get_active_buyback_prices(state.get_pool()).await?))
 }
 
 pub async fn get_stock_buyback_periods(
@@ -95,5 +95,5 @@ pub async fn get_stock_buyback_periods(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackPeriod>>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
-    Ok(Json(stocks_service::get_stock_buyback_periods(&state).await?))
+    Ok(Json(stocks_service::get_stock_buyback_periods(state.get_pool()).await?))
 }

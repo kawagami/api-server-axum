@@ -27,7 +27,7 @@ pub fn new(state: AppState) -> Router<AppState> {
 }
 
 async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<User>>, AppError> {
-    Ok(Json(users_service::get_users(&state).await?))
+    Ok(Json(users_service::get_users(state.get_pool()).await?))
 }
 
 async fn create_user(
@@ -36,7 +36,7 @@ async fn create_user(
     Json(user): Json<NewUser>,
 ) -> Result<Json<bool>, AppError> {
     auth_user.require_permission(Perm::UserCreate)?;
-    users_service::create_user(&state, user).await?;
+    users_service::create_user(state.get_pool(), user).await?;
     Ok(Json(true))
 }
 
@@ -46,7 +46,7 @@ async fn delete_user(
     Json(user): Json<User>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::UserDelete)?;
-    users_service::delete_user(&state, user.id).await?;
+    users_service::delete_user(state.get_pool(), state.get_redis_pool(), user.id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -56,7 +56,7 @@ async fn get_user_roles(
     Path(user_id): Path<i64>,
 ) -> Result<Json<Vec<Role>>, AppError> {
     auth_user.require_permission(Perm::RoleRead)?;
-    Ok(Json(users_service::get_user_roles(&state, user_id).await?))
+    Ok(Json(users_service::get_user_roles(state.get_pool(), user_id).await?))
 }
 
 async fn set_user_roles(
@@ -66,6 +66,6 @@ async fn set_user_roles(
     Json(body): Json<SetUserRoles>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::RoleAssign)?;
-    users_service::set_user_roles(&state, user_id, body.role_ids).await?;
+    users_service::set_user_roles(state.get_pool(), state.get_redis_pool(), user_id, body.role_ids).await?;
     Ok(StatusCode::NO_CONTENT)
 }

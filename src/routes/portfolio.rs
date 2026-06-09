@@ -30,7 +30,7 @@ async fn list(
     Extension(auth_member): Extension<AuthenticatedMember>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<PortfolioEntry>>, AppError> {
-    Ok(Json(portfolio_service::get_by_member(&state, auth_member.member_id).await?))
+    Ok(Json(portfolio_service::get_by_member(state.get_pool(), auth_member.member_id).await?))
 }
 
 async fn create(
@@ -38,7 +38,7 @@ async fn create(
     State(state): State<AppState>,
     Json(req): Json<PortfolioRequest>,
 ) -> Result<Json<PortfolioEntry>, AppError> {
-    Ok(Json(portfolio_service::create(&state, auth_member.member_id, &req).await?))
+    Ok(Json(portfolio_service::create(state.get_pool(), auth_member.member_id, &req).await?))
 }
 
 async fn update(
@@ -47,7 +47,7 @@ async fn update(
     Path(id): Path<Uuid>,
     Json(req): Json<PortfolioRequest>,
 ) -> Result<Json<PortfolioEntry>, AppError> {
-    Ok(Json(portfolio_service::update(&state, id, auth_member.member_id, &req).await?))
+    Ok(Json(portfolio_service::update(state.get_pool(), id, auth_member.member_id, &req).await?))
 }
 
 async fn delete(
@@ -55,7 +55,7 @@ async fn delete(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
-    portfolio_service::delete(&state, id, auth_member.member_id).await?;
+    portfolio_service::delete(state.get_pool(), id, auth_member.member_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -63,7 +63,7 @@ async fn summary(
     Extension(auth_member): Extension<AuthenticatedMember>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<PortfolioSummaryEntry>>, AppError> {
-    Ok(Json(portfolio_service::get_summary(&state, auth_member.member_id).await?))
+    Ok(Json(portfolio_service::get_summary(state.get_pool(), state.get_redis_pool(), state.get_http_client(), auth_member.member_id).await?))
 }
 
 async fn history(
@@ -71,5 +71,5 @@ async fn history(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<HistoryRecord>>, AppError> {
-    Ok(Json(portfolio_service::get_history(&state, id, auth_member.member_id).await?))
+    Ok(Json(portfolio_service::get_history(state.get_pool(), state.get_redis_pool(), state.get_http_client(), id, auth_member.member_id).await?))
 }

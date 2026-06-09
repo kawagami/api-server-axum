@@ -1,21 +1,21 @@
-use crate::state::AppState;
+use crate::state::Settings;
 use lettre::{
     message::header::ContentType,
     transport::smtp::authentication::Credentials,
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 
-pub async fn send_notification(state: &AppState, subject: &str, body: String) {
-    let username = match state.get_setting("smtp_username").filter(|s| !s.is_empty()) {
+pub async fn send_notification(settings: &Settings, subject: &str, body: String) {
+    let username = match settings.get("smtp_username").filter(|s| !s.is_empty()) {
         Some(v) => v,
         None => return,
     };
-    let password = match state.get_setting("smtp_password").filter(|s| !s.is_empty()) {
+    let password = match settings.get("smtp_password").filter(|s| !s.is_empty()) {
         Some(v) => v,
         None => return,
     };
-    let to = state
-        .get_setting("notify_email")
+    let to = settings
+        .get("notify_email")
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| username.clone());
 

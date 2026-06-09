@@ -29,7 +29,7 @@ async fn list_roles(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Role>>, AppError> {
     auth_user.require_permission(Perm::RoleRead)?;
-    Ok(Json(roles_service::get_roles(&state).await?))
+    Ok(Json(roles_service::get_roles(state.get_pool()).await?))
 }
 
 async fn get_role(
@@ -38,7 +38,7 @@ async fn get_role(
     Path(id): Path<i32>,
 ) -> Result<Json<RoleWithPermissions>, AppError> {
     auth_user.require_permission(Perm::RoleRead)?;
-    Ok(Json(roles_service::get_role(&state, id).await?))
+    Ok(Json(roles_service::get_role(state.get_pool(), id).await?))
 }
 
 async fn create_role(
@@ -47,7 +47,7 @@ async fn create_role(
     Json(body): Json<NewRole>,
 ) -> Result<Json<Role>, AppError> {
     auth_user.require_permission(Perm::RoleCreate)?;
-    Ok(Json(roles_service::create_role(&state, body).await?))
+    Ok(Json(roles_service::create_role(state.get_pool(), body).await?))
 }
 
 async fn set_permissions(
@@ -57,7 +57,7 @@ async fn set_permissions(
     Json(body): Json<SetRolePermissions>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::RoleUpdate)?;
-    roles_service::set_role_permissions(&state, id, body).await?;
+    roles_service::set_role_permissions(state.get_pool(), state.get_redis_pool(), id, body).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -67,6 +67,6 @@ async fn delete_role(
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::RoleDelete)?;
-    roles_service::delete_role(&state, id).await?;
+    roles_service::delete_role(state.get_pool(), state.get_redis_pool(), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

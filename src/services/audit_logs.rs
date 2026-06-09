@@ -1,10 +1,11 @@
-use crate::{errors::AppError, repositories::audit_logs, state::AppState};
+use crate::{errors::AppError, repositories::audit_logs};
 use chrono::{DateTime, Utc};
+use sqlx::{Pool, Postgres};
 
 pub use crate::repositories::audit_logs::AuditLog;
 
 pub async fn get_audit_logs(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     user_email: Option<String>,
     method: Option<String>,
     path: Option<String>,
@@ -13,16 +14,7 @@ pub async fn get_audit_logs(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<AuditLog>, AppError> {
-    audit_logs::get_audit_logs(
-        state.get_pool(),
-        user_email,
-        method,
-        path,
-        from,
-        to,
-        limit,
-        offset,
-    )
-    .await
-    .map_err(AppError::from)
+    audit_logs::get_audit_logs(pool, user_email, method, path, from, to, limit, offset)
+        .await
+        .map_err(AppError::from)
 }

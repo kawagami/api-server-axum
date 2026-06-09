@@ -1,30 +1,27 @@
 use crate::{
-    errors::AppError, // 引入 AppError
-    state::AppState,
+    errors::AppError,
     structs::notes::{HackmdNoteListAndTag, Post, Tag},
 };
-use sqlx::QueryBuilder;
+use sqlx::{Pool, Postgres, QueryBuilder};
 
-pub async fn delete_posts(state: &AppState) -> Result<(), AppError> {
+pub async fn delete_posts(pool: &Pool<Postgres>) -> Result<(), AppError> {
     sqlx::query("DELETE FROM hackmd_posts;")
-        .execute(state.get_pool())
+        .execute(pool)
         .await
-        .map_err(AppError::from)?; // 自動轉換 sqlx::Error 為 AppError
+        .map_err(AppError::from)?;
 
     Ok(())
 }
 
-// bulk insert
-pub async fn insert_posts_handler(state: &AppState, posts: Vec<Post>) -> Result<(), AppError> {
-    // 清除舊資料
-    let _ = delete_posts(state).await;
+pub async fn insert_posts_handler(pool: &Pool<Postgres>, posts: Vec<Post>) -> Result<(), AppError> {
+    let _ = delete_posts(pool).await;
 
     let mut query_builder = QueryBuilder::new(
         r#"
         INSERT INTO hackmd_posts (
-            id, content, created_at, last_changed_at, user_path, 
-            permalink, publish_link, publish_type, published_at, 
-            read_permission, short_id, tags, tags_updated_at, 
+            id, content, created_at, last_changed_at, user_path,
+            permalink, publish_link, publish_type, published_at,
+            read_permission, short_id, tags, tags_updated_at,
             team_path, title, title_updated_at, write_permission
         )
         "#,
@@ -50,24 +47,19 @@ pub async fn insert_posts_handler(state: &AppState, posts: Vec<Post>) -> Result<
             .push_bind(post.write_permission);
     });
 
-    let query = query_builder.build();
-
-    query
-        .execute(state.get_pool())
-        .await
-        .map_err(AppError::from)?; // 確保錯誤被轉換為 AppError
+    query_builder.build().execute(pool).await.map_err(AppError::from)?;
 
     Ok(())
 }
 
-pub async fn get_tags(state: &AppState) -> Result<Vec<Tag>, AppError> {
+pub async fn get_tags(pool: &Pool<Postgres>) -> Result<Vec<Tag>, AppError> {
     sqlx::query_as(
         r#"
-            SELECT 
+            SELECT
                 ROW_NUMBER() OVER (ORDER BY MAX(last_changed_at) DESC) AS id,
                 name
             FROM (
-                SELECT 
+                SELECT
                     unnest(tags) AS name,
                     last_changed_at
                 FROM hackmd_posts
@@ -76,12 +68,12 @@ pub async fn get_tags(state: &AppState) -> Result<Vec<Tag>, AppError> {
             ORDER BY MAX(last_changed_at) DESC
         "#,
     )
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await
-    .map_err(AppError::from) // 自動轉換 sqlx::Error 為 AppError
+    .map_err(AppError::from)
 }
 
-pub async fn get_lists(state: &AppState) -> Result<Vec<HackmdNoteListAndTag>, AppError> {
+pub async fn get_lists(pool: &Pool<Postgres>) -> Result<Vec<HackmdNoteListAndTag>, AppError> {
     sqlx::query_as(
         r#"
             SELECT
@@ -98,7 +90,7 @@ pub async fn get_lists(state: &AppState) -> Result<Vec<HackmdNoteListAndTag>, Ap
                 last_changed_at DESC;
         "#,
     )
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await
-    .map_err(AppError::from) // 自動轉換 sqlx::Error 為 AppError
+    .map_err(AppError::from)
 }

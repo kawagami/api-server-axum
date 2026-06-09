@@ -1,25 +1,25 @@
 use crate::{
     errors::AppError,
-    state::AppState,
     structs::roles::{NewRole, Permission, Role, RoleWithPermissions},
 };
+use sqlx::{Pool, Postgres};
 
-pub async fn get_roles(state: &AppState) -> Result<Vec<Role>, AppError> {
+pub async fn get_roles(pool: &Pool<Postgres>) -> Result<Vec<Role>, AppError> {
     Ok(
         sqlx::query_as("SELECT id, name, description FROM roles ORDER BY id")
-            .fetch_all(state.get_pool())
+            .fetch_all(pool)
             .await?,
     )
 }
 
 pub async fn get_role_with_permissions(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     role_id: i32,
 ) -> Result<RoleWithPermissions, AppError> {
     let role: Role =
         sqlx::query_as("SELECT id, name, description FROM roles WHERE id = $1")
             .bind(role_id)
-            .fetch_one(state.get_pool())
+            .fetch_one(pool)
             .await?;
 
     let permissions: Vec<Permission> = sqlx::query_as(
@@ -32,7 +32,7 @@ pub async fn get_role_with_permissions(
         "#,
     )
     .bind(role_id)
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?;
 
     Ok(RoleWithPermissions {
@@ -43,16 +43,16 @@ pub async fn get_role_with_permissions(
     })
 }
 
-pub async fn get_role_id_by_name(state: &AppState, name: &str) -> Result<i32, AppError> {
+pub async fn get_role_id_by_name(pool: &Pool<Postgres>, name: &str) -> Result<i32, AppError> {
     let (id,): (i32,) = sqlx::query_as("SELECT id FROM roles WHERE name = $1")
         .bind(name)
-        .fetch_one(state.get_pool())
+        .fetch_one(pool)
         .await?;
     Ok(id)
 }
 
 pub async fn get_user_permission_strings_by_email(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     email: &str,
 ) -> Result<Vec<String>, AppError> {
     let is_super_admin: bool = sqlx::query_scalar(
@@ -66,13 +66,13 @@ pub async fn get_user_permission_strings_by_email(
         "#,
     )
     .bind(email)
-    .fetch_one(state.get_pool())
+    .fetch_one(pool)
     .await?;
 
     if is_super_admin {
         let rows: Vec<(String, String)> =
             sqlx::query_as("SELECT resource, action FROM permissions")
-                .fetch_all(state.get_pool())
+                .fetch_all(pool)
                 .await?;
         return Ok(rows.into_iter().map(|(r, a)| format!("{}:{}", r, a)).collect());
     }
@@ -88,41 +88,41 @@ pub async fn get_user_permission_strings_by_email(
         "#,
     )
     .bind(email)
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?;
 
     Ok(rows.into_iter().map(|(r, a)| format!("{}:{}", r, a)).collect())
 }
 
 pub async fn get_emails_by_role_id(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     role_id: i32,
 ) -> Result<Vec<String>, AppError> {
     let rows: Vec<(String,)> = sqlx::query_as(
         "SELECT u.email FROM users u JOIN user_roles ur ON u.id = ur.user_id WHERE ur.role_id = $1",
     )
     .bind(role_id)
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?;
     Ok(rows.into_iter().map(|(e,)| e).collect())
 }
 
-pub async fn create_role(state: &AppState, new_role: &NewRole) -> Result<Role, AppError> {
+pub async fn create_role(pool: &Pool<Postgres>, new_role: &NewRole) -> Result<Role, AppError> {
     Ok(sqlx::query_as(
         "INSERT INTO roles (name, description) VALUES ($1, $2) RETURNING id, name, description",
     )
     .bind(&new_role.name)
     .bind(&new_role.description)
-    .fetch_one(state.get_pool())
+    .fetch_one(pool)
     .await?)
 }
 
 pub async fn set_role_permissions(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     role_id: i32,
     permission_ids: &[i32],
 ) -> Result<(), AppError> {
-    let mut tx = state.get_pool().begin().await?;
+    let mut tx = pool.begin().await?;
 
     sqlx::query("DELETE FROM role_permissions WHERE role_id = $1")
         .bind(role_id)
@@ -143,12 +143,12 @@ pub async fn set_role_permissions(
     Ok(())
 }
 
-pub async fn delete_role(state: &AppState, role_id: i32) -> Result<(), AppError> {
+pub async fn delete_role(pool: &Pool<Postgres>, role_id: i32) -> Result<(), AppError> {
     let built_in = ["guest", "member", "admin", "super_admin"];
     let (name,): (String,) =
         sqlx::query_as("SELECT name FROM roles WHERE id = $1")
             .bind(role_id)
-            .fetch_one(state.get_pool())
+            .fetch_one(pool)
             .await?;
 
     if built_in.contains(&name.as_str()) {
@@ -161,7 +161,7 @@ pub async fn delete_role(state: &AppState, role_id: i32) -> Result<(), AppError>
 
     sqlx::query("DELETE FROM roles WHERE id = $1")
         .bind(role_id)
-        .execute(state.get_pool())
+        .execute(pool)
         .await?;
 
     Ok(())

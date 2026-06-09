@@ -48,7 +48,6 @@ name = "api-server-axum"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "axum",
  "axum-extra",
  "bb8",

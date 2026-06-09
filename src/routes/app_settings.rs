@@ -29,7 +29,7 @@ async fn get_all(
     State(state): State<AppState>,
 ) -> Result<Json<BTreeMap<String, Vec<AppSetting>>>, AppError> {
     auth_user.require_permission(Perm::SettingRead)?;
-    Ok(Json(settings_service::get_all(&state).await?))
+    Ok(Json(settings_service::get_all(state.get_pool()).await?))
 }
 
 async fn update(
@@ -39,5 +39,6 @@ async fn update(
     Json(payload): Json<UpdateSetting>,
 ) -> Result<Json<AppSetting>, AppError> {
     auth_user.require_permission(Perm::SettingUpdate)?;
-    Ok(Json(settings_service::update(&state, &key, &payload.value).await?))
+    let settings = state.get_settings();
+    Ok(Json(settings_service::update(state.get_pool(), &settings, &key, &payload.value).await?))
 }

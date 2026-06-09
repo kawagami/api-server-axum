@@ -1,9 +1,8 @@
-use crate::{errors::AppError, state::AppState, structs::blogs::DbBlog};
-use sqlx::PgConnection;
+use crate::{errors::AppError, structs::blogs::DbBlog};
+use sqlx::{PgConnection, Pool, Postgres};
 
-/// 取得帶分頁的 blogs
 pub async fn get_blogs_with_pagination(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     limit: usize,
     offset: usize,
     tag: Option<&str>,
@@ -21,7 +20,7 @@ pub async fn get_blogs_with_pagination(
         .bind(t)
         .bind(limit as i64)
         .bind(offset as i64)
-        .fetch_all(state.get_pool())
+        .fetch_all(pool)
         .await
         .map_err(AppError::from),
         None => sqlx::query_as(
@@ -34,14 +33,13 @@ pub async fn get_blogs_with_pagination(
         )
         .bind(limit as i64)
         .bind(offset as i64)
-        .fetch_all(state.get_pool())
+        .fetch_all(pool)
         .await
         .map_err(AppError::from),
     }
 }
 
-/// 取得特定 blog
-pub async fn get_blog_by_id(state: &AppState, id: uuid::Uuid) -> Result<DbBlog, AppError> {
+pub async fn get_blog_by_id(pool: &Pool<Postgres>, id: uuid::Uuid) -> Result<DbBlog, AppError> {
     sqlx::query_as(
         r#"
             SELECT id, markdown, tocs, tags, created_at, updated_at
@@ -50,26 +48,26 @@ pub async fn get_blog_by_id(state: &AppState, id: uuid::Uuid) -> Result<DbBlog, 
             "#,
     )
     .bind(id)
-    .fetch_one(state.get_pool())
+    .fetch_one(pool)
     .await
     .map_err(AppError::from)
 }
 
-pub async fn count_blogs(state: &AppState, tag: Option<&str>) -> Result<i64, AppError> {
+pub async fn count_blogs(pool: &Pool<Postgres>, tag: Option<&str>) -> Result<i64, AppError> {
     match tag {
         Some(t) => sqlx::query_scalar("SELECT COUNT(*) FROM blogs WHERE $1 = ANY(tags)")
             .bind(t)
-            .fetch_one(state.get_pool())
+            .fetch_one(pool)
             .await
             .map_err(AppError::from),
         None => sqlx::query_scalar("SELECT COUNT(*) FROM blogs")
-            .fetch_one(state.get_pool())
+            .fetch_one(pool)
             .await
             .map_err(AppError::from),
     }
 }
 
-pub async fn get_all_tags(state: &AppState) -> Result<Vec<String>, AppError> {
+pub async fn get_all_tags(pool: &Pool<Postgres>) -> Result<Vec<String>, AppError> {
     sqlx::query_scalar(
         r#"
             SELECT DISTINCT unnest(tags) AS tag
@@ -77,7 +75,7 @@ pub async fn get_all_tags(state: &AppState) -> Result<Vec<String>, AppError> {
             ORDER BY tag
             "#,
     )
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await
     .map_err(AppError::from)
 }

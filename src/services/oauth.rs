@@ -1,12 +1,17 @@
 use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{members, redis},
-    state::AppState,
+    state::Settings,
     structs::auth::{Claims, RefreshClaims},
+    structs::config::AppConfig,
 };
+use bb8::Pool as RedisPool;
+use bb8_redis::RedisConnectionManager;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use reqwest::Client;
 use serde::Deserialize;
+use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
 struct OAuthConfig {
@@ -33,25 +38,24 @@ impl OAuthProvider {
         }
     }
 
-    fn config_from(&self, state: &AppState) -> Result<OAuthConfig, AppError> {
-        let cfg = state.get_config();
+    fn config_from(&self, config: &AppConfig, settings: &Settings) -> Result<OAuthConfig, AppError> {
         let (client_secret, id_key, redirect_key, auth_url, token_url) = match self {
             Self::Google => (
-                &cfg.oauth_google.client_secret,
+                &config.oauth_google.client_secret,
                 "google_client_id",
                 "google_redirect_url",
                 "https://accounts.google.com/o/oauth2/v2/auth",
                 "https://oauth2.googleapis.com/token",
             ),
             Self::GitHub => (
-                &cfg.oauth_github.client_secret,
+                &config.oauth_github.client_secret,
                 "github_client_id",
                 "github_redirect_url",
                 "https://github.com/login/oauth/authorize",
                 "https://github.com/login/oauth/access_token",
             ),
             Self::Line => (
-                &cfg.oauth_line.client_secret,
+                &config.oauth_line.client_secret,
                 "line_client_id",
                 "line_redirect_url",
                 "https://access.line.me/oauth2/v2.1/authorize",
@@ -59,15 +63,15 @@ impl OAuthProvider {
             ),
         };
 
-        let client_id = state
-            .get_setting(id_key)
+        let client_id = settings
+            .get(id_key)
             .filter(|v| !v.is_empty())
             .ok_or_else(|| {
                 AppError::SystemError(SystemError::Internal(format!("{} not configured", id_key)))
             })?;
 
-        let redirect_url = state
-            .get_setting(redirect_key)
+        let redirect_url = settings
+            .get(redirect_key)
             .filter(|v| !v.is_empty())
             .ok_or_else(|| {
                 AppError::SystemError(SystemError::Internal(format!(
@@ -94,8 +98,8 @@ impl OAuthProvider {
     }
 }
 
-pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider, state: &AppState) -> Result<String, AppError> {
-    let cfg = provider.config_from(state)?;
+pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider, config: &AppConfig, settings: &Settings) -> Result<String, AppError> {
+    let cfg = provider.config_from(config, settings)?;
 
     let scope = match provider {
         OAuthProvider::Google => "openid email profile",
@@ -116,33 +120,37 @@ pub fn get_oauth_url(state_value: &str, provider: &OAuthProvider, state: &AppSta
 }
 
 pub async fn generate_oauth_url(
-    state: &AppState,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    config: &AppConfig,
+    settings: &Settings,
     provider: &OAuthProvider,
 ) -> Result<String, AppError> {
     let state_value = Uuid::new_v4().to_string();
-    redis::set_oauth_state(state, &state_value).await?;
-    get_oauth_url(&state_value, provider, state)
+    redis::set_oauth_state(redis_pool, &state_value).await?;
+    get_oauth_url(&state_value, provider, config, settings)
 }
 
 pub async fn exchange_code(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    config: &AppConfig,
+    settings: &Settings,
+    client: &Client,
     provider: &OAuthProvider,
     code: &str,
     state_param: &str,
 ) -> Result<(String, String), AppError> {
-    let valid = redis::consume_oauth_state(state, state_param).await?;
+    let valid = redis::consume_oauth_state(redis_pool, state_param).await?;
     if !valid {
         return Err(AppError::AuthError(AuthError::InvalidToken));
     }
 
-    let cfg = provider.config_from(state)?;
-    let client = state.get_http_client();
-
+    let cfg = provider.config_from(config, settings)?;
     let token_res = exchange_code_for_token(client, provider, &cfg, code).await?;
     let user_info = fetch_user_info(client, provider, &token_res.access_token).await?;
 
     let member_id = members::find_or_create_by_oauth(
-        state,
+        pool,
         provider.name(),
         &user_info.provider_id,
         &user_info.name,
@@ -151,20 +159,21 @@ pub async fn exchange_code(
     )
     .await?;
 
-    issue_tokens(state, member_id).await
+    issue_tokens(redis_pool, config, member_id).await
 }
 
 pub async fn refresh_member_token(
-    state: &AppState,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    config: &AppConfig,
     refresh_token_jwt: &str,
 ) -> Result<(String, String), AppError> {
-    let refresh_claims = decode_refresh_jwt(refresh_token_jwt, &state.get_config().jwt_secret)?;
+    let refresh_claims = decode_refresh_jwt(refresh_token_jwt, &config.jwt_secret)?;
     let member_id: i64 = refresh_claims
         .sub
         .parse()
         .map_err(|_| AppError::AuthError(AuthError::InvalidToken))?;
 
-    let stored_jti = redis::get_member_refresh_token(state, member_id)
+    let stored_jti = redis::get_member_refresh_token(redis_pool, member_id)
         .await?
         .ok_or(AppError::AuthError(AuthError::Unauthorized))?;
 
@@ -172,15 +181,19 @@ pub async fn refresh_member_token(
         return Err(AppError::AuthError(AuthError::Unauthorized));
     }
 
-    issue_tokens(state, member_id).await
+    issue_tokens(redis_pool, config, member_id).await
 }
 
-async fn issue_tokens(state: &AppState, member_id: i64) -> Result<(String, String), AppError> {
+async fn issue_tokens(
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    config: &AppConfig,
+    member_id: i64,
+) -> Result<(String, String), AppError> {
     let jti = Uuid::new_v4().to_string();
-    redis::set_member_refresh_token(state, member_id, &jti).await?;
+    redis::set_member_refresh_token(redis_pool, member_id, &jti).await?;
 
-    let access_token = encode_member_jwt(member_id, &state.get_config().jwt_secret)?;
-    let refresh_token = encode_refresh_jwt(member_id, &jti, &state.get_config().jwt_secret)?;
+    let access_token = encode_member_jwt(member_id, &config.jwt_secret)?;
+    let refresh_token = encode_refresh_jwt(member_id, &jti, &config.jwt_secret)?;
 
     Ok((access_token, refresh_token))
 }

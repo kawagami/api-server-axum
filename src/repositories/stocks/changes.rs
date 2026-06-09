@@ -1,14 +1,13 @@
 use crate::{
     errors::AppError,
-    state::AppState,
     structs::stocks::{
         Conditions, StockChange, StockChangePaginatedResponse, StockChangeRef,
     },
 };
-use sqlx::{QueryBuilder, Row};
+use sqlx::{Pool, Postgres, QueryBuilder, Row};
 
 pub async fn get_all_stock_changes(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     conditions: Conditions,
 ) -> Result<StockChangePaginatedResponse, AppError> {
     let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM stock_changes s WHERE 1=1");
@@ -28,20 +27,20 @@ pub async fn get_all_stock_changes(
 
     let total: i64 = count_query
         .build()
-        .fetch_one(state.get_pool())
+        .fetch_one(pool)
         .await?
         .get(0);
 
     let data = data_query
         .build_query_as()
-        .fetch_all(state.get_pool())
+        .fetch_all(pool)
         .await?;
 
     Ok(StockChangePaginatedResponse { data, total })
 }
 
 pub async fn get_one_pending_stock_change(
-    state: &AppState,
+    pool: &Pool<Postgres>,
 ) -> Result<Option<StockChangeRef>, AppError> {
     let row = sqlx::query(
         r#"
@@ -53,7 +52,7 @@ pub async fn get_one_pending_stock_change(
         LIMIT 1
         "#,
     )
-    .fetch_optional(state.get_pool())
+    .fetch_optional(pool)
     .await?;
 
     if let Some(row) = row {
@@ -68,7 +67,7 @@ pub async fn get_one_pending_stock_change(
 }
 
 pub async fn upsert_stock_change(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     info: &StockChange,
 ) -> Result<(), AppError> {
     sqlx::query(
@@ -96,14 +95,14 @@ pub async fn upsert_stock_change(
     .bind(info.end_date)
     .bind(&info.end_price)
     .bind(&info.change)
-    .execute(state.get_pool())
+    .execute(pool)
     .await?;
 
     Ok(())
 }
 
 pub async fn update_stock_change_failed(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     stock: &StockChangeRef,
 ) -> Result<(), AppError> {
     sqlx::query(
@@ -113,13 +112,13 @@ pub async fn update_stock_change_failed(
     .bind(&stock.stock_no)
     .bind(stock.start_date)
     .bind(stock.end_date)
-    .execute(state.get_pool())
+    .execute(pool)
     .await?;
 
     Ok(())
 }
 
-pub async fn sync_buyback_periods_to_pending(state: &AppState) -> Result<u64, AppError> {
+pub async fn sync_buyback_periods_to_pending(pool: &Pool<Postgres>) -> Result<u64, AppError> {
     let result = sqlx::query(
         r#"
         INSERT INTO stock_changes (stock_no, start_date, end_date)
@@ -130,13 +129,13 @@ pub async fn sync_buyback_periods_to_pending(state: &AppState) -> Result<u64, Ap
         WHERE stock_changes.status = 'pending'
         "#,
     )
-    .execute(state.get_pool())
+    .execute(pool)
     .await?;
 
     Ok(result.rows_affected())
 }
 
-pub async fn update_one_stock_change_pending(state: &AppState, id: i32) -> Result<(), AppError> {
+pub async fn update_one_stock_change_pending(pool: &Pool<Postgres>, id: i32) -> Result<(), AppError> {
     sqlx::query(
         r#"UPDATE stock_changes
         SET "status" = 'pending', stock_name = NULL, start_price = NULL,
@@ -144,7 +143,7 @@ pub async fn update_one_stock_change_pending(state: &AppState, id: i32) -> Resul
         WHERE id = $1"#,
     )
     .bind(id)
-    .execute(state.get_pool())
+    .execute(pool)
     .await?;
 
     Ok(())

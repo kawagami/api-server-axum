@@ -23,14 +23,14 @@ async fn get_blogs(
     Query(query): Query<Pagination>,
     State(state): State<AppState>,
 ) -> Result<Json<BlogsResponse>, AppError> {
-    let blogs = blogs_service::get_blogs(&state, query.page, query.per_page, query.tag).await?;
+    let blogs = blogs_service::get_blogs(state.get_pool(), query.page, query.per_page, query.tag).await?;
     Ok(Json(blogs))
 }
 
 async fn get_tags(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<String>>, AppError> {
-    let tags = blogs_service::get_tags(&state).await?;
+    let tags = blogs_service::get_tags(state.get_pool()).await?;
     Ok(Json(tags))
 }
 
@@ -38,6 +38,6 @@ async fn get_blog(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<DbBlog>, AppError> {
-    let blog = blogs_service::get_blog(&state, id).await?;
+    let blog = blogs_service::get_blog(state.get_pool(), id).await?;
     Ok(Json(blog))
 }

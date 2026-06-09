@@ -1,13 +1,12 @@
 use crate::{
     errors::AppError,
-    state::AppState,
     structs::stocks::NewStockClosingPrice,
 };
 use chrono::NaiveDate;
-use sqlx::QueryBuilder;
+use sqlx::{Pool, Postgres, QueryBuilder};
 
 pub async fn upsert_stock_closing_prices(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     data: &[NewStockClosingPrice],
 ) -> Result<(), AppError> {
     if data.is_empty() {
@@ -29,13 +28,13 @@ pub async fn upsert_stock_closing_prices(
     });
 
     qb.push(" ON CONFLICT (stock_no, date) DO UPDATE SET close_price = EXCLUDED.close_price, updated_at = EXCLUDED.updated_at");
-    qb.build().execute(state.get_pool()).await?;
+    qb.build().execute(pool).await?;
 
     Ok(())
 }
 
 pub async fn get_stock_closing_prices_by_date_range(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     stock_no: &str,
     start_date: NaiveDate,
     end_date: NaiveDate,
@@ -47,6 +46,6 @@ pub async fn get_stock_closing_prices_by_date_range(
     .bind(stock_no)
     .bind(start_date)
     .bind(end_date)
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?)
 }

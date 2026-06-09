@@ -1,12 +1,11 @@
 use crate::{
     errors::AppError,
-    state::AppState,
     structs::stocks::{BuybackRecord, StartPriceFilter, StockBuybackInfo, StockBuybackMoreInfo, StockBuybackPeriod},
 };
-use sqlx::QueryBuilder;
+use sqlx::{Pool, Postgres, QueryBuilder};
 
 pub async fn bulk_insert_stock_buyback_periods(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     records: &[BuybackRecord],
 ) -> Result<u64, AppError> {
     if records.is_empty() {
@@ -25,14 +24,14 @@ pub async fn bulk_insert_stock_buyback_periods(
     .bind(&stock_nos)
     .bind(&start_dates)
     .bind(&end_dates)
-    .execute(state.get_pool())
+    .execute(pool)
     .await?;
 
     Ok(result.rows_affected())
 }
 
 pub async fn get_active_buyback_prices(
-    state: &AppState,
+    pool: &Pool<Postgres>,
 ) -> Result<Vec<StockBuybackMoreInfo>, AppError> {
     Ok(sqlx::query_as(
         "SELECT
@@ -67,12 +66,12 @@ pub async fn get_active_buyback_prices(
             AND start_date_price.close_price IS NOT NULL
         ORDER BY p.start_date ASC",
     )
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?)
 }
 
 pub async fn get_active_buyback_prices_filtered(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     filter: StartPriceFilter,
 ) -> Result<Vec<StockBuybackInfo>, AppError> {
     let mut qb = QueryBuilder::new(
@@ -109,11 +108,11 @@ pub async fn get_active_buyback_prices_filtered(
 
     qb.push(" ORDER BY p.start_date ASC");
 
-    Ok(qb.build_query_as().fetch_all(state.get_pool()).await?)
+    Ok(qb.build_query_as().fetch_all(pool).await?)
 }
 
 pub async fn get_new_future_buybacks(
-    state: &AppState,
+    pool: &Pool<Postgres>,
 ) -> Result<Vec<StockBuybackPeriod>, AppError> {
     Ok(sqlx::query_as(
         "SELECT stock_no, start_date, end_date
@@ -122,16 +121,16 @@ pub async fn get_new_future_buybacks(
            AND created_at::date = CURRENT_DATE
          ORDER BY start_date ASC",
     )
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?)
 }
 
 pub async fn get_stock_buyback_periods(
-    state: &AppState,
+    pool: &Pool<Postgres>,
 ) -> Result<Vec<StockBuybackPeriod>, AppError> {
     Ok(
         sqlx::query_as("SELECT * FROM stock_buyback_periods ORDER BY start_date ASC")
-            .fetch_all(state.get_pool())
+            .fetch_all(pool)
             .await?,
     )
 }

@@ -1,8 +1,8 @@
-use crate::{errors::AppError, state::AppState, structs::stocks::StockExRight};
+use crate::{errors::AppError, structs::stocks::StockExRight};
 use chrono::{DateTime, NaiveDate, Utc};
-use sqlx::QueryBuilder;
+use sqlx::{Pool, Postgres, QueryBuilder};
 
-pub async fn upsert_ex_rights(state: &AppState, data: &[StockExRight]) -> Result<(), AppError> {
+pub async fn upsert_ex_rights(pool: &Pool<Postgres>, data: &[StockExRight]) -> Result<(), AppError> {
     if data.is_empty() {
         return Ok(());
     }
@@ -29,13 +29,13 @@ pub async fn upsert_ex_rights(state: &AppState, data: &[StockExRight]) -> Result
          stock_rate = EXCLUDED.stock_rate, \
          updated_at = EXCLUDED.updated_at",
     );
-    qb.build().execute(state.get_pool()).await?;
+    qb.build().execute(pool).await?;
 
     Ok(())
 }
 
 pub async fn upsert_ex_rights_checked(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     stock_no: &str,
     from_date: NaiveDate,
 ) -> Result<(), AppError> {
@@ -46,13 +46,13 @@ pub async fn upsert_ex_rights_checked(
     )
     .bind(stock_no)
     .bind(from_date)
-    .execute(state.get_pool())
+    .execute(pool)
     .await?;
     Ok(())
 }
 
 pub async fn find_ex_rights_checked(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     stock_no: &str,
     from_date: NaiveDate,
 ) -> Result<Option<DateTime<Utc>>, AppError> {
@@ -62,13 +62,13 @@ pub async fn find_ex_rights_checked(
     )
     .bind(stock_no)
     .bind(from_date)
-    .fetch_optional(state.get_pool())
+    .fetch_optional(pool)
     .await?;
     Ok(row.map(|(t,)| t))
 }
 
 pub async fn get_ex_rights_by_range(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     stock_no: &str,
     from: NaiveDate,
     to: NaiveDate,
@@ -82,7 +82,7 @@ pub async fn get_ex_rights_by_range(
     .bind(stock_no)
     .bind(from)
     .bind(to)
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?;
     Ok(rows)
 }

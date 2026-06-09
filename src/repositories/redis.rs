@@ -1,27 +1,41 @@
-use crate::state::AppState;
-use redis::{AsyncCommands, RedisError};
+use bb8::Pool as RedisPool;
+use bb8_redis::RedisConnectionManager;
+use redis::{AsyncCommands, ErrorKind, RedisError};
 
-// 新增函數：設置有效時間 1 小時的鍵值對
-pub async fn redis_set(state: &AppState, key: &str, value: &str) -> Result<(), RedisError> {
-    let mut conn = state.get_redis_conn().await?;
+pub async fn get_redis_conn(
+    pool: &RedisPool<RedisConnectionManager>,
+) -> Result<bb8::PooledConnection<'_, RedisConnectionManager>, RedisError> {
+    pool.get().await.map_err(|e| match e {
+        bb8::RunError::User(err) => err,
+        bb8::RunError::TimedOut => {
+            RedisError::from((ErrorKind::IoError, "Redis connection pool timed out"))
+        }
+    })
+}
 
+pub async fn redis_set(
+    pool: &RedisPool<RedisConnectionManager>,
+    key: &str,
+    value: &str,
+) -> Result<(), RedisError> {
+    let mut conn = get_redis_conn(pool).await?;
     conn.set_ex(key, value, 3600).await
 }
 
-// 新增函數：檢查 Redis 中的鍵是否存在
-pub async fn redis_check_key_exists(state: &AppState, key: &str) -> Result<bool, RedisError> {
-    let mut conn = state.get_redis_conn().await?;
-
-    // 使用 EXISTS 命令檢查鍵是否存在 返回 true 表示鍵存在；false 表示鍵不存在
+pub async fn redis_check_key_exists(
+    pool: &RedisPool<RedisConnectionManager>,
+    key: &str,
+) -> Result<bool, RedisError> {
+    let mut conn = get_redis_conn(pool).await?;
     Ok(conn.exists(key).await?)
 }
 
 pub async fn set_user_permissions(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     email: &str,
     permissions: &[String],
 ) -> Result<(), crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let key = format!("user:permissions:{}", email);
     let value = serde_json::to_string(permissions)
         .map_err(|e| crate::errors::AppError::from(serde_json::Error::from(e)))?;
@@ -30,98 +44,100 @@ pub async fn set_user_permissions(
 }
 
 pub async fn get_user_permissions(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     email: &str,
 ) -> Result<Option<Vec<String>>, crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let key = format!("user:permissions:{}", email);
     let value: Option<String> = conn.get(key).await?;
     Ok(value.and_then(|v| serde_json::from_str(&v).ok()))
 }
 
 pub async fn del_user_permissions(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     email: &str,
 ) -> Result<(), crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let key = format!("user:permissions:{}", email);
     conn.del::<_, ()>(key).await?;
     Ok(())
 }
 
 pub async fn set_oauth_state(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     state_value: &str,
 ) -> Result<(), crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let key = format!("oauth:state:{}", state_value);
     conn.set_ex::<_, _, ()>(key, "1", 300).await?;
     Ok(())
 }
 
 pub async fn consume_oauth_state(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     state_value: &str,
 ) -> Result<bool, crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let key = format!("oauth:state:{}", state_value);
     let deleted: i64 = conn.del(key).await?;
     Ok(deleted > 0)
 }
 
 pub async fn set_member_refresh_token(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     member_id: i64,
     jti: &str,
 ) -> Result<(), crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let key = format!("member:refresh:{}", member_id);
     conn.set_ex::<_, _, ()>(key, jti, 30 * 24 * 3600).await?;
     Ok(())
 }
 
 pub async fn get_member_refresh_token(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     member_id: i64,
 ) -> Result<Option<String>, crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let key = format!("member:refresh:{}", member_id);
     Ok(conn.get(key).await?)
 }
 
-pub async fn invalidate_permissions_for_emails(state: &AppState, emails: &[String]) {
+pub async fn invalidate_permissions_for_emails(
+    pool: &RedisPool<RedisConnectionManager>,
+    emails: &[String],
+) {
     for email in emails {
-        let _ = del_user_permissions(state, email).await;
+        let _ = del_user_permissions(pool, email).await;
     }
 }
 
 pub async fn del_user_login(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     email: &str,
 ) -> Result<(), crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let key = format!("user:login:{}", email);
     conn.del::<_, ()>(key).await?;
     Ok(())
 }
 
 pub async fn cache_get(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     key: &str,
 ) -> Result<Option<String>, crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     let value: Option<String> = conn.get(key).await?;
     Ok(value)
 }
 
 pub async fn cache_set(
-    state: &AppState,
+    pool: &RedisPool<RedisConnectionManager>,
     key: &str,
     value: &str,
     ttl_secs: u64,
 ) -> Result<(), crate::errors::AppError> {
-    let mut conn = state.get_redis_conn().await?;
+    let mut conn = get_redis_conn(pool).await?;
     conn.set_ex::<_, _, ()>(key, value, ttl_secs).await?;
     Ok(())
 }
-

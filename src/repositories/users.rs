@@ -1,30 +1,30 @@
 use crate::{
     errors::AppError,
-    state::AppState,
     structs::{roles::Role, users::{DbUser, NewUser, User}},
 };
+use sqlx::{Pool, Postgres};
 
-pub async fn get_users(state: &AppState) -> Result<Vec<User>, AppError> {
+pub async fn get_users(pool: &Pool<Postgres>) -> Result<Vec<User>, AppError> {
     Ok(sqlx::query_as("SELECT id, name, email FROM users")
-        .fetch_all(state.get_pool())
+        .fetch_all(pool)
         .await?)
 }
 
-pub async fn check_email_exists(state: &AppState, email: &str) -> Result<DbUser, AppError> {
+pub async fn check_email_exists(pool: &Pool<Postgres>, email: &str) -> Result<DbUser, AppError> {
     Ok(sqlx::query_as(
         "SELECT id, email, password FROM users WHERE email = $1 LIMIT 1",
     )
     .bind(email)
-    .fetch_one(state.get_pool())
+    .fetch_one(pool)
     .await?)
 }
 
 pub async fn create_user(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     new_user: NewUser,
     default_role_id: i32,
 ) -> Result<(), AppError> {
-    let mut tx = state.get_pool().begin().await?;
+    let mut tx = pool.begin().await?;
 
     let (user_id,): (i64,) = sqlx::query_as(
         "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id",
@@ -45,8 +45,8 @@ pub async fn create_user(
     Ok(())
 }
 
-pub async fn delete_user(state: &AppState, user_id: i64) -> Result<String, AppError> {
-    let mut tx = state.get_pool().begin().await?;
+pub async fn delete_user(pool: &Pool<Postgres>, user_id: i64) -> Result<String, AppError> {
+    let mut tx = pool.begin().await?;
 
     let (email,): (String,) = sqlx::query_as("SELECT email FROM users WHERE id = $1")
         .bind(user_id)
@@ -67,7 +67,7 @@ pub async fn delete_user(state: &AppState, user_id: i64) -> Result<String, AppEr
     Ok(email)
 }
 
-pub async fn get_user_roles(state: &AppState, user_id: i64) -> Result<Vec<Role>, AppError> {
+pub async fn get_user_roles(pool: &Pool<Postgres>, user_id: i64) -> Result<Vec<Role>, AppError> {
     Ok(sqlx::query_as(
         "SELECT r.id, r.name, r.description
          FROM roles r
@@ -76,38 +76,38 @@ pub async fn get_user_roles(state: &AppState, user_id: i64) -> Result<Vec<Role>,
          ORDER BY r.id",
     )
     .bind(user_id)
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?)
 }
 
-pub async fn get_email_by_id(state: &AppState, user_id: i64) -> Result<String, AppError> {
+pub async fn get_email_by_id(pool: &Pool<Postgres>, user_id: i64) -> Result<String, AppError> {
     let (email,): (String,) =
         sqlx::query_as("SELECT email FROM users WHERE id = $1")
             .bind(user_id)
-            .fetch_one(state.get_pool())
+            .fetch_one(pool)
             .await?;
     Ok(email)
 }
 
 pub async fn update_password(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     email: &str,
     new_hash: &str,
 ) -> Result<(), AppError> {
     sqlx::query("UPDATE users SET password = $1 WHERE email = $2")
         .bind(new_hash)
         .bind(email)
-        .execute(state.get_pool())
+        .execute(pool)
         .await?;
     Ok(())
 }
 
 pub async fn set_user_roles(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     user_id: i64,
     role_ids: &[i32],
 ) -> Result<(), AppError> {
-    let mut tx = state.get_pool().begin().await?;
+    let mut tx = pool.begin().await?;
 
     let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE id = $1")
         .bind(user_id)

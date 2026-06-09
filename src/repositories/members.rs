@@ -1,24 +1,24 @@
 use crate::{
     errors::AppError,
-    state::AppState,
     structs::members::{Member, MemberDetail},
 };
+use sqlx::{Pool, Postgres};
 
-pub async fn get_members(state: &AppState) -> Result<Vec<Member>, AppError> {
+pub async fn get_members(pool: &Pool<Postgres>) -> Result<Vec<Member>, AppError> {
     let members = sqlx::query_as(
         "SELECT id, name, email, avatar_url, created_at FROM members ORDER BY id DESC",
     )
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?;
     Ok(members)
 }
 
-pub async fn get_member_by_id(state: &AppState, id: i64) -> Result<Option<MemberDetail>, AppError> {
+pub async fn get_member_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<MemberDetail>, AppError> {
     let member: Option<Member> = sqlx::query_as(
         "SELECT id, name, email, avatar_url, created_at FROM members WHERE id = $1",
     )
     .bind(id)
-    .fetch_optional(state.get_pool())
+    .fetch_optional(pool)
     .await?;
 
     let Some(member) = member else { return Ok(None) };
@@ -26,7 +26,7 @@ pub async fn get_member_by_id(state: &AppState, id: i64) -> Result<Option<Member
     let providers: Vec<String> =
         sqlx::query_scalar("SELECT provider FROM member_oauth WHERE member_id = $1")
             .bind(id)
-            .fetch_all(state.get_pool())
+            .fetch_all(pool)
             .await?;
 
     Ok(Some(MemberDetail {
@@ -40,7 +40,7 @@ pub async fn get_member_by_id(state: &AppState, id: i64) -> Result<Option<Member
 }
 
 pub async fn find_or_create_by_oauth(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     provider: &str,
     provider_id: &str,
     name: &str,
@@ -52,14 +52,14 @@ pub async fn find_or_create_by_oauth(
     )
     .bind(provider)
     .bind(provider_id)
-    .fetch_optional(state.get_pool())
+    .fetch_optional(pool)
     .await?;
 
     if let Some((member_id,)) = existing {
         return Ok(member_id);
     }
 
-    let mut tx = state.get_pool().begin().await?;
+    let mut tx = pool.begin().await?;
 
     let (member_id,): (i64,) = sqlx::query_as(
         "INSERT INTO members (name, email, avatar_url) VALUES ($1, $2, $3) RETURNING id",

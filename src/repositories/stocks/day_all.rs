@@ -1,10 +1,10 @@
-use crate::{errors::AppError, state::AppState, structs::stocks::{StockDayAll, StockDayAllInsertRow}};
+use crate::{errors::AppError, structs::stocks::{StockDayAll, StockDayAllInsertRow}};
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
-use sqlx::QueryBuilder;
+use sqlx::{Pool, Postgres, QueryBuilder};
 
 pub async fn get_stock_day_all(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     stock_code: Option<String>,
     trade_date: Option<NaiveDate>,
     limit: i64,
@@ -34,24 +34,24 @@ pub async fn get_stock_day_all(
     builder.push(" LIMIT ").push_bind(limit);
     builder.push(" OFFSET ").push_bind(offset);
 
-    Ok(builder.build_query_as::<StockDayAll>().fetch_all(state.get_pool()).await?)
+    Ok(builder.build_query_as::<StockDayAll>().fetch_all(pool).await?)
 }
 
 pub async fn get_stock_name_by_code(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     stock_code: &str,
 ) -> Result<Option<String>, AppError> {
     let row: Option<(String,)> = sqlx::query_as(
         "SELECT stock_name FROM stock_day_all WHERE stock_code = $1 ORDER BY trade_date DESC LIMIT 1",
     )
     .bind(stock_code)
-    .fetch_optional(state.get_pool())
+    .fetch_optional(pool)
     .await?;
     Ok(row.map(|(name,)| name))
 }
 
 pub async fn insert_stock_day_all_batch(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     rows: &[StockDayAllInsertRow],
 ) -> Result<(), AppError> {
     if rows.is_empty() {
@@ -98,7 +98,7 @@ pub async fn insert_stock_day_all_batch(
         .bind(&close_prices)
         .bind(&price_changes)
         .bind(&transaction_counts)
-        .execute(state.get_pool())
+        .execute(pool)
         .await?;
 
     Ok(())

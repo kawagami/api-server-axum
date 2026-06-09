@@ -1,15 +1,15 @@
 use crate::{
     errors::{AppError, RequestError},
-    state::AppState,
     structs::portfolio::{PortfolioEntry, PortfolioRequest},
 };
+use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
 const COLS: &str =
     "id, member_id, stock_code, buy_date, cost_per_share, shares, created_at, updated_at";
 
 pub async fn get_by_id_for_member(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     id: Uuid,
     member_id: i64,
 ) -> Result<PortfolioEntry, AppError> {
@@ -19,25 +19,25 @@ pub async fn get_by_id_for_member(
     ))
     .bind(id)
     .bind(member_id)
-    .fetch_optional(state.get_pool())
+    .fetch_optional(pool)
     .await?;
 
     row.ok_or(AppError::RequestError(RequestError::NotFound))
 }
 
-pub async fn get_by_member(state: &AppState, member_id: i64) -> Result<Vec<PortfolioEntry>, AppError> {
+pub async fn get_by_member(pool: &Pool<Postgres>, member_id: i64) -> Result<Vec<PortfolioEntry>, AppError> {
     let rows = sqlx::query_as(&format!(
         "SELECT {} FROM portfolio WHERE member_id = $1 ORDER BY buy_date DESC, created_at DESC",
         COLS
     ))
     .bind(member_id)
-    .fetch_all(state.get_pool())
+    .fetch_all(pool)
     .await?;
     Ok(rows)
 }
 
 pub async fn create(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     member_id: i64,
     req: &PortfolioRequest,
 ) -> Result<PortfolioEntry, AppError> {
@@ -52,13 +52,13 @@ pub async fn create(
     .bind(req.buy_date)
     .bind(req.cost_per_share)
     .bind(req.shares)
-    .fetch_one(state.get_pool())
+    .fetch_one(pool)
     .await?;
     Ok(row)
 }
 
 pub async fn update(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     id: Uuid,
     member_id: i64,
     req: &PortfolioRequest,
@@ -76,17 +76,17 @@ pub async fn update(
     .bind(req.shares)
     .bind(id)
     .bind(member_id)
-    .fetch_optional(state.get_pool())
+    .fetch_optional(pool)
     .await?;
 
     row.ok_or(AppError::RequestError(RequestError::NotFound))
 }
 
-pub async fn delete(state: &AppState, id: Uuid, member_id: i64) -> Result<(), AppError> {
+pub async fn delete(pool: &Pool<Postgres>, id: Uuid, member_id: i64) -> Result<(), AppError> {
     let result = sqlx::query("DELETE FROM portfolio WHERE id = $1 AND member_id = $2")
         .bind(id)
         .bind(member_id)
-        .execute(state.get_pool())
+        .execute(pool)
         .await?;
 
     if result.rows_affected() == 0 {

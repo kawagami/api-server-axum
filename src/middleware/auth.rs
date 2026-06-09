@@ -32,12 +32,12 @@ pub async fn authorize_and_load(
     let login_key = format!("user:login:{}", email);
     verify_user_login(&state, &login_key).await?;
 
-    let permissions = match redis::get_user_permissions(&state, &email).await? {
+    let permissions = match redis::get_user_permissions(state.get_redis_pool(), &email).await? {
         Some(perms) => perms,
         None => {
             let perms =
-                roles_repo::get_user_permission_strings_by_email(&state, &email).await?;
-            let _ = redis::set_user_permissions(&state, &email, &perms).await;
+                roles_repo::get_user_permission_strings_by_email(state.get_pool(), &email).await?;
+            let _ = redis::set_user_permissions(state.get_redis_pool(), &email, &perms).await;
             perms
         }
     };
@@ -86,7 +86,7 @@ pub(crate) fn extract_token(req: &Request) -> Result<String, AppError> {
 }
 
 async fn verify_user_login(state: &AppState, key: &str) -> Result<(), AppError> {
-    redis::redis_check_key_exists(state, key)
+    redis::redis_check_key_exists(state.get_redis_pool(), key)
         .await?
         .then_some(())
         .ok_or(AppError::AuthError(AuthError::Unauthorized))

@@ -19,5 +19,5 @@ async fn list_permissions(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Permission>>, AppError> {
     auth_user.require_permission(Perm::RoleRead)?;
-    Ok(Json(roles_service::get_permissions(&state).await?))
+    Ok(Json(roles_service::get_permissions(state.get_pool()).await?))
 }

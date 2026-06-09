@@ -1,7 +1,9 @@
+#[derive(Clone)]
 pub struct OAuthProviderConfig {
     pub client_secret: String,
 }
 
+#[derive(Clone)]
 pub struct AppConfig {
     pub jwt_secret: String,
     pub oauth_google: OAuthProviderConfig,

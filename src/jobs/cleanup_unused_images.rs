@@ -1,15 +1,5 @@
-use crate::{services::images as images_service, state::AppState, structs::jobs::AppJob};
-use async_trait::async_trait;
+use crate::{services::images as images_service, state::AppState};
 
-pub struct CleanupUnusedImagesJob;
-
-#[async_trait]
-impl AppJob for CleanupUnusedImagesJob {
-    fn cron_expression(&self) -> &str {
-        "0 0 * * * *" // 每小時執行一次
-    }
-
-    async fn run(&self, state: AppState) {
-        images_service::cleanup_unused_images(&state).await;
-    }
+pub async fn run(state: AppState) {
+    images_service::cleanup_unused_images(state.get_pool(), state.get_storage()).await;
 }

@@ -5,17 +5,19 @@ use crate::{
         redis as redis_repo,
         stocks::{find_ex_rights_checked, get_ex_rights_by_range, get_stock_closing_prices_by_date_range, get_stock_name_by_code, upsert_ex_rights, upsert_ex_rights_checked, upsert_stock_closing_prices},
     },
-    state::AppState,
     structs::{
         portfolio::{HistoryRecord, PortfolioEntry, PortfolioRequest, PortfolioSummaryEntry},
         stocks::{NewStockClosingPrice, StockExRight},
     },
     utils::reqwest::get_json_data,
 };
+use bb8::Pool as RedisPool;
+use bb8_redis::RedisConnectionManager;
 use chrono::{Datelike, Local, Months, NaiveDate};
 use futures::future::try_join_all;
-use reqwest::Method;
+use reqwest::{Client, Method};
 use serde::Deserialize;
+use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -44,59 +46,65 @@ struct ExEvent {
     stock_rate: f64,
 }
 
-pub async fn get_by_member(state: &AppState, member_id: i64) -> Result<Vec<PortfolioEntry>, AppError> {
-    portfolio_repo::get_by_member(state, member_id).await
+pub async fn get_by_member(pool: &Pool<Postgres>, member_id: i64) -> Result<Vec<PortfolioEntry>, AppError> {
+    portfolio_repo::get_by_member(pool, member_id).await
 }
 
 pub async fn create(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     member_id: i64,
     req: &PortfolioRequest,
 ) -> Result<PortfolioEntry, AppError> {
-    portfolio_repo::create(state, member_id, req).await
+    portfolio_repo::create(pool, member_id, req).await
 }
 
 pub async fn update(
-    state: &AppState,
+    pool: &Pool<Postgres>,
     id: Uuid,
     member_id: i64,
     req: &PortfolioRequest,
 ) -> Result<PortfolioEntry, AppError> {
-    portfolio_repo::update(state, id, member_id, req).await
+    portfolio_repo::update(pool, id, member_id, req).await
 }
 
-pub async fn delete(state: &AppState, id: Uuid, member_id: i64) -> Result<(), AppError> {
-    portfolio_repo::delete(state, id, member_id).await
+pub async fn delete(pool: &Pool<Postgres>, id: Uuid, member_id: i64) -> Result<(), AppError> {
+    portfolio_repo::delete(pool, id, member_id).await
 }
 
 pub async fn get_history(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    client: &Client,
     id: Uuid,
     member_id: i64,
 ) -> Result<Vec<HistoryRecord>, AppError> {
-    let entry = portfolio_repo::get_by_id_for_member(state, id, member_id).await?;
+    let entry = portfolio_repo::get_by_id_for_member(pool, id, member_id).await?;
     let today = Local::now().date_naive();
 
-    let closes = fetch_all_closing_prices(state, &entry.stock_code, entry.buy_date, today).await?;
-    let ex_events = fetch_ex_events(state, &entry.stock_code, entry.buy_date, today).await?;
+    let closes = fetch_all_closing_prices(pool, redis_pool, client, &entry.stock_code, entry.buy_date, today).await?;
+    let ex_events = fetch_ex_events(pool, redis_pool, client, &entry.stock_code, entry.buy_date, today).await?;
 
     Ok(build_history(entry.cost_per_share, entry.shares, closes, ex_events))
 }
 
 pub async fn get_summary(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    client: &Client,
     member_id: i64,
 ) -> Result<Vec<PortfolioSummaryEntry>, AppError> {
-    let entries = portfolio_repo::get_by_member(state, member_id).await?;
+    let entries = portfolio_repo::get_by_member(pool, member_id).await?;
     let today = Local::now().date_naive();
 
     let result = try_join_all(entries.into_iter().map(|entry| {
-        let state = state.clone();
+        let pool = pool.clone();
+        let redis_pool = redis_pool.clone();
+        let client = client.clone();
         async move {
             let (closes, ex_events, stock_name) = tokio::try_join!(
-                fetch_all_closing_prices(&state, &entry.stock_code, entry.buy_date, today),
-                fetch_ex_events(&state, &entry.stock_code, entry.buy_date, today),
-                async { Ok::<_, AppError>(get_stock_name_by_code(&state, &entry.stock_code).await.unwrap_or(None)) },
+                fetch_all_closing_prices(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today),
+                fetch_ex_events(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today),
+                async { Ok::<_, AppError>(get_stock_name_by_code(&pool, &entry.stock_code).await.unwrap_or(None)) },
             )?;
 
             let (current_price, current_value, pnl, pnl_pct) =
@@ -164,7 +172,9 @@ fn redis_deserialize_closes(s: &str) -> Option<Vec<DayClose>> {
 }
 
 async fn fetch_closing_month(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    client: &Client,
     stock_code: &str,
     month: NaiveDate,
 ) -> Result<Vec<DayClose>, AppError> {
@@ -174,7 +184,7 @@ async fn fetch_closing_month(
     let ttl = if is_current { 3600u64 } else { 604800u64 };
 
     // 1. Redis
-    if let Ok(Some(cached)) = redis_repo::cache_get(state, &cache_key).await {
+    if let Ok(Some(cached)) = redis_repo::cache_get(redis_pool, &cache_key).await {
         if let Some(data) = redis_deserialize_closes(&cached) {
             return Ok(data);
         }
@@ -188,11 +198,11 @@ async fn fetch_closing_month(
             .and_then(|d| d.pred_opt())
             .unwrap_or(month);
 
-        let db_rows = get_stock_closing_prices_by_date_range(state, stock_code, first_day, last_day).await?;
+        let db_rows = get_stock_closing_prices_by_date_range(pool, stock_code, first_day, last_day).await?;
         if !db_rows.is_empty() {
             let closes: Vec<DayClose> = db_rows.iter().map(|r| DayClose { date: r.date, close: r.close_price }).collect();
             if let Some(json) = redis_serialize_closes(&closes) {
-                let _ = redis_repo::cache_set(state, &cache_key, &json, ttl).await;
+                let _ = redis_repo::cache_set(redis_pool, &cache_key, &json, ttl).await;
             }
             return Ok(closes);
         }
@@ -206,7 +216,7 @@ async fn fetch_closing_month(
     );
 
     let resp: TwseResponse = match get_json_data(
-        state.get_http_client(),
+        client,
         &url,
         Method::GET,
         Some(twse_headers()),
@@ -243,21 +253,23 @@ async fn fetch_closing_month(
             .iter()
             .map(|d| NewStockClosingPrice { stock_no: stock_code.to_string(), date: d.date, close_price: d.close })
             .collect();
-        if let Err(e) = upsert_stock_closing_prices(state, &prices).await {
+        if let Err(e) = upsert_stock_closing_prices(pool, &prices).await {
             tracing::warn!("upsert_stock_closing_prices failed {}: {}", stock_code, e);
         }
     }
 
     // 5. Write Redis
     if let Some(json) = redis_serialize_closes(&closes) {
-        let _ = redis_repo::cache_set(state, &cache_key, &json, ttl).await;
+        let _ = redis_repo::cache_set(redis_pool, &cache_key, &json, ttl).await;
     }
 
     Ok(closes)
 }
 
 async fn fetch_all_closing_prices(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    client: &Client,
     stock_code: &str,
     from: NaiveDate,
     to: NaiveDate,
@@ -267,7 +279,7 @@ async fn fetch_all_closing_prices(
     let end_month = NaiveDate::from_ymd_opt(to.year(), to.month(), 1).unwrap();
 
     while current <= end_month {
-        let mut month_data = fetch_closing_month(state, stock_code, current).await?;
+        let mut month_data = fetch_closing_month(pool, redis_pool, client, stock_code, current).await?;
         all.append(&mut month_data);
         current = current.checked_add_months(Months::new(1)).unwrap();
     }
@@ -278,7 +290,9 @@ async fn fetch_all_closing_prices(
 }
 
 async fn fetch_ex_events(
-    state: &AppState,
+    pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    client: &Client,
     stock_code: &str,
     from: NaiveDate,
     to: NaiveDate,
@@ -288,7 +302,7 @@ async fn fetch_ex_events(
     let cache_key = format!("twse:exright:{}:{}", stock_code, start_str);
 
     // 1. Redis
-    if let Ok(Some(cached)) = redis_repo::cache_get(state, &cache_key).await {
+    if let Ok(Some(cached)) = redis_repo::cache_get(redis_pool, &cache_key).await {
         if let Ok(rows) = serde_json::from_str::<Vec<(String, f64, f64, f64)>>(&cached) {
             let events: Vec<ExEvent> = rows
                 .into_iter()
@@ -306,21 +320,21 @@ async fn fetch_ex_events(
     }
 
     // 2. DB (ex-rights rows)
-    let db_rows = get_ex_rights_by_range(state, stock_code, from, to).await?;
+    let db_rows = get_ex_rights_by_range(pool, stock_code, from, to).await?;
     if !db_rows.is_empty() {
         let events: Vec<ExEvent> = db_rows
             .iter()
             .map(|r| ExEvent { date: r.ex_date, close_before: r.close_before, cash_div: r.cash_div, stock_rate: r.stock_rate })
             .collect();
-        cache_ex_events(state, &cache_key, &events).await;
+        cache_ex_events(redis_pool, &cache_key, &events).await;
         return Ok(events);
     }
 
     // 2.5. DB (checked table) — confirmed no ex-rights within 30 days
-    if let Ok(Some(checked_at)) = find_ex_rights_checked(state, stock_code, from).await {
+    if let Ok(Some(checked_at)) = find_ex_rights_checked(pool, stock_code, from).await {
         let age_days = (chrono::Utc::now() - checked_at).num_days();
         if age_days < 30 {
-            cache_ex_events(state, &cache_key, &[]).await;
+            cache_ex_events(redis_pool, &cache_key, &[]).await;
             return Ok(vec![]);
         }
     }
@@ -332,7 +346,7 @@ async fn fetch_ex_events(
     );
 
     let resp: TwseResponse = match get_json_data(
-        state.get_http_client(),
+        client,
         &url,
         Method::GET,
         Some(twse_headers()),
@@ -373,29 +387,29 @@ async fn fetch_ex_events(
             .iter()
             .map(|e| StockExRight { stock_no: stock_code.to_string(), ex_date: e.date, close_before: e.close_before, cash_div: e.cash_div, stock_rate: e.stock_rate })
             .collect();
-        if let Err(e) = upsert_ex_rights(state, &rows).await {
+        if let Err(e) = upsert_ex_rights(pool, &rows).await {
             tracing::warn!("upsert_ex_rights failed {}: {}", stock_code, e);
         }
     }
 
     // 4.5. Write checked record (regardless of result, marks TWSE was queried)
-    if let Err(e) = upsert_ex_rights_checked(state, stock_code, from).await {
+    if let Err(e) = upsert_ex_rights_checked(pool, stock_code, from).await {
         tracing::warn!("upsert_ex_rights_checked failed {}: {}", stock_code, e);
     }
 
     // 5. Write Redis
-    cache_ex_events(state, &cache_key, &events).await;
+    cache_ex_events(redis_pool, &cache_key, &events).await;
 
     Ok(events)
 }
 
-async fn cache_ex_events(state: &AppState, key: &str, events: &[ExEvent]) {
+async fn cache_ex_events(redis_pool: &RedisPool<RedisConnectionManager>, key: &str, events: &[ExEvent]) {
     let v: Vec<(String, f64, f64, f64)> = events
         .iter()
         .map(|e| (e.date.format("%Y-%m-%d").to_string(), e.close_before, e.cash_div, e.stock_rate))
         .collect();
     if let Ok(json) = serde_json::to_string(&v) {
-        let _ = redis_repo::cache_set(state, key, &json, 86400).await;
+        let _ = redis_repo::cache_set(redis_pool, key, &json, 86400).await;
     }
 }
 

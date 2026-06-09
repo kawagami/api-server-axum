@@ -25,7 +25,7 @@ pub struct AppStateInner {
     pub connections: ConnectionMap,
     pub storage: Storage,
     pub config: AppConfig,
-    pub settings: RwLock<HashMap<String, String>>,
+    pub settings: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl AppStateInner {
@@ -62,7 +62,7 @@ impl AppStateInner {
             connections: Arc::new(Mutex::new(HashMap::new())),
             storage: Storage::from_env(),
             config: AppConfig::from_env(),
-            settings: RwLock::new(HashMap::new()),
+            settings: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -82,6 +82,26 @@ pub struct DisplayTrackedConnection {
     pub connected_at: std::time::SystemTime,
     pub user_email: Option<String>,
     pub real_ip: String,
+}
+
+#[derive(Clone)]
+pub struct Settings(Arc<RwLock<HashMap<String, String>>>);
+
+impl Settings {
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.0.read().unwrap().get(key).cloned()
+    }
+
+    pub async fn reload(&self, pool: &Pool<Postgres>) {
+        match crate::repositories::app_settings::get_all(pool).await {
+            Ok(rows) => {
+                *self.0.write().unwrap() = rows.into_iter().map(|s| (s.key, s.value)).collect();
+            }
+            Err(e) => {
+                tracing::error!("Failed to reload app_settings: {:?}", e);
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -112,6 +132,10 @@ impl AppState {
         })
     }
 
+    pub fn get_redis_pool(&self) -> &RedisPool<RedisConnectionManager> {
+        &self.0.redis_pool
+    }
+
     pub fn get_http_client(&self) -> &Client {
         &self.0.http_client
     }
@@ -132,8 +156,8 @@ impl AppState {
         &self.0.config
     }
 
-    pub fn get_setting(&self, key: &str) -> Option<String> {
-        self.0.settings.read().unwrap().get(key).cloned()
+    pub fn get_settings(&self) -> Settings {
+        Settings(self.0.settings.clone())
     }
 
     pub async fn reload_settings(&self) {
@@ -154,6 +178,7 @@ impl AppState {
             "data": data
         })
         .to_string();
-        let _ = self.get_tx().send(msg);
+        let _ = self.0.tx.send(msg);
     }
 }
+

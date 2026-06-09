@@ -17,11 +17,11 @@ pub fn new() -> Router<AppState> {
 }
 
 async fn get_tags(State(state): State<AppState>) -> Result<Json<Vec<Tag>>, AppError> {
-    Ok(Json(notes_service::get_tags(&state).await?))
+    Ok(Json(notes_service::get_tags(state.get_pool()).await?))
 }
 
 async fn get_lists(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<HackmdNoteListAndTag>>, AppError> {
-    Ok(Json(notes_service::get_lists(&state).await?))
+    Ok(Json(notes_service::get_lists(state.get_pool()).await?))
 }

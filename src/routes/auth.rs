@@ -33,7 +33,14 @@ async fn sign_in(
     State(state): State<AppState>,
     Json(user_data): Json<SignInData>,
 ) -> Result<Json<String>, AppError> {
-    let token = auth_service::sign_in(&state, &user_data.email, &user_data.password).await?;
+    let token = auth_service::sign_in(
+        state.get_pool(),
+        state.get_redis_pool(),
+        &state.get_config().jwt_secret,
+        &user_data.email,
+        &user_data.password,
+    )
+    .await?;
     Ok(Json(token))
 }
 
@@ -50,7 +57,12 @@ async fn refresh(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthenticatedUser>,
 ) -> Result<Json<String>, AppError> {
-    let token = auth_service::refresh_admin_token(&state, auth_user.email).await?;
+    let token = auth_service::refresh_admin_token(
+        state.get_redis_pool(),
+        &state.get_config().jwt_secret,
+        auth_user.email,
+    )
+    .await?;
     Ok(Json(token))
 }
 
@@ -59,5 +71,11 @@ async fn change_password(
     Extension(auth_user): Extension<AuthenticatedUser>,
     Json(body): Json<ChangePasswordData>,
 ) -> Result<(), AppError> {
-    auth_service::change_password(&state, &auth_user.email, &body.current_password, &body.new_password).await
+    auth_service::change_password(
+        state.get_pool(),
+        &auth_user.email,
+        &body.current_password,
+        &body.new_password,
+    )
+    .await
 }

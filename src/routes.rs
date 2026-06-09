@@ -48,7 +48,8 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
     state.reload_settings().await;
 
     let cors_origins: Vec<HeaderValue> = state
-        .get_setting("cors_allowed_origins")
+        .get_settings()
+        .get("cors_allowed_origins")
         .unwrap_or_else(|| "https://kawa.homes".to_string())
         .split(',')
         .filter_map(|s| s.trim().parse().ok())

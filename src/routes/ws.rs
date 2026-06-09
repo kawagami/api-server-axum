@@ -44,7 +44,7 @@ async fn validate_ws_token(state: &AppState, token: String) -> Option<String> {
     .ok()?;
     let email = token_data.claims.sub;
     let key = format!("user:login:{}", email);
-    let exists = redis_repo::redis_check_key_exists(state, &key)
+    let exists = redis_repo::redis_check_key_exists(state.get_redis_pool(), &key)
         .await
         .unwrap_or(false);
     exists.then_some(email)

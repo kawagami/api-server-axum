@@ -37,7 +37,7 @@ async fn get_members(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Member>>, AppError> {
     auth_user.require_permission(Perm::MemberRead)?;
-    Ok(Json(members_service::get_members(&state).await?))
+    Ok(Json(members_service::get_members(state.get_pool()).await?))
 }
 
 async fn get_member_by_id(
@@ -46,12 +46,12 @@ async fn get_member_by_id(
     Path(id): Path<i64>,
 ) -> Result<Json<Option<MemberDetail>>, AppError> {
     auth_user.require_permission(Perm::MemberRead)?;
-    Ok(Json(members_service::get_member_by_id(&state, id).await?))
+    Ok(Json(members_service::get_member_by_id(state.get_pool(), id).await?))
 }
 
 async fn get_me(
     Extension(auth_member): Extension<AuthenticatedMember>,
     State(state): State<AppState>,
 ) -> Result<Json<Option<MemberDetail>>, AppError> {
-    Ok(Json(members_service::get_member_by_id(&state, auth_member.member_id).await?))
+    Ok(Json(members_service::get_member_by_id(state.get_pool(), auth_member.member_id).await?))
 }
