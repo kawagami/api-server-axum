@@ -3,7 +3,6 @@ use axum::body::Bytes;
 use futures_util::Stream;
 pub use local::{LocalStorage, LocalStorageError};
 
-#[derive(Clone)]
 pub enum Storage {
     Local(LocalStorage),
     // Firebase(FirebaseStorage),

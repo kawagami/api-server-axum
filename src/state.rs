@@ -161,15 +161,7 @@ impl AppState {
     }
 
     pub async fn reload_settings(&self) {
-        match crate::repositories::app_settings::get_all(self.get_pool()).await {
-            Ok(rows) => {
-                *self.0.settings.write().unwrap() =
-                    rows.into_iter().map(|s| (s.key, s.value)).collect();
-            }
-            Err(e) => {
-                tracing::error!("Failed to reload app_settings: {:?}", e);
-            }
-        }
+        self.get_settings().reload(self.get_pool()).await;
     }
 
     pub fn broadcast(&self, event: WsEvent, data: serde_json::Value) {
