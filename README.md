@@ -21,22 +21,22 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 
 | 前綴 | 說明 |
 |------|------|
-| `GET /` | health check |
 | `/admin/auth` | admin 登入、me、token refresh |
 | `/admin/users` | 使用者管理 |
 | `/admin/roles` | 角色管理 |
 | `/admin/permissions` | 權限清單 |
 | `/admin/settings` | Runtime 設定（讀取 / 更新） |
 | `/admin/audit_logs` | 操作稽核紀錄 |
+| `/admin/blogs` | 部落格修改 / 刪除 |
+| `/admin/images` | 圖片上傳 / 刪除 / 清單 |
+| `/admin/stocks` | 股票資料查詢、pending change 管理 |
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
 | `/member/portfolio` | member 投資組合 CRUD、即時損益總覽、歷史價格 / 還原成本（需 Bearer token） |
-| `/blogs` | 部落格 CRUD |
+| `/blogs` | 部落格查詢（列表 / tags / 單篇，公開） |
 | `/notes` | HackMD 筆記 tags / lists |
-| `/stocks` | 股票資料查詢、pending change 管理 |
 | `/ws` | WebSocket 連線、線上清單、點對點訊息 |
 | `/roster` | 排班 |
-| `/images` | 圖片上傳 / 刪除 / 清單 |
 | `/logs` | 操作紀錄 |
 | `/uploads/*` | 本機靜態檔案 |
 | `/tools` | 工具 |
@@ -62,17 +62,21 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - `jsonwebtoken 9` — JWT
 - `reqwest 0.12` — 對外 HTTP 請求
 - `tower-http` — CORS、timeout、body limit（10 MB）
+- `bcrypt` — 密碼 hash
+- `lettre` — SMTP email 通知
+- `scraper` — 庫藏股 HTML 解析
 
 ## 環境變數
 
 | 變數 | 必填 | 預設值 |
 |------|------|--------|
 | `DATABASE_URL` | 是 | — |
-| `REDIS_HOST` | 是 | — |
+| `REDIS_HOST` | 是 | —（port 寫死 6379，不可設定） |
 | `JWT_SECRET` | 是 | — |
 | `APP_HOST` | 否 | `0.0.0.0` |
 | `APP_PORT` | 否 | `3000` |
 | `UPLOAD_PATH` | 否 | `./uploads` |
+| `RUST_LOG` | 否 | tracing 預設 filter |
 | `GOOGLE_CLIENT_SECRET` | 否 | — |
 | `GITHUB_CLIENT_SECRET` | 否 | — |
 | `LINE_CLIENT_SECRET` | 否 | — |
