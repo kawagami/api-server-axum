@@ -39,10 +39,10 @@ async fn create_user(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Json(user): Json<NewUser>,
-) -> Result<Json<bool>, AppError> {
+) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::UserCreate)?;
     users_service::create_user(state.get_pool(), user).await?;
-    Ok(Json(true))
+    Ok(StatusCode::CREATED)
 }
 
 async fn delete_user(

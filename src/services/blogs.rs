@@ -29,7 +29,9 @@ pub async fn get_blogs(
     per_page: usize,
     tag: Option<String>,
 ) -> Result<BlogsResponse, AppError> {
-    let offset = (page.saturating_sub(1)) * per_page;
+    let per_page = per_page.clamp(1, crate::structs::pagination::MAX_PER_PAGE as usize);
+    let page = page.max(1);
+    let offset = (page - 1) * per_page;
     let tag_ref = tag.as_deref();
     let (total, data) = tokio::try_join!(
         blogs_repo::count_blogs(pool, tag_ref),

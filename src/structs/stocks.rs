@@ -39,40 +39,17 @@ pub struct StockChange {
     pub change: Option<f64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct StockChangeId {
-    pub id: i32,
-}
-
-#[derive(Deserialize)]
+// repo 查詢條件 — limit/offset 由 route 層的 PageQuery 轉換而來
 pub struct Conditions {
     pub status: Option<String>,
-    #[serde(default = "default_changes_limit")]
     pub limit: i64,
-    #[serde(default)]
     pub offset: i64,
-}
-
-fn default_changes_limit() -> i64 {
-    50
 }
 
 #[derive(Serialize)]
 pub struct StockChangePaginatedResponse {
     pub data: Vec<StockChange>,
     pub total: i64,
-}
-
-#[derive(Deserialize)]
-pub struct Pagination {
-    #[serde(default = "default_limit")]
-    pub limit: i64,
-    #[serde(default)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    100
 }
 
 #[derive(Serialize, Deserialize)]

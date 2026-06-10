@@ -18,7 +18,7 @@ use axum::{
     http::HeaderMap,
     middleware,
     response::IntoResponse,
-    routing::{any, get},
+    routing::{any, get, post},
     Json, Router,
 };
 use axum_extra::{headers, TypedHeader};
@@ -53,7 +53,7 @@ async fn validate_ws_token(state: &AppState, token: String) -> Option<String> {
 pub fn new(state: AppState) -> Router<AppState> {
     let admin_routes = Router::new()
         .route("/get_online_connections", get(get_online_connections))
-        .route("/say_something_to_someone", get(say_something_to_someone))
+        .route("/say_something_to_someone", post(say_something_to_someone))
         .layer(middleware::from_fn_with_state(
             state,
             auth::authorize_and_load,
@@ -249,8 +249,8 @@ pub struct SendMessageParams {
 
 async fn say_something_to_someone(
     Extension(auth_user): Extension<AuthenticatedUser>,
-    Query(params): Query<SendMessageParams>,
     State(state): State<AppState>,
+    Json(params): Json<SendMessageParams>,
 ) -> Result<Json<String>, AppError> {
     auth_user.require_permission(Perm::WsRead)?;
     let connections = state.get_connections().lock().await;

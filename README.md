@@ -41,6 +41,8 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/uploads/*` | 本機靜態檔案 |
 | `/tools` | 工具 |
 
+分頁端點統一 `?page=1&per_page=N`（per_page 上限 200）；POST 建立資源回 `201`，更新／刪除無內容回 `204`。
+
 ## 排程 Job
 
 | Job | 週期 | 說明 |

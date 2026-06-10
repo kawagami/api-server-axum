@@ -1,5 +1,6 @@
 use axum::{
     extract::{Extension, Path, State},
+    http::StatusCode,
     routing::put,
     Json, Router,
 };
@@ -29,19 +30,19 @@ async fn put_blog(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(blog): Json<PutBlog>,
-) -> Result<Json<()>, AppError> {
+) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::BlogUpdate)?;
     let title = blogs_service::upsert_blog(state.get_pool(), id, blog).await?;
     state.broadcast(WsEvent::BlogCreated, serde_json::json!({ "id": id, "title": title }));
-    Ok(Json(()))
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn delete_blog(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-) -> Result<Json<()>, AppError> {
+) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::BlogDelete)?;
     blogs_service::delete_blog_with_images(state.get_pool(), id).await?;
-    Ok(Json(()))
+    Ok(StatusCode::NO_CONTENT)
 }

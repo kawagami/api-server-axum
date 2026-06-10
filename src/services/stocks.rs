@@ -6,11 +6,12 @@ use crate::{
     },
     repositories::stocks as stocks_repo,
     structs::stocks::{
-        Conditions, GetStockDayAll, NewStockClosingPrice, Pagination, StockBuybackMoreInfo,
+        Conditions, GetStockDayAll, NewStockClosingPrice, StockBuybackMoreInfo,
         StockBuybackPeriod, StockChange, StockChangePaginatedResponse, StockChangeRef,
         StockClosingPriceResponse, StockDayAll, StockDayAllInsertRow, StockDayAvgResponse,
         BuybackRecord, StockRequest, StockStats, TwseApiResponse,
     },
+    utils::date::parse_roc_date,
     utils::reqwest::{get_json_data, get_raw_html_string},
 };
 use chrono::{Duration, NaiveDate};
@@ -23,17 +24,6 @@ use std::sync::LazyLock;
 use tokio::sync::Semaphore;
 
 static TWSE_SEMAPHORE: LazyLock<Semaphore> = LazyLock::new(|| Semaphore::new(1));
-
-fn parse_roc_date(s: &str) -> Option<NaiveDate> {
-    let parts: Vec<&str> = s.split('/').collect();
-    if parts.len() != 3 {
-        return None;
-    }
-    let year = parts[0].parse::<i32>().ok()? + 1911;
-    let month = parts[1].parse::<u32>().ok()?;
-    let day = parts[2].parse::<u32>().ok()?;
-    NaiveDate::from_ymd_opt(year, month, day)
-}
 
 pub fn parse_buyback_stock_raw_html(html: String) -> Vec<BuybackRecord> {
     let document = Html::parse_document(&html);
@@ -336,16 +326,10 @@ pub async fn update_one_stock_change_pending(pool: &Pool<Postgres>, id: i32) -> 
 pub async fn get_stock_day_all_list(
     pool: &Pool<Postgres>,
     params: GetStockDayAll,
-    pagination: Pagination,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<StockDayAll>, AppError> {
-    stocks_repo::get_stock_day_all(
-        pool,
-        params.stock_code,
-        params.trade_date,
-        pagination.limit,
-        pagination.offset,
-    )
-    .await
+    stocks_repo::get_stock_day_all(pool, params.stock_code, params.trade_date, limit, offset).await
 }
 
 pub async fn get_active_buyback_prices(

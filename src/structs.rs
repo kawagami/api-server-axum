@@ -5,6 +5,7 @@ pub mod blogs;
 pub mod jobs;
 pub mod members;
 pub mod notes;
+pub mod pagination;
 pub mod portfolio;
 pub mod roles;
 pub mod roster;

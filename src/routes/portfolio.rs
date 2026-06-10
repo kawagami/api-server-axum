@@ -37,8 +37,9 @@ async fn create(
     Extension(auth_member): Extension<AuthenticatedMember>,
     State(state): State<AppState>,
     Json(req): Json<PortfolioRequest>,
-) -> Result<Json<PortfolioEntry>, AppError> {
-    Ok(Json(portfolio_service::create(state.get_pool(), auth_member.member_id, &req).await?))
+) -> Result<(StatusCode, Json<PortfolioEntry>), AppError> {
+    let entry = portfolio_service::create(state.get_pool(), auth_member.member_id, &req).await?;
+    Ok((StatusCode::CREATED, Json(entry)))
 }
 
 async fn update(

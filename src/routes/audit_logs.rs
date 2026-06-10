@@ -2,7 +2,7 @@ use crate::{
     errors::AppError,
     services::audit_logs::{get_audit_logs, AuditLog},
     state::AppState,
-    structs::{auth::AuthenticatedUser, roles::Perm},
+    structs::{auth::AuthenticatedUser, pagination::PageQuery, roles::Perm},
 };
 use axum::{
     extract::{Extension, Query, State},
@@ -19,14 +19,6 @@ struct AuditLogQuery {
     path: Option<String>,
     from: Option<DateTime<Utc>>,
     to: Option<DateTime<Utc>>,
-    #[serde(default = "default_limit")]
-    limit: i64,
-    #[serde(default)]
-    offset: i64,
-}
-
-fn default_limit() -> i64 {
-    100
 }
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -37,8 +29,10 @@ async fn get_audit_logs_handler(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(query): Query<AuditLogQuery>,
+    Query(page): Query<PageQuery>,
 ) -> Result<Json<Vec<AuditLog>>, AppError> {
     auth_user.require_permission(Perm::AuditRead)?;
+    let (limit, offset) = page.to_limit_offset(100);
     let logs = get_audit_logs(
         state.get_pool(),
         query.user_email,
@@ -46,8 +40,8 @@ async fn get_audit_logs_handler(
         query.path,
         query.from,
         query.to,
-        query.limit,
-        query.offset,
+        limit,
+        offset,
     )
     .await?;
     Ok(Json(logs))

@@ -1,8 +1,9 @@
 use crate::{
     errors::AppError,
-    repositories::logs::{get_logs, Log},
+    repositories::logs::Log,
+    services::logs as logs_service,
     state::AppState,
-    structs::{auth::AuthenticatedUser, roles::Perm},
+    structs::{auth::AuthenticatedUser, pagination::PageQuery, roles::Perm},
 };
 use axum::{
     extract::{Extension, Query, State},
@@ -14,14 +15,6 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 struct LogQuery {
     level: Option<String>,
-    #[serde(default = "default_limit")]
-    limit: i64,
-    #[serde(default)]
-    offset: i64,
-}
-
-fn default_limit() -> i64 {
-    100
 }
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -32,8 +25,10 @@ async fn get_logs_handler(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(query): Query<LogQuery>,
+    Query(page): Query<PageQuery>,
 ) -> Result<Json<Vec<Log>>, AppError> {
     auth_user.require_permission(Perm::LogRead)?;
-    let logs = get_logs(state.get_pool(), query.level, query.limit, query.offset).await?;
+    let (limit, offset) = page.to_limit_offset(100);
+    let logs = logs_service::get_logs(state.get_pool(), query.level, limit, offset).await?;
     Ok(Json(logs))
 }

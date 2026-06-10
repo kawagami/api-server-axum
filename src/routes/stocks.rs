@@ -4,66 +4,63 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
+        pagination::PageQuery,
         roles::Perm,
         stocks::{
-            Conditions, GetStockDayAll, Pagination, StockBuybackMoreInfo, StockBuybackPeriod,
-            StockChangePaginatedResponse, StockChangeId, StockClosingPriceResponse, StockRequest,
-            StockDayAll,
+            Conditions, GetStockDayAll, StockBuybackMoreInfo, StockBuybackPeriod,
+            StockChangePaginatedResponse, StockClosingPriceResponse, StockDayAll, StockRequest,
         },
     },
 };
 use axum::{
-    extract::{Extension, Query, State},
+    extract::{Extension, Path, Query, State},
+    http::StatusCode,
     routing::{get, patch},
     Json, Router,
 };
+use serde::Deserialize;
 
 pub fn new(state: AppState) -> Router<AppState> {
     super::with_auth(
         state,
         Router::new()
-            .route("/get_all_stock_changes", get(get_all_stock_changes))
-            .route(
-                "/update_one_stock_change_pending",
-                patch(update_one_stock_change_pending),
-            )
-            .route(
-                "/fetch_stock_closing_price_pair_stats",
-                get(fetch_stock_closing_price_pair_stats),
-            )
-            .route("/get_stock_day_all", get(get_stock_day_all))
-            .route(
-                "/get_unfinished_buyback_price_gap",
-                get(get_unfinished_buyback_price_gap),
-            )
-            .route(
-                "/get_stock_buyback_periods",
-                get(get_stock_buyback_periods),
-            ),
+            .route("/changes", get(list_stock_changes))
+            .route("/changes/{id}/pending", patch(reset_stock_change_pending))
+            .route("/closing_price_stats", get(get_closing_price_stats))
+            .route("/day_all", get(get_stock_day_all))
+            .route("/buyback_price_gaps", get(get_buyback_price_gaps))
+            .route("/buyback_periods", get(get_buyback_periods)),
     )
 }
 
-pub async fn get_all_stock_changes(
+#[derive(Deserialize)]
+struct StatusFilter {
+    status: Option<String>,
+}
+
+async fn list_stock_changes(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
-    Query(payload): Query<Conditions>,
+    Query(filter): Query<StatusFilter>,
+    Query(page): Query<PageQuery>,
 ) -> Result<Json<StockChangePaginatedResponse>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
-    Ok(Json(stocks_service::get_all_stock_changes(state.get_pool(), payload).await?))
+    let (limit, offset) = page.to_limit_offset(50);
+    let conditions = Conditions { status: filter.status, limit, offset };
+    Ok(Json(stocks_service::get_all_stock_changes(state.get_pool(), conditions).await?))
 }
 
-pub async fn update_one_stock_change_pending(
+async fn reset_stock_change_pending(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
-    Json(payload): Json<StockChangeId>,
-) -> Result<Json<()>, AppError> {
+    Path(id): Path<i32>,
+) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::StockUpdate)?;
-    Ok(Json(
-        stocks_service::update_one_stock_change_pending(state.get_pool(), payload.id).await?,
-    ))
+    stocks_service::update_one_stock_change_pending(state.get_pool(), id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn fetch_stock_closing_price_pair_stats(
+async fn get_closing_price_stats(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(payload): Query<StockRequest>,
@@ -72,17 +69,18 @@ pub async fn fetch_stock_closing_price_pair_stats(
     Ok(Json(stocks_service::get_closing_price_pair_stats(state.get_pool(), state.get_http_client(), &payload).await?))
 }
 
-pub async fn get_stock_day_all(
+async fn get_stock_day_all(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(payload): Query<GetStockDayAll>,
-    Query(pagination): Query<Pagination>,
+    Query(page): Query<PageQuery>,
 ) -> Result<Json<Vec<StockDayAll>>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
-    Ok(Json(stocks_service::get_stock_day_all_list(state.get_pool(), payload, pagination).await?))
+    let (limit, offset) = page.to_limit_offset(100);
+    Ok(Json(stocks_service::get_stock_day_all_list(state.get_pool(), payload, limit, offset).await?))
 }
 
-pub async fn get_unfinished_buyback_price_gap(
+async fn get_buyback_price_gaps(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackMoreInfo>>, AppError> {
@@ -90,7 +88,7 @@ pub async fn get_unfinished_buyback_price_gap(
     Ok(Json(stocks_service::get_active_buyback_prices(state.get_pool()).await?))
 }
 
-pub async fn get_stock_buyback_periods(
+async fn get_buyback_periods(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackPeriod>>, AppError> {

@@ -45,9 +45,10 @@ async fn create_role(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Json(body): Json<NewRole>,
-) -> Result<Json<Role>, AppError> {
+) -> Result<(StatusCode, Json<Role>), AppError> {
     auth_user.require_permission(Perm::RoleCreate)?;
-    Ok(Json(roles_service::create_role(state.get_pool(), body).await?))
+    let role = roles_service::create_role(state.get_pool(), body).await?;
+    Ok((StatusCode::CREATED, Json(role)))
 }
 
 async fn set_permissions(
