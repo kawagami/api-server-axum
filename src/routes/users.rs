@@ -16,17 +16,22 @@ use axum::{
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
-    let protected = super::with_auth(
+    super::with_auth(
         state,
         Router::new()
-            .route("/", axum::routing::post(create_user).delete(delete_user))
+            .route(
+                "/",
+                get(get_users).post(create_user).delete(delete_user),
+            )
             .route("/{id}/roles", get(get_user_roles).put(set_user_roles)),
-    );
-
-    Router::new().route("/", get(get_users)).merge(protected)
+    )
 }
 
-async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<User>>, AppError> {
+async fn get_users(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<User>>, AppError> {
+    auth_user.require_permission(Perm::UserRead)?;
     Ok(Json(users_service::get_users(state.get_pool()).await?))
 }
 
