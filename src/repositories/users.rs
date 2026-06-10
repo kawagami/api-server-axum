@@ -123,12 +123,14 @@ pub async fn set_user_roles(
         .execute(&mut *tx)
         .await?;
 
-    for &role_id in role_ids {
+    if !role_ids.is_empty() {
         sqlx::query(
-            "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            "INSERT INTO user_roles (user_id, role_id)
+             SELECT $1, unnest($2::int[])
+             ON CONFLICT DO NOTHING",
         )
         .bind(user_id)
-        .bind(role_id)
+        .bind(role_ids)
         .execute(&mut *tx)
         .await?;
     }

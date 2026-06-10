@@ -11,6 +11,18 @@ pub enum AppJob {
 }
 
 impl AppJob {
+    pub fn name(&self) -> &'static str {
+        match self {
+            AppJob::CleanupUnusedImages => "CleanupUnusedImages",
+            AppJob::FetchStockDayAll => "FetchStockDayAll",
+            AppJob::FetchBuybackPeriods => "FetchBuybackPeriods",
+            AppJob::FetchNotes => "FetchNotes",
+            AppJob::FetchHistoricalClosingPrices => "FetchHistoricalClosingPrices",
+            AppJob::ConsumePendingStockChange => "ConsumePendingStockChange",
+            AppJob::SyncBuybackToPending => "SyncBuybackToPending",
+        }
+    }
+
     pub fn cron_expression(&self) -> &str {
         match self {
             AppJob::CleanupUnusedImages => "0 0 * * * *",

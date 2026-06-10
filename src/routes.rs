@@ -47,6 +47,11 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
 
     state.reload_settings().await;
 
+    crate::services::oauth::OAuthProvider::warn_if_partially_configured(
+        state.get_config(),
+        &state.get_settings(),
+    );
+
     let cors_origins: Vec<HeaderValue> = state
         .get_settings()
         .get("cors_allowed_origins")

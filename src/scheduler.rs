@@ -23,11 +23,20 @@ pub async fn initialize_scheduler(state: AppState) {
 async fn add_job(scheduler: &JobScheduler, state: AppState, job: AppJob) {
     let expr = job.cron_expression().to_string();
     let job = Arc::new(job);
+    // 防重疊：上一輪還沒跑完就跳過本輪
+    let running = Arc::new(tokio::sync::Mutex::new(()));
 
     let cron_job = match CronJob::new_async(expr.as_str(), move |_uuid, _l| {
         let state = state.clone();
         let job = job.clone();
-        Box::pin(async move { job.run(state).await })
+        let running = running.clone();
+        Box::pin(async move {
+            let Ok(_guard) = running.try_lock() else {
+                tracing::warn!("job {} still running, skip this tick", job.name());
+                return;
+            };
+            job.run(state).await
+        })
     }) {
         Ok(j) => j,
         Err(e) => {

@@ -9,6 +9,7 @@ use crate::{
         portfolio::{HistoryRecord, PortfolioEntry, PortfolioRequest, PortfolioSummaryEntry},
         stocks::{NewStockClosingPrice, StockExRight},
     },
+    utils::date::parse_roc_date,
     utils::reqwest::get_json_data,
 };
 use bb8::Pool as RedisPool;
@@ -135,17 +136,6 @@ fn twse_headers() -> HashMap<String, String> {
     h.insert("Accept-Language".into(), "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7".into());
     h.insert("Referer".into(), "https://www.twse.com.tw/".into());
     h
-}
-
-fn parse_roc_date(s: &str) -> Option<NaiveDate> {
-    let parts: Vec<&str> = s.trim().split('/').collect();
-    if parts.len() != 3 {
-        return None;
-    }
-    let year: i32 = parts[0].trim().parse().ok()?;
-    let month: u32 = parts[1].trim().parse().ok()?;
-    let day: u32 = parts[2].trim().parse().ok()?;
-    NaiveDate::from_ymd_opt(year + 1911, month, day)
 }
 
 fn parse_twse_f64(s: &str) -> Option<f64> {

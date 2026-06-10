@@ -77,6 +77,18 @@ pub enum AuthError {
 pub enum SystemError {
     #[error("內部錯誤: {0}")]
     Internal(String),
+
+    #[error("資料庫錯誤")]
+    Database(#[source] sqlx::Error),
+
+    #[error("Redis 錯誤")]
+    Redis(#[source] redis::RedisError),
+
+    #[error("JSON 處理錯誤")]
+    Json(#[source] serde_json::Error),
+
+    #[error("時間解析錯誤")]
+    TimeParse(#[source] chrono::ParseError),
 }
 
 impl AppError {
@@ -156,14 +168,14 @@ impl From<sqlx::Error> for AppError {
     fn from(err: sqlx::Error) -> Self {
         match err {
             sqlx::Error::RowNotFound => RequestError::NotFound.into(),
-            e => Self::SystemError(SystemError::Internal(e.to_string())),
+            e => Self::SystemError(SystemError::Database(e)),
         }
     }
 }
 
 impl From<serde_json::Error> for AppError {
     fn from(err: serde_json::Error) -> Self {
-        Self::SystemError(SystemError::Internal(err.to_string()))
+        Self::SystemError(SystemError::Json(err))
     }
 }
 
@@ -181,13 +193,13 @@ impl From<reqwest::Error> for AppError {
 
 impl From<chrono::ParseError> for AppError {
     fn from(err: chrono::ParseError) -> Self {
-        Self::SystemError(SystemError::Internal(err.to_string()))
+        Self::SystemError(SystemError::TimeParse(err))
     }
 }
 
 impl From<redis::RedisError> for AppError {
     fn from(err: redis::RedisError) -> Self {
-        Self::SystemError(SystemError::Internal(err.to_string()))
+        Self::SystemError(SystemError::Redis(err))
     }
 }
 

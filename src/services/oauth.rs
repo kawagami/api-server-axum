@@ -89,6 +89,28 @@ impl OAuthProvider {
         })
     }
 
+    // 啟動時檢查 client_id（DB）與 client_secret（env）是否成對，缺一邊只會在
+    // token exchange 時才爆，提早警告
+    pub fn warn_if_partially_configured(config: &AppConfig, settings: &Settings) {
+        for provider in [Self::Google, Self::GitHub, Self::Line] {
+            let (secret, id_key) = match provider {
+                Self::Google => (&config.oauth_google.client_secret, "google_client_id"),
+                Self::GitHub => (&config.oauth_github.client_secret, "github_client_id"),
+                Self::Line => (&config.oauth_line.client_secret, "line_client_id"),
+            };
+            let has_id = settings.get(id_key).is_some_and(|v| !v.is_empty());
+            let has_secret = !secret.is_empty();
+            if has_id != has_secret {
+                tracing::warn!(
+                    "OAuth {} 設定不完整：client_id {}、client_secret {}",
+                    provider.name(),
+                    if has_id { "已設定" } else { "缺少" },
+                    if has_secret { "已設定" } else { "缺少" },
+                );
+            }
+        }
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
             Self::Google => "google",

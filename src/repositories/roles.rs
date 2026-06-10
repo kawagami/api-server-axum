@@ -129,12 +129,14 @@ pub async fn set_role_permissions(
         .execute(&mut *tx)
         .await?;
 
-    for &perm_id in permission_ids {
+    if !permission_ids.is_empty() {
         sqlx::query(
-            "INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            "INSERT INTO role_permissions (role_id, permission_id)
+             SELECT $1, unnest($2::int[])
+             ON CONFLICT DO NOTHING",
         )
         .bind(role_id)
-        .bind(perm_id)
+        .bind(permission_ids)
         .execute(&mut *tx)
         .await?;
     }

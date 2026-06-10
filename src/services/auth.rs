@@ -26,7 +26,7 @@ pub async fn sign_in(
         password_hash: db_user.password,
     };
 
-    if !verify_password(password, &user.password_hash)? {
+    if !verify_password(password.to_string(), user.password_hash.clone()).await? {
         return Err(AppError::AuthError(AuthError::InvalidPassword));
     }
 
@@ -60,12 +60,11 @@ pub async fn change_password(
         .await
         .map_err(|_| AppError::AuthError(AuthError::UserNotFound))?;
 
-    if !verify_password(current_password, &db_user.password)? {
+    if !verify_password(current_password.to_string(), db_user.password).await? {
         return Err(AppError::AuthError(AuthError::InvalidPassword));
     }
 
-    let new_hash = hash(new_password, DEFAULT_COST)
-        .map_err(|_| AppError::SystemError(SystemError::Internal("密碼 hash 失敗".to_string())))?;
+    let new_hash = hash_password(new_password.to_string()).await?;
 
     users::update_password(pool, email, &new_hash).await
 }
@@ -85,7 +84,17 @@ fn encode_jwt(email: String, jwt_secret: &str) -> Result<String, AppError> {
     .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
 }
 
-fn verify_password(password: &str, hash: &str) -> Result<bool, AppError> {
-    verify(password, hash)
+// bcrypt 為 CPU-bound（DEFAULT_COST 約百毫秒），用 spawn_blocking 避免卡住 tokio worker
+async fn verify_password(password: String, hash: String) -> Result<bool, AppError> {
+    tokio::task::spawn_blocking(move || verify(password, &hash))
+        .await
+        .map_err(|_| AppError::SystemError(SystemError::Internal("密碼驗證 task 失敗".to_string())))?
         .map_err(|_| AppError::SystemError(SystemError::Internal("密碼驗證處理失敗".to_string())))
+}
+
+pub(crate) async fn hash_password(password: String) -> Result<String, AppError> {
+    tokio::task::spawn_blocking(move || hash(password, DEFAULT_COST))
+        .await
+        .map_err(|_| AppError::SystemError(SystemError::Internal("密碼 hash task 失敗".to_string())))?
+        .map_err(|_| AppError::SystemError(SystemError::Internal("密碼 hash 失敗".to_string())))
 }

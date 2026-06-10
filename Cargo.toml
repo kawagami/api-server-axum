@@ -37,7 +37,7 @@ bb8 = "0.8.5"
 bb8-redis = "0.17.0"
 redis = "0.27.2"
 rand = "0.8"
-tokio-cron-scheduler = "*"
+tokio-cron-scheduler = "0.15"
 uuid = { version = "1.11.0", features = ["v4", "serde"] }
 thiserror = "2"
 anyhow = "1.0"

@@ -1,11 +1,10 @@
 use crate::{
-    errors::{AppError, SystemError},
+    errors::AppError,
     repositories::{redis, roles as roles_repo, users as users_repo},
     structs::{roles::Role, users::{NewUser, User}},
 };
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
-use bcrypt::{hash, DEFAULT_COST};
 use sqlx::{Pool, Postgres};
 
 pub async fn get_users(pool: &Pool<Postgres>) -> Result<Vec<User>, AppError> {
@@ -13,8 +12,7 @@ pub async fn get_users(pool: &Pool<Postgres>) -> Result<Vec<User>, AppError> {
 }
 
 pub async fn create_user(pool: &Pool<Postgres>, mut user: NewUser) -> Result<(), AppError> {
-    user.password = hash(&user.password, DEFAULT_COST)
-        .map_err(|_| AppError::SystemError(SystemError::Internal("密碼 hash 失敗".to_string())))?;
+    user.password = super::auth::hash_password(user.password).await?;
     let role_id = roles_repo::get_role_id_by_name(pool, "member").await?;
     users_repo::create_user(pool, user, role_id).await
 }
