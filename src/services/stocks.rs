@@ -12,18 +12,13 @@ use crate::{
         BuybackRecord, StockRequest, StockStats, TwseApiResponse,
     },
     utils::date::parse_roc_date,
-    utils::reqwest::{get_json_data, get_raw_html_string},
+    utils::reqwest::get_raw_html_string,
 };
 use chrono::{Duration, NaiveDate};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use scraper::{Html, Selector};
 use sqlx::{Pool, Postgres};
-use std::collections::HashMap;
-use std::sync::LazyLock;
-use tokio::sync::Semaphore;
-
-static TWSE_SEMAPHORE: LazyLock<Semaphore> = LazyLock::new(|| Semaphore::new(1));
 
 pub fn parse_buyback_stock_raw_html(html: String) -> Vec<BuybackRecord> {
     let document = Html::parse_document(&html);
@@ -101,47 +96,7 @@ pub async fn get_stock_day_avg(
     stock_no: &str,
     date: NaiveDate,
 ) -> Result<StockDayAvgResponse, AppError> {
-    let _permit = TWSE_SEMAPHORE.acquire().await.unwrap();
-    let date_str = date.format("%Y%m%d").to_string();
-    let url = format!(
-        "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY_AVG?date={}&stockNo={}&response=json&_={}",
-        date_str,
-        stock_no,
-        get_timestamp()
-    );
-
-    let mut headers = HashMap::new();
-    headers.insert("User-Agent".to_string(), "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36".to_string());
-    headers.insert(
-        "Accept".to_string(),
-        "application/json, text/javascript, */*; q=0.01".to_string(),
-    );
-    headers.insert(
-        "Accept-Language".to_string(),
-        "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7".to_string(),
-    );
-    headers.insert(
-        "Referer".to_string(),
-        "https://www.twse.com.tw/".to_string(),
-    );
-
-    get_json_data::<StockDayAvgResponse>(
-        request_client,
-        &url,
-        reqwest::Method::GET,
-        Some(headers),
-        None,
-        None,
-    )
-    .await
-}
-
-fn get_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    now.as_millis().to_string()
+    super::twse::fetch_stock_day_avg(request_client, stock_no, date).await
 }
 
 pub fn parse_stock_day_avg_response(
@@ -273,12 +228,7 @@ pub fn round_to_n_decimal(value: f64, decimals: u32) -> f64 {
 
 pub async fn stock_day_all_service(pool: &Pool<Postgres>, client: &Client) -> Result<(), AppError> {
     let url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL";
-    let resp: TwseApiResponse = client
-        .get(url)
-        .send()
-        .await?
-        .json()
-        .await?;
+    let resp: TwseApiResponse = super::twse::fetch_json(client, url).await?;
 
     let trade_date = chrono::NaiveDate::parse_from_str(&resp.date, "%Y%m%d")?;
 

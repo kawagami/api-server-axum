@@ -11,4 +11,5 @@ pub mod oauth;
 pub mod portfolio;
 pub mod roles;
 pub mod stocks;
+pub mod twse;
 pub mod users;

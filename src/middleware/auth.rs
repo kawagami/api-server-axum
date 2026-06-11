@@ -22,15 +22,7 @@ pub async fn authorize_and_load(
     next: Next,
 ) -> Result<Response<Body>, AppError> {
     let token = extract_token(&req)?;
-    let token_data = decode_jwt(token, &state.get_config().jwt_secret)?;
-
-    if token_data.claims.role != "admin" {
-        return Err(AppError::AuthError(AuthError::Forbidden));
-    }
-
-    let email = token_data.claims.sub;
-    let login_key = format!("user:login:{}", email);
-    verify_user_login(&state, &login_key).await?;
+    let email = verify_admin_token(&state, token).await?;
 
     let permissions = match redis::get_user_permissions(state.get_redis_pool(), &email).await? {
         Some(perms) => perms,
@@ -83,6 +75,21 @@ pub(crate) fn extract_token(req: &Request) -> Result<String, AppError> {
         .nth(1)
         .ok_or(AppError::AuthError(AuthError::MissingToken))
         .map(ToString::to_string)
+}
+
+/// 驗證 admin JWT（簽章、role、Redis login session），回傳 email。
+/// middleware 與 WS 升級握手共用，JWT 驗證邏輯只此一份。
+pub(crate) async fn verify_admin_token(state: &AppState, token: String) -> Result<String, AppError> {
+    let token_data = decode_jwt(token, &state.get_config().jwt_secret)?;
+
+    if token_data.claims.role != "admin" {
+        return Err(AppError::AuthError(AuthError::Forbidden));
+    }
+
+    let email = token_data.claims.sub;
+    let login_key = format!("user:login:{}", email);
+    verify_user_login(state, &login_key).await?;
+    Ok(email)
 }
 
 async fn verify_user_login(state: &AppState, key: &str) -> Result<(), AppError> {

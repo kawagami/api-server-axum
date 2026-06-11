@@ -103,12 +103,22 @@ pub async fn get_member_refresh_token(
     Ok(conn.get(key).await?)
 }
 
+/// 失效單一 user 的權限快取 — 失敗只記 warn，不阻斷主流程
+pub async fn invalidate_user_permissions(
+    pool: &RedisPool<RedisConnectionManager>,
+    email: &str,
+) {
+    if let Err(e) = del_user_permissions(pool, email).await {
+        tracing::warn!("Failed to invalidate permissions cache for {}: {}", email, e);
+    }
+}
+
 pub async fn invalidate_permissions_for_emails(
     pool: &RedisPool<RedisConnectionManager>,
     emails: &[String],
 ) {
     for email in emails {
-        let _ = del_user_permissions(pool, email).await;
+        invalidate_user_permissions(pool, email).await;
     }
 }
 

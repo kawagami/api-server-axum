@@ -1,12 +1,8 @@
 use crate::{
     errors::AppError,
     middleware::auth,
-    repositories::redis as redis_repo,
     state::{AppState, DisplayTrackedConnection, TrackedConnection},
-    structs::{
-        auth::{AuthenticatedUser, Claims},
-        roles::Perm,
-    },
+    structs::{auth::AuthenticatedUser, roles::Perm},
 };
 use axum::{
     body::Bytes,
@@ -23,7 +19,6 @@ use axum::{
 };
 use axum_extra::{headers, TypedHeader};
 use futures_util::{sink::SinkExt, stream::StreamExt};
-use jsonwebtoken::{decode, DecodingKey, Validation};
 use std::{net::SocketAddr, ops::ControlFlow, sync::Arc, time::SystemTime};
 use tokio::{sync::Mutex, time::Duration};
 
@@ -36,18 +31,7 @@ struct WsQuery {
 }
 
 async fn validate_ws_token(state: &AppState, token: String) -> Option<String> {
-    let token_data = decode::<Claims>(
-        &token,
-        &DecodingKey::from_secret(state.get_config().jwt_secret.as_ref()),
-        &Validation::default(),
-    )
-    .ok()?;
-    let email = token_data.claims.sub;
-    let key = format!("user:login:{}", email);
-    let exists = redis_repo::redis_check_key_exists(state.get_redis_pool(), &key)
-        .await
-        .unwrap_or(false);
-    exists.then_some(email)
+    auth::verify_admin_token(state, token).await.ok()
 }
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -111,20 +95,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
         serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_email": user_email }),
     );
 
-    let mut rx = state.get_tx().subscribe();
-
-    // --- send_task: 將 state 的訊息發送給客戶端 ---
-    let send_sender_clone = sender_arc.clone();
-    let mut send_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            let mut sender_guard = send_sender_clone.lock().await;
-            if let Err(e) = sender_guard.send(Message::Text(msg.into())).await {
-                tracing::warn!("Failed to send message to {}: {}", who, e);
-                break;
-            }
-        }
-    });
-
     // --- recv_task: 接收客戶端訊息 ---
     let recv_state_clone = state.clone();
     let mut recv_task = tokio::spawn(async move {
@@ -168,11 +138,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
 
     // --- tokio::select!: 協調所有任務 ---
     tokio::select! {
-        rv_a = (&mut send_task) => {
-            if let Err(e) = rv_a {
-                tracing::error!("Error in send_task for {who}: {:?}", e);
-            }
-        },
         rv_b = (&mut recv_task) => {
             if let Err(e) = rv_b {
                 tracing::error!("Error in recv_task for {who}: {:?}", e);
@@ -186,7 +151,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     }
 
     // 清理工作
-    send_task.abort();
     recv_task.abort();
     ping_task.abort();
 
@@ -199,7 +163,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
 fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            let _ = state.get_tx().send(format!("{} : {}", who, t));
+            state.broadcast_raw(format!("{} : {}", who, t));
         }
         Message::Binary(_) => {}
         Message::Close(c) => {

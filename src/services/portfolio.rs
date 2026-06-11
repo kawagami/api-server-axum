@@ -10,16 +10,13 @@ use crate::{
         stocks::{NewStockClosingPrice, StockExRight},
     },
     utils::date::parse_roc_date,
-    utils::reqwest::get_json_data,
 };
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
 use chrono::{Datelike, Local, Months, NaiveDate};
 use futures::future::try_join_all;
-use reqwest::{Client, Method};
-use serde::Deserialize;
+use reqwest::Client;
 use sqlx::{Pool, Postgres};
-use std::collections::HashMap;
 use uuid::Uuid;
 
 // TWT49U field indices — adjust here if TWSE changes column order
@@ -29,11 +26,7 @@ const EX_IDX_CLOSE_BEFORE: usize = 3;
 const EX_IDX_STOCK_RATE: usize = 4;
 const EX_IDX_CASH_DIV: usize = 5;
 
-#[derive(Deserialize)]
-struct TwseResponse {
-    stat: String,
-    data: Option<Vec<Vec<String>>>,
-}
+use super::twse::{self, TwseResponse};
 
 struct DayClose {
     date: NaiveDate,
@@ -129,23 +122,6 @@ pub async fn get_summary(
     Ok(result)
 }
 
-fn twse_headers() -> HashMap<String, String> {
-    let mut h = HashMap::new();
-    h.insert("User-Agent".into(), "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36".into());
-    h.insert("Accept".into(), "application/json, text/javascript, */*; q=0.01".into());
-    h.insert("Accept-Language".into(), "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7".into());
-    h.insert("Referer".into(), "https://www.twse.com.tw/".into());
-    h
-}
-
-fn parse_twse_f64(s: &str) -> Option<f64> {
-    let clean = s.trim().replace(",", "");
-    if clean.is_empty() || clean == "--" || clean == "-" {
-        return None;
-    }
-    clean.parse().ok()
-}
-
 fn redis_serialize_closes(closes: &[DayClose]) -> Option<String> {
     let v: Vec<(String, f64)> = closes
         .iter()
@@ -199,25 +175,10 @@ async fn fetch_closing_month(
     }
 
     // 3. TWSE
-    let date_str = month.format("%Y%m01").to_string();
-    let url = format!(
-        "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date={}&stockNo={}&response=json",
-        date_str, stock_code
-    );
-
-    let resp: TwseResponse = match get_json_data(
-        client,
-        &url,
-        Method::GET,
-        Some(twse_headers()),
-        None,
-        None,
-    )
-    .await
-    {
+    let resp: TwseResponse = match twse::fetch_stock_day(client, stock_code, month).await {
         Ok(r) => r,
         Err(e) => {
-            tracing::warn!("TWSE STOCK_DAY fetch failed {}/{}: {}", stock_code, date_str, e);
+            tracing::warn!("TWSE STOCK_DAY fetch failed {}/{}: {}", stock_code, month.format("%Y%m"), e);
             return Ok(vec![]);
         }
     };
@@ -229,7 +190,7 @@ async fn fetch_closing_month(
             .filter_map(|row| {
                 if row.len() < 7 { return None; }
                 let date = parse_roc_date(&row[0])?;
-                let close = parse_twse_f64(&row[6])?;
+                let close = twse::parse_f64(&row[6])?;
                 Some(DayClose { date, close })
             })
             .collect()
@@ -330,21 +291,7 @@ async fn fetch_ex_events(
     }
 
     // 3. TWSE
-    let url = format!(
-        "https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate={}&endDate={}&response=json",
-        start_str, end_str
-    );
-
-    let resp: TwseResponse = match get_json_data(
-        client,
-        &url,
-        Method::GET,
-        Some(twse_headers()),
-        None,
-        None,
-    )
-    .await
-    {
+    let resp: TwseResponse = match twse::fetch_ex_rights(client, &start_str, &end_str).await {
         Ok(r) => r,
         Err(e) => {
             tracing::warn!("TWSE TWT49U fetch failed {}/{}-{}: {}", stock_code, start_str, end_str, e);
@@ -361,9 +308,9 @@ async fn fetch_ex_events(
                 if row.len() < min_len { return None; }
                 if row[EX_IDX_CODE].trim() != stock_code { return None; }
                 let date = parse_roc_date(&row[EX_IDX_DATE])?;
-                let close_before = parse_twse_f64(&row[EX_IDX_CLOSE_BEFORE]).unwrap_or(0.0);
-                let stock_rate = parse_twse_f64(&row[EX_IDX_STOCK_RATE]).unwrap_or(0.0);
-                let cash_div = parse_twse_f64(&row[EX_IDX_CASH_DIV]).unwrap_or(0.0);
+                let close_before = twse::parse_f64(&row[EX_IDX_CLOSE_BEFORE]).unwrap_or(0.0);
+                let stock_rate = twse::parse_f64(&row[EX_IDX_STOCK_RATE]).unwrap_or(0.0);
+                let cash_div = twse::parse_f64(&row[EX_IDX_CASH_DIV]).unwrap_or(0.0);
                 Some(ExEvent { date, close_before, cash_div, stock_rate })
             })
             .collect()

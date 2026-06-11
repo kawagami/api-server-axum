@@ -1,7 +1,7 @@
 use axum::extract::ws::{Message, WebSocket};
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
-use futures::stream::SplitSink;
+use futures::{stream::SplitSink, SinkExt};
 use reqwest::Client;
 use serde::Serialize;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, RwLock},
     time::Duration,
 };
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::Mutex;
 
 use crate::storage::Storage;
 use crate::structs::config::AppConfig;
@@ -21,7 +21,6 @@ pub struct AppStateInner {
     pub pg_pool: Pool<Postgres>,
     pub redis_pool: RedisPool<RedisConnectionManager>,
     pub http_client: Client,
-    pub tx: broadcast::Sender<String>,
     pub connections: ConnectionMap,
     pub storage: Storage,
     pub config: AppConfig,
@@ -52,13 +51,10 @@ impl AppStateInner {
             .build()
             .expect("Failed to build HTTP client");
 
-        let (tx, _rx) = broadcast::channel(100);
-
         Self {
             pg_pool,
             redis_pool,
             http_client,
-            tx,
             connections: Arc::new(Mutex::new(HashMap::new())),
             storage: Storage::from_env(),
             config: AppConfig::from_env(),
@@ -68,10 +64,11 @@ impl AppStateInner {
 }
 
 pub type ConnectionMap = Arc<Mutex<HashMap<SocketAddr, TrackedConnection>>>;
+pub type WsSender = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
 pub struct TrackedConnection {
     pub connected_at: std::time::SystemTime,
-    pub sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
+    pub sender: WsSender,
     pub user_email: Option<String>,
     pub real_ip: String,
 }
@@ -140,10 +137,6 @@ impl AppState {
         &self.0.http_client
     }
 
-    pub fn get_tx(&self) -> &broadcast::Sender<String> {
-        &self.0.tx
-    }
-
     pub fn get_connections(&self) -> &ConnectionMap {
         &self.0.connections
     }
@@ -170,7 +163,28 @@ impl AppState {
             "data": data
         })
         .to_string();
-        let _ = self.0.tx.send(msg);
+        self.broadcast_raw(msg);
+    }
+
+    /// 廣播給所有連線 — 先複製 sender 清單釋放 map lock，
+    /// 再 per-connection spawn，慢速客戶端不會卡住其他連線
+    pub fn broadcast_raw(&self, msg: String) {
+        let connections = self.0.connections.clone();
+        tokio::spawn(async move {
+            let senders: Vec<(SocketAddr, WsSender)> = {
+                let conns = connections.lock().await;
+                conns.iter().map(|(addr, c)| (*addr, c.sender.clone())).collect()
+            };
+            for (addr, sender) in senders {
+                let msg = msg.clone();
+                tokio::spawn(async move {
+                    let mut guard = sender.lock().await;
+                    if let Err(e) = guard.send(Message::Text(msg.into())).await {
+                        tracing::warn!("broadcast to {} failed: {}", addr, e);
+                    }
+                });
+            }
+        });
     }
 }
 
