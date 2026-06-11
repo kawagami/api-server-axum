@@ -13,7 +13,7 @@ const PUBLIC_KEYS: &[&str] = &["site_theme"];
 /// 設定值驗證 — key 不在表內就不驗證
 fn validate(key: &str, value: &str) -> Result<(), AppError> {
     let allowed: &[&str] = match key {
-        "site_theme" => &["forest", "ocean"],
+        "site_theme" => &["forest", "ocean", "sky"],
         _ => return Ok(()),
     };
     if allowed.contains(&value) {
