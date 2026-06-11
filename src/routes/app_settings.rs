@@ -24,6 +24,15 @@ pub fn new(state: AppState) -> Router<AppState> {
     )
 }
 
+/// GET /settings/public — 無認證，訪客 SSR 用；只回白名單設定
+pub fn public() -> Router<AppState> {
+    Router::new().route("/public", get(get_public))
+}
+
+async fn get_public(State(state): State<AppState>) -> Json<BTreeMap<String, String>> {
+    Json(settings_service::get_public(&state.get_settings()))
+}
+
 async fn get_all(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,

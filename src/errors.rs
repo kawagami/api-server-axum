@@ -42,6 +42,9 @@ pub enum RequestError {
     #[error("無效的請求內容: {0}")]
     InvalidContent(String),
 
+    #[error("驗證失敗: {0}")]
+    UnprocessableContent(String),
+
     #[error("找不到資源")]
     NotFound,
 }
@@ -108,6 +111,7 @@ impl AppError {
             Self::RequestError(err) => match err {
                 RequestError::MultipartError(_) => StatusCode::BAD_REQUEST,
                 RequestError::InvalidContent(_) => StatusCode::BAD_REQUEST,
+                RequestError::UnprocessableContent(_) => StatusCode::UNPROCESSABLE_ENTITY,
                 RequestError::NotFound => StatusCode::NOT_FOUND,
             },
             Self::AuthError(err) => match err {

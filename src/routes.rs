@@ -77,6 +77,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/member/portfolio", portfolio::new(state.clone()))
         .nest("/oauth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))
+        .nest("/settings", app_settings::public())
         .nest_service("/uploads", ServeDir::new(&upload_path))
         .layer(middleware::from_fn_with_state(state.clone(), audit::audit_log))
         .layer(DefaultBodyLimit::disable())
