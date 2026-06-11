@@ -8,12 +8,13 @@ use sqlx::{Pool, Postgres};
 use std::collections::BTreeMap;
 
 /// 可由無認證端點讀取的設定白名單 — 新增公開設定時在此加 key
-const PUBLIC_KEYS: &[&str] = &["site_theme"];
+const PUBLIC_KEYS: &[&str] = &["site_theme", "default_color_mode"];
 
 /// 設定值驗證 — key 不在表內就不驗證
 fn validate(key: &str, value: &str) -> Result<(), AppError> {
     let allowed: &[&str] = match key {
         "site_theme" => &["forest", "ocean", "sky"],
+        "default_color_mode" => &["light", "dark", "system"],
         _ => return Ok(()),
     };
     if allowed.contains(&value) {
