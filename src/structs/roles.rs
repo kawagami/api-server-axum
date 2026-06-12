@@ -23,6 +23,9 @@ pub enum Perm {
     UserDelete,
     SettingRead,
     SettingUpdate,
+    TorrentRead,
+    TorrentCreate,
+    TorrentDelete,
 }
 
 impl Perm {
@@ -49,6 +52,9 @@ impl Perm {
             Self::UserDelete     => "user:delete",
             Self::SettingRead    => "setting:read",
             Self::SettingUpdate  => "setting:update",
+            Self::TorrentRead    => "torrent:read",
+            Self::TorrentCreate  => "torrent:create",
+            Self::TorrentDelete  => "torrent:delete",
         }
     }
 }

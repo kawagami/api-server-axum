@@ -11,5 +11,6 @@ pub mod roles;
 pub mod roster;
 pub mod stocks;
 pub mod tools;
+pub mod torrents;
 pub mod users;
 pub mod ws;

@@ -24,6 +24,7 @@ sqlx = { version = "0.8", features = [
     "chrono",
     "uuid",
     "rust_decimal",
+    "json",
 ] }
 dotenvy = "0.15.7"
 serde = { version = "1", features = ["derive"] }
@@ -53,3 +54,5 @@ axum-extra = { version = "0.10.1", features = ["typed-header"] }
 tokio-util = { version = "0.7.18", features = ["io"] }
 zhconv = "0.4.1"
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder", "hostname"] }
+librqbit = "8"
+tower = { version = "0.5", features = ["util"] }

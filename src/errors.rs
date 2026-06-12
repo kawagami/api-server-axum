@@ -45,6 +45,12 @@ pub enum RequestError {
     #[error("驗證失敗: {0}")]
     UnprocessableContent(String),
 
+    #[error("資源衝突: {0}")]
+    Conflict(String),
+
+    #[error("儲存空間不足: {0}")]
+    InsufficientStorage(String),
+
     #[error("找不到資源")]
     NotFound,
 }
@@ -112,6 +118,8 @@ impl AppError {
                 RequestError::MultipartError(_) => StatusCode::BAD_REQUEST,
                 RequestError::InvalidContent(_) => StatusCode::BAD_REQUEST,
                 RequestError::UnprocessableContent(_) => StatusCode::UNPROCESSABLE_ENTITY,
+                RequestError::Conflict(_) => StatusCode::CONFLICT,
+                RequestError::InsufficientStorage(_) => StatusCode::INSUFFICIENT_STORAGE,
                 RequestError::NotFound => StatusCode::NOT_FOUND,
             },
             Self::AuthError(err) => match err {

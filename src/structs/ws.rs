@@ -4,6 +4,9 @@ pub enum WsEvent {
     BlogCreated,
     UserJoined,
     UserLeft,
+    TorrentProgress,
+    TorrentCompleted,
+    TorrentFailed,
 }
 
 impl WsEvent {
@@ -14,6 +17,9 @@ impl WsEvent {
             Self::BlogCreated => "blog_created",
             Self::UserJoined => "user_joined",
             Self::UserLeft => "user_left",
+            Self::TorrentProgress => "torrent_progress",
+            Self::TorrentCompleted => "torrent_completed",
+            Self::TorrentFailed => "torrent_failed",
         }
     }
 }

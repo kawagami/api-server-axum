@@ -6,6 +6,7 @@ pub async fn initialize_scheduler(state: AppState) {
     let scheduler = JobScheduler::new().await.expect("failed to create scheduler");
 
     for job in [
+        AppJob::CleanupExpiredTorrents,
         AppJob::CleanupUnusedImages,
         AppJob::FetchStockDayAll,
         AppJob::FetchBuybackPeriods,

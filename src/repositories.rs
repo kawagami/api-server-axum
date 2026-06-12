@@ -10,4 +10,5 @@ pub mod portfolio;
 pub mod redis;
 pub mod roles;
 pub mod stocks;
+pub mod torrents;
 pub mod users;

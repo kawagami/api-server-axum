@@ -1,7 +1,9 @@
 use crate::state::AppState;
 use axum::Router;
 
-use super::{admin_blogs, app_settings, audit_logs, auth, images, permissions, roles, stocks, users};
+use super::{
+    admin_blogs, app_settings, audit_logs, auth, images, permissions, roles, stocks, torrents, users,
+};
 
 pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
@@ -13,5 +15,6 @@ pub fn new(state: AppState) -> Router<AppState> {
         .nest("/blogs", admin_blogs::new(state.clone()))
         .nest("/images", images::new(state.clone()))
         .nest("/stocks", stocks::new(state.clone()))
+        .nest("/torrents", torrents::new(state.clone()))
         .nest("/settings", app_settings::new(state))
 }

@@ -13,6 +13,7 @@ use std::{
 };
 use tokio::sync::Mutex;
 
+use crate::services::torrents::TorrentManager;
 use crate::storage::Storage;
 use crate::structs::config::AppConfig;
 use crate::structs::ws::WsEvent;
@@ -25,6 +26,7 @@ pub struct AppStateInner {
     pub storage: Storage,
     pub config: AppConfig,
     pub settings: Arc<RwLock<HashMap<String, String>>>,
+    pub torrents: TorrentManager,
 }
 
 impl AppStateInner {
@@ -59,6 +61,7 @@ impl AppStateInner {
             storage: Storage::from_env(),
             config: AppConfig::from_env(),
             settings: Arc::new(RwLock::new(HashMap::new())),
+            torrents: TorrentManager::new().await,
         }
     }
 }
@@ -147,6 +150,10 @@ impl AppState {
 
     pub fn get_config(&self) -> &AppConfig {
         &self.0.config
+    }
+
+    pub fn get_torrents(&self) -> &TorrentManager {
+        &self.0.torrents
     }
 
     pub fn get_settings(&self) -> Settings {

@@ -15,6 +15,7 @@ mod roles;
 mod roster;
 mod stocks;
 mod tools;
+mod torrents;
 mod users;
 mod ws;
 
@@ -63,6 +64,9 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
     tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone()));
 
     initialize_scheduler(state.clone()).await;
+
+    // 重啟 resume：把 pending / downloading 的 torrent 補回 session
+    tokio::spawn(crate::services::torrents::sync_active(state.clone()));
 
     let upload_path = std::env::var("UPLOAD_PATH").unwrap_or_else(|_| "./uploads".to_string());
 
