@@ -54,5 +54,5 @@ axum-extra = { version = "0.10.1", features = ["typed-header"] }
 tokio-util = { version = "0.7.18", features = ["io"] }
 zhconv = "0.4.1"
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder", "hostname"] }
-librqbit = "8"
+librqbit = { version = "8", default-features = false, features = ["rust-tls"] }
 tower = { version = "0.5", features = ["util"] }

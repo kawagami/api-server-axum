@@ -2,7 +2,8 @@ FROM rust:1.88-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache musl-dev pkgconfig tzdata
+# cmake/make/gcc/perl/linux-headers：librqbit → aws-lc-sys 編譯 C 原始碼用
+RUN apk add --no-cache musl-dev pkgconfig tzdata cmake make gcc perl linux-headers
 
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
