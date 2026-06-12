@@ -25,6 +25,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         state,
         Router::new()
             .route("/", post(create_torrent).get(list_torrents))
+            .route("/storage", get(get_storage_stats))
             .route("/{id}", get(get_torrent).delete(delete_torrent))
             .route("/{id}/pending", patch(reset_torrent_pending))
             .route("/{id}/download_links", post(create_download_links)),
@@ -62,6 +63,14 @@ async fn list_torrents(
     Ok(Json(
         crate::repositories::torrents::list(state.get_pool(), filter.status, limit, offset).await?,
     ))
+}
+
+async fn get_storage_stats(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    auth_user.require_permission(Perm::TorrentRead)?;
+    Ok(Json(torrents_service::storage_stats(&state).await?))
 }
 
 async fn get_torrent(

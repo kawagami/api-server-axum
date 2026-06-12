@@ -66,6 +66,7 @@ dependencies = [
  "futures-util",
  "jsonwebtoken",
  "lettre",
+ "libc",
  "librqbit",
  "rand 0.8.6",
  "redis",
