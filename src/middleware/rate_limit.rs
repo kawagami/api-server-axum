@@ -7,7 +7,6 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use redis::AsyncCommands;
 use std::net::SocketAddr;
 
 const MAX_REQUESTS: i64 = 20;
@@ -18,25 +17,36 @@ pub async fn tools_rate_limit(
     req: Request,
     next: Next,
 ) -> Result<Response<Body>, AppError> {
-    let ip = req
-        .headers()
-        .get("CF-Connecting-IP")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
-        .or_else(|| {
-            req.extensions()
-                .get::<ConnectInfo<SocketAddr>>()
-                .map(|ci| ci.0.ip().to_string())
-        })
-        .unwrap_or_else(|| "unknown".to_string());
+    let socket_ip = req
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0.ip().to_string());
+
+    // 只有確定流量經 Cloudflare（TRUST_CF_HEADER=true）才信任 header，否則 header 可偽造繞過 rate limit
+    let ip = if state.get_config().trust_cf_header {
+        req.headers()
+            .get("CF-Connecting-IP")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+            .or(socket_ip)
+            .unwrap_or_else(|| "unknown".to_string())
+    } else {
+        socket_ip.unwrap_or_else(|| "unknown".to_string())
+    };
 
     let key = format!("rate_limit:tools:{}", ip);
     let mut conn = state.get_redis_conn().await?;
 
-    let count: i64 = conn.incr(&key, 1).await?;
-    if count == 1 {
-        let _: () = conn.expire(&key, WINDOW_SECS).await?;
-    }
+    // 原子：INCR + 首次設 TTL 一次完成，避免 incr 成功 expire 失敗導致 key 無 TTL 永久封鎖
+    let count: i64 = redis::Script::new(
+        "local c = redis.call('INCR', KEYS[1]) \
+         if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end \
+         return c",
+    )
+    .key(&key)
+    .arg(WINDOW_SECS)
+    .invoke_async(&mut *conn)
+    .await?;
 
     if count > MAX_REQUESTS {
         return Ok((

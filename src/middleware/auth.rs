@@ -70,11 +70,13 @@ pub(crate) fn extract_token(req: &Request) -> Result<String, AppError> {
         .to_str()
         .map_err(|_| AppError::AuthError(AuthError::InvalidHeader))?;
 
-    auth_header
-        .split_whitespace()
-        .nth(1)
-        .ok_or(AppError::AuthError(AuthError::MissingToken))
-        .map(ToString::to_string)
+    let mut parts = auth_header.split_whitespace();
+    match (parts.next(), parts.next()) {
+        (Some(scheme), Some(token)) if scheme.eq_ignore_ascii_case("Bearer") && !token.is_empty() => {
+            Ok(token.to_string())
+        }
+        _ => Err(AppError::AuthError(AuthError::InvalidHeader)),
+    }
 }
 
 /// 驗證 admin JWT（簽章、role、Redis login session），回傳 email。

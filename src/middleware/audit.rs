@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::{state::AppState, structs::auth::AuthenticatedUser};
 use axum::{body::Body, extract::{Request, State}, middleware::Next, response::Response};
 
 pub async fn audit_log(
@@ -6,7 +6,11 @@ pub async fn audit_log(
     req: Request,
     next: Next,
 ) -> Response<Body> {
-    let user_email = extract_admin_email(&req, &state.get_config().jwt_secret);
+    // auth middleware（外層）已驗證並塞入 AuthenticatedUser，直接讀，不重複 decode JWT
+    let user_email = req
+        .extensions()
+        .get::<AuthenticatedUser>()
+        .map(|u| u.email.clone());
 
     let method = req.method().to_string();
     let path = req.uri().path().to_string();
@@ -33,15 +37,4 @@ pub async fn audit_log(
     }
 
     response
-}
-
-fn extract_admin_email(req: &Request, jwt_secret: &str) -> Option<String> {
-    let token = super::auth::extract_token(req).ok()?;
-    let token_data = super::auth::decode_jwt(token, jwt_secret).ok()?;
-
-    if token_data.claims.role != "admin" {
-        return None;
-    }
-
-    Some(token_data.claims.sub)
 }

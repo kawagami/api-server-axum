@@ -19,7 +19,7 @@ mod torrents;
 mod users;
 mod ws;
 
-use crate::{logging::LogEntry, middleware::audit, scheduler::initialize_scheduler, state::AppState};
+use crate::{logging::LogEntry, scheduler::initialize_scheduler, state::AppState};
 use axum::{
     extract::DefaultBodyLimit,
     http::{header, HeaderValue, Method, StatusCode},
@@ -32,10 +32,16 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
 pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<AppState> {
-    router.layer(middleware::from_fn_with_state(
-        state,
-        crate::middleware::auth::authorize_and_load,
-    ))
+    // audit 掛在 auth 內層：auth 先跑塞入 AuthenticatedUser，audit 直接讀 extension，不重複 decode JWT
+    router
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::audit::audit_log,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state,
+            crate::middleware::auth::authorize_and_load,
+        ))
 }
 
 pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
@@ -83,7 +89,6 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/logs", logs::new(state.clone()))
         .nest("/settings", app_settings::public())
         .nest_service("/uploads", ServeDir::new(&upload_path))
-        .layer(middleware::from_fn_with_state(state.clone(), audit::audit_log))
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(
