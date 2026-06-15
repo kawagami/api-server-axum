@@ -1,5 +1,5 @@
 use crate::{state::AppState, structs::auth::AuthenticatedUser};
-use axum::{body::Body, extract::{Request, State}, middleware::Next, response::Response};
+use axum::{body::Body, extract::{OriginalUri, Request, State}, middleware::Next, response::Response};
 
 pub async fn audit_log(
     State(state): State<AppState>,
@@ -13,8 +13,14 @@ pub async fn audit_log(
         .map(|u| u.email.clone());
 
     let method = req.method().to_string();
-    let path = req.uri().path().to_string();
-    let query = req.uri().query().map(ToString::to_string);
+    // audit 掛在 nest 內層，req.uri() 前綴已被剝掉；用 OriginalUri 取完整原始路徑
+    let uri = req
+        .extensions()
+        .get::<OriginalUri>()
+        .map(|o| &o.0)
+        .unwrap_or_else(|| req.uri());
+    let path = uri.path().to_string();
+    let query = uri.query().map(ToString::to_string);
 
     let response = next.run(req).await;
 
