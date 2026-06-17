@@ -104,7 +104,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
             match msg_result {
                 Ok(msg) => {
                     cnt += 1;
-                    if process_message(msg, who, &recv_state_clone).is_break() {
+                    if process_message(msg, who, &recv_state_clone).await.is_break() {
                         break;
                     }
                 }
@@ -160,9 +160,15 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     tracing::debug!("Websocket context {who} ({real_ip}) destroyed");
 }
 
-fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
+async fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
+            // 先試解析象棋協定 `{ type, data }`；非象棋訊息沿用既有 echo
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&t) {
+                if crate::services::chess::handle(state, who, &value).await {
+                    return ControlFlow::Continue(());
+                }
+            }
             state.broadcast_raw(format!("{} : {}", who, t));
         }
         Message::Binary(_) => {}
@@ -252,6 +258,9 @@ async fn say_something_to_someone(
 }
 
 async fn cleanup_connection(state: &AppState, who: SocketAddr) {
+    // 象棋：在佇列就移除；在對局就判對手勝（斷線即判敗）
+    crate::services::chess::handle_disconnect(state, who).await;
+
     let (user_email, real_ip) = {
         let mut connections = state.get_connections().lock().await;
         let email = connections.get(&who).and_then(|c| c.user_email.clone());

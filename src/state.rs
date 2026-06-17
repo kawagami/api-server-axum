@@ -13,6 +13,7 @@ use std::{
 };
 use tokio::sync::Mutex;
 
+use crate::games::chess::hub::ChessHub;
 use crate::services::torrents::TorrentManager;
 use crate::storage::Storage;
 use crate::structs::config::AppConfig;
@@ -27,6 +28,7 @@ pub struct AppStateInner {
     pub config: AppConfig,
     pub settings: Arc<RwLock<HashMap<String, String>>>,
     pub torrents: TorrentManager,
+    pub chess: ChessHub,
 }
 
 impl AppStateInner {
@@ -62,6 +64,7 @@ impl AppStateInner {
             config: AppConfig::from_env(),
             settings: Arc::new(RwLock::new(HashMap::new())),
             torrents: TorrentManager::new().await,
+            chess: Arc::new(Mutex::new(Default::default())),
         }
     }
 }
@@ -154,6 +157,27 @@ impl AppState {
 
     pub fn get_torrents(&self) -> &TorrentManager {
         &self.0.torrents
+    }
+
+    pub fn chess(&self) -> &ChessHub {
+        &self.0.chess
+    }
+
+    /// 點對點送文字訊息給單一連線（找不到連線就靜默丟棄）。
+    pub fn send_to(&self, addr: SocketAddr, msg: String) {
+        let connections = self.0.connections.clone();
+        tokio::spawn(async move {
+            let sender = {
+                let conns = connections.lock().await;
+                conns.get(&addr).map(|c| c.sender.clone())
+            };
+            if let Some(sender) = sender {
+                let mut guard = sender.lock().await;
+                if let Err(e) = guard.send(Message::Text(msg.into())).await {
+                    tracing::warn!("send_to {} failed: {}", addr, e);
+                }
+            }
+        });
     }
 
     pub fn get_settings(&self) -> Settings {

@@ -1,3 +1,4 @@
+mod games;
 mod errors;
 mod jobs;
 mod logging;
