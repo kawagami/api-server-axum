@@ -16,7 +16,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - 投資組合管理（member 持股 CRUD）
 - 排班（roster）
 - 排程 job（cron）
-- 線上象棋 1v1（server-authoritative，匿名配對，複用 `/ws`；規則引擎 + Fischer 計時）
+- 線上象棋 1v1（server-authoritative，匿名，大廳自選桌 + 快速配對，複用 `/ws`；規則引擎 + Fischer 計時）
 
 ## API 路由
 

@@ -1,6 +1,6 @@
-//! 房間 / 配對的記憶體狀態（純資料，無 WS 依賴）。重啟即丟失。
+//! 大廳 / 桌位 / 對局的記憶體狀態（純資料，無 WS 依賴）。重啟即丟失。
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -15,15 +15,39 @@ pub type ChessHub = Arc<Mutex<ChessHubInner>>;
 
 #[derive(Default)]
 pub struct ChessHubInner {
+    /// 快速配對佇列。
     pub queue: VecDeque<SocketAddr>,
-    pub rooms: HashMap<u64, Room>,
-    /// 連線 → 所屬 room，快速反查。
-    pub conn_room: HashMap<SocketAddr, u64>,
+    /// 所有桌（等待中 + 對戰中）。
+    pub tables: HashMap<u64, Table>,
+    /// 連線 → 所屬桌（host 等待中或對戰中皆含），快速反查。
+    pub conn_table: HashMap<SocketAddr, u64>,
+    /// 訂閱大廳更新的連線（在大廳頁、未入局）。
+    pub lobby: HashSet<SocketAddr>,
     pub next_id: u64,
 }
 
-pub struct Room {
+impl ChessHubInner {
+    /// 連線是否已有承諾（在佇列或在桌）。一條連線同時只能在其一。
+    pub fn is_committed(&self, who: SocketAddr) -> bool {
+        self.conn_table.contains_key(&who) || self.queue.contains(&who)
+    }
+}
+
+pub struct Table {
     pub id: u64,
+    pub name: String,
+    pub state: TableState,
+}
+
+pub enum TableState {
+    /// 等待對手；`host` 已就座。
+    Waiting { host: SocketAddr },
+    /// 對戰中。
+    Playing(Game),
+}
+
+/// 進行中的一局。
+pub struct Game {
     pub red: SocketAddr,
     pub black: SocketAddr,
     pub state: GameState,
@@ -34,7 +58,19 @@ pub struct Room {
     pub ended: bool,
 }
 
-impl Room {
+impl Game {
+    pub fn new(red: SocketAddr, black: SocketAddr, state: GameState) -> Self {
+        Game {
+            red,
+            black,
+            state,
+            red_ms: INITIAL_CLOCK_MS,
+            black_ms: INITIAL_CLOCK_MS,
+            turn_started_at: Instant::now(),
+            ended: false,
+        }
+    }
+
     pub fn side_of(&self, who: SocketAddr) -> Option<Side> {
         if who == self.red {
             Some(Side::Red)
