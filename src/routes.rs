@@ -74,8 +74,10 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
     // 重啟 resume：把 pending / downloading 的 torrent 補回 session
     tokio::spawn(crate::services::torrents::sync_active(state.clone()));
 
-    // 象棋計時掃描：偵測行棋方時鐘耗盡卻無人走步 → 主動判負
-    tokio::spawn(crate::services::chess::timeout_watcher(state.clone()));
+    // 遊戲計時掃描：偵測行棋方時鐘耗盡卻無人走步 → 主動判負（每遊戲一個 watcher）
+    for hub in state.games().all() {
+        hub.spawn_watcher(state.clone());
+    }
 
     let upload_path = std::env::var("UPLOAD_PATH").unwrap_or_else(|_| "./uploads".to_string());
 

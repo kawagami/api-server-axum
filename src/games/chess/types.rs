@@ -17,13 +17,6 @@ impl Side {
             Side::Black => Side::Red,
         }
     }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Side::Red => "red",
-            Side::Black => "black",
-        }
-    }
 }
 
 /// 棋子種類。
@@ -97,7 +90,6 @@ pub enum Status {
 /// 非法走步原因；`code()` 為傳給前端的字串。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IllegalReason {
-    NotYourTurn,
     NoPiece,
     WrongPiece,
     CaptureOwn,
@@ -114,7 +106,6 @@ pub enum IllegalReason {
 impl IllegalReason {
     pub fn code(self) -> &'static str {
         match self {
-            IllegalReason::NotYourTurn => "NotYourTurn",
             IllegalReason::NoPiece => "NoPiece",
             IllegalReason::WrongPiece => "WrongPiece",
             IllegalReason::CaptureOwn => "CaptureOwn",

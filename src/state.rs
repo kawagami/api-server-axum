@@ -13,7 +13,7 @@ use std::{
 };
 use tokio::sync::Mutex;
 
-use crate::games::chess::hub::ChessHub;
+use crate::games::registry::GameRegistry;
 use crate::services::torrents::TorrentManager;
 use crate::storage::Storage;
 use crate::structs::config::AppConfig;
@@ -28,7 +28,7 @@ pub struct AppStateInner {
     pub config: AppConfig,
     pub settings: Arc<RwLock<HashMap<String, String>>>,
     pub torrents: TorrentManager,
-    pub chess: ChessHub,
+    pub games: GameRegistry,
 }
 
 impl AppStateInner {
@@ -64,7 +64,7 @@ impl AppStateInner {
             config: AppConfig::from_env(),
             settings: Arc::new(RwLock::new(HashMap::new())),
             torrents: TorrentManager::new().await,
-            chess: Arc::new(Mutex::new(Default::default())),
+            games: GameRegistry::new(),
         }
     }
 }
@@ -159,8 +159,8 @@ impl AppState {
         &self.0.torrents
     }
 
-    pub fn chess(&self) -> &ChessHub {
-        &self.0.chess
+    pub fn games(&self) -> &GameRegistry {
+        &self.0.games
     }
 
     /// 點對點送文字訊息給單一連線（找不到連線就靜默丟棄）。

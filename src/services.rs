@@ -3,7 +3,6 @@ pub mod email;
 pub mod audit_logs;
 pub mod auth;
 pub mod blogs;
-pub mod chess;
 pub mod images;
 pub mod logs;
 pub mod members;

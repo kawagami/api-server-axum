@@ -160,12 +160,23 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     tracing::debug!("Websocket context {who} ({real_ip}) destroyed");
 }
 
+/// 依信封 `game` 欄分派給對應遊戲 hub。回傳 true 表示已當作遊戲訊息處理。
+async fn dispatch_game(state: &AppState, who: SocketAddr, value: &serde_json::Value) -> bool {
+    let Some(game) = value.get("game").and_then(|v| v.as_str()) else {
+        return false;
+    };
+    match state.games().get(game) {
+        Some(hub) => hub.handle(state, who, value).await,
+        None => false,
+    }
+}
+
 async fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            // 先試解析象棋協定 `{ type, data }`；非象棋訊息沿用既有 echo
+            // 先試解析遊戲協定 `{ game, type, data }`；非遊戲訊息沿用既有 echo
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(&t) {
-                if crate::services::chess::handle(state, who, &value).await {
+                if dispatch_game(state, who, &value).await {
                     return ControlFlow::Continue(());
                 }
             }
@@ -258,8 +269,10 @@ async fn say_something_to_someone(
 }
 
 async fn cleanup_connection(state: &AppState, who: SocketAddr) {
-    // 象棋：在佇列就移除；在對局就判對手勝（斷線即判敗）
-    crate::services::chess::handle_disconnect(state, who).await;
+    // 各遊戲斷線清理：在佇列就移除；在對局就判對手勝（斷線即判敗）
+    for hub in state.games().all() {
+        hub.disconnect(state, who).await;
+    }
 
     let (user_email, real_ip) = {
         let mut connections = state.get_connections().lock().await;
