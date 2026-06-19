@@ -91,9 +91,12 @@ fn room_snapshot(room: &Room) -> Value {
 }
 
 fn push_room_update(room: &Room, outbox: &mut Vec<(SocketAddr, String)>) {
-    let m = msg("room_update", room_snapshot(room));
-    for &p in &room.players {
-        outbox.push((p, m.clone()));
+    let base = room_snapshot(room);
+    // 逐人注入 your_seat（等待中有人離開會重編號，故每則都帶當前 seat）
+    for (seat, &p) in room.players.iter().enumerate() {
+        let mut v = base.clone();
+        v["your_seat"] = json!(seat);
+        outbox.push((p, msg("room_update", v)));
     }
 }
 
@@ -316,9 +319,12 @@ fn state_payload(gs: &GameState) -> Value {
 
 fn broadcast_state(room: &Room, outbox: &mut Vec<(SocketAddr, String)>) {
     if let RoomState::Playing(gs) = &room.state {
-        let m = msg("state", state_payload(gs));
-        for &p in &room.players {
-            outbox.push((p, m.clone()));
+        let base = state_payload(gs);
+        // 逐人注入 your_seat
+        for (seat, &p) in room.players.iter().enumerate() {
+            let mut v = base.clone();
+            v["your_seat"] = json!(seat);
+            outbox.push((p, msg("state", v)));
         }
     }
 }
