@@ -1,3 +1,15 @@
+use serde_json::{json, Value};
+
+/// 站台 WS 統一信封序列化。應用層訊息一律 `{ type, data }`；
+/// 遊戲訊息額外帶 `game` 欄（邏輯頻道）。所有送出端走此處，杜絕格式長歪。
+pub fn envelope(typ: &str, data: Value) -> String {
+    json!({ "type": typ, "data": data }).to_string()
+}
+
+pub fn game_envelope(game: &str, typ: &str, data: Value) -> String {
+    json!({ "game": game, "type": typ, "data": data }).to_string()
+}
+
 pub enum WsEvent {
     StockCompleted,
     StockFailed,

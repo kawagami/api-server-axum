@@ -36,7 +36,7 @@ pub async fn handle<E: GameEngine>(
 }
 
 fn msg<E: GameEngine>(typ: &str, data: Value) -> String {
-    json!({ "game": E::NAME, "type": typ, "data": data }).to_string()
+    crate::structs::ws::game_envelope(E::NAME, typ, data)
 }
 
 fn clock_json<E: GameEngine>(game: &Game<E>) -> Value {

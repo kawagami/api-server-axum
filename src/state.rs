@@ -189,12 +189,7 @@ impl AppState {
     }
 
     pub fn broadcast(&self, event: WsEvent, data: serde_json::Value) {
-        let msg = serde_json::json!({
-            "type": event.as_str(),
-            "data": data
-        })
-        .to_string();
-        self.broadcast_raw(msg);
+        self.broadcast_raw(crate::structs::ws::envelope(event.as_str(), data));
     }
 
     /// 廣播給所有連線 — 先複製 sender 清單釋放 map lock，

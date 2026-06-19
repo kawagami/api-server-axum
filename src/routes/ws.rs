@@ -174,13 +174,11 @@ async fn dispatch_game(state: &AppState, who: SocketAddr, value: &serde_json::Va
 async fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            // 先試解析遊戲協定 `{ game, type, data }`；非遊戲訊息沿用既有 echo
+            // 解析統一信封 `{ game?, type, data }`，分派給對應遊戲 hub。
+            // 非 JSON / 未知訊息一律忽略（不再 echo 廣播）。
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(&t) {
-                if dispatch_game(state, who, &value).await {
-                    return ControlFlow::Continue(());
-                }
+                dispatch_game(state, who, &value).await;
             }
-            state.broadcast_raw(format!("{} : {}", who, t));
         }
         Message::Binary(_) => {}
         Message::Close(c) => {
@@ -240,13 +238,11 @@ async fn say_something_to_someone(
         Ok(socket_addr) => {
             if let Some(tracked_conn) = connections.get(&socket_addr) {
                 let mut sender_guard = tracked_conn.sender.lock().await;
-                let payload = serde_json::json!({
-                    "message_type": "AdminMessage",
-                    "content": params.message,
-                    "from": "admin",
-                    "to": "direct"
-                });
-                let message = Message::Text(payload.to_string().into());
+                let payload = crate::structs::ws::envelope(
+                    "admin_message",
+                    serde_json::json!({ "content": params.message, "from": auth_user.email }),
+                );
+                let message = Message::Text(payload.into());
 
                 match sender_guard.send(message).await {
                     Ok(_) => Ok(Json("Message sent successfully".to_string())),
