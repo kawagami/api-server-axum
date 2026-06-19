@@ -17,6 +17,8 @@ use crate::games::chess::game::ChessGame;
 use crate::games::common::engine::GameEngine;
 use crate::games::common::hub::{GameHub, HubInner};
 use crate::games::common::service;
+use crate::games::farm::hub::{FarmHub, FarmHubInner};
+use crate::games::farm::service as farm_service;
 use crate::games::go::game::GoGame;
 use crate::games::gomoku::game::GomokuGame;
 use crate::games::western_chess::game::WesternChessGame;
@@ -35,6 +37,8 @@ pub enum AnyHub {
     Go(GameHub<GoGame>),
     /// 阿瓦隆：獨立子系統（非 GameEngine 2 人框架）。
     Avalon(AvalonHub),
+    /// 農場經營：N 人 worker-placement，獨立子系統。
+    Farm(FarmHub),
 }
 
 impl AnyHub {
@@ -46,6 +50,7 @@ impl AnyHub {
             AnyHub::WesternChess(h) => service::handle(h, state, who, value).await,
             AnyHub::Go(h) => service::handle(h, state, who, value).await,
             AnyHub::Avalon(h) => avalon_service::handle(h, state, who, value).await,
+            AnyHub::Farm(h) => farm_service::handle(h, state, who, value).await,
         }
     }
 
@@ -57,6 +62,7 @@ impl AnyHub {
             AnyHub::WesternChess(h) => service::handle_disconnect(h, state, who).await,
             AnyHub::Go(h) => service::handle_disconnect(h, state, who).await,
             AnyHub::Avalon(h) => avalon_service::handle_disconnect(h, state, who).await,
+            AnyHub::Farm(h) => farm_service::handle_disconnect(h, state, who).await,
         }
     }
 
@@ -67,7 +73,7 @@ impl AnyHub {
             AnyHub::Banqi(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
             AnyHub::WesternChess(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
             AnyHub::Go(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
-            AnyHub::Avalon(_) => return, // 阿瓦隆無計時，不需 watcher
+            AnyHub::Avalon(_) | AnyHub::Farm(_) => return, // 無計時，不需 watcher
         };
     }
 }
@@ -84,6 +90,7 @@ impl GameRegistry {
         m.insert(WesternChessGame::NAME, AnyHub::WesternChess(new_hub()));
         m.insert(GoGame::NAME, AnyHub::Go(new_hub()));
         m.insert("avalon", AnyHub::Avalon(Arc::new(Mutex::new(AvalonHubInner::default()))));
+        m.insert("farm", AnyHub::Farm(Arc::new(Mutex::new(FarmHubInner::default()))));
         GameRegistry(m)
     }
 

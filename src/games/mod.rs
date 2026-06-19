@@ -5,6 +5,7 @@ pub mod avalon;
 pub mod banqi;
 pub mod chess;
 pub mod common;
+pub mod farm;
 pub mod go;
 pub mod gomoku;
 pub mod registry;
