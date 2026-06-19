@@ -16,7 +16,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - 投資組合管理（member 持股 CRUD）
 - 排班（roster）
 - 排程 job（cron）
-- 線上對戰遊戲（象棋 / 五子棋 / 暗棋 / 西洋棋 / 圍棋，server-authoritative，匿名，大廳自選桌 + 快速配對，複用 `/ws`；泛型框架 + Fischer 計時）
+- 線上對戰遊戲（象棋 / 五子棋 / 暗棋 / 西洋棋 / 圍棋 / 阿瓦隆，server-authoritative，匿名，大廳自選桌 + 快速配對，複用 `/ws`；泛型框架 + Fischer 計時；阿瓦隆為 N 人社交推理）
 
 ## API 路由
 
@@ -37,7 +37,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/settings/public` | 公開設定（白名單，如 `site_theme`，無認證） |
 | `/blogs` | 部落格查詢（列表 / tags / 單篇，公開） |
 | `/notes` | HackMD 筆記 tags / lists |
-| `/ws` | WebSocket 連線、線上清單、點對點訊息、對戰遊戲配對/對戰（象棋/五子棋/暗棋/西洋棋/圍棋） |
+| `/ws` | WebSocket 連線、線上清單、點對點訊息、對戰遊戲配對/對戰（象棋/五子棋/暗棋/西洋棋/圍棋/阿瓦隆） |
 | `/roster` | 排班 |
 | `/logs` | 操作紀錄 |
 | `/uploads/*` | 本機靜態檔案 |

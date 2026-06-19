@@ -10,6 +10,8 @@ use std::sync::Arc;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
+use crate::games::avalon::hub::{AvalonHub, AvalonHubInner};
+use crate::games::avalon::service as avalon_service;
 use crate::games::banqi::game::BanqiGame;
 use crate::games::chess::game::ChessGame;
 use crate::games::common::engine::GameEngine;
@@ -31,6 +33,8 @@ pub enum AnyHub {
     Banqi(GameHub<BanqiGame>),
     WesternChess(GameHub<WesternChessGame>),
     Go(GameHub<GoGame>),
+    /// 阿瓦隆：獨立子系統（非 GameEngine 2 人框架）。
+    Avalon(AvalonHub),
 }
 
 impl AnyHub {
@@ -41,6 +45,7 @@ impl AnyHub {
             AnyHub::Banqi(h) => service::handle(h, state, who, value).await,
             AnyHub::WesternChess(h) => service::handle(h, state, who, value).await,
             AnyHub::Go(h) => service::handle(h, state, who, value).await,
+            AnyHub::Avalon(h) => avalon_service::handle(h, state, who, value).await,
         }
     }
 
@@ -51,6 +56,7 @@ impl AnyHub {
             AnyHub::Banqi(h) => service::handle_disconnect(h, state, who).await,
             AnyHub::WesternChess(h) => service::handle_disconnect(h, state, who).await,
             AnyHub::Go(h) => service::handle_disconnect(h, state, who).await,
+            AnyHub::Avalon(h) => avalon_service::handle_disconnect(h, state, who).await,
         }
     }
 
@@ -61,6 +67,7 @@ impl AnyHub {
             AnyHub::Banqi(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
             AnyHub::WesternChess(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
             AnyHub::Go(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
+            AnyHub::Avalon(_) => return, // 阿瓦隆無計時，不需 watcher
         };
     }
 }
@@ -76,6 +83,7 @@ impl GameRegistry {
         m.insert(BanqiGame::NAME, AnyHub::Banqi(new_hub()));
         m.insert(WesternChessGame::NAME, AnyHub::WesternChess(new_hub()));
         m.insert(GoGame::NAME, AnyHub::Go(new_hub()));
+        m.insert("avalon", AnyHub::Avalon(Arc::new(Mutex::new(AvalonHubInner::default()))));
         GameRegistry(m)
     }
 
