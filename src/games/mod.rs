@@ -4,5 +4,7 @@
 pub mod banqi;
 pub mod chess;
 pub mod common;
+pub mod go;
 pub mod gomoku;
 pub mod registry;
+pub mod western_chess;

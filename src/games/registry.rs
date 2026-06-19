@@ -15,7 +15,9 @@ use crate::games::chess::game::ChessGame;
 use crate::games::common::engine::GameEngine;
 use crate::games::common::hub::{GameHub, HubInner};
 use crate::games::common::service;
+use crate::games::go::game::GoGame;
 use crate::games::gomoku::game::GomokuGame;
+use crate::games::western_chess::game::WesternChessGame;
 use crate::state::AppState;
 
 fn new_hub<E: GameEngine>() -> GameHub<E> {
@@ -27,6 +29,8 @@ pub enum AnyHub {
     Chess(GameHub<ChessGame>),
     Gomoku(GameHub<GomokuGame>),
     Banqi(GameHub<BanqiGame>),
+    WesternChess(GameHub<WesternChessGame>),
+    Go(GameHub<GoGame>),
 }
 
 impl AnyHub {
@@ -35,6 +39,8 @@ impl AnyHub {
             AnyHub::Chess(h) => service::handle(h, state, who, value).await,
             AnyHub::Gomoku(h) => service::handle(h, state, who, value).await,
             AnyHub::Banqi(h) => service::handle(h, state, who, value).await,
+            AnyHub::WesternChess(h) => service::handle(h, state, who, value).await,
+            AnyHub::Go(h) => service::handle(h, state, who, value).await,
         }
     }
 
@@ -43,6 +49,8 @@ impl AnyHub {
             AnyHub::Chess(h) => service::handle_disconnect(h, state, who).await,
             AnyHub::Gomoku(h) => service::handle_disconnect(h, state, who).await,
             AnyHub::Banqi(h) => service::handle_disconnect(h, state, who).await,
+            AnyHub::WesternChess(h) => service::handle_disconnect(h, state, who).await,
+            AnyHub::Go(h) => service::handle_disconnect(h, state, who).await,
         }
     }
 
@@ -51,6 +59,8 @@ impl AnyHub {
             AnyHub::Chess(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
             AnyHub::Gomoku(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
             AnyHub::Banqi(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
+            AnyHub::WesternChess(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
+            AnyHub::Go(h) => tokio::spawn(service::timeout_watcher(h.clone(), state)),
         };
     }
 }
@@ -64,6 +74,8 @@ impl GameRegistry {
         m.insert(ChessGame::NAME, AnyHub::Chess(new_hub()));
         m.insert(GomokuGame::NAME, AnyHub::Gomoku(new_hub()));
         m.insert(BanqiGame::NAME, AnyHub::Banqi(new_hub()));
+        m.insert(WesternChessGame::NAME, AnyHub::WesternChess(new_hub()));
+        m.insert(GoGame::NAME, AnyHub::Go(new_hub()));
         GameRegistry(m)
     }
 
