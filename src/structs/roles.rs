@@ -26,6 +26,7 @@ pub enum Perm {
     TorrentRead,
     TorrentCreate,
     TorrentDelete,
+    GameRead,
 }
 
 impl Perm {
@@ -55,6 +56,7 @@ impl Perm {
             Self::TorrentRead    => "torrent:read",
             Self::TorrentCreate  => "torrent:create",
             Self::TorrentDelete  => "torrent:delete",
+            Self::GameRead       => "game:read",
         }
     }
 }

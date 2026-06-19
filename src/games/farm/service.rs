@@ -26,7 +26,7 @@ pub async fn handle(hub: &FarmHub, state: &AppState, who: SocketAddr, value: &Va
 }
 
 fn msg(typ: &str, data: Value) -> String {
-    crate::structs::ws::game_envelope("farm", typ, data)
+    crate::structs::ws::game_envelope(super::NAME, typ, data)
 }
 
 fn flush(state: &AppState, outbox: Vec<(SocketAddr, String)>) {

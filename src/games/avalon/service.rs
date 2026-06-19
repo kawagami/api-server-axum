@@ -31,7 +31,7 @@ pub async fn handle(hub: &AvalonHub, state: &AppState, who: SocketAddr, value: &
 }
 
 fn msg(typ: &str, data: Value) -> String {
-    crate::structs::ws::game_envelope("avalon", typ, data)
+    crate::structs::ws::game_envelope(super::NAME, typ, data)
 }
 
 fn flush(state: &AppState, outbox: Vec<(SocketAddr, String)>) {

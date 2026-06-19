@@ -12,6 +12,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - Runtime 設定管理（admin 頁面熱更新，不需重啟）
 - 股票資料（全市場行情、庫藏股計畫、股價變動追蹤）
 - 圖片上傳 / 管理（本機儲存）
+- Torrent 下載（磁力連結 → 內嵌 librqbit session 下載 → 短效簽名連結取檔，併發上限 / 容量配額 / 完成 email 通知）
 - 使用者 / 角色 / 權限管理
 - 投資組合管理（member 持股 CRUD）
 - 排班（roster）
@@ -31,6 +32,8 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/admin/blogs` | 部落格修改 / 刪除 |
 | `/admin/images` | 圖片上傳 / 刪除 / 清單 |
 | `/admin/stocks` | 股票資料查詢、pending change 管理 |
+| `/admin/torrents` | torrent 下載任務（新增 / 列表 / 簽名下載連結 / 刪除） |
+| `/admin/games` | 即時對局總覽（各遊戲等待 / 進行中桌數、在玩人數、排隊、大廳） |
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
 | `/member/portfolio` | member 投資組合 CRUD、即時損益總覽、歷史價格 / 還原成本（需 Bearer token） |
@@ -65,10 +68,12 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - `tokio-cron-scheduler` — cron job
 - `jsonwebtoken 9` — JWT
 - `reqwest 0.12` — 對外 HTTP 請求
-- `tower-http` — CORS、timeout、body limit（10 MB）
+- `tower-http` — CORS、timeout、trace、body limit（10 MB）
+- `tower` — ServiceExt::oneshot（檔案下載走 ServeFile，內建 Range）
 - `bcrypt` — 密碼 hash
 - `lettre` — SMTP email 通知
 - `scraper` — 庫藏股 HTML 解析
+- `librqbit 8` — 內嵌 BitTorrent session（rustls，musl 靜態編譯）
 
 ## 環境變數
 
@@ -80,6 +85,8 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `APP_HOST` | 否 | `0.0.0.0` |
 | `APP_PORT` | 否 | `3000` |
 | `UPLOAD_PATH` | 否 | `./uploads` |
+| `TORRENT_PATH` | 否 | `./torrents` |
+| `TRUST_CF_HEADER` | 否 | `false`（true/1 才信任 CF-Connecting-IP，僅限只經 Cloudflare 的部署） |
 | `RUST_LOG` | 否 | tracing 預設 filter |
 | `GOOGLE_CLIENT_SECRET` | 否 | — |
 | `GITHUB_CLIENT_SECRET` | 否 | — |

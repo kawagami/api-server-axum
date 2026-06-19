@@ -1,4 +1,5 @@
 mod admin;
+mod admin_games;
 mod app_settings;
 mod admin_blogs;
 mod audit_logs;
