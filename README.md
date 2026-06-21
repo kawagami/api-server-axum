@@ -15,6 +15,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - Torrent 下載（磁力連結 → 內嵌 librqbit session 下載 → 短效簽名連結取檔，併發上限 / 容量配額 / 完成 email 通知）
 - 使用者 / 角色 / 權限管理
 - 投資組合管理（member 持股 CRUD）
+- 記帳（member 收支記錄 CRUD，固定分類，收支結餘 / 分類加總 / 每月趨勢統計）
 - 排班（roster）
 - 排程 job（cron）
 - 線上對戰遊戲（象棋 / 五子棋 / 暗棋 / 西洋棋 / 圍棋 / 阿瓦隆 / 農場經營，server-authoritative，匿名，大廳自選桌 + 快速配對，複用 `/ws`；泛型框架 + Fischer 計時；阿瓦隆＝N 人社交推理、農場經營＝N 人 worker-placement）
@@ -37,6 +38,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
 | `/member/portfolio` | member 投資組合 CRUD、即時損益總覽、歷史價格 / 還原成本（需 Bearer token） |
+| `/member/ledger` | member 記帳 CRUD、固定分類清單、收支 / 分類 / 每月統計（需 Bearer token） |
 | `/settings/public` | 公開設定（白名單，如 `site_theme`，無認證） |
 | `/blogs` | 部落格查詢（列表 / tags / 單篇，公開） |
 | `/notes` | HackMD 筆記 tags / lists |

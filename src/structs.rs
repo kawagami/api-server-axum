@@ -3,6 +3,7 @@ pub mod auth;
 pub mod config;
 pub mod blogs;
 pub mod jobs;
+pub mod ledger;
 pub mod members;
 pub mod notes;
 pub mod pagination;

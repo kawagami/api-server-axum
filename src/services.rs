@@ -5,6 +5,7 @@ pub mod auth;
 pub mod blogs;
 pub mod images;
 pub mod logs;
+pub mod ledger;
 pub mod members;
 pub mod notes;
 pub mod oauth;

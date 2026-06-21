@@ -3,6 +3,7 @@ pub mod audit_logs;
 pub mod blogs;
 pub mod logs;
 pub mod images;
+pub mod ledger;
 pub mod members;
 pub mod notes;
 pub mod permissions;
