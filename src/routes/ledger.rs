@@ -5,7 +5,8 @@ use crate::{
     state::AppState,
     structs::{
         ledger::{
-            CategoryList, LedgerEntry, LedgerListQuery, LedgerRequest, LedgerSummary, SummaryQuery,
+            CategoryList, InvoiceImportRequest, LedgerEntry, LedgerListQuery, LedgerRequest,
+            LedgerSummary, SummaryQuery,
         },
         members::AuthenticatedMember,
     },
@@ -22,6 +23,7 @@ use uuid::Uuid;
 pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(list).post(create))
+        .route("/invoice", axum::routing::post(import_invoice))
         .route("/categories", get(categories))
         .route("/summary", get(summary))
         .route("/{id}", axum::routing::put(update).delete(delete))
@@ -44,6 +46,15 @@ async fn create(
     Json(req): Json<LedgerRequest>,
 ) -> Result<(StatusCode, Json<LedgerEntry>), AppError> {
     let entry = ledger_service::create(state.get_pool(), auth_member.member_id, &req).await?;
+    Ok((StatusCode::CREATED, Json(entry)))
+}
+
+async fn import_invoice(
+    Extension(auth_member): Extension<AuthenticatedMember>,
+    State(state): State<AppState>,
+    Json(req): Json<InvoiceImportRequest>,
+) -> Result<(StatusCode, Json<LedgerEntry>), AppError> {
+    let entry = ledger_service::import_invoice(state.get_pool(), auth_member.member_id, &req).await?;
     Ok((StatusCode::CREATED, Json(entry)))
 }
 

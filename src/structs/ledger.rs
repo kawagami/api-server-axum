@@ -36,11 +36,14 @@ pub struct LedgerEntry {
     pub category: String,
     pub note: Option<String>,
     pub occurred_at: NaiveDate,
+    pub invoice_number: Option<String>, // 發票號碼（手動建立為 null）
+    pub seller_tax_id: Option<String>,  // 賣方統編
+    pub source: String,                 // 'manual' | 'invoice_qr'
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-/// 新增 / 更新請求 body
+/// 新增 / 更新請求 body（手動記帳）
 #[derive(Deserialize)]
 pub struct LedgerRequest {
     pub kind: String,
@@ -48,6 +51,17 @@ pub struct LedgerRequest {
     pub category: String,
     pub note: Option<String>,
     pub occurred_at: NaiveDate,
+}
+
+/// 匯入發票請求 body（前端掃 QR Code 解析後送來）。一律記為 expense。
+#[derive(Deserialize)]
+pub struct InvoiceImportRequest {
+    pub invoice_number: String,
+    pub amount: Decimal,
+    pub occurred_at: NaiveDate,
+    pub seller_tax_id: Option<String>,
+    pub category: Option<String>, // 省略則用 "other"
+    pub note: Option<String>,
 }
 
 /// 列表查詢參數：分頁 + kind / category / 日期區間 filter

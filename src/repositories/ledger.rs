@@ -7,8 +7,8 @@ use rust_decimal::Decimal;
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
-const COLS: &str =
-    "id, member_id, kind, amount, category, note, occurred_at, created_at, updated_at";
+const COLS: &str = "id, member_id, kind, amount, category, note, occurred_at, \
+     invoice_number, seller_tax_id, source, created_at, updated_at";
 
 pub async fn get_by_member(
     pool: &Pool<Postgres>,
@@ -58,6 +58,42 @@ pub async fn create(
     .fetch_one(pool)
     .await?;
     Ok(row)
+}
+
+/// 從掃描的發票建立一筆 expense。發票號碼重複（unique 違反）回 409。
+pub async fn create_from_invoice(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    amount: Decimal,
+    category: &str,
+    note: Option<&str>,
+    occurred_at: NaiveDate,
+    invoice_number: &str,
+    seller_tax_id: Option<&str>,
+) -> Result<LedgerEntry, AppError> {
+    let result = sqlx::query_as(&format!(
+        "INSERT INTO ledger_entries
+            (member_id, kind, amount, category, note, occurred_at, invoice_number, seller_tax_id, source)
+         VALUES ($1, 'expense', $2, $3, $4, $5, $6, $7, 'invoice_qr')
+         RETURNING {COLS}"
+    ))
+    .bind(member_id)
+    .bind(amount)
+    .bind(category)
+    .bind(note)
+    .bind(occurred_at)
+    .bind(invoice_number)
+    .bind(seller_tax_id)
+    .fetch_one(pool)
+    .await;
+
+    match result {
+        Ok(row) => Ok(row),
+        Err(sqlx::Error::Database(e)) if e.code().as_deref() == Some("23505") => Err(
+            RequestError::Conflict(format!("發票 {invoice_number} 已匯入過")).into(),
+        ),
+        Err(e) => Err(e.into()),
+    }
 }
 
 pub async fn update(

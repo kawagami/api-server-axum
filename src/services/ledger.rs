@@ -2,8 +2,8 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::ledger as ledger_repo,
     structs::ledger::{
-        CategoryList, CategoryOption, LedgerEntry, LedgerListQuery, LedgerRequest, LedgerSummary,
-        SummaryQuery, EXPENSE_CATEGORIES, INCOME_CATEGORIES,
+        CategoryList, CategoryOption, InvoiceImportRequest, LedgerEntry, LedgerListQuery,
+        LedgerRequest, LedgerSummary, SummaryQuery, EXPENSE_CATEGORIES, INCOME_CATEGORIES,
     },
 };
 use chrono::NaiveDate;
@@ -84,6 +84,41 @@ pub async fn update(
 
 pub async fn delete(pool: &Pool<Postgres>, id: Uuid, member_id: i64) -> Result<(), AppError> {
     ledger_repo::delete(pool, id, member_id).await
+}
+
+/// 匯入掃描的發票：固定 expense，category 省略則用 "other"，發票號碼重複回 409
+pub async fn import_invoice(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    req: &InvoiceImportRequest,
+) -> Result<LedgerEntry, AppError> {
+    let invoice_number = req.invoice_number.trim();
+    if invoice_number.is_empty() {
+        return Err(RequestError::UnprocessableContent("invoice_number 不可為空".to_string()).into());
+    }
+
+    let category = req.category.clone().unwrap_or_else(|| "other".to_string());
+
+    // 重用手動記帳的驗證（檢查 category 屬於 expense、amount > 0）
+    validate(&LedgerRequest {
+        kind: "expense".to_string(),
+        amount: req.amount,
+        category: category.clone(),
+        note: req.note.clone(),
+        occurred_at: req.occurred_at,
+    })?;
+
+    ledger_repo::create_from_invoice(
+        pool,
+        member_id,
+        req.amount,
+        &category,
+        req.note.as_deref(),
+        req.occurred_at,
+        invoice_number,
+        req.seller_tax_id.as_deref(),
+    )
+    .await
 }
 
 pub async fn summary(
