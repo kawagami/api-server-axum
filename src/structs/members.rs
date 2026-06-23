@@ -19,6 +19,7 @@ pub struct MemberDetail {
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
     pub providers: Vec<String>,
+    pub lottery_notify_enabled: bool, // 統一發票中獎 email 通知開關
 }
 
 #[derive(Clone, Debug)]

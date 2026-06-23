@@ -4,6 +4,8 @@ pub mod audit_logs;
 pub mod auth;
 pub mod blogs;
 pub mod images;
+pub mod invoice_lottery;
+pub mod invoices;
 pub mod logs;
 pub mod ledger;
 pub mod members;

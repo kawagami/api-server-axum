@@ -2,6 +2,7 @@ pub mod app_settings;
 pub mod auth;
 pub mod config;
 pub mod blogs;
+pub mod invoices;
 pub mod jobs;
 pub mod ledger;
 pub mod members;

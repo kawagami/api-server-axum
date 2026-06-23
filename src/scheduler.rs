@@ -14,6 +14,7 @@ pub async fn initialize_scheduler(state: AppState) {
         AppJob::FetchHistoricalClosingPrices,
         AppJob::ConsumePendingStockChange,
         AppJob::SyncBuybackToPending,
+        AppJob::CheckInvoiceLottery,
     ] {
         add_job(&scheduler, state.clone(), job).await;
     }

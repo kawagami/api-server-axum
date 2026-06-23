@@ -29,6 +29,12 @@ pub async fn get_member_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<M
             .fetch_all(pool)
             .await?;
 
+    let lottery_notify_enabled: bool =
+        sqlx::query_scalar("SELECT lottery_notify_enabled FROM members WHERE id = $1")
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+
     Ok(Some(MemberDetail {
         id: member.id,
         name: member.name,
@@ -36,6 +42,7 @@ pub async fn get_member_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<M
         avatar_url: member.avatar_url,
         created_at: member.created_at,
         providers,
+        lottery_notify_enabled,
     }))
 }
 

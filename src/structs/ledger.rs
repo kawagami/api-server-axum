@@ -53,17 +53,6 @@ pub struct LedgerRequest {
     pub occurred_at: NaiveDate,
 }
 
-/// 匯入發票請求 body（前端掃 QR Code 解析後送來）。一律記為 expense。
-#[derive(Deserialize)]
-pub struct InvoiceImportRequest {
-    pub invoice_number: String,
-    pub amount: Decimal,
-    pub occurred_at: NaiveDate,
-    pub seller_tax_id: Option<String>,
-    pub category: Option<String>, // 省略則用 "other"
-    pub note: Option<String>,
-}
-
 /// 列表查詢參數：分頁 + kind / category / 日期區間 filter
 #[derive(Deserialize)]
 pub struct LedgerListQuery {

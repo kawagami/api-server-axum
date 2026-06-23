@@ -5,7 +5,18 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 
+/// 寄給後台預設通知信箱（notify_email，未設定則寄件帳號本身）
 pub async fn send_notification(settings: &Settings, subject: &str, body: String) {
+    let to = settings
+        .get("notify_email")
+        .filter(|s| !s.is_empty())
+        .or_else(|| settings.get("smtp_username").filter(|s| !s.is_empty()));
+    let Some(to) = to else { return };
+    send_to(settings, &to, subject, body).await;
+}
+
+/// 寄給指定收件人；SMTP 未設定則靜默跳過
+pub async fn send_to(settings: &Settings, to: &str, subject: &str, body: String) {
     let username = match settings.get("smtp_username").filter(|s| !s.is_empty()) {
         Some(v) => v,
         None => return,
@@ -14,13 +25,9 @@ pub async fn send_notification(settings: &Settings, subject: &str, body: String)
         Some(v) => v,
         None => return,
     };
-    let to = settings
-        .get("notify_email")
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| username.clone());
 
-    match send_email(&username, &password, &to, subject, body).await {
-        Ok(_) => tracing::info!("email sent: {}", subject),
+    match send_email(&username, &password, to, subject, body).await {
+        Ok(_) => tracing::info!("email sent: {} -> {}", subject, to),
         Err(e) => tracing::error!("email fail [{}]: {}", subject, e),
     }
 }
