@@ -20,6 +20,7 @@ pub struct MemberDetail {
     pub created_at: DateTime<Utc>,
     pub providers: Vec<String>,
     pub lottery_notify_enabled: bool, // 統一發票中獎 email 通知開關
+    pub lotto_notify_enabled: bool,   // 大樂透/威力彩中獎 email 通知開關
 }
 
 #[derive(Clone, Debug)]

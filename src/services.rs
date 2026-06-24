@@ -8,6 +8,8 @@ pub mod invoice_lottery;
 pub mod invoices;
 pub mod logs;
 pub mod ledger;
+pub mod lotto;
+pub mod lotto_tickets;
 pub mod members;
 pub mod notes;
 pub mod oauth;

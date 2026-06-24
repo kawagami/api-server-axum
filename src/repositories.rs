@@ -5,6 +5,7 @@ pub mod logs;
 pub mod images;
 pub mod invoices;
 pub mod ledger;
+pub mod lotto;
 pub mod members;
 pub mod notes;
 pub mod permissions;

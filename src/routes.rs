@@ -10,6 +10,7 @@ mod logs;
 mod images;
 mod invoices;
 mod ledger;
+mod lotto;
 mod members;
 mod notes;
 mod oauth;
@@ -96,6 +97,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/member/portfolio", portfolio::new(state.clone()))
         .nest("/member/ledger", ledger::new(state.clone()))
         .nest("/member/invoices", invoices::new(state.clone()))
+        .nest("/member/lotto", lotto::new(state.clone()))
         .nest("/oauth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))
         .nest("/settings", app_settings::public())

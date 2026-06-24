@@ -10,6 +10,7 @@ pub enum AppJob {
     ConsumePendingStockChange,
     SyncBuybackToPending,
     CheckInvoiceLottery,
+    CheckLottoWins,
 }
 
 impl AppJob {
@@ -24,6 +25,7 @@ impl AppJob {
             AppJob::ConsumePendingStockChange => "ConsumePendingStockChange",
             AppJob::SyncBuybackToPending => "SyncBuybackToPending",
             AppJob::CheckInvoiceLottery => "CheckInvoiceLottery",
+            AppJob::CheckLottoWins => "CheckLottoWins",
         }
     }
 
@@ -39,6 +41,8 @@ impl AppJob {
             AppJob::SyncBuybackToPending => "0 10 20 * * *",
             // 每日 UTC 17:00（= UTC+8 隔日 01:00）；偵測新開獎期別才實際動作
             AppJob::CheckInvoiceLottery => "0 0 17 * * *",
+            // 每日 UTC 13:30（= UTC+8 21:30）；已過大樂透/威力彩開獎時間，每天跑覆蓋四個開獎日
+            AppJob::CheckLottoWins => "0 30 13 * * *",
         }
     }
 
@@ -53,6 +57,7 @@ impl AppJob {
             AppJob::ConsumePendingStockChange => crate::jobs::consume_pending_stock_change::run(state).await,
             AppJob::SyncBuybackToPending => crate::jobs::sync_buyback_to_pending::run(state).await,
             AppJob::CheckInvoiceLottery => crate::jobs::check_invoice_lottery::run(state).await,
+            AppJob::CheckLottoWins => crate::jobs::check_lotto_wins::run(state).await,
         }
     }
 }
