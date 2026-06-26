@@ -9,9 +9,9 @@ use crate::{
         Conditions, GetStockDayAll, NewStockClosingPrice, StockBuybackMoreInfo,
         StockBuybackPeriod, StockChange, StockChangePaginatedResponse, StockChangeRef,
         StockClosingPriceResponse, StockDayAll, StockDayAllInsertRow, StockDayAvgResponse,
-        BuybackRecord, StockRequest, StockStats, TwseApiResponse,
+        BuybackRecord, StockRequest, StockStats,
     },
-    utils::date::parse_roc_date,
+    utils::date::{parse_roc_compact_date, parse_roc_date},
     utils::reqwest::get_raw_html_string,
 };
 use chrono::{Duration, NaiveDate};
@@ -228,38 +228,83 @@ pub fn round_to_n_decimal(value: f64, decimals: u32) -> f64 {
 
 pub async fn stock_day_all_service(pool: &Pool<Postgres>, client: &Client) -> Result<(), AppError> {
     let url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL";
-    let resp: TwseApiResponse = super::twse::fetch_json(client, url).await?;
+    let body = super::twse::fetch_text(client, url).await?;
+    let rows = parse_stock_day_all_csv(&body)?;
+    insert_stock_day_all_batch(pool, &rows).await
+}
 
-    let trade_date = chrono::NaiveDate::parse_from_str(&resp.date, "%Y%m%d")?;
+/// STOCK_DAY_ALL CSV 標題列開頭（用來辨識回應格式是否如預期）。
+const STOCK_DAY_ALL_HEADER: &str = "日期,證券代號,證券名稱";
+
+/// 解析 TWSE STOCK_DAY_ALL CSV 回應為待寫入列。
+///
+/// 純函式、零 IO。標題列不符預期 → `InvalidContent`（偵測 TWSE 改格式）；
+/// 標題符合但無資料列（如非交易日）→ 回空陣列（不視為錯誤）。
+fn parse_stock_day_all_csv(body: &str) -> Result<Vec<StockDayAllInsertRow>, AppError> {
+    let body = body.trim_start_matches('\u{feff}'); // 去 BOM
+    let mut lines = body.lines();
+
+    let header = lines.next().map(str::trim).unwrap_or("");
+    if !header.starts_with(STOCK_DAY_ALL_HEADER) {
+        let preview: String = header.chars().take(40).collect();
+        return Err(RequestError::InvalidContent(format!(
+            "STOCK_DAY_ALL 回應格式非預期 CSV，開頭：{preview}"
+        ))
+        .into());
+    }
 
     let parse_i64 = |s: &str| -> Option<i64> {
-        if s.is_empty() || s == "--" { None } else { s.trim().replace(",", "").parse().ok() }
+        if s.is_empty() || s == "--" { None } else { s.trim().replace(',', "").parse().ok() }
     };
-
     let parse_decimal = |s: &str| -> Option<Decimal> {
-        if s.is_empty() || s == "--" { None } else { s.trim().replace(",", "").parse().ok() }
+        if s.is_empty() || s == "--" { None } else { s.trim().replace(',', "").parse().ok() }
     };
 
-    let rows: Vec<StockDayAllInsertRow> = resp.data.iter()
-        .filter(|row| row.len() >= 10)
-        .filter_map(|row| {
+    let rows = lines
+        .map(parse_csv_line)
+        .filter(|f| f.len() >= 11)
+        .filter_map(|f| {
             Some(StockDayAllInsertRow {
-                trade_date,
-                stock_code: row[0].clone(),
-                stock_name: row[1].clone(),
-                trade_volume: parse_i64(&row[2])?,
-                trade_amount: parse_i64(&row[3])?,
-                open_price: parse_decimal(&row[4])?,
-                high_price: parse_decimal(&row[5])?,
-                low_price: parse_decimal(&row[6])?,
-                close_price: parse_decimal(&row[7])?,
-                price_change: parse_decimal(&row[8])?,
-                transaction_count: parse_i64(&row[9]).unwrap_or(0) as i32,
+                trade_date: parse_roc_compact_date(&f[0])?,
+                stock_code: f[1].clone(),
+                stock_name: f[2].clone(),
+                trade_volume: parse_i64(&f[3])?,
+                trade_amount: parse_i64(&f[4])?,
+                open_price: parse_decimal(&f[5])?,
+                high_price: parse_decimal(&f[6])?,
+                low_price: parse_decimal(&f[7])?,
+                close_price: parse_decimal(&f[8])?,
+                price_change: parse_decimal(&f[9])?,
+                transaction_count: parse_i64(&f[10]).unwrap_or(0) as i32,
             })
         })
         .collect();
 
-    insert_stock_day_all_batch(pool, &rows).await
+    Ok(rows)
+}
+
+/// 解析單行 CSV：支援雙引號包欄（欄內可含逗號/千分位）與 `""` 跳脫。
+fn parse_csv_line(line: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut cur = String::new();
+    let mut in_quotes = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if in_quotes && chars.peek() == Some(&'"') => {
+                cur.push('"');
+                chars.next();
+            }
+            '"' => in_quotes = !in_quotes,
+            ',' if !in_quotes => {
+                fields.push(cur.trim().to_string());
+                cur.clear();
+            }
+            _ => cur.push(c),
+        }
+    }
+    fields.push(cur.trim().to_string());
+    fields
 }
 
 pub async fn get_all_stock_changes(
@@ -328,4 +373,52 @@ pub async fn get_closing_price_pair_stats(
             day_span,
         },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE: &str = "日期,證券代號,證券名稱,成交股數,成交金額,開盤價,最高價,最低價,收盤價,漲跌價差,成交筆數\n\
+\"1150625\",\"00400A\",\"主動國泰動能高息\",\"47542815\",\"714458519\",\"15.12\",\"15.14\",\"14.90\",\"15.00\",\"0.0800\",\"7627\"\n\
+\"1150625\",\"2330\",\"台積電\",\"1,234,567\",\"9,876,543,210\",\"1000.00\",\"1010.00\",\"995.00\",\"1005.00\",\"-5.0000\",\"50000\"\n";
+
+    #[test]
+    fn parses_csv_rows() {
+        let rows = parse_stock_day_all_csv(SAMPLE).unwrap();
+        assert_eq!(rows.len(), 2);
+
+        let tsmc = &rows[1];
+        assert_eq!(tsmc.stock_code, "2330");
+        assert_eq!(tsmc.stock_name, "台積電");
+        assert_eq!(tsmc.trade_volume, 1_234_567); // 引號內千分位需正確去除
+        assert_eq!(tsmc.trade_amount, 9_876_543_210);
+        assert_eq!(tsmc.close_price, "1005.00".parse::<Decimal>().unwrap());
+        assert_eq!(tsmc.price_change, "-5.0000".parse::<Decimal>().unwrap());
+        assert_eq!(tsmc.trade_date, NaiveDate::from_ymd_opt(2026, 6, 25).unwrap());
+    }
+
+    #[test]
+    fn skips_header_and_blank_lines() {
+        let body = "日期,證券代號,證券名稱,成交股數,成交金額,開盤價,最高價,最低價,收盤價,漲跌價差,成交筆數\n\n";
+        // 標題符合但無資料列（非交易日）→ 空陣列，非錯誤
+        let rows = parse_stock_day_all_csv(body).unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn errors_on_non_csv_body() {
+        // 模擬 TWSE 改回 JSON / 回錯誤頁 → 應報錯而非靜默吞掉
+        let result = parse_stock_day_all_csv("{\"stat\":\"OK\",\"data\":[]}");
+        match result {
+            Err(e) => assert!(e.to_string().contains("STOCK_DAY_ALL")),
+            Ok(_) => panic!("非 CSV 內容應回錯誤"),
+        }
+    }
+
+    #[test]
+    fn parse_csv_line_handles_quoted_commas() {
+        let fields = parse_csv_line("\"a\",\"1,234\",\"b\"");
+        assert_eq!(fields, vec!["a", "1,234", "b"]);
+    }
 }

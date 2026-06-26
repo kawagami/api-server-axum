@@ -1,7 +1,11 @@
 //! TWSE API 共用存取層 — headers、欄位解析、全域併發限制。
 //! 所有 www.twse.com.tw 請求一律經過 `fetch_json`（semaphore = 1）避免被 rate limit。
 
-use crate::{errors::AppError, structs::stocks::StockDayAvgResponse, utils::reqwest::get_json_data};
+use crate::{
+    errors::AppError,
+    structs::stocks::StockDayAvgResponse,
+    utils::reqwest::{get_json_data, get_raw_html_string},
+};
 use chrono::NaiveDate;
 use reqwest::{Client, Method};
 use serde::Deserialize;
@@ -42,6 +46,12 @@ pub async fn fetch_json<T: serde::de::DeserializeOwned>(
 ) -> Result<T, AppError> {
     let _permit = TWSE_SEMAPHORE.acquire().await.expect("semaphore closed");
     get_json_data(client, url, Method::GET, Some(headers()), None, None).await
+}
+
+/// 取得 CSV / 純文字回應（沿用 TWSE headers + 全域 semaphore）
+pub async fn fetch_text(client: &Client, url: &str) -> Result<String, AppError> {
+    let _permit = TWSE_SEMAPHORE.acquire().await.expect("semaphore closed");
+    get_raw_html_string(client, url, Method::GET, Some(headers()), None).await
 }
 
 /// 月成交資訊（STOCK_DAY）— month 取該月任一日

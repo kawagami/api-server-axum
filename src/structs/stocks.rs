@@ -82,12 +82,6 @@ pub struct StockStats {
     pub day_span: i64,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct TwseApiResponse {
-    pub date: String,
-    pub data: Vec<Vec<String>>,
-}
-
 #[derive(Deserialize)]
 pub struct GetStockDayAll {
     pub trade_date: Option<NaiveDate>,
