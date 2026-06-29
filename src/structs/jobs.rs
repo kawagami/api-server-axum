@@ -11,6 +11,7 @@ pub enum AppJob {
     SyncBuybackToPending,
     CheckInvoiceLottery,
     CheckLottoWins,
+    AggregateVisitors,
 }
 
 impl AppJob {
@@ -26,6 +27,7 @@ impl AppJob {
             AppJob::SyncBuybackToPending => "SyncBuybackToPending",
             AppJob::CheckInvoiceLottery => "CheckInvoiceLottery",
             AppJob::CheckLottoWins => "CheckLottoWins",
+            AppJob::AggregateVisitors => "AggregateVisitors",
         }
     }
 
@@ -43,6 +45,8 @@ impl AppJob {
             AppJob::CheckInvoiceLottery => "0 0 17 * * *",
             // 每日 UTC 13:30（= UTC+8 21:30）；已過大樂透/威力彩開獎時間，每天跑覆蓋四個開獎日
             AppJob::CheckLottoWins => "0 30 13 * * *",
+            // 每日 UTC 16:05（= UTC+8 隔日 00:05）；台北日界剛過，落地前一日不重複到訪
+            AppJob::AggregateVisitors => "0 5 16 * * *",
         }
     }
 
@@ -58,6 +62,7 @@ impl AppJob {
             AppJob::SyncBuybackToPending => crate::jobs::sync_buyback_to_pending::run(state).await,
             AppJob::CheckInvoiceLottery => crate::jobs::check_invoice_lottery::run(state).await,
             AppJob::CheckLottoWins => crate::jobs::check_lotto_wins::run(state).await,
+            AppJob::AggregateVisitors => crate::jobs::aggregate_visitors::run(state).await,
         }
     }
 }

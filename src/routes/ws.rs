@@ -71,6 +71,18 @@ async fn ws_handler(
         .map(|s| s.to_string())
         .unwrap_or_else(|| addr.ip().to_string());
     tracing::info!("{real_ip} connected ({}) email={:?}", user_agent, user_email);
+
+    // 每日不重複到訪統計：以 WS 握手為採集點（天然濾掉不跑 JS 的 bot），
+    // 去重元素 = ip|ua。best-effort，不阻塞連線。
+    {
+        let redis_pool = state.get_redis_pool().clone();
+        let ip = real_ip.clone();
+        let ua = user_agent.clone();
+        tokio::spawn(async move {
+            crate::repositories::visitors::record_visit(&redis_pool, &ip, &ua).await;
+        });
+    }
+
     ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email, real_ip))
 }
 

@@ -1,3 +1,4 @@
+pub mod aggregate_visitors;
 pub mod check_invoice_lottery;
 pub mod check_lotto_wins;
 pub mod cleanup_expired_torrents;
