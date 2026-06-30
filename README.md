@@ -6,7 +6,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 
 - JWT 驗證（admin 登入 / 登出 / token refresh / Redis session）
 - OAuth 登入（Google / GitHub / LINE）+ member token refresh
-- WebSocket 即時推送（broadcast channel + 逐連線 sender）
+- WebSocket 即時推送（逐連線 sender，廣播直接迭代連線 map）
 - 部落格 CRUD
 - HackMD 筆記同步
 - Runtime 設定管理（admin 頁面熱更新，不需重啟）
@@ -19,6 +19,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 - 發票登錄 + 統一發票自動對獎（member 登錄發票，排程每期抓財政部中獎號碼比對，中獎寄 email 通知，opt-in）
 - 樂透登錄 + 大樂透 / 威力彩自動對獎（member 批次登錄選號，排程每日抓台彩開獎號碼比對，中獎寄 email 通知，opt-in）
 - 排班（roster）
+- 每日不重複到訪統計（WS 握手採集、Redis HyperLogLog 計數、每日落地 `daily_visitor_stats`）
 - 排程 job（cron）
 - 線上對戰遊戲（象棋 / 五子棋 / 暗棋 / 西洋棋 / 圍棋 / 阿瓦隆 / 農場經營，server-authoritative，匿名，大廳自選桌 + 快速配對，複用 `/ws`；泛型框架 + Fischer 計時；阿瓦隆＝N 人社交推理、農場經營＝N 人 worker-placement）
 
@@ -37,6 +38,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `/admin/stocks` | 股票資料查詢、pending change 管理 |
 | `/admin/torrents` | torrent 下載任務（新增 / 列表 / 簽名下載連結 / 刪除） |
 | `/admin/games` | 即時對局總覽（各遊戲等待 / 進行中桌數、在玩人數、排隊、大廳） |
+| `/admin/stats` | 每日不重複到訪統計（today 即時 PFCOUNT + 近 N 天去重 + 歷史） |
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
 | `/member/portfolio` | member 投資組合 CRUD、即時損益總覽、歷史價格 / 還原成本（需 Bearer token） |
@@ -62,12 +64,14 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 | `ConsumePendingStockChange` | 每分鐘 | 消費一筆 pending stock_change，查詢 TWSE 股價 |
 | `FetchHistoricalClosingPrices` | 每分鐘 | 補缺起始日收盤價 |
 | `CleanupUnusedImages` | 每小時 | 清除 status=unused 且逾時的孤立圖片 |
+| `CleanupExpiredTorrents` | 每小時 :30 | 清除逾期 torrent（DB + 磁碟） |
 | `FetchNotes` | 每日 UTC+8 03:00 | 同步 HackMD 筆記（需 DB 設定 `hackmd_token`） |
 | `FetchStockDayAll` | 每日 UTC 20:00 | 抓全市場行情寫入 `stock_day_all` |
 | `FetchBuybackPeriods` | 每日 UTC 20:00 | 抓庫藏股計畫 HTML 寫入 `stock_buyback_periods`；有新未來庫藏股時 email 通知（需設定 `smtp_username` / `smtp_password`） |
 | `SyncBuybackToPending` | 每日 UTC 20:10 | 將 `stock_buyback_periods` 同步為 pending stock_changes；若 end_date 有異動，自動更新 pending 狀態的記錄 |
 | `CheckInvoiceLottery` | 每日 UTC 17:00 | 抓財政部統一發票中獎號碼，對 member 登錄發票比對，中獎且已開啟通知者寄 email |
 | `CheckLottoWins` | 每日 UTC 13:30 | 抓台彩大樂透 / 威力彩開獎號碼，對 member 登錄選號比對，中獎且已開啟通知者寄 email |
+| `AggregateVisitors` | 每日 UTC 16:05（台北 00:05） | 落地前一台北日不重複到訪 PFCOUNT → `daily_visitor_stats` |
 
 ## 技術棧
 
