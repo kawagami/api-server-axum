@@ -108,8 +108,8 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://kawa.homes`。
 ## 常用指令
 
 ```bash
-bash build.sh       # Docker build
-bash up.sh          # Docker Compose 啟動
+docker build --no-cache -t kawagami77/api-server:axum .   # Docker build
+cargo watch -x run                                        # 本機開發熱重載
 ```
 
 ## 在 VPS 環境中給予指定 user 角色(super_admin)的指令
