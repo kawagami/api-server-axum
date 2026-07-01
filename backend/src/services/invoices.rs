@@ -3,7 +3,10 @@ use crate::{
     repositories::{invoices as invoices_repo, ledger as ledger_repo},
     services::invoice_lottery::{period_of_date, PeriodNumbers},
     structs::{
-        invoices::{AdminLotteryNumbersRequest, Invoice, InvoiceListQuery, InvoiceRequest},
+        invoices::{
+            AdminLotteryNumbersRequest, DrawListQuery, Invoice, InvoiceListQuery, InvoiceRequest,
+            PeriodDraw,
+        },
         ledger::EXPENSE_CATEGORIES,
     },
 };
@@ -82,6 +85,12 @@ pub async fn list(
 
 pub async fn get(pool: &Pool<Postgres>, id: Uuid, member_id: i64) -> Result<Invoice, AppError> {
     invoices_repo::get_for_member(pool, id, member_id).await
+}
+
+/// 近期各期中獎號碼（前端展示；不限個人發票）
+pub async fn draws(pool: &Pool<Postgres>, query: &DrawListQuery) -> Result<Vec<PeriodDraw>, AppError> {
+    let limit = query.limit.unwrap_or(6).clamp(1, 24);
+    invoices_repo::recent_period_draws(pool, query.period.as_deref(), limit).await
 }
 
 pub async fn delete(pool: &Pool<Postgres>, id: Uuid, member_id: i64) -> Result<(), AppError> {

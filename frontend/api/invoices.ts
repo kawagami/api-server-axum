@@ -1,7 +1,7 @@
 "use server";
 
 import memberRequest from "@/libs/memberRequest";
-import type { Invoice, InvoiceInput, InvoiceListParams } from "@/types";
+import type { Invoice, InvoiceInput, InvoiceListParams, InvoiceDraw, InvoiceDrawParams } from "@/types";
 
 export async function getInvoices(params: InvoiceListParams = {}): Promise<Invoice[]> {
     const qs = new URLSearchParams();
@@ -34,6 +34,17 @@ export async function deleteInvoice(id: string): Promise<null> {
     return memberRequest<null>({
         url: `${process.env.API_URL}/member/invoices/${id}`,
         method: 'DELETE',
+    });
+}
+
+// 近期各期中獎號碼（需登入）
+export async function getInvoiceDraws(params: InvoiceDrawParams = {}): Promise<InvoiceDraw[]> {
+    const qs = new URLSearchParams();
+    if (params.period) qs.set('period', params.period);
+    if (params.limit) qs.set('limit', String(params.limit));
+    const q = qs.toString();
+    return memberRequest<InvoiceDraw[]>({
+        url: `${process.env.API_URL}/member/invoices/draws${q ? `?${q}` : ''}`,
     });
 }
 

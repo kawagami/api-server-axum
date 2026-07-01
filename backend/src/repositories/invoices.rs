@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
     services::invoice_lottery::PeriodNumbers,
-    structs::invoices::{Invoice, InvoiceListQuery, InvoiceRequest, WinnerRow},
+    structs::invoices::{Invoice, InvoiceListQuery, InvoiceRequest, PeriodDraw, WinnerRow},
 };
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
@@ -193,6 +193,49 @@ pub async fn load_period_numbers(pool: &Pool<Postgres>, period: &str) -> Result<
         }
     }
     Ok(n)
+}
+
+/// 近期各期中獎號碼（前端展示用），一期一筆；rows 依 period DESC 排序，同期相鄰後於 Rust 分組
+pub async fn recent_period_draws(
+    pool: &Pool<Postgres>,
+    period: Option<&str>,
+    limit: i64,
+) -> Result<Vec<PeriodDraw>, AppError> {
+    let rows: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT period, prize_tier, number FROM invoice_lottery_numbers
+         WHERE period IN (
+             SELECT period FROM invoice_lottery_numbers
+             WHERE ($1::text IS NULL OR period = $1)
+             GROUP BY period ORDER BY period DESC LIMIT $2
+         )
+         ORDER BY period DESC, prize_tier, number",
+    )
+    .bind(period)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    let mut out: Vec<PeriodDraw> = Vec::new();
+    for (p, tier, number) in rows {
+        if out.last().map(|e| e.period != p).unwrap_or(true) {
+            out.push(PeriodDraw {
+                period: p,
+                special: None,
+                grand: None,
+                first: Vec::new(),
+                additional: Vec::new(),
+            });
+        }
+        let entry = out.last_mut().unwrap();
+        match tier.as_str() {
+            "special" => entry.special = Some(number),
+            "grand" => entry.grand = Some(number),
+            "first" => entry.first.push(number),
+            "additional" => entry.additional.push(number),
+            _ => {}
+        }
+    }
+    Ok(out)
 }
 
 /// 某期未對獎的發票 (id, 號碼)

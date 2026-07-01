@@ -46,6 +46,23 @@ pub struct InvoiceListQuery {
     pub per_page: Option<i64>,
 }
 
+/// 開獎號碼查詢
+#[derive(Deserialize)]
+pub struct DrawListQuery {
+    pub period: Option<String>, // 指定期別；省略則回近期各期
+    pub limit: Option<i64>,     // 回傳期數（預設 6、上限 24）
+}
+
+/// 某一期的中獎號碼（前端展示用，一期一筆）
+#[derive(Serialize)]
+pub struct PeriodDraw {
+    pub period: String,
+    pub special: Option<String>, // 特別獎（8 碼）
+    pub grand: Option<String>,   // 特獎（8 碼）
+    pub first: Vec<String>,      // 頭獎（8 碼，通常 3 組）
+    pub additional: Vec<String>, // 增開六獎（3 碼，0~N 組）
+}
+
 /// 通知偏好切換
 #[derive(Deserialize)]
 pub struct NotifyPrefRequest {

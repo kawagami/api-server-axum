@@ -4,7 +4,10 @@ use crate::{
     services::invoices as invoices_service,
     state::AppState,
     structs::{
-        invoices::{Invoice, InvoiceListQuery, InvoiceRequest, NotifyPrefRequest, NotifyPrefResponse},
+        invoices::{
+            DrawListQuery, Invoice, InvoiceListQuery, InvoiceRequest, NotifyPrefRequest,
+            NotifyPrefResponse, PeriodDraw,
+        },
         members::AuthenticatedMember,
     },
 };
@@ -20,6 +23,7 @@ use uuid::Uuid;
 pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(list).post(register))
+        .route("/draws", get(draws))
         .route("/notify", patch(set_notify))
         .route("/{id}", get(detail).delete(delete))
         .layer(middleware::from_fn_with_state(state, auth::authorize_member))
@@ -61,6 +65,14 @@ async fn delete(
 ) -> Result<StatusCode, AppError> {
     invoices_service::delete(state.get_pool(), id, auth_member.member_id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn draws(
+    Extension(_auth_member): Extension<AuthenticatedMember>,
+    State(state): State<AppState>,
+    Query(query): Query<DrawListQuery>,
+) -> Result<Json<Vec<PeriodDraw>>, AppError> {
+    Ok(Json(invoices_service::draws(state.get_pool(), &query).await?))
 }
 
 async fn set_notify(

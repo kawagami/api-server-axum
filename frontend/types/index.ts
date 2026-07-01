@@ -143,6 +143,20 @@ export interface InvoiceListParams {
   per_page?: number;
 }
 
+// 某期統一發票中獎號碼（GET /member/invoices/draws，一期一筆；財政部公布，對中末幾碼即中）
+export interface InvoiceDraw {
+  period: string; // YYYYMM（期末偶數月）
+  special: string | null; // 特別獎 8 碼
+  grand: string | null; // 特獎 8 碼
+  first: string[]; // 頭獎 8 碼（通常 3 組）
+  additional: string[]; // 增開六獎 3 碼（0~N 組）
+}
+
+export interface InvoiceDrawParams {
+  period?: string; // 指定期別；省略回近期各期
+  limit?: number; // 回傳期數（預設 6、上限 24）
+}
+
 // 大樂透 / 威力彩 選號登錄 + 自動對獎（POST /member/lotto；與發票對獎為不同功能）
 export type LottoGame = 'lotto649' | 'super_lotto638';
 export type LottoSource = 'qr' | 'manual';
