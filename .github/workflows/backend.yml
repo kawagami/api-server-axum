@@ -1,9 +1,12 @@
-name: ci
+name: backend-ci
 
 on:
   push:
     branches:
       - 'master'
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
 
 jobs:
   docker:
@@ -23,11 +26,13 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./backend
           push: true
-          tags: kawagami77/my-next-blog:latest
+          tags: kawagami77/api-server:latest
+          cache-from: type=registry,ref=kawagami77/api-server:buildcache
+          cache-to: type=registry,ref=kawagami77/api-server:buildcache,mode=max
       -
         name: Update Vultr VPS Docker Service
         uses: appleboy/ssh-action@v1.2.5
@@ -36,6 +41,7 @@ jobs:
           username: ${{ secrets.VULTR_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            docker pull kawagami77/my-next-blog:latest
-            sh up.sh
+            cd docker-env
+            docker pull kawagami77/api-server:latest
+            docker-compose up -d --remove-orphans
             docker image prune --force

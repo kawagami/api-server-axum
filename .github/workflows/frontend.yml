@@ -1,9 +1,12 @@
-name: ci
+name: frontend-ci
 
 on:
   push:
     branches:
       - 'master'
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
 
 jobs:
   docker:
@@ -23,13 +26,11 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./frontend
           push: true
-          tags: kawagami77/api-server:axum
-          cache-from: type=registry,ref=kawagami77/api-server:buildcache
-          cache-to: type=registry,ref=kawagami77/api-server:buildcache,mode=max
+          tags: kawagami77/my-next-blog:latest
       -
         name: Update Vultr VPS Docker Service
         uses: appleboy/ssh-action@v1.2.5
@@ -38,7 +39,6 @@ jobs:
           username: ${{ secrets.VULTR_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd docker-env
-            docker pull kawagami77/api-server:axum
-            docker-compose up -d --remove-orphans
+            docker pull kawagami77/my-next-blog:latest
+            sh up.sh
             docker image prune --force
