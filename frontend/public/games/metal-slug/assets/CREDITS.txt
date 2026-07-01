@@ -1,0 +1,4 @@
+Player sprite: "CC0 2D Douche Cyborg (Jump, Run, Shoot, Idle)"
+Source: https://opengameart.org/content/cc0-2d-douche-cyborg-jump-run-shoot-idle
+License: CC0 (public domain)
+Packed into per-anim strips via PIL (cell 139x154, bottom-center aligned).

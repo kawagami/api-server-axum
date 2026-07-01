@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Kawa">
+  <!-- K（monoline，同 kawa-logo 筆畫風格） -->
+  <g fill="none" stroke="#40916c" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 22 V78" />
+    <path d="M60 26 L28 54" />
+    <path d="M36 48 L62 78" />
+  </g>
+  <!-- 從 K 右上冒出的葉子 -->
+  <path d="M58 28 C 62 12, 78 5, 90 9 C 88 24, 72 33, 59 30 Z" fill="#74c69d" />
+  <path d="M61 28 C 69 22, 78 16, 87 11" fill="none" stroke="#2d6a4f" stroke-width="3" stroke-linecap="round" />
+</svg>
