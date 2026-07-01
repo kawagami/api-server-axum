@@ -9,7 +9,7 @@ on:
       - '.github/workflows/frontend.yml'
 
 jobs:
-  docker:
+  build:
     runs-on: ubuntu-latest
     steps:
       -
@@ -31,6 +31,15 @@ jobs:
           context: ./frontend
           push: true
           tags: kawagami77/my-next-blog:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # 與 backend.yml 的 deploy job 共用 group：build 各自並行，只有部署階段序列化（排隊、不取消）
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
+    steps:
       -
         name: Update Vultr VPS Docker Service
         uses: appleboy/ssh-action@v1.2.5
