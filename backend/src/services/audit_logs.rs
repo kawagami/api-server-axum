@@ -4,6 +4,7 @@ use sqlx::{Pool, Postgres};
 
 pub use crate::repositories::audit_logs::AuditLog;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn get_audit_logs(
     pool: &Pool<Postgres>,
     user_email: Option<String>,

@@ -27,7 +27,7 @@ pub async fn redis_check_key_exists(
     key: &str,
 ) -> Result<bool, RedisError> {
     let mut conn = get_redis_conn(pool).await?;
-    Ok(conn.exists(key).await?)
+    conn.exists(key).await
 }
 
 pub async fn set_user_permissions(
@@ -38,7 +38,7 @@ pub async fn set_user_permissions(
     let mut conn = get_redis_conn(pool).await?;
     let key = format!("user:permissions:{}", email);
     let value = serde_json::to_string(permissions)
-        .map_err(|e| crate::errors::AppError::from(serde_json::Error::from(e)))?;
+        .map_err(crate::errors::AppError::from)?;
     conn.set_ex::<_, _, ()>(key, value, 3600).await?;
     Ok(())
 }

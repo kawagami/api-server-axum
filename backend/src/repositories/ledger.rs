@@ -61,6 +61,7 @@ pub async fn create(
 }
 
 /// 從掃描的發票建立一筆 expense。發票號碼重複（unique 違反）回 409。
+#[allow(clippy::too_many_arguments)]
 pub async fn create_from_invoice(
     pool: &Pool<Postgres>,
     member_id: i64,

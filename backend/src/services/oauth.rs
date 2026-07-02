@@ -152,6 +152,7 @@ pub async fn generate_oauth_url(
     get_oauth_url(&state_value, provider, config, settings)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn exchange_code(
     pool: &Pool<Postgres>,
     redis_pool: &RedisPool<RedisConnectionManager>,

@@ -214,9 +214,9 @@ fn validate_geometry(board: &Board, mv: Move, piece: Piece) -> Result<(), Illega
 }
 
 fn find_general(board: &Board, side: Side) -> Option<Square> {
-    for r in 0..10 {
-        for c in 0..9 {
-            if let Some(p) = board[r][c] {
+    for (r, row) in board.iter().enumerate() {
+        for (c, cell) in row.iter().enumerate() {
+            if let Some(p) = cell {
                 if p.kind == PieceKind::General && p.side == side {
                     return Some(Square::new(c as i8, r as i8));
                 }

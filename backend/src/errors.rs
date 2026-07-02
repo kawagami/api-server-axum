@@ -15,6 +15,8 @@ struct ErrorResponse {
     details: Option<String>,
 }
 
+// 變體統一 *Error 後綴是本專案慣例，比去掉後綴的裸名（Connection / Request…）可讀
+#[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
 pub enum AppError {
     // HTTP 相關錯誤

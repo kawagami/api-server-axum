@@ -9,7 +9,39 @@ on:
       - '.github/workflows/frontend.yml'
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      -
+        name: Enable corepack (pnpm 版本由 package.json packageManager 釘住)
+        run: corepack enable
+      -
+        name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      -
+        name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      -
+        name: Type check
+        run: pnpm exec tsc --noEmit
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       -

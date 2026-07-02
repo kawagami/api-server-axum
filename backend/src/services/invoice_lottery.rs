@@ -193,11 +193,11 @@ pub fn parse_feed(xml: &str) -> Vec<(String, PeriodNumbers)> {
         }
         let period = format!("{:04}{:02}", minguo + 1911, ending);
 
-        let mut nums = PeriodNumbers::default();
-        nums.special = special_re
-            .captures(body)
-            .map(|c| c[1].to_string());
-        nums.grand = grand_re.captures(body).map(|c| c[1].to_string());
+        let mut nums = PeriodNumbers {
+            special: special_re.captures(body).map(|c| c[1].to_string()),
+            grand: grand_re.captures(body).map(|c| c[1].to_string()),
+            ..Default::default()
+        };
         if let Some(c) = first_block_re.captures(body) {
             nums.first = d8.find_iter(&c[1]).map(|m| m.as_str().to_string()).collect();
         }

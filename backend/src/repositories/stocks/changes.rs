@@ -91,10 +91,10 @@ pub async fn upsert_stock_change(
     .bind(&info.stock_no)
     .bind(&info.stock_name)
     .bind(info.start_date)
-    .bind(&info.start_price)
+    .bind(info.start_price)
     .bind(info.end_date)
-    .bind(&info.end_price)
-    .bind(&info.change)
+    .bind(info.end_price)
+    .bind(info.change)
     .execute(pool)
     .await?;
 

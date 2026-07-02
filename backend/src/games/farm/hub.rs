@@ -36,6 +36,8 @@ pub struct Room {
     pub state: RoomState,
 }
 
+// 房間數少、Waiting 短命，Playing 大 payload 不 Box 也無記憶體壓力
+#[allow(clippy::large_enum_variant)]
 pub enum RoomState {
     Waiting,
     Playing(GameState),

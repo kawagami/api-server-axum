@@ -156,9 +156,9 @@ pub fn from_deck(deck: Vec<Piece>) -> BanqiState {
     assert_eq!(deck.len(), 32);
     let mut board = [[Cell::Empty; 8]; 4];
     let mut it = deck.into_iter();
-    for row in 0..ROWS as usize {
-        for col in 0..COLS as usize {
-            board[row][col] = Cell::Hidden(it.next().unwrap());
+    for row in board.iter_mut() {
+        for cell in row.iter_mut() {
+            *cell = Cell::Hidden(it.next().unwrap());
         }
     }
     BanqiState {

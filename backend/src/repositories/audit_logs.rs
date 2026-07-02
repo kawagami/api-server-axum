@@ -13,6 +13,8 @@ pub struct AuditLog {
     pub created_at: DateTime<Utc>,
 }
 
+// 篩選參數各自獨立可省略，收成 struct 反而多一層；維持平鋪
+#[allow(clippy::too_many_arguments)]
 pub async fn get_audit_logs(
     pool: &Pool<Postgres>,
     user_email: Option<String>,
