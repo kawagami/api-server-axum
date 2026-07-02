@@ -70,7 +70,8 @@ cd frontend && pnpm install && pnpm dev
 ## CI / 部署
 
 - **Path-based CI**:改 `backend/**` 只觸發 `backend.yml`、改 `frontend/**` 只觸發 `frontend.yml`,互不重 build。
-- 每條 workflow 拆成 `build`(build+push image)與 `deploy`(SSH VPS)兩段;兩條的 `deploy` 共用 `concurrency: vps-deploy`,**build 並行、部署序列化**,避免同時動 VPS 撞車。
+- 每條 workflow 拆成 `test`(後端 clippy + cargo test、前端 tsc --noEmit)、`build`(build+push image)與 `deploy`(SSH VPS)三段;test 不過不會 build 與部署。兩條的 `deploy` 共用 `concurrency: vps-deploy`,**build 並行、部署序列化**,避免同時動 VPS 撞車。
+- image 同時推 `:latest`(部署契約)與 `:<commit sha>`(回滾用)。
 - **push `master` = 直接上 production**(build image → SSH VPS → pull + 重啟)。
 - 環境變數一律 **runtime 注入**,image 內不烤設定值;實際部署設定在 `docker-env`。
 
