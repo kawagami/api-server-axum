@@ -33,7 +33,73 @@
 - 改 `backend/**` / `frontend/**` → 各自 workflow build image 後 SSH：`cd ~/kawa-deploy && docker pull … && docker compose up -d`。
 - 三條 deploy 共用 `concurrency: vps-deploy`，序列化不撞車。
 
-## 一次性切換 runbook（從舊 docker-env 遷移）
+## 全新機器 bootstrap
+
+從零把整站架在一台新 VPS 上的流程。
+
+### 0. 前提
+
+- 新 VPS：建使用者 + SSH 金鑰、裝 docker（含 compose plugin）與 rsync、使用者加入 `docker` 群組
+- Cloudflare DNS：`kawa.homes`、`*.kawa.homes` 指向新機 IP；SSL/TLS 模式 **Full (Strict)**
+- 若新機**取代**舊機：GitHub secrets 更新 `VULTR_HOST` / `VULTR_USERNAME` / `SSH_PRIVATE_KEY`
+
+### 1. 建持久層
+
+```bash
+docker run --rm -v /srv:/srv alpine sh -c "mkdir -p /srv/kawa/env && chown -R $(id -u):$(id -g) /srv/kawa"
+```
+
+照 `env.example/kawa.env` 建 `/srv/kawa/env/kawa.env`。**新站是產新值不是抄舊值**：
+`JWT_SECRET` 產新隨機字串、`POSTGRES_PASSWORD` 自訂（空庫，首次啟動用它初始化，
+`DATABASE_URL` 內密碼要同步）、OAuth secrets 沿用既有 app。
+`cloudflare.ini` 放好後 `chmod 600`。
+
+### 2. 部署設定、起服務
+
+```bash
+# 本機
+rsync -av deploy/ 新VPS:~/kawa-deploy/
+# VPS
+cd ~/kawa-deploy && docker compose up -d
+```
+
+此時 **nginx 起不來是正常的**（憑證還不存在）。
+
+### 3. 發憑證
+
+```bash
+bash shells/issue-cert.sh && docker compose restart nginx
+```
+
+### 4. 建第一個 admin（手動 SQL）
+
+migration 啟動時自動跑完，`roles` / `permissions` 有 seed，但 **users 沒有**，
+而 `POST /admin/users` 在認證牆後 — 第一個帳號只能手動塞：
+
+```bash
+# 產 bcrypt hash
+docker run --rm python:3-alpine sh -c "pip -q install bcrypt && python -c \"import bcrypt;print(bcrypt.hashpw(b'你的密碼', bcrypt.gensalt()).decode())\""
+
+docker exec -it database psql -U kawa -d kawa -c "
+  INSERT INTO users (email, password) VALUES ('you@example.com', '<上面的hash>');
+  INSERT INTO user_roles (user_id, role_id)
+    SELECT u.id, r.id FROM users u, roles r
+    WHERE u.email = 'you@example.com' AND r.name = 'super_admin';
+"
+```
+
+### 5. 後台補 runtime 設定
+
+登入 `/admin` → settings：OAuth client id / redirect URL、SMTP 帳密等
+（存 `app_settings` 表，migration 有預設值，OAuth / SMTP 要填真值才能用）。
+
+### 帶資料搬家的變體
+
+不是空站而是搬家：跳過步驟 4–5，舊機停機後把整個 `/srv/kawa`
+（env + uploads + torrents + dbdata）rsync 到新機同路徑；
+憑證在新機重發（DNS-01 不依賴舊機）比搬 volume 簡單。
+
+## 一次性切換 runbook（從舊 docker-env 遷移；已於 2026-07-02 完成，留檔參考）
 
 **先不 push 這批變更**，照順序做完、站台確認活著再 push。
 
