@@ -1,24 +1,15 @@
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
+// session 是 httpOnly cookie，同源 fetch 自動帶上，client 端不經手 token
 async function doRefresh(): Promise<void> {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        stopTokenRefresh();
-        return;
-    }
-
-    const res = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (res.ok) {
-        const { token: newToken } = await res.json();
-        localStorage.setItem('token', newToken);
-    } else {
-        stopTokenRefresh();
-        localStorage.removeItem('token');
-        window.location.href = '/admin/login';
+    try {
+        const res = await fetch('/api/auth/refresh', { method: 'POST' });
+        if (!res.ok) {
+            stopTokenRefresh();
+            window.location.href = '/admin/login';
+        }
+    } catch {
+        // 網路暫時異常：保留 timer，下一輪再試
     }
 }
 
@@ -31,11 +22,5 @@ export function stopTokenRefresh(): void {
     if (refreshTimer !== null) {
         clearInterval(refreshTimer);
         refreshTimer = null;
-    }
-}
-
-export function restartTokenRefresh(): void {
-    if (localStorage.getItem('token')) {
-        startTokenRefresh();
     }
 }

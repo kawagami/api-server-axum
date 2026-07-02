@@ -34,8 +34,6 @@ export default function Login() {
                 return;
             }
 
-            const { token } = await res.json();
-            localStorage.setItem('token', token);
             startTokenRefresh();
             router.push(redirectUrl);
         } catch {

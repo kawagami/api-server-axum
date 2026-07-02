@@ -5,7 +5,6 @@ import { LogOut } from "lucide-react";
 
 export default function LogoutButton() {
     async function handleLogout() {
-        localStorage.removeItem('token');
         await clearSession();
     }
 

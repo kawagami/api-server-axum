@@ -28,5 +28,5 @@ export async function POST(req: NextRequest) {
         sameSite: 'lax',
     });
 
-    return NextResponse.json({ token });
+    return NextResponse.json({ ok: true });
 }
