@@ -9,7 +9,7 @@
 |------|-------|------|
 | nginx | nginx:alpine | 反向代理（`kawa.homes` → frontend、`axum.kawa.homes` → backend） |
 | certbot | certbot/dns-cloudflare | Let's Encrypt 自動 renew（DNS-01） |
-| database | postgres:17-alpine | 資料庫 |
+| database | postgres:18-alpine | 資料庫 |
 | valkey | valkey/valkey:alpine | Cache（Redis 相容） |
 | backend | kawagami77/api-server:latest | Rust/Axum 後端 |
 | frontend | kawagami77/my-next-blog:latest | Next.js 前端 |
@@ -24,7 +24,7 @@
 │                     + cloudflare.ini（certbot 用，格式限制沒法併）。範例見 env.example/
 ├── uploads/       ← 後端上傳檔案
 ├── torrents/      ← torrent 下載檔案
-└── dbdata/        ← postgres 資料
+└── dbdata/        ← postgres 資料（PG 18 佈局：實際 cluster 在 dbdata/18/docker/）
 ```
 
 ## CI 部署（日常）
@@ -98,6 +98,92 @@ docker exec -it database psql -U kawa -d kawa -c "
 不是空站而是搬家：跳過步驟 4–5，舊機停機後把整個 `/srv/kawa`
 （env + uploads + torrents + dbdata）rsync 到新機同路徑；
 憑證在新機重發（DNS-01 不依賴舊機）比搬 volume 簡單。
+
+## 一次性升級 runbook：PG 17 → 18 + migration squash（2026-07-02 準備）
+
+兩件事共用同一停機窗口：
+- **PG 17 → 18**：資料目錄格式跨大版本不相容，走 dump/restore；掛載點同步改為
+  PG 18 image 的新佈局（`/var/lib/postgresql`）。
+- **migration squash**：`backend/migrations/` 60 個 migration 壓成單一
+  `20260702000000_baseline`（schema 為兩庫 pg_dump diff 驗證過的等價版本，
+  含 roles / permissions / role_permissions / app_settings 種子）。既有 DB 的
+  `_sqlx_migrations` 有 60 筆舊紀錄，新後端只認 baseline 一筆，**必須手動改表**，
+  否則新舊 image 都起不來。
+
+**先不 push 這批變更**，照順序做完再 push（同舊 docker-env 切換的做法）。
+
+### 1. 備份（站台不中斷）
+
+```bash
+# VPS 上
+docker exec database pg_dump -U kawa -d kawa > ~/kawa-pg17-dump.sql
+head -3 ~/kawa-pg17-dump.sql && wc -l ~/kawa-pg17-dump.sql   # 確認 dump 有內容
+```
+
+### 2. 停站、換資料目錄（停機開始）
+
+```bash
+# VPS 上
+cd ~/kawa-deploy && docker compose down
+
+# 舊 PG17 資料目錄整個改名保留（root 建的，透過容器搬）
+docker run --rm -v /srv/kawa:/d alpine mv /d/dbdata /d/dbdata-pg17
+
+# 本機把新 compose（PG18）傳上去
+rsync -av deploy/ VPS:~/kawa-deploy/
+```
+
+### 3. 起 PG 18、灌回資料
+
+```bash
+# VPS 上：只起 database，等 healthy（首次啟動用 kawa.env 的 POSTGRES_PASSWORD 初始化空庫）
+cd ~/kawa-deploy && docker compose up -d database
+docker compose ps database    # 等 healthy
+
+docker exec -i database psql -U kawa -d kawa -v ON_ERROR_STOP=1 < ~/kawa-pg17-dump.sql
+```
+
+### 4. 改 `_sqlx_migrations` 為 baseline 單筆
+
+restore 回來的是 60 筆舊紀錄；換成 baseline 一筆（checksum = baseline.up.sql 的 SHA-384，
+換行後校驗：`sha384sum backend/migrations/20260702000000_baseline.up.sql`）：
+
+```bash
+docker exec database psql -U kawa -d kawa -c "
+  BEGIN;
+  TRUNCATE _sqlx_migrations;
+  INSERT INTO _sqlx_migrations (version, description, installed_on, success, checksum, execution_time)
+  VALUES (20260702000000, 'baseline', now(), true,
+          decode('6e6e89d969f1966ec0b7ca50347f119b23dd09bcf3df1ec38f1e6d2a16a3110e5bbaabd1d7083b7f7cf3f2ab34174ec9','hex'), 0);
+  COMMIT;
+"
+```
+
+### 5. 起全站、push、等 CI 換後端
+
+```bash
+# VPS 上
+docker compose up -d
+# 舊 backend image 會因 migration 對不上啟動失敗直接退出 —— 預期行為，
+# 前台/nginx 先恢復，API 等 CI 佈上新 image
+```
+
+本機 push 這批 commit → `backend.yml` test/build/deploy 跑完（約數分鐘）後 backend 恢復。
+（`deploy.yml` 也會觸發重 rsync 一次同樣的 compose，無妨。）
+
+### 6. 驗證與善後
+
+```bash
+docker compose ps            # database healthy、backend Up
+curl -sI https://axum.kawa.homes | head -1
+docker exec database psql -U kawa -d kawa -tAc "SELECT version FROM _sqlx_migrations"   # 只有 20260702000000
+```
+
+- 本地開發 DB：砍掉重建（`cargo run` 會自動套 baseline），或比照步驟 4 修 `_sqlx_migrations`。
+- 站台穩定幾天後刪 `/srv/kawa/dbdata-pg17` 與 `~/kawa-pg17-dump.sql`。
+
+**回滾**（push 前）：`docker compose down` → `docker run --rm -v /srv/kawa:/d alpine sh -c "rm -rf /d/dbdata && mv /d/dbdata-pg17 /d/dbdata"` → 本機 rsync 舊版 deploy/ → `up -d`。
+**回滾**（push 後）：同上，另把 backend image 釘回舊 `:<sha>` tag。
 
 ## 一次性切換 runbook（從舊 docker-env 遷移；已於 2026-07-02 完成，留檔參考）
 

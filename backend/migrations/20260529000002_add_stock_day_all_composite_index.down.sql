@@ -1,1 +1,0 @@
-DROP INDEX IF EXISTS idx_stock_day_all_stock_code_trade_date;

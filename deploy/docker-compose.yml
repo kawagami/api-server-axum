@@ -38,14 +38,15 @@ services:
     restart: unless-stopped
 
   database:
-    image: postgres:17-alpine
+    # PG 18 起官方 image 的 volume 掛載點改為 /var/lib/postgresql（不再是 …/data），
+    # 資料目錄由 image 決定為 <mount>/18/docker，未來大版本升級可用 image 的 pg_upgrade 流程
+    image: postgres:18-alpine
     container_name: database
     volumes:
-      - /srv/kawa/dbdata:/var/lib/postgresql/data
+      - /srv/kawa/dbdata:/var/lib/postgresql
     env_file:
       - /srv/kawa/env/kawa.env   # POSTGRES_PASSWORD
     environment:
-      - "PGDATA=/var/lib/postgresql/data/pgdata"
       - "POSTGRES_DB=kawa"
       - "POSTGRES_USER=kawa"
       - "PGUSER=kawa"

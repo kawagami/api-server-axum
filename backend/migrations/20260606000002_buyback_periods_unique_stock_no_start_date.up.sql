@@ -1,5 +1,0 @@
-ALTER TABLE stock_buyback_periods
-DROP CONSTRAINT stock_buyback_periods_stock_no_start_date_end_date_key;
-
-ALTER TABLE stock_buyback_periods
-ADD CONSTRAINT stock_buyback_periods_stock_no_start_date_key UNIQUE (stock_no, start_date);
