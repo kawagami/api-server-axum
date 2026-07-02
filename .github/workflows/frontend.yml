@@ -85,6 +85,7 @@ jobs:
           username: ${{ secrets.VULTR_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            cd ~/kawa-deploy
             docker pull kawagami77/my-next-blog:latest
-            sh up.sh
+            docker compose up -d --remove-orphans
             docker image prune --force

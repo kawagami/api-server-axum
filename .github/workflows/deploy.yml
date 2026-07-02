@@ -1,0 +1,60 @@
+name: deploy-env
+
+# 部署編排（compose / nginx）變更時同步到 VPS 並套用，不重 build image。
+# 流程：staging 目錄驗證 → rsync 覆蓋 ~/kawa-deploy → compose up → nginx -t → reload
+
+on:
+  push:
+    branches:
+      - 'master'
+    paths:
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # 與 backend.yml / frontend.yml 的 deploy job 共用 group，部署序列化
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Clean staging dir
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VULTR_HOST }}
+          username: ${{ secrets.VULTR_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: rm -rf ~/kawa-deploy-staging
+      -
+        name: Copy deploy config to staging
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VULTR_HOST }}
+          username: ${{ secrets.VULTR_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "deploy"
+          target: "~/kawa-deploy-staging"
+          strip_components: 1
+      -
+        name: Validate and apply
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VULTR_HOST }}
+          username: ${{ secrets.VULTR_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            # 先驗證 staging 的 compose（env 檔在 /srv/kawa/env，VPS 上存在）
+            docker compose -f ~/kawa-deploy-staging/docker-compose.yml config --quiet
+            # 驗證通過才覆蓋正式目錄（--delete 清掉已移除的檔案）
+            rsync -a --delete ~/kawa-deploy-staging/ ~/kawa-deploy/
+            cd ~/kawa-deploy
+            docker compose up -d --remove-orphans
+            # nginx 設定先 -t 再 reload，壞設定不會生效
+            docker compose exec -T nginx nginx -t
+            docker compose exec -T nginx nginx -s reload

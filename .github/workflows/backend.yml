@@ -80,7 +80,7 @@ jobs:
           username: ${{ secrets.VULTR_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd docker-env
+            cd ~/kawa-deploy
             docker pull kawagami77/api-server:latest
-            docker-compose up -d --remove-orphans
+            docker compose up -d --remove-orphans
             docker image prune --force

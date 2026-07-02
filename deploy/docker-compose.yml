@@ -1,0 +1,86 @@
+# kawa.homes 全站編排 — 單一事實來源，所有服務集中此檔
+#
+# 邊界原則：
+# - 本目錄（~/kawa-deploy）由 CI rsync 覆蓋，視為可拋棄，不要在 VPS 上直接改
+# - 秘密值與持久資料在 /srv/kawa/，部署永遠不會動到：
+#     /srv/kawa/env/      kawa.env(全站唯一 env 檔，三容器共用) / cloudflare.ini
+#     /srv/kawa/uploads/  /srv/kawa/torrents/  /srv/kawa/dbdata/
+#   範例見 env.example/
+name: kawa
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    stop_signal: SIGTERM
+    # 定期 reload 讓 certbot renew 後的新憑證生效
+    command: /bin/sh -c "while :; do sleep 6h; nginx -s reload; done & exec nginx -g 'daemon off;'"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - letsencrypt:/etc/letsencrypt
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+
+  certbot:
+    image: certbot/dns-cloudflare
+    container_name: certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - /srv/kawa/env/cloudflare.ini:/etc/cloudflare/cloudflare.ini:ro
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done"
+    restart: unless-stopped
+
+  database:
+    image: postgres:17-alpine
+    container_name: database
+    volumes:
+      - /srv/kawa/dbdata:/var/lib/postgresql/data
+    env_file:
+      - /srv/kawa/env/kawa.env   # POSTGRES_PASSWORD
+    environment:
+      - "PGDATA=/var/lib/postgresql/data/pgdata"
+      - "POSTGRES_DB=kawa"
+      - "POSTGRES_USER=kawa"
+      - "PGUSER=kawa"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "kawa", "-U", "kawa"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  valkey:
+    image: "valkey/valkey:alpine"
+    container_name: valkey
+    ulimits:
+      memlock: -1
+
+  backend:
+    image: kawagami77/api-server:latest
+    container_name: backend
+    working_dir: /app   # scratch image 無預設 workdir；UPLOAD_PATH 等相對路徑以 /app 為基準
+    env_file:
+      - /srv/kawa/env/kawa.env
+    volumes:
+      - /srv/kawa/uploads:/app/uploads
+      - /srv/kawa/torrents:/app/torrents
+    depends_on:
+      database:
+        condition: service_healthy
+
+  frontend:
+    image: kawagami77/my-next-blog:latest
+    container_name: frontend
+    stop_grace_period: 1s
+    env_file:
+      - /srv/kawa/env/kawa.env
+
+volumes:
+  letsencrypt:
