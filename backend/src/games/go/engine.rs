@@ -82,11 +82,9 @@ fn group_and_liberties(board: &Board, c: i8, r: i8) -> (Vec<(i8, i8)>, usize) {
                 None => {
                     libs.insert((nc, nr));
                 }
-                x if x == color => {
-                    if !seen.contains(&(nc, nr)) {
-                        seen.push((nc, nr));
-                        stack.push((nc, nr));
-                    }
+                x if x == color && !seen.contains(&(nc, nr)) => {
+                    seen.push((nc, nr));
+                    stack.push((nc, nr));
                 }
                 _ => {}
             }
