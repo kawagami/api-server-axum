@@ -189,17 +189,26 @@ impl AppState {
     }
 
     pub fn broadcast(&self, event: WsEvent, data: serde_json::Value) {
-        self.broadcast_raw(crate::structs::ws::envelope(event.as_str(), data));
+        self.broadcast_filtered(crate::structs::ws::envelope(event.as_str(), data), false);
     }
 
-    /// 廣播給所有連線 — 先複製 sender 清單釋放 map lock，
+    /// 只推給已通過 admin 驗證的連線（user_email 有值）— 含 IP/email 等個資的事件走這裡
+    pub fn broadcast_to_admins(&self, event: WsEvent, data: serde_json::Value) {
+        self.broadcast_filtered(crate::structs::ws::envelope(event.as_str(), data), true);
+    }
+
+    /// 廣播 — 先複製 sender 清單釋放 map lock，
     /// 再 per-connection spawn，慢速客戶端不會卡住其他連線
-    pub fn broadcast_raw(&self, msg: String) {
+    fn broadcast_filtered(&self, msg: String, admins_only: bool) {
         let connections = self.0.connections.clone();
         tokio::spawn(async move {
             let senders: Vec<(SocketAddr, WsSender)> = {
                 let conns = connections.lock().await;
-                conns.iter().map(|(addr, c)| (*addr, c.sender.clone())).collect()
+                conns
+                    .iter()
+                    .filter(|(_, c)| !admins_only || c.user_email.is_some())
+                    .map(|(addr, c)| (*addr, c.sender.clone()))
+                    .collect()
             };
             for (addr, sender) in senders {
                 let msg = msg.clone();

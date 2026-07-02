@@ -1,6 +1,7 @@
 use crate::{
     errors::AppError,
     middleware::auth,
+    repositories::redis as redis_repo,
     state::{AppState, DisplayTrackedConnection, TrackedConnection},
     structs::{auth::AuthenticatedUser, roles::Perm},
 };
@@ -27,17 +28,14 @@ const PING_INTERVAL_SECONDS: u64 = 30;
 
 #[derive(serde::Deserialize)]
 struct WsQuery {
-    jwt: Option<String>,
-}
-
-async fn validate_ws_token(state: &AppState, token: String) -> Option<String> {
-    auth::verify_admin_token(state, token).await.ok()
+    ticket: Option<String>,
 }
 
 pub fn new(state: AppState) -> Router<AppState> {
     let admin_routes = Router::new()
         .route("/get_online_connections", get(get_online_connections))
         .route("/say_something_to_someone", post(say_something_to_someone))
+        .route("/ticket", post(create_ws_ticket))
         .layer(middleware::from_fn_with_state(
             state,
             auth::authorize_and_load,
@@ -61,8 +59,13 @@ async fn ws_handler(
     } else {
         String::from("Unknown browser")
     };
-    let user_email = match query.jwt {
-        Some(jwt) => validate_ws_token(&state, jwt).await,
+    // admin 身分改用一次性 ticket（POST /ws/ticket 換發，30 秒 TTL），
+    // JWT 不再走 URL query，避免 token 進 access log
+    let user_email = match query.ticket {
+        Some(ticket) => redis_repo::consume_ws_ticket(state.get_redis_pool(), &ticket)
+            .await
+            .ok()
+            .flatten(),
         None => None,
     };
     let real_ip = req_headers
@@ -102,7 +105,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
         connections.insert(who, connection_info);
     }
 
-    state.broadcast(
+    // 含 IP / email 個資，只推給 admin 連線，不對匿名訪客廣播
+    state.broadcast_to_admins(
         crate::structs::ws::WsEvent::UserJoined,
         serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_email": user_email }),
     );
@@ -276,6 +280,17 @@ async fn say_something_to_someone(
     }
 }
 
+/// 換發 WS 一次性連線票（30 秒 TTL）。登入中的 admin 用它連 WS 取得管理員身分，
+/// token 本體不再出現在 WS URL。
+async fn create_ws_ticket(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let ticket = uuid::Uuid::new_v4().to_string();
+    redis_repo::set_ws_ticket(state.get_redis_pool(), &ticket, &auth_user.email).await?;
+    Ok(Json(serde_json::json!({ "ticket": ticket })))
+}
+
 async fn cleanup_connection(state: &AppState, who: SocketAddr) {
     // 各遊戲斷線清理：在佇列就移除；在對局就判對手勝（斷線即判敗）
     for hub in state.games().all() {
@@ -289,7 +304,7 @@ async fn cleanup_connection(state: &AppState, who: SocketAddr) {
         connections.remove(&who);
         (email, ip)
     };
-    state.broadcast(
+    state.broadcast_to_admins(
         crate::structs::ws::WsEvent::UserLeft,
         serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_email": user_email }),
     );

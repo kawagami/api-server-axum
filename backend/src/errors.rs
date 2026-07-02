@@ -82,6 +82,10 @@ pub enum AuthError {
 
     #[error("密碼驗證失敗")]
     InvalidPassword,
+
+    // 登入失敗統一回此訊息，不區分帳號不存在/密碼錯誤，防帳號枚舉
+    #[error("帳號或密碼錯誤")]
+    InvalidCredentials,
 }
 
 #[derive(Error, Debug)]
@@ -133,6 +137,7 @@ impl AppError {
                 AuthError::Forbidden => StatusCode::FORBIDDEN,
                 AuthError::UserNotFound => StatusCode::UNAUTHORIZED,
                 AuthError::InvalidPassword => StatusCode::UNAUTHORIZED,
+                AuthError::InvalidCredentials => StatusCode::UNAUTHORIZED,
             },
             Self::SystemError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }

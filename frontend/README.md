@@ -100,6 +100,6 @@ JWT_SECRET=...
 
 push `master` 即自動部署：GitHub Actions type check（`tsc --noEmit`）→ build + push image（`kawagami77/my-next-blog`，`:latest` + `:<commit sha>` 供回滾）→ SSH 進 VPS pull + 重啟（monorepo 根 `.github/workflows/frontend.yml`）。
 
-- image 不含任何 env/secrets，設定由 VPS mount `.env.production` 於 runtime 注入
+- image 不含任何 env/secrets，設定由 VPS `/srv/kawa/env/` 的 env 檔經 compose `env_file` 於 runtime 注入（見 `deploy/`）
 - multi-stage build（deps → builder → Node Alpine runner，non-root、standalone output）
 - 本機驗證 image：`docker build -t blog-next . && docker run --env-file .env -p 3000:3000 blog-next`

@@ -9,13 +9,33 @@ use axum::{
 };
 use std::net::SocketAddr;
 
-const MAX_REQUESTS: i64 = 20;
+const TOOLS_MAX_REQUESTS: i64 = 20;
+// 登入爆破防護：每次失敗都燒一次 bcrypt（~百毫秒 CPU），限流門檻收緊
+const AUTH_MAX_REQUESTS: i64 = 5;
 const WINDOW_SECS: i64 = 60;
 
 pub async fn tools_rate_limit(
     State(state): State<AppState>,
     req: Request,
     next: Next,
+) -> Result<Response<Body>, AppError> {
+    rate_limit(state, req, next, "tools", TOOLS_MAX_REQUESTS).await
+}
+
+pub async fn auth_rate_limit(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Result<Response<Body>, AppError> {
+    rate_limit(state, req, next, "auth", AUTH_MAX_REQUESTS).await
+}
+
+async fn rate_limit(
+    state: AppState,
+    req: Request,
+    next: Next,
+    scope: &str,
+    max_requests: i64,
 ) -> Result<Response<Body>, AppError> {
     let socket_ip = req
         .extensions()
@@ -34,7 +54,7 @@ pub async fn tools_rate_limit(
         socket_ip.unwrap_or_else(|| "unknown".to_string())
     };
 
-    let key = format!("rate_limit:tools:{}", ip);
+    let key = format!("rate_limit:{}:{}", scope, ip);
     let mut conn = state.get_redis_conn().await?;
 
     // 原子：INCR + 首次設 TTL 一次完成，避免 incr 成功 expire 失敗導致 key 無 TTL 永久封鎖
@@ -48,7 +68,7 @@ pub async fn tools_rate_limit(
     .invoke_async(&mut *conn)
     .await?;
 
-    if count > MAX_REQUESTS {
+    if count > max_requests {
         return Ok((
             StatusCode::TOO_MANY_REQUESTS,
             Json(serde_json::json!({

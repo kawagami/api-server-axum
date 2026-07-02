@@ -132,6 +132,29 @@ pub async fn del_user_login(
     Ok(())
 }
 
+/// WS 一次性連線票：30 秒 TTL，value 為 admin email
+pub async fn set_ws_ticket(
+    pool: &RedisPool<RedisConnectionManager>,
+    ticket: &str,
+    email: &str,
+) -> Result<(), crate::errors::AppError> {
+    let mut conn = get_redis_conn(pool).await?;
+    let key = format!("ws:ticket:{}", ticket);
+    conn.set_ex::<_, _, ()>(key, email, 30).await?;
+    Ok(())
+}
+
+/// 取出並刪除 WS ticket（一次性），回傳持票人 email；不存在或已用過回 None
+pub async fn consume_ws_ticket(
+    pool: &RedisPool<RedisConnectionManager>,
+    ticket: &str,
+) -> Result<Option<String>, crate::errors::AppError> {
+    let mut conn = get_redis_conn(pool).await?;
+    let key = format!("ws:ticket:{}", ticket);
+    let value: Option<String> = redis::cmd("GETDEL").arg(&key).query_async(&mut *conn).await?;
+    Ok(value)
+}
+
 pub async fn cache_get(
     pool: &RedisPool<RedisConnectionManager>,
     key: &str,

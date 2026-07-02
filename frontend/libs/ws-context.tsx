@@ -28,7 +28,7 @@ const RECONNECT_MAX_MS = 30000;
 // 連續重連失敗超過此次數（約 75s）才顯示「請重新整理」提示，背景仍持續嘗試
 const RECONNECT_FAIL_THRESHOLD = 5;
 
-export function WsProvider({ children, jwt, wsUrl }: { children: React.ReactNode; jwt: string | null; wsUrl: string }) {
+export function WsProvider({ children, hasSession, wsUrl }: { children: React.ReactNode; hasSession: boolean; wsUrl: string }) {
     const listenersRef = useRef<Map<string, Set<Listener>>>(new Map());
     const reconnectHandlersRef = useRef<Set<ReconnectHandler>>(new Set());
     const wsRef = useRef<WebSocket | null>(null);
@@ -47,8 +47,6 @@ export function WsProvider({ children, jwt, wsUrl }: { children: React.ReactNode
         let attempt = 0;
         let timeoutId: ReturnType<typeof setTimeout>;
 
-        const url = jwt ? `${wsUrl}/ws?jwt=${jwt}` : `${wsUrl}/ws`;
-
         const scheduleReconnect = () => {
             if (destroyed) return;
             // 指數退避 + jitter（避免多 client 同時重連打爆 server）
@@ -59,7 +57,21 @@ export function WsProvider({ children, jwt, wsUrl }: { children: React.ReactNode
             timeoutId = setTimeout(connect, delay);
         };
 
-        const connect = () => {
+        const connect = async () => {
+            // admin 已登入：先換一次性連線票（30 秒效期、票是一次性的，每次連線都要換新），
+            // token 本體不進 WS URL；換票失敗就退回匿名連線
+            let url = `${wsUrl}/ws`;
+            if (hasSession) {
+                try {
+                    const res = await fetch('/api/auth/ws-ticket', { method: 'POST' });
+                    if (res.ok) {
+                        const { ticket } = await res.json() as { ticket: string };
+                        url = `${wsUrl}/ws?ticket=${ticket}`;
+                    }
+                } catch { /* 換票失敗，匿名連線 */ }
+            }
+            if (destroyed) return;
+
             const ws = new WebSocket(url);
             wsRef.current = ws;
 
@@ -101,7 +113,7 @@ export function WsProvider({ children, jwt, wsUrl }: { children: React.ReactNode
             };
         };
 
-        connect();
+        void connect();
 
         return () => {
             destroyed = true;
@@ -115,7 +127,7 @@ export function WsProvider({ children, jwt, wsUrl }: { children: React.ReactNode
             wsRef.current = null;
             hasConnectedRef.current = false;
         };
-    }, [jwt, wsUrl]);
+    }, [hasSession, wsUrl]);
 
     const value = useMemo<WsContextValue>(() => ({
         subscribe: (type, fn) => {

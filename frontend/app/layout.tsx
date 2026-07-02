@@ -18,7 +18,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // 全站風格：site_theme 是具體主題 → 固定；是 'auto' → 依 theme_rotation + 當天星期（Asia/Taipei）輪播
     // layout 因 cookies() 為動態渲染、每 request 重算，跨午夜自動換主題不受 60s settings cache 影響
     const siteTheme = resolveActiveTheme(publicSettings.site_theme, normalizeRotation(publicSettings.theme_rotation));
-    const jwt = cookieStore.get('session')?.value ?? null;
+    // 只傳「是否有 session」的布林值；token 本體不進 RSC payload，
+    // WS 連線身分由 client 打 /api/auth/ws-ticket 換一次性票
+    const hasSession = cookieStore.has('session');
 
     // 深淺色：使用者 cookie ＞ admin 預設 ＞ 系統偏好
     const themeCookie = cookieStore.get('theme')?.value;   // dark / light / undefined
@@ -34,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 )}
             </head>
             <body className="bg-gradient-to-b from-primary-50 to-neutral-100 text-neutral-800 dark:from-primary-950 dark:to-neutral-900 dark:text-neutral-100">
-                <WsProvider jwt={jwt} wsUrl={process.env.WS_URL ?? ''}>
+                <WsProvider hasSession={hasSession} wsUrl={process.env.WS_URL ?? ''}>
                     <ThemeBackground theme={siteTheme} />
                     {children}
                 </WsProvider>

@@ -6,6 +6,7 @@ use crate::{
 };
 use axum::{
     extract::{Extension, Json, State},
+    middleware,
     routing::{get, post},
     Router,
 };
@@ -13,14 +14,21 @@ use serde::Serialize;
 
 pub fn new(state: AppState) -> Router<AppState> {
     let protected = super::with_auth(
-        state,
+        state.clone(),
         Router::new()
             .route("/me", get(me))
             .route("/refresh", post(refresh))
             .route("/change_password", post(change_password)),
     );
 
-    Router::new().route("/", post(sign_in)).merge(protected)
+    // 密碼登入端點掛 per-IP 限流，防爆破與 bcrypt CPU 耗盡
+    Router::new()
+        .route("/", post(sign_in))
+        .layer(middleware::from_fn_with_state(
+            state,
+            crate::middleware::rate_limit::auth_rate_limit,
+        ))
+        .merge(protected)
 }
 
 #[derive(Serialize)]

@@ -8,7 +8,9 @@ import { startTokenRefresh } from '@/libs/token-refresh';
 export default function Login() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const redirectUrl = searchParams.get('redirect') || '/admin';
+    // open-redirect 防護：只收站內相對路徑（同 OAuth callback 的規則）
+    const rawRedirect = searchParams.get('redirect');
+    const redirectUrl = rawRedirect?.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/admin';
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 

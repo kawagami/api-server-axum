@@ -9,6 +9,12 @@ use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use sqlx::{Pool, Postgres};
+use std::sync::LazyLock;
+
+// 帳號不存在時也要跑一次同 cost 的 bcrypt，拉平回應時間防 timing 枚舉。
+// lazy 初始化發生在 spawn_blocking 執行緒，不佔 async worker。
+static DUMMY_HASH: LazyLock<String> =
+    LazyLock::new(|| hash("dummy-password", DEFAULT_COST).expect("bcrypt dummy hash"));
 
 pub async fn sign_in(
     pool: &Pool<Postgres>,
@@ -17,9 +23,13 @@ pub async fn sign_in(
     email: &str,
     password: &str,
 ) -> Result<String, AppError> {
-    let db_user = users::check_email_exists(pool, email)
-        .await
-        .map_err(|_| AppError::AuthError(AuthError::UserNotFound))?;
+    let db_user = match users::check_email_exists(pool, email).await {
+        Ok(user) => user,
+        Err(_) => {
+            dummy_verify_password(password.to_string()).await;
+            return Err(AppError::AuthError(AuthError::InvalidCredentials));
+        }
+    };
 
     let user = CurrentUser {
         email: db_user.email,
@@ -27,7 +37,7 @@ pub async fn sign_in(
     };
 
     if !verify_password(password.to_string(), user.password_hash.clone()).await? {
-        return Err(AppError::AuthError(AuthError::InvalidPassword));
+        return Err(AppError::AuthError(AuthError::InvalidCredentials));
     }
 
     let login_key = format!("user:login:{}", user.email);
@@ -82,6 +92,10 @@ fn encode_jwt(email: String, jwt_secret: &str) -> Result<String, AppError> {
         &EncodingKey::from_secret(jwt_secret.as_ref()),
     )
     .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
+}
+
+async fn dummy_verify_password(password: String) {
+    let _ = tokio::task::spawn_blocking(move || verify(password, &DUMMY_HASH)).await;
 }
 
 // bcrypt 為 CPU-bound（DEFAULT_COST 約百毫秒），用 spawn_blocking 避免卡住 tokio worker
