@@ -58,11 +58,16 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
-          tags: kawagami77/my-next-blog:latest
+          # :latest 供 docker-env 部署；:sha 供回滾（docker pull kawagami77/my-next-blog:<sha>）
+          tags: |
+            kawagami77/my-next-blog:latest
+            kawagami77/my-next-blog:${{ github.sha }}
+          cache-from: type=registry,ref=kawagami77/my-next-blog:buildcache
+          cache-to: type=registry,ref=kawagami77/my-next-blog:buildcache,mode=max
 
   deploy:
     needs: build

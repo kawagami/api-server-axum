@@ -57,7 +57,10 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: kawagami77/api-server:latest
+          # :latest 供 docker-env 部署；:sha 供回滾（docker pull kawagami77/api-server:<sha>）
+          tags: |
+            kawagami77/api-server:latest
+            kawagami77/api-server:${{ github.sha }}
           cache-from: type=registry,ref=kawagami77/api-server:buildcache
           cache-to: type=registry,ref=kawagami77/api-server:buildcache,mode=max
 
