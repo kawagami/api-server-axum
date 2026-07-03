@@ -141,20 +141,20 @@
   "Dashboard": {
     "title": "Dashboard",
     "welcomeBack": "Welcome back",
-    "invoices": "Invoices",
-    "invoicesDesc": "Register invoices for the lottery",
-    "lotto": "Lottery Picks",
-    "lottoDesc": "Register picks for auto checking",
-    "notifications": "Notifications",
-    "notificationsDesc": "Real-time WebSocket notifications",
-    "profile": "Profile",
-    "profileDesc": "View and manage your account",
-    "blogs": "Blog",
-    "blogsDesc": "All posts",
-    "notes": "Notes",
-    "notesDesc": "HackMD synced notes",
-    "tools": "Tools",
-    "toolsDesc": "Passwords, timers, rosters"
+    "quickActions": "Quick actions",
+    "scanInvoice": "Scan invoice",
+    "scanInvoiceDesc": "Register uniform invoices with your camera",
+    "registerLotto": "Register lotto",
+    "registerLottoDesc": "Register Lotto 6/49 or Super Lotto picks",
+    "myFeatures": "My features",
+    "items": {
+      "profile": "View and manage your account.",
+      "notifications": "Real-time in-site notifications.",
+      "portfolio": "Live holdings P&L and history.",
+      "ledger": "Income/expense records and charts.",
+      "invoices": "Registered invoices and winnings.",
+      "lotto": "Your picks and draw results."
+    }
   },
   "BlogError": {
     "title": "Failed to load",

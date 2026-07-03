@@ -141,20 +141,20 @@
   "Dashboard": {
     "title": "仪表板",
     "welcomeBack": "欢迎回来",
-    "invoices": "发票登录",
-    "invoicesDesc": "登录发票自动对奖",
-    "lotto": "乐透选号",
-    "lottoDesc": "登录选号自动对奖",
-    "notifications": "通知",
-    "notificationsDesc": "实时 WebSocket 通知",
-    "profile": "个人资料",
-    "profileDesc": "查看与管理账号",
-    "blogs": "博客",
-    "blogsDesc": "所有文章",
-    "notes": "笔记",
-    "notesDesc": "HackMD 同步笔记",
-    "tools": "工具",
-    "toolsDesc": "密码、计时、排班"
+    "quickActions": "快速操作",
+    "scanInvoice": "扫发票",
+    "scanInvoiceDesc": "相机扫描登记统一发票",
+    "registerLotto": "登记乐透",
+    "registerLottoDesc": "登记大乐透／威力彩选号",
+    "myFeatures": "我的功能",
+    "items": {
+      "profile": "查看与管理账号资料。",
+      "notifications": "实时站内通知。",
+      "portfolio": "持股实时损益与历史走势。",
+      "ledger": "收支记录与分类统计图表。",
+      "invoices": "发票登记列表与中奖查询。",
+      "lotto": "选号列表与开奖对照。"
+    }
   },
   "BlogError": {
     "title": "加载失败",

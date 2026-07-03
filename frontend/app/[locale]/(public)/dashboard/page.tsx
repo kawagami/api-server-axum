@@ -2,25 +2,27 @@ import { getCurrentMember } from "@/api/members";
 import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
-import { Bell, User, BookOpen, FileText, Wrench, ReceiptText, Ticket } from "lucide-react";
+import { ScanLine, Ticket } from "lucide-react";
+import FeatureCard from "@/components/feature-card";
+import { MEMBER_LINKS } from "@/libs/site-nav";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Dashboard");
     return { title: t("title") };
 }
 
-const QUICK_LINKS = [
-    { href: "/invoices/scan", labelKey: "invoices", descKey: "invoicesDesc", icon: ReceiptText },
-    { href: "/lotto/register", labelKey: "lotto", descKey: "lottoDesc", icon: Ticket },
-    { href: "/dashboard/notifications", labelKey: "notifications", descKey: "notificationsDesc", icon: Bell },
-    { href: "/profile", labelKey: "profile", descKey: "profileDesc", icon: User },
-    { href: "/", labelKey: "blogs", descKey: "blogsDesc", icon: BookOpen },
-    { href: "/hackmd-notes", labelKey: "notes", descKey: "notesDesc", icon: FileText },
-    { href: "/tools/new-password", labelKey: "tools", descKey: "toolsDesc", icon: Wrench },
+// 快速操作是 deep-link 捷徑（非導航），留在本頁維護，不進 site-nav
+const QUICK_ACTIONS = [
+    { href: "/invoices/scan", labelKey: "scanInvoice", descKey: "scanInvoiceDesc", icon: ScanLine },
+    { href: "/lotto/register", labelKey: "registerLotto", descKey: "registerLottoDesc", icon: Ticket },
 ] as const;
 
 export default async function DashboardPage() {
-    const [member, t] = await Promise.all([getCurrentMember(), getTranslations("Dashboard")]);
+    const [member, t, tHeader] = await Promise.all([
+        getCurrentMember(),
+        getTranslations("Dashboard"),
+        getTranslations("Header"),
+    ]);
 
     return (
         <div className="w-full max-w-3xl px-4 py-8 flex flex-col gap-8">
@@ -43,19 +45,39 @@ export default async function DashboardPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {QUICK_LINKS.map(({ href, labelKey, descKey, icon: Icon }) => (
-                    <Link
-                        key={href}
-                        href={href}
-                        className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow hover:shadow-md transition-shadow flex flex-col gap-2 group"
-                    >
-                        <Icon size={20} className="text-primary-500 group-hover:scale-110 transition-transform" />
-                        <span className="font-semibold text-sm">{t(labelKey)}</span>
-                        <span className="text-xs text-neutral-500 dark:text-neutral-400">{t(descKey)}</span>
-                    </Link>
-                ))}
-            </div>
+            <section className="flex flex-col gap-3">
+                <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">{t("quickActions")}</h2>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    {QUICK_ACTIONS.map(({ href, labelKey, descKey, icon: Icon }) => (
+                        <Link
+                            key={href}
+                            href={href}
+                            className="flex-1 flex items-center gap-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl px-5 py-4 shadow-md hover:shadow-lg transition-colors"
+                        >
+                            <Icon size={24} className="shrink-0" />
+                            <span className="flex flex-col">
+                                <span className="font-semibold">{t(labelKey)}</span>
+                                <span className="text-xs text-primary-100">{t(descKey)}</span>
+                            </span>
+                        </Link>
+                    ))}
+                </div>
+            </section>
+
+            <section className="flex flex-col gap-3">
+                <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">{t("myFeatures")}</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {MEMBER_LINKS.filter(({ key }) => key !== "dashboard").map(({ key, href, labelKey, icon }) => (
+                        <FeatureCard
+                            key={key}
+                            href={href}
+                            icon={icon}
+                            title={tHeader(labelKey)}
+                            desc={t(`items.${key}`)}
+                        />
+                    ))}
+                </div>
+            </section>
         </div>
     );
 }

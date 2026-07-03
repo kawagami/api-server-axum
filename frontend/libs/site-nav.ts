@@ -13,11 +13,18 @@ import {
     Castle,
     Wheat,
     Crosshair,
+    LayoutDashboard,
+    User,
+    Bell,
+    TrendingUp,
+    Wallet,
+    ReceiptText,
+    Ticket,
     type LucideIcon,
 } from "lucide-react";
 
-// 工具與遊戲清單的單一來源：header 下拉、/tools 與 /games index 頁共用。
-// 新增項目只要加一行（labelKey 對應 Header namespace、key 對應 ToolsHub/GamesHub 的 items）
+// 工具 / 遊戲 / 會員功能清單的單一來源：header 下拉、/tools 與 /games index 頁、dashboard 共用。
+// 新增項目只要加一行（labelKey 對應 Header namespace、key 對應 ToolsHub/GamesHub/Dashboard 的 items）
 export interface SiteNavItem {
     key: string;
     href: string;
@@ -43,4 +50,14 @@ export const GAMES: readonly SiteNavItem[] = [
     { key: "avalon", href: "/games/avalon", labelKey: "gameAvalon", icon: Castle },
     { key: "farm", href: "/games/farm", labelKey: "gameFarm", icon: Wheat },
     { key: "metalSlug", href: "/games/metal-slug", labelKey: "gameMetalSlug", icon: Crosshair },
+] as const;
+
+export const MEMBER_LINKS: readonly SiteNavItem[] = [
+    { key: "dashboard", href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
+    { key: "profile", href: "/profile", labelKey: "profile", icon: User },
+    { key: "notifications", href: "/dashboard/notifications", labelKey: "notifications", icon: Bell },
+    { key: "portfolio", href: "/portfolio", labelKey: "portfolio", icon: TrendingUp },
+    { key: "ledger", href: "/ledger", labelKey: "ledger", icon: Wallet },
+    { key: "invoices", href: "/invoices", labelKey: "invoices", icon: ReceiptText },
+    { key: "lotto", href: "/lotto", labelKey: "lotto", icon: Ticket },
 ] as const;

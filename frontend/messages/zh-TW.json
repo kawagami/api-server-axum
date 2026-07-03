@@ -141,20 +141,20 @@
   "Dashboard": {
     "title": "儀表板",
     "welcomeBack": "歡迎回來",
-    "invoices": "發票登錄",
-    "invoicesDesc": "登錄發票自動對獎",
-    "lotto": "樂透選號",
-    "lottoDesc": "登錄選號自動對獎",
-    "notifications": "通知",
-    "notificationsDesc": "即時 WebSocket 通知",
-    "profile": "個人資料",
-    "profileDesc": "查看與管理帳號",
-    "blogs": "部落格",
-    "blogsDesc": "所有文章",
-    "notes": "筆記",
-    "notesDesc": "HackMD 同步筆記",
-    "tools": "工具",
-    "toolsDesc": "密碼、計時、排班"
+    "quickActions": "快速操作",
+    "scanInvoice": "掃發票",
+    "scanInvoiceDesc": "相機掃描登錄統一發票",
+    "registerLotto": "登錄樂透",
+    "registerLottoDesc": "登錄大樂透／威力彩選號",
+    "myFeatures": "我的功能",
+    "items": {
+      "profile": "查看與管理帳號資料。",
+      "notifications": "即時站內通知。",
+      "portfolio": "持股即時損益與歷史走勢。",
+      "ledger": "收支記錄與分類統計圖表。",
+      "invoices": "發票登錄列表與中獎查詢。",
+      "lotto": "選號列表與開獎對照。"
+    }
   },
   "BlogError": {
     "title": "載入失敗",
