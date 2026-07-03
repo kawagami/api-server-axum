@@ -8,6 +8,7 @@ import { logout } from '@/actions/auth';
 import { LayoutDashboard, User, Bell, ChevronDown, X, Menu, TrendingUp, Wallet, ReceiptText, Ticket, type LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import LocaleSwitcher from '@/components/locale-switcher';
+import { TOOLS, GAMES } from '@/libs/site-nav';
 
 import type { UserColorMode } from "@/libs/color-mode";
 
@@ -16,28 +17,6 @@ interface HeaderProps {
     colorMode: UserColorMode
     defaultIsDark: boolean | null
 }
-
-// 工具選單與會員選單的單一來源；新增工具只要加一行
-const TOOLS = [
-    { href: "/tools/new-password", labelKey: "toolNewPassword" },
-    { href: "/tools/convert-text", labelKey: "toolConvertText" },
-    { href: "/tools/countdown", labelKey: "toolCountdown" },
-    { href: "/tools/roster", labelKey: "toolRoster" },
-    { href: "/tools/alarm", labelKey: "toolAlarm" },
-    { href: "/tools/hourly-chime", labelKey: "toolHourlyChime" },
-] as const;
-
-// 遊戲選單；新增遊戲只要加一行
-const GAMES = [
-    { href: "/games/chess", labelKey: "gameChess" },
-    { href: "/games/western-chess", labelKey: "gameWesternChess" },
-    { href: "/games/gomoku", labelKey: "gameGomoku" },
-    { href: "/games/go", labelKey: "gameGo" },
-    { href: "/games/banqi", labelKey: "gameBanqi" },
-    { href: "/games/avalon", labelKey: "gameAvalon" },
-    { href: "/games/farm", labelKey: "gameFarm" },
-    { href: "/games/metal-slug", labelKey: "gameMetalSlug" },
-] as const;
 
 const MEMBER_LINKS: ReadonlyArray<{ href: string; labelKey: string; icon: LucideIcon }> = [
     { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
@@ -79,8 +58,8 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
     const isBlogActive = pathname.startsWith('/blogs');
     const isNotesActive = pathname.startsWith('/hackmd-notes');
     const isAboutActive = pathname.startsWith('/about');
-    const isToolsActive = TOOLS.some(({ href }) => pathname.startsWith(href));
-    const isGamesActive = GAMES.some(({ href }) => pathname.startsWith(href));
+    const isToolsActive = pathname.startsWith('/tools');
+    const isGamesActive = pathname.startsWith('/games');
 
     const closeAll = () => {
         setIsOpen(false);
@@ -126,16 +105,24 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                 <nav ref={navRef} className="hidden md:flex items-center gap-2">
                     <Link href="/blogs" aria-label={t('blog')} className={`${navLinkClass} ${isBlogActive ? activeNavClass : ''}`}>{t('blog')}</Link>
                     <Link href="/hackmd-notes" aria-label={t('notes')} className={`${navLinkClass} ${isNotesActive ? activeNavClass : ''}`}>{t('notes')}</Link>
-                    <div className="relative">
-                        <button
-                            className={`${navTriggerClass} ${isToolsActive ? activeNavClass : ''}`}
-                            aria-label={t('openToolsMenu')}
-                            aria-expanded={isResourcesOpen}
-                            onClick={() => setIsResourcesOpen(o => !o)}
-                        >
-                            {t('tools')}
-                            <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isResourcesOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                    <div
+                        className="relative"
+                        onMouseEnter={() => setIsResourcesOpen(true)}
+                        onMouseLeave={() => setIsResourcesOpen(false)}
+                    >
+                        <span className={`${navTriggerClass} ${isToolsActive ? activeNavClass : ''}`}>
+                            <Link href="/tools" aria-label={t('tools')} className="focus:outline-none focus:ring-2 focus:ring-primary-400 rounded" onClick={closeDesktopDropdowns}>
+                                {t('tools')}
+                            </Link>
+                            <button
+                                aria-label={t('openToolsMenu')}
+                                aria-expanded={isResourcesOpen}
+                                onClick={() => setIsResourcesOpen(o => !o)}
+                                className="focus:outline-none focus:ring-2 focus:ring-primary-400 rounded"
+                            >
+                                <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isResourcesOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                        </span>
                         <DesktopDropdown isOpen={isResourcesOpen}>
                             {TOOLS.map(({ href, labelKey }) => (
                                 <Link key={href} href={href} tabIndex={isResourcesOpen ? 0 : -1} className={dropdownItemClass} onClick={() => setIsResourcesOpen(false)}>
@@ -144,16 +131,24 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                             ))}
                         </DesktopDropdown>
                     </div>
-                    <div className="relative">
-                        <button
-                            className={`${navTriggerClass} ${isGamesActive ? activeNavClass : ''}`}
-                            aria-label={t('openGamesMenu')}
-                            aria-expanded={isGamesOpen}
-                            onClick={() => setIsGamesOpen(o => !o)}
-                        >
-                            {t('games')}
-                            <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isGamesOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                    <div
+                        className="relative"
+                        onMouseEnter={() => setIsGamesOpen(true)}
+                        onMouseLeave={() => setIsGamesOpen(false)}
+                    >
+                        <span className={`${navTriggerClass} ${isGamesActive ? activeNavClass : ''}`}>
+                            <Link href="/games" aria-label={t('games')} className="focus:outline-none focus:ring-2 focus:ring-primary-400 rounded" onClick={closeDesktopDropdowns}>
+                                {t('games')}
+                            </Link>
+                            <button
+                                aria-label={t('openGamesMenu')}
+                                aria-expanded={isGamesOpen}
+                                onClick={() => setIsGamesOpen(o => !o)}
+                                className="focus:outline-none focus:ring-2 focus:ring-primary-400 rounded"
+                            >
+                                <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isGamesOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                        </span>
                         <DesktopDropdown isOpen={isGamesOpen}>
                             {GAMES.map(({ href, labelKey }) => (
                                 <Link key={href} href={href} tabIndex={isGamesOpen ? 0 : -1} className={dropdownItemClass} onClick={() => setIsGamesOpen(false)}>
@@ -213,14 +208,19 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                         <Link href="/blogs" className={`${mobileItemClass} ${isBlogActive ? activeNavClass : ''}`} onClick={closeAll}>{t('blog')}</Link>
                         <Link href="/hackmd-notes" className={`${mobileItemClass} ${isNotesActive ? activeNavClass : ''}`} onClick={closeAll}>{t('notes')}</Link>
 
-                        <button
-                            className={`${mobileItemClass} flex items-center justify-between w-full text-left ${isToolsActive ? activeNavClass : ''}`}
-                            aria-expanded={isResourcesOpen}
-                            onClick={() => setIsResourcesOpen(o => !o)}
-                        >
-                            {t('tools')}
-                            <ChevronDown size={14} className={`transition-transform ${isResourcesOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                        <div className="flex items-center">
+                            <Link href="/tools" className={`${mobileItemClass} flex-1 ${isToolsActive ? activeNavClass : ''}`} onClick={closeAll}>
+                                {t('tools')}
+                            </Link>
+                            <button
+                                className={mobileItemClass}
+                                aria-label={t('openToolsMenu')}
+                                aria-expanded={isResourcesOpen}
+                                onClick={() => setIsResourcesOpen(o => !o)}
+                            >
+                                <ChevronDown size={14} className={`transition-transform ${isResourcesOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                        </div>
                         {isResourcesOpen && (
                             <div className="ml-4 flex flex-col gap-1">
                                 {TOOLS.map(({ href, labelKey }) => (
@@ -231,14 +231,19 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                             </div>
                         )}
 
-                        <button
-                            className={`${mobileItemClass} flex items-center justify-between w-full text-left ${isGamesActive ? activeNavClass : ''}`}
-                            aria-expanded={isGamesOpen}
-                            onClick={() => setIsGamesOpen(o => !o)}
-                        >
-                            {t('games')}
-                            <ChevronDown size={14} className={`transition-transform ${isGamesOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                        <div className="flex items-center">
+                            <Link href="/games" className={`${mobileItemClass} flex-1 ${isGamesActive ? activeNavClass : ''}`} onClick={closeAll}>
+                                {t('games')}
+                            </Link>
+                            <button
+                                className={mobileItemClass}
+                                aria-label={t('openGamesMenu')}
+                                aria-expanded={isGamesOpen}
+                                onClick={() => setIsGamesOpen(o => !o)}
+                            >
+                                <ChevronDown size={14} className={`transition-transform ${isGamesOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                        </div>
                         {isGamesOpen && (
                             <div className="ml-4 flex flex-col gap-1">
                                 {GAMES.map(({ href, labelKey }) => (

@@ -1,6 +1,6 @@
-import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
 import KawaLogo from "@/components/kawa-logo";
+import FeatureCard from "@/components/feature-card";
 import {
     FileText,
     StickyNote,
@@ -24,12 +24,12 @@ interface Feature {
 const FEATURES: Feature[] = [
     { key: "blog", href: "/blogs", icon: FileText },
     { key: "notes", href: "/hackmd-notes", icon: StickyNote },
-    { key: "games", href: "/games/chess", icon: Gamepad2 },
+    { key: "games", href: "/games", icon: Gamepad2 },
     { key: "ledger", href: "/ledger", icon: Wallet },
     { key: "portfolio", href: "/portfolio", icon: TrendingUp },
     { key: "invoices", href: "/invoices", icon: ReceiptText },
     { key: "lotto", href: "/lotto", icon: Ticket },
-    { key: "tools", href: "/tools/countdown", icon: Wrench },
+    { key: "tools", href: "/tools", icon: Wrench },
     { key: "about", href: "/about", icon: Info },
 ];
 
@@ -57,24 +57,14 @@ export default async function ProjectIntro() {
 
                 {/* 功能卡片 */}
                 <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {FEATURES.map(({ key, href, icon: Icon }) => (
-                        <Link
+                    {FEATURES.map(({ key, href, icon }) => (
+                        <FeatureCard
                             key={key}
                             href={href}
-                            className="group flex flex-col bg-white dark:bg-neutral-800 shadow-md rounded-xl p-5 hover:shadow-lg transition-shadow duration-300"
-                        >
-                            <div className="flex items-center gap-3 mb-2">
-                                <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300">
-                                    <Icon size={20} />
-                                </span>
-                                <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100 group-hover:text-primary-600 dark:group-hover:text-primary-300 transition-colors">
-                                    {t(`features.${key}.title`)}
-                                </h2>
-                            </div>
-                            <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                                {t(`features.${key}.desc`)}
-                            </p>
-                        </Link>
+                            icon={icon}
+                            title={t(`features.${key}.title`)}
+                            desc={t(`features.${key}.desc`)}
+                        />
                     ))}
                 </section>
             </div>

@@ -784,5 +784,35 @@
         "desc": "Learn about this project's architecture and tech choices."
       }
     }
+  },
+  "ToolsHub": {
+    "metaTitle": "Tools — Kawa's Homes",
+    "metaDescription": "Handy online tools: countdown timer, alarm, hourly chime, roster scheduling, password generator, and Chinese text conversion.",
+    "title": "Tools",
+    "intro": "Handy online tools, ready to use — no login required.",
+    "items": {
+      "newPassword": "Generate random passwords in batches, with adjustable count and length.",
+      "convertText": "Convert text between Simplified and Traditional Chinese.",
+      "countdown": "Count down a custom duration with a sound alert at the end.",
+      "roster": "Enter staff and days to auto-generate a fair shift roster.",
+      "alarm": "Set alarms that ring at a specific time.",
+      "hourlyChime": "Play a chime at the top of every hour."
+    }
+  },
+  "GamesHub": {
+    "metaTitle": "Games — Kawa's Homes",
+    "metaDescription": "Real-time multiplayer online games: Xiangqi, Chess, Gomoku, Go, Banqi, Avalon, farm management, and more.",
+    "title": "Games",
+    "intro": "Real-time multiplayer battles — create a room for friends or match in the lobby.",
+    "items": {
+      "chess": "Classic Chinese chess (Xiangqi) with real-time play, clocks, and spectating.",
+      "westernChess": "Play chess online against others.",
+      "gomoku": "Fast-paced five-in-a-row duels.",
+      "go": "The classic game of Go — surround territory and capture stones.",
+      "banqi": "Half-board Xiangqi variant with hidden, flip-to-reveal pieces.",
+      "avalon": "Social deduction for 5–10 players — good versus evil mind games.",
+      "farm": "Worker-placement farm management for 2–4 players.",
+      "metalSlug": "A 2D side-scrolling action game built with Bevy (prototype)."
+    }
   }
 }
