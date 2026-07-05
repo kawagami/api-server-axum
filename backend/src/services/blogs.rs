@@ -2,6 +2,7 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::{blogs as blogs_repo, images as images_repo},
     structs::blogs::{BlogsResponse, DbBlog, PutBlog},
+    structs::pagination::PageQuery,
 };
 use regex::Regex;
 use sqlx::{Pool, Postgres};
@@ -25,13 +26,11 @@ fn extract_upload_urls(markdown: &str) -> Vec<String> {
 
 pub async fn get_blogs(
     pool: &Pool<Postgres>,
-    page: usize,
-    per_page: usize,
+    page: &PageQuery,
     tag: Option<String>,
 ) -> Result<BlogsResponse, AppError> {
-    let per_page = per_page.clamp(1, crate::structs::pagination::MAX_PER_PAGE as usize);
-    let page = page.max(1);
-    let offset = (page - 1) * per_page;
+    let (per_page, offset) = page.to_limit_offset(10);
+    let (page, per_page, offset) = (page.page.unwrap_or(1).max(1) as usize, per_page as usize, offset as usize);
     let tag_ref = tag.as_deref();
     let (total, data) = tokio::try_join!(
         blogs_repo::count_blogs(pool, tag_ref),

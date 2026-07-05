@@ -10,22 +10,10 @@ pub struct PutBlog {
     pub tags: Vec<String>,
 }
 
+/// blogs 列表的標籤過濾（分頁走共用 `PageQuery`）。
 #[derive(Deserialize)]
-pub struct Pagination {
-    #[serde(default = "default_page")]
-    pub page: usize,
-    #[serde(default = "default_per_page")]
-    pub per_page: usize,
+pub struct TagFilter {
     pub tag: Option<String>,
-}
-
-// 預設值函式
-fn default_page() -> usize {
-    1
-}
-
-fn default_per_page() -> usize {
-    10
 }
 
 impl PutBlog {

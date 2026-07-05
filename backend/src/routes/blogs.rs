@@ -9,7 +9,8 @@ use crate::{
     errors::AppError,
     services::blogs as blogs_service,
     state::AppState,
-    structs::blogs::{BlogsResponse, DbBlog, Pagination},
+    structs::blogs::{BlogsResponse, DbBlog, TagFilter},
+    structs::pagination::PageQuery,
 };
 
 pub fn new() -> Router<AppState> {
@@ -20,10 +21,11 @@ pub fn new() -> Router<AppState> {
 }
 
 async fn get_blogs(
-    Query(query): Query<Pagination>,
+    Query(page): Query<PageQuery>,
+    Query(filter): Query<TagFilter>,
     State(state): State<AppState>,
 ) -> Result<Json<BlogsResponse>, AppError> {
-    let blogs = blogs_service::get_blogs(state.get_pool(), query.page, query.per_page, query.tag).await?;
+    let blogs = blogs_service::get_blogs(state.get_pool(), &page, filter.tag).await?;
     Ok(Json(blogs))
 }
 
