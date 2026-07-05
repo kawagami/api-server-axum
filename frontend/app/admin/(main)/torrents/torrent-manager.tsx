@@ -1,23 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Copy, Download, Loader2, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Download, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { AdminHeadRow, AdminRow, AdminTable, AdminTd, AdminTh } from "@/components/admin/table";
-import { useWsSubscribe } from "@/hooks/useWsSubscribe";
-import {
-    createTorrentDownloadLinks,
-    deleteTorrent,
-    getTorrent,
-    getTorrents,
-    getTorrentStorage,
-    postTorrent,
-    retryTorrent,
-} from "@/api/torrents";
+import { createTorrentDownloadLinks, deleteTorrent, retryTorrent } from "@/api/torrents";
 import StorageBars from "./storage-bars";
+import AddTorrentForm from "./add-torrent-form";
+import FileDownloadModal, { displayName } from "./file-download-modal";
+import { useTorrentLive } from "./useTorrentLive";
 import { TORRENT_STATUS_BADGE } from "@/libs/badge-styles";
 import { formatBytes } from "@/libs/format-bytes";
-import type { Torrent, TorrentProgressEvent, TorrentStorage } from "@/types";
+import type { Torrent, TorrentStorage } from "@/types";
 
 interface Props {
     initialTorrents: Torrent[];
@@ -36,118 +30,23 @@ function buildHref(status: string, page: number) {
     return `/admin/torrents${qs ? `?${qs}` : ""}`;
 }
 
-function displayName(t: Torrent) {
-    if (t.name) return t.name;
-    const uri = t.magnet_uri;
-    return uri.length > 60 ? `${uri.slice(0, 60)}…` : uri;
-}
-
-function addErrorMessage(status?: number, message?: string) {
-    switch (status) {
-        case 409: return "相同 torrent 已存在";
-        case 422: return "magnet 格式錯誤（缺少 btih）";
-        case 507: return "伺服器 torrent 容量已滿，請先刪除舊任務";
-        default: return message ?? "新增失敗";
-    }
-}
-
 const pageBtnClass = "flex items-center gap-1 px-3 py-1.5 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors";
 const pageBtnDisabledClass = "flex items-center gap-1 px-3 py-1.5 rounded border border-neutral-200 dark:border-neutral-700 text-neutral-300 dark:text-neutral-600 text-sm cursor-not-allowed";
 
 export default function TorrentManager({ initialTorrents, initialTotal, initialStorage, status, page, perPage }: Props) {
-    const [torrents, setTorrents] = useState<Torrent[]>(initialTorrents);
-    const [total, setTotal] = useState(initialTotal);
-    const [storage, setStorage] = useState<TorrentStorage | null>(initialStorage);
-    const [liveMap, setLiveMap] = useState<Record<number, TorrentProgressEvent>>({});
-
-    const [magnet, setMagnet] = useState("");
-    const [adding, setAdding] = useState(false);
-    const [formError, setFormError] = useState<string | null>(null);
+    const { torrents, total, storage, liveMap, refresh } = useTorrentLive({
+        initialTorrents,
+        initialTotal,
+        initialStorage,
+        status,
+        page,
+        perPage,
+    });
 
     const [busyId, setBusyId] = useState<number | null>(null);
     const [modalTorrent, setModalTorrent] = useState<Torrent | null>(null);
     const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
-
-    // WS「進度有變動才推」，卡住的任務不會再推 — 掛載/刷新後打詳情端點把 live 進度補回來
-    const seedLive = useCallback(async (list: Torrent[]) => {
-        const ids = list.filter((t) => t.status === "downloading").map((t) => t.id);
-        if (ids.length === 0) return;
-        const details = await Promise.all(ids.map((id) => getTorrent(id).catch(() => null)));
-        setLiveMap((prev) => {
-            const next = { ...prev };
-            for (const d of details) {
-                if (d?.live) next[d.id] = { id: d.id, name: d.name ?? "", ...d.live };
-            }
-            return next;
-        });
-    }, []);
-
-    useEffect(() => {
-        // setState 發生在 fetch await 之後，非同步、不會 cascading render
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        seedLive(initialTorrents);
-    }, [seedLive, initialTorrents]);
-
-    const refresh = useCallback(async () => {
-        try {
-            const [{ data, total }, storageRes] = await Promise.all([
-                getTorrents(status || null, page, perPage),
-                getTorrentStorage().catch(() => null),
-            ]);
-            setTorrents(data);
-            setTotal(total);
-            if (storageRes) setStorage(storageRes);
-            seedLive(data);
-        } catch {
-            // 列表刷新失敗就維持現狀，下次事件再試
-        }
-    }, [status, page, perPage, seedLive]);
-
-    useWsSubscribe("torrent_progress", (data) => {
-        const ev = data as TorrentProgressEvent;
-        setLiveMap((prev) => ({ ...prev, [ev.id]: ev }));
-        // pending → downloading 的轉換靠進度推播得知，順手更新 status
-        setTorrents((prev) =>
-            prev.map((t) => (t.id === ev.id && t.status === "pending" ? { ...t, status: "downloading" } : t)),
-        );
-    });
-
-    useWsSubscribe("torrent_completed", (data) => {
-        const ev = data as { id: number };
-        setLiveMap((prev) => {
-            const next = { ...prev };
-            delete next[ev.id];
-            return next;
-        });
-        refresh();
-    });
-
-    useWsSubscribe("torrent_failed", (data) => {
-        const ev = data as { id: number };
-        setLiveMap((prev) => {
-            const next = { ...prev };
-            delete next[ev.id];
-            return next;
-        });
-        refresh();
-    });
-
-    const handleAdd = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const uri = magnet.trim();
-        if (!uri || adding) return;
-        setAdding(true);
-        setFormError(null);
-        const result = await postTorrent(uri);
-        setAdding(false);
-        if (result.ok) {
-            setMagnet("");
-            refresh();
-        } else {
-            setFormError(addErrorMessage(result.status, result.message));
-        }
-    };
 
     // 點擊當下才產生連結（效期以回應的 expires_at 為準，後端 torrent_link_ttl_minutes 可調）
     const fetchLink = async (torrentId: number, fileIndex: number): Promise<string | null> => {
@@ -219,26 +118,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
     return (
         <div className="flex flex-col gap-4">
             <StorageBars storage={storage} />
-            <form onSubmit={handleAdd} className="flex flex-col gap-1">
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={magnet}
-                        onChange={(e) => setMagnet(e.target.value)}
-                        placeholder="magnet:?xt=urn:btih:..."
-                        className="flex-1 px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                    <button
-                        type="submit"
-                        disabled={adding || !magnet.trim()}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                        新增
-                    </button>
-                </div>
-                {formError && <p className="text-sm text-red-500">{formError}</p>}
-            </form>
+            <AddTorrentForm onAdded={refresh} />
 
             <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-x-auto">
                 <AdminTable>
@@ -390,66 +270,14 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
             </div>
 
             {modalTorrent && (
-                <div
-                    className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-                    onClick={() => setModalTorrent(null)}
-                >
-                    <div
-                        className="w-full max-w-lg max-h-[80svh] overflow-auto bg-white dark:bg-neutral-900 rounded-lg shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
-                            <span className="font-semibold text-neutral-800 dark:text-white truncate" title={modalTorrent.name ?? undefined}>
-                                {displayName(modalTorrent)}
-                            </span>
-                            <button
-                                onClick={() => setModalTorrent(null)}
-                                className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                                aria-label="關閉"
-                            >
-                                <X className="w-5 h-5 text-neutral-500" />
-                            </button>
-                        </div>
-                        <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                            {(modalTorrent.files ?? []).map((f) => {
-                                const key = `${modalTorrent.id}:${f.index}`;
-                                return (
-                                    <li key={f.index} className="flex items-center gap-3 px-4 py-2.5">
-                                        <div className="flex-1 min-w-0">
-                                            <span className="block text-sm text-neutral-800 dark:text-neutral-200 truncate" title={f.path}>
-                                                {f.path}
-                                            </span>
-                                            <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                                                {formatBytes(f.size)}
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={() => downloadFile(modalTorrent.id, f.index)}
-                                            disabled={downloadingKey !== null}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm transition-colors disabled:opacity-60"
-                                        >
-                                            {downloadingKey === key
-                                                ? <Loader2 className="w-4 h-4 animate-spin" />
-                                                : <Download className="w-4 h-4" />}
-                                            下載
-                                        </button>
-                                        <button
-                                            onClick={() => copyLink(modalTorrent.id, f.index)}
-                                            disabled={downloadingKey !== null}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-sm transition-colors disabled:opacity-60"
-                                            title="複製下載連結"
-                                        >
-                                            {copiedKey === key
-                                                ? <Check className="w-4 h-4 text-green-500" />
-                                                : <Copy className="w-4 h-4" />}
-                                            複製
-                                        </button>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </div>
-                </div>
+                <FileDownloadModal
+                    torrent={modalTorrent}
+                    downloadingKey={downloadingKey}
+                    copiedKey={copiedKey}
+                    onClose={() => setModalTorrent(null)}
+                    onDownload={downloadFile}
+                    onCopy={copyLink}
+                />
             )}
         </div>
     );
