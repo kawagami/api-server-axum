@@ -151,7 +151,11 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                     <LocaleSwitcher />
                     <ThemeButton initialMode={colorMode} defaultIsDark={defaultIsDark} />
                     {member ? (
-                        <div className="relative">
+                        <div
+                            className="relative"
+                            onMouseEnter={() => setIsMemberOpen(true)}
+                            onMouseLeave={() => setIsMemberOpen(false)}
+                        >
                             <button
                                 className="flex items-center gap-1 px-4 rounded hover:text-primary-600 dark:hover:text-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-400"
                                 aria-label={t('openMemberMenu')}
