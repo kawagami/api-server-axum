@@ -41,7 +41,7 @@ async fn create_user(
     Json(user): Json<NewUser>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::UserCreate)?;
-    users_service::create_user(state.get_pool(), user).await?;
+    users_service::create_user(state.get_pool(), &state.get_settings(), user).await?;
     Ok(StatusCode::CREATED)
 }
 

@@ -51,6 +51,17 @@ pub async fn get_role_id_by_name(pool: &Pool<Postgres>, name: &str) -> Result<i3
     Ok(id)
 }
 
+/// 依角色名稱批次查 id，不存在的名稱直接略過（供建立管理員的預設角色 fallback 用）
+pub async fn get_role_ids_by_names(
+    pool: &Pool<Postgres>,
+    names: &[String],
+) -> Result<Vec<i32>, AppError> {
+    Ok(sqlx::query_scalar("SELECT id FROM roles WHERE name = ANY($1)")
+        .bind(names)
+        .fetch_all(pool)
+        .await?)
+}
+
 pub async fn get_user_permission_strings_by_email(
     pool: &Pool<Postgres>,
     email: &str,

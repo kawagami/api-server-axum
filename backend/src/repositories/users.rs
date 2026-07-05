@@ -22,7 +22,7 @@ pub async fn check_email_exists(pool: &Pool<Postgres>, email: &str) -> Result<Db
 pub async fn create_user(
     pool: &Pool<Postgres>,
     new_user: NewUser,
-    default_role_id: i32,
+    role_ids: &[i32],
 ) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
 
@@ -35,11 +35,17 @@ pub async fn create_user(
     .fetch_one(&mut *tx)
     .await?;
 
-    sqlx::query("INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)")
+    if !role_ids.is_empty() {
+        sqlx::query(
+            "INSERT INTO user_roles (user_id, role_id)
+             SELECT $1, unnest($2::int[])
+             ON CONFLICT DO NOTHING",
+        )
         .bind(user_id)
-        .bind(default_role_id)
+        .bind(role_ids)
         .execute(&mut *tx)
         .await?;
+    }
 
     tx.commit().await?;
     Ok(())
