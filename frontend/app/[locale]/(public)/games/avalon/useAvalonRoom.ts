@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useWsContext, type WsMessage } from '@/libs/ws-context';
+import { useCallback, useRef, useState } from 'react';
+import { useWsContext } from '@/libs/ws-context';
+import { useRoomBase } from '../_shared/useRoomBase';
 import {
     GAME,
     type RoomSummary, type RoomListData, type RoomUpdateData, type RoomClosedData,
     type RoleAssignedData, type PhaseChangedData, type TeamProposedData, type VoteResultData,
     type QuestResultData, type GameOverData, type ChatData, type ChatEntry,
-    type ErrorData, type RoomOptions,
+    type RoomOptions,
 } from './avalon-types';
 
 export type UiPhase = 'connecting' | 'lobby' | 'room' | 'playing';
@@ -49,7 +50,7 @@ export interface UseAvalonRoom {
 }
 
 export function useAvalonRoom(): UseAvalonRoom {
-    const { subscribe, unsubscribe, send, onReconnect } = useWsContext();
+    const { send } = useWsContext();
 
     const [uiPhase, setUiPhase] = useState<UiPhase>('connecting');
     const [rooms, setRooms] = useState<RoomSummary[]>([]);
@@ -61,15 +62,21 @@ export function useAvalonRoom(): UseAvalonRoom {
     const [questResult, setQuestResult] = useState<QuestResultData | null>(null);
     const [gameOver, setGameOver] = useState<GameOverData | null>(null);
     const [chat, setChat] = useState<ChatEntry[]>([]);
-    const [notice, setNotice] = useState<string | null>(null);
     const [voted, setVoted] = useState(false);
     const [cardPlayed, setCardPlayed] = useState(false);
     const [iAmHost, setIAmHost] = useState(false);
 
     const chatSeq = useRef(0);
 
-    useEffect(() => {
-        const handlers: Record<string, (data: unknown) => void> = {
+    // 房內狀態全清（room_closed / 重連 / 回大廳共用）
+    const resetRoom = useCallback(() => {
+        setRoom(null); setRole(null); setGamePhase(null); setGameOver(null); setIAmHost(false);
+    }, []);
+
+    const { notice, setNotice } = useRoomBase({
+        game: GAME,
+        knownErrors: KNOWN_ERR,
+        handlers: {
             room_list: d => {
                 setRooms((d as RoomListData).rooms);
                 setUiPhase(p => (p === 'connecting' ? 'lobby' : p));
@@ -82,7 +89,7 @@ export function useAvalonRoom(): UseAvalonRoom {
             },
             room_closed: d => {
                 setNotice(`closed_${(d as RoomClosedData).reason}`);
-                setRoom(null); setRole(null); setGamePhase(null); setGameOver(null); setIAmHost(false);
+                resetRoom();
                 send('join_lobby', undefined, GAME);
                 setUiPhase('connecting');
             },
@@ -107,41 +114,14 @@ export function useAvalonRoom(): UseAvalonRoom {
                 const c = d as ChatData;
                 setChat(prev => [...prev, { ...c, id: ++chatSeq.current }].slice(-200));
             },
-            error: d => {
-                const r = (d as ErrorData).reason;
-                setNotice(KNOWN_ERR.has(r) ? `err_${r}` : 'err_generic');
-            },
-        };
-        const entries = Object.entries(handlers).map(([type, fn]) => {
-            const guarded = (data: unknown, msg: WsMessage) => { if (msg.game === GAME) fn(data); };
-            return [type, guarded] as const;
-        });
-        entries.forEach(([type, fn]) => subscribe(type, fn));
-        return () => entries.forEach(([type, fn]) => unsubscribe(type, fn));
-    }, [subscribe, unsubscribe, send]);
-
-    // 進頁進大廳（一次）
-    const startedRef = useRef(false);
-    useEffect(() => {
-        if (startedRef.current) return;
-        startedRef.current = true;
-        send('join_lobby', undefined, GAME);
-    }, [send]);
-
-    // 切離頁面：在房內 / 對局中要主動退出（共用 socket 不會因切頁斷線）
-    const inRoomRef = useRef(false);
-    useEffect(() => { inRoomRef.current = uiPhase === 'room' || uiPhase === 'playing'; }, [uiPhase]);
-    useEffect(() => () => {
-        if (inRoomRef.current) send('leave_room', undefined, GAME);
-    }, [send]);
-
-    // 重連後 server 已遺失大廳訂閱與房間/對局狀態：重送 join_lobby 取回大廳。
-    // 房間/對局在 server 重啟後已不存在，故清掉房內狀態並回 connecting，等 room_list 重建畫面。
-    useEffect(() => onReconnect(() => {
-        send('join_lobby', undefined, GAME);
-        setRoom(null); setRole(null); setGamePhase(null); setGameOver(null); setIAmHost(false);
-        setUiPhase('connecting');
-    }), [onReconnect, send]);
+        },
+        // 房間/對局在 server 重啟後已不存在，故清掉房內狀態並回 connecting，等 room_list 重建畫面
+        onReconnectReset: () => { resetRoom(); setUiPhase('connecting'); },
+        // 切離頁面：在房內 / 對局中要主動退出
+        leaveOnUnmount: () => {
+            if (uiPhase === 'room' || uiPhase === 'playing') send('leave_room', undefined, GAME);
+        },
+    });
 
     const actions = {
         createRoom: useCallback((roomName: string, nickname: string, options: RoomOptions) => {
@@ -152,12 +132,12 @@ export function useAvalonRoom(): UseAvalonRoom {
             if (options.mordred || options.oberon) data.options = options;
             setIAmHost(true);
             send('create_room', data, GAME);
-        }, [send]),
+        }, [send, setNotice]),
         joinRoom: useCallback((roomId: number, nickname: string) => {
             setNotice(null);
             setIAmHost(false);
             send('join_room', nickname ? { room_id: roomId, nickname } : { room_id: roomId }, GAME);
-        }, [send]),
+        }, [send, setNotice]),
         leaveRoom: useCallback(() => { send('leave_room', undefined, GAME); }, [send]),
         startGame: useCallback(() => send('start_game', undefined, GAME), [send]),
         sendChat: useCallback((text: string) => send('chat', { text }, GAME), [send]),
@@ -166,11 +146,12 @@ export function useAvalonRoom(): UseAvalonRoom {
         questCard: useCallback((success: boolean) => { setCardPlayed(true); send('quest_card', { success }, GAME); }, [send]),
         assassinate: useCallback((target: number) => send('assassinate', { target }, GAME), [send]),
         backToLobby: useCallback(() => {
-            setNotice(null); setRoom(null); setRole(null); setGamePhase(null); setGameOver(null); setIAmHost(false);
+            setNotice(null);
+            resetRoom();
             send('leave_room', undefined, GAME);
             send('join_lobby', undefined, GAME);
             setUiPhase('connecting');
-        }, [send]),
+        }, [send, setNotice, resetRoom]),
     };
 
     return {

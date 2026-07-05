@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useWsContext, type WsMessage } from '@/libs/ws-context';
+import { useCallback, useState } from 'react';
+import { useWsContext } from '@/libs/ws-context';
+import { useRoomBase } from '../_shared/useRoomBase';
 import {
     GAME, type RoomSummary, type RoomListData, type RoomUpdateData, type RoomClosedData,
-    type FarmState, type GameOverData, type ErrorData,
+    type FarmState, type GameOverData,
 } from './farm-types';
 
 export type UiPhase = 'connecting' | 'lobby' | 'room' | 'playing';
@@ -25,7 +26,7 @@ export interface UseFarmRoom {
     gameOver: GameOverData | null;
     notice: string | null;
     iAmHost: boolean;
-    mySeat: number | null;  // 後端未給 your_seat，前端啟發推定（建房者0 / 暱稱比對 / 最新 seat）
+    mySeat: number | null;  // 後端逐人注入 your_seat（state 優先，房內用 room_update）
     actions: {
         createRoom: (roomName: string, nickname: string) => void;
         joinRoom: (roomId: number, nickname: string) => void;
@@ -36,17 +37,23 @@ export interface UseFarmRoom {
 }
 
 export function useFarmRoom(): UseFarmRoom {
-    const { subscribe, unsubscribe, send, onReconnect } = useWsContext();
+    const { send } = useWsContext();
 
     const [uiPhase, setUiPhase] = useState<UiPhase>('connecting');
     const [rooms, setRooms] = useState<RoomSummary[]>([]);
     const [room, setRoom] = useState<RoomUpdateData | null>(null);
     const [state, setState] = useState<FarmState | null>(null);
     const [gameOver, setGameOver] = useState<GameOverData | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
 
-    useEffect(() => {
-        const handlers: Record<string, (data: unknown) => void> = {
+    // 房內狀態全清（room_closed / 重連 / 回大廳共用）
+    const resetRoom = useCallback(() => {
+        setRoom(null); setState(null); setGameOver(null);
+    }, []);
+
+    const { notice, setNotice } = useRoomBase({
+        game: GAME,
+        knownErrors: KNOWN_ERR,
+        handlers: {
             room_list: d => {
                 setRooms((d as RoomListData).rooms);
                 setUiPhase(p => (p === 'connecting' ? 'lobby' : p));
@@ -59,7 +66,7 @@ export function useFarmRoom(): UseFarmRoom {
             },
             room_closed: d => {
                 setNotice(`closed_${(d as RoomClosedData).reason}`);
-                setRoom(null); setState(null); setGameOver(null);
+                resetRoom();
                 send('join_lobby', undefined, GAME);
                 setUiPhase('connecting');
             },
@@ -69,37 +76,14 @@ export function useFarmRoom(): UseFarmRoom {
                 setUiPhase('playing');
             },
             game_over: d => setGameOver(d as GameOverData),
-            error: d => {
-                const r = (d as ErrorData).reason;
-                setNotice(KNOWN_ERR.has(r) ? `err_${r}` : 'err_generic');
-            },
-        };
-        const entries = Object.entries(handlers).map(([type, fn]) => {
-            const guarded = (data: unknown, msg: WsMessage) => { if (msg.game === GAME) fn(data); };
-            return [type, guarded] as const;
-        });
-        entries.forEach(([type, fn]) => subscribe(type, fn));
-        return () => entries.forEach(([type, fn]) => unsubscribe(type, fn));
-    }, [subscribe, unsubscribe, send]);
-
-    const startedRef = useRef(false);
-    useEffect(() => {
-        if (startedRef.current) return;
-        startedRef.current = true;
-        send('join_lobby', undefined, GAME);
-    }, [send]);
-
-    const inRoomRef = useRef(false);
-    useEffect(() => { inRoomRef.current = uiPhase === 'room' || uiPhase === 'playing'; }, [uiPhase]);
-    useEffect(() => () => { if (inRoomRef.current) send('leave_room', undefined, GAME); }, [send]);
-
-    // 重連後 server 已遺失大廳訂閱與房間/對局狀態：重送 join_lobby 取回大廳。
-    // 房間/對局在 server 重啟後已不存在，故清掉房內狀態並回 connecting，等 room_list 重建畫面。
-    useEffect(() => onReconnect(() => {
-        send('join_lobby', undefined, GAME);
-        setRoom(null); setState(null); setGameOver(null);
-        setUiPhase('connecting');
-    }), [onReconnect, send]);
+        },
+        // 房間/對局在 server 重啟後已不存在，故清掉房內狀態並回 connecting，等 room_list 重建畫面
+        onReconnectReset: () => { resetRoom(); setUiPhase('connecting'); },
+        // 切離頁面：在房內 / 對局中要主動退出
+        leaveOnUnmount: () => {
+            if (uiPhase === 'room' || uiPhase === 'playing') send('leave_room', undefined, GAME);
+        },
+    });
 
     const actions = {
         createRoom: useCallback((roomName: string, nickname: string) => {
@@ -108,22 +92,23 @@ export function useFarmRoom(): UseFarmRoom {
             if (roomName) data.room_name = roomName;
             if (nickname) data.nickname = nickname;
             send('create_room', data, GAME);
-        }, [send]),
+        }, [send, setNotice]),
         joinRoom: useCallback((roomId: number, nickname: string) => {
             setNotice(null);
             send('join_room', nickname ? { room_id: roomId, nickname } : { room_id: roomId }, GAME);
-        }, [send]),
+        }, [send, setNotice]),
         startGame: useCallback(() => send('start_game', undefined, GAME), [send]),
         sendAction: useCallback((action: string, input?: Record<string, unknown>) => {
             setNotice(null);
             send('action', input ? { action, input } : { action }, GAME);
-        }, [send]),
+        }, [send, setNotice]),
         backToLobby: useCallback(() => {
-            setNotice(null); setRoom(null); setState(null); setGameOver(null);
+            setNotice(null);
+            resetRoom();
             send('leave_room', undefined, GAME);
             send('join_lobby', undefined, GAME);
             setUiPhase('connecting');
-        }, [send]),
+        }, [send, setNotice, resetRoom]),
     };
 
     // your_seat 由後端逐人注入（state 優先，房內用 room_update）

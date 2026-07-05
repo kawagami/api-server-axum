@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useWsContext, type WsMessage } from '@/libs/ws-context';
+import { useCallback, useState } from 'react';
+import { useWsContext } from '@/libs/ws-context';
+import { useRoomBase } from './useRoomBase';
 import { sound } from './sound';
 import type {
     GameId, WireTable, TableListData, TableCreatedData, QueuedData,
-    MatchFoundData, MoveMadeBase, GameOverData, ErrorData,
+    MatchFoundData, MoveMadeBase, GameOverData,
 } from './wire';
 
 export type RoomPhase = 'connecting' | 'lobby' | 'queued' | 'hosting' | 'playing' | 'over';
@@ -48,13 +49,12 @@ export interface UseGameRoom {
 
 // game：遊戲 id；sides：[先手, 後手] 標籤（決定初始 turn 與 clock 鍵）
 export function useGameRoom(game: GameId, sides: readonly [string, string], cb: GameRoomCallbacks): UseGameRoom {
-    const { subscribe, unsubscribe, send, onReconnect } = useWsContext();
+    const { send } = useWsContext();
 
     const [phase, setPhase] = useState<RoomPhase>('connecting');
     const [tables, setTables] = useState<WireTable[]>([]);
     const [queuePos, setQueuePos] = useState(0);
     const [hostedTableId, setHostedTableId] = useState<number | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
     const [myColor, setMyColor] = useState<string>(sides[0]);
     const [turn, setTurn] = useState<string>(sides[0]);
     const [clock, setClock] = useState<Record<string, number>>({ [sides[0]]: 300000, [sides[1]]: 300000 });
@@ -62,12 +62,11 @@ export function useGameRoom(game: GameId, sides: readonly [string, string], cb: 
     const [pending, setPending] = useState(false);
     const [shake, setShake] = useState(false);
 
-    // callbacks 最新值（避免反覆 sub/unsub）
-    const cbRef = useRef(cb);
-    useEffect(() => { cbRef.current = cb; });
-
-    useEffect(() => {
-        const handlers: Record<string, (data: unknown) => void> = {
+    const { notice, setNotice } = useRoomBase({
+        game,
+        knownErrors: KNOWN_ERR,
+        genericErrorKey: 'errGeneric',
+        handlers: {
             table_list: d => {
                 setTables((d as TableListData).tables);
                 setPhase(p => (p === 'connecting' ? 'lobby' : p));
@@ -92,7 +91,7 @@ export function useGameRoom(game: GameId, sides: readonly [string, string], cb: 
                 setPending(false);
                 setHostedTableId(null);
                 setNotice(null);
-                cbRef.current.onMatchFound(color);
+                cb.onMatchFound(color);
                 setPhase('playing');
             },
             move_made: d => {
@@ -100,11 +99,11 @@ export function useGameRoom(game: GameId, sides: readonly [string, string], cb: 
                 setTurn(m.turn);
                 setClock(m.clock);
                 setPending(false);
-                cbRef.current.onMoveMade(d);
+                cb.onMoveMade(d);
             },
             check: d => {
                 sound.check();
-                cbRef.current.onCheck?.(d);
+                cb.onCheck?.(d);
             },
             game_over: d => {
                 setResult(d as GameOverData);
@@ -117,54 +116,26 @@ export function useGameRoom(game: GameId, sides: readonly [string, string], cb: 
                 setPending(false);
                 setTimeout(() => setShake(false), 400);
             },
-            error: d => {
-                const r = (d as ErrorData).reason;
-                setNotice(KNOWN_ERR.has(r) ? `err_${r}` : 'errGeneric');
-            },
-        };
-        // game 分流：只處理本遊戲訊息
-        const entries = Object.entries(handlers).map(([type, fn]) => {
-            const guarded = (data: unknown, msg: WsMessage) => { if (msg.game === game) fn(data); };
-            return [type, guarded] as const;
-        });
-        entries.forEach(([type, fn]) => subscribe(type, fn));
-        return () => entries.forEach(([type, fn]) => unsubscribe(type, fn));
-    }, [subscribe, unsubscribe, game, sides]);
-
-    // 進頁進大廳（一次）
-    const startedRef = useRef(false);
-    useEffect(() => {
-        if (startedRef.current) return;
-        startedRef.current = true;
-        send('join_lobby', undefined, game);
-    }, [send, game]);
-
-    // 切離頁面主動退出（共用 socket 不會因切頁斷線）：依當下 phase 送對應指令
-    const phaseRef = useRef(phase);
-    useEffect(() => { phaseRef.current = phase; }, [phase]);
-    useEffect(() => () => {
-        const p = phaseRef.current;
-        if (p === 'queued') send('leave_queue', undefined, game);
-        else if (p === 'hosting') send('leave_table', undefined, game);
-        else if (p === 'playing') send('resign', undefined, game);
-    }, [send, game]);
-
-    // 重連後 server 已遺失大廳訂閱與對局狀態：重送 join_lobby 取回大廳。
-    // 佇列/桌位/對局在 server 重啟後已不存在，故非大廳一律回 connecting，等 table_list 重建畫面。
-    useEffect(() => onReconnect(() => {
-        send('join_lobby', undefined, game);
-        setPhase(p => (p === 'lobby' ? p : 'connecting'));
-    }), [onReconnect, send, game]);
+        },
+        // 佇列/桌位/對局在 server 重啟後已不存在，故非大廳一律回 connecting，等 table_list 重建畫面
+        onReconnectReset: () => setPhase(p => (p === 'lobby' ? p : 'connecting')),
+        // 切離頁面依當下 phase 送對應退出指令
+        leaveOnUnmount: () => {
+            if (phase === 'queued') send('leave_queue', undefined, game);
+            else if (phase === 'hosting') send('leave_table', undefined, game);
+            else if (phase === 'playing') send('resign', undefined, game);
+        },
+    });
 
     const actions = {
-        quickMatch: useCallback(() => { setNotice(null); send('join_queue', undefined, game); }, [send, game]),
-        createTable: useCallback((name: string) => { setNotice(null); send('create_table', name ? { name } : {}, game); }, [send, game]),
-        joinTable: useCallback((id: number) => { setNotice(null); send('join_table', { table_id: id }, game); }, [send, game]),
+        quickMatch: useCallback(() => { setNotice(null); send('join_queue', undefined, game); }, [send, game, setNotice]),
+        createTable: useCallback((name: string) => { setNotice(null); send('create_table', name ? { name } : {}, game); }, [send, game, setNotice]),
+        joinTable: useCallback((id: number) => { setNotice(null); send('join_table', { table_id: id }, game); }, [send, game, setNotice]),
         leaveQueue: useCallback(() => { send('leave_queue', undefined, game); setPhase('lobby'); }, [send, game]),
         cancelHost: useCallback(() => { send('leave_table', undefined, game); setHostedTableId(null); setPhase('lobby'); }, [send, game]),
         sendMove: useCallback((data: unknown) => { setPending(true); send('move', data, game); }, [send, game]),
         resign: useCallback(() => send('resign', undefined, game), [send, game]),
-        backToLobby: useCallback(() => { setNotice(null); setResult(null); send('join_lobby', undefined, game); setPhase('connecting'); }, [send, game]),
+        backToLobby: useCallback(() => { setNotice(null); setResult(null); send('join_lobby', undefined, game); setPhase('connecting'); }, [send, game, setNotice]),
     };
 
     return { phase, tables, queuePos, hostedTableId, notice, myColor, turn, clock, result, pending, shake, actions };
