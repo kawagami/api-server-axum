@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Trash2, Loader2, QrCode, ScanBarcode, Keyboard, Trophy, Plus, X } from "lucide-react";
 import { getInvoices, deleteInvoice } from "@/api/invoices";
+import usePagedList from "@/hooks/usePagedList";
 import type { Invoice, InvoiceSource, PrizeTier } from "@/types";
 
 const PER_PAGE = 50;
@@ -44,15 +45,19 @@ export default function InvoiceListClient({ initialEntries, lockWon = false }: P
     const locale = useLocale();
     const dateFmt = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Taipei' });
 
-    const [entries, setEntries] = useState<Invoice[]>(initialEntries);
+    const { items: entries, setItems: setEntries, hasMore, isPending, load, loadMore } = usePagedList<Invoice>(PER_PAGE, {
+        items: initialEntries,
+        fetcher: page => getInvoices({ won: lockWon ? true : undefined, page, per_page: PER_PAGE }),
+    });
     const [period, setPeriod] = useState('');
     const [won, setWon] = useState<WonFilter>('');
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(initialEntries.length >= PER_PAGE);
-    const [loading, setLoading] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
+    // isPending 不分 load / loadMore，記下最後動作以維持「重抓=整區 spinner、載入更多=按鈕 spinner」
+    const [action, setAction] = useState<'reload' | 'more'>('reload');
     const [mutating, setMutating] = useState(false);
     const firstRun = useRef(true);
+
+    const loading = isPending && action === 'reload';
+    const loadingMore = isPending && action === 'more';
 
     const wonParam = useCallback((): boolean | undefined => {
         if (lockWon) return true;
@@ -61,37 +66,19 @@ export default function InvoiceListClient({ initialEntries, lockWon = false }: P
         return undefined;
     }, [lockWon, won]);
 
-    const reload = useCallback(async () => {
-        const list = await getInvoices({ period: period || undefined, won: wonParam(), page: 1, per_page: PER_PAGE });
-        setEntries(list);
-        setPage(1);
-        setHasMore(list.length >= PER_PAGE);
-    }, [period, wonParam]);
-
+    // filter 變動 → 重抓清單（首次 render 由 server 端資料 seed，跳過）
     useEffect(() => {
         if (firstRun.current) {
             firstRun.current = false;
             return;
         }
-        let cancelled = false;
-        setLoading(true);
-        reload()
-            .catch(() => { /* memberRequest 處理 401 redirect */ })
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
-    }, [reload]);
+        setAction('reload');
+        load(page => getInvoices({ period: period || undefined, won: wonParam(), page, per_page: PER_PAGE }));
+    }, [period, wonParam, load]);
 
-    async function loadMore() {
-        setLoadingMore(true);
-        try {
-            const next = page + 1;
-            const more = await getInvoices({ period: period || undefined, won: wonParam(), page: next, per_page: PER_PAGE });
-            setEntries(prev => [...prev, ...more]);
-            setPage(next);
-            setHasMore(more.length >= PER_PAGE);
-        } finally {
-            setLoadingMore(false);
-        }
+    function handleLoadMore() {
+        setAction('more');
+        loadMore();
     }
 
     async function handleDelete(id: string) {
@@ -216,7 +203,7 @@ export default function InvoiceListClient({ initialEntries, lockWon = false }: P
 
                     {hasMore && (
                         <button
-                            onClick={loadMore}
+                            onClick={handleLoadMore}
                             disabled={loadingMore}
                             className="mt-2 self-center flex items-center gap-2 px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
                         >

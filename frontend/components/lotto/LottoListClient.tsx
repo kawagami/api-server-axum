@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Trash2, Loader2, QrCode, Keyboard, Trophy, Plus, X } from "lucide-react";
 import { getLottoTickets, deleteLottoTicket } from "@/api/lotto";
+import usePagedList from "@/hooks/usePagedList";
 import { GAME_KEY, PRIZE_KEY } from "@/libs/lotto";
 import Balls from "@/components/lotto/Balls";
 import type { LottoTicket, LottoSource, LottoGame, LottoStatus } from "@/types";
@@ -26,52 +27,38 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
     const locale = useLocale();
     const dateFmt = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Taipei' });
 
-    const [entries, setEntries] = useState<LottoTicket[]>(initialEntries);
+    const { items: entries, setItems: setEntries, hasMore, isPending, load, loadMore } = usePagedList<LottoTicket>(PER_PAGE, {
+        items: initialEntries,
+        fetcher: page => getLottoTickets({ status: lockWon ? 'won' : undefined, page, per_page: PER_PAGE }),
+    });
     const [game, setGame] = useState<'' | LottoGame>('');
     const [status, setStatus] = useState<'' | LottoStatus>('');
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(initialEntries.length >= PER_PAGE);
-    const [loading, setLoading] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
+    // isPending 不分 load / loadMore，記下最後動作以維持「重抓=整區 spinner、載入更多=按鈕 spinner」
+    const [action, setAction] = useState<'reload' | 'more'>('reload');
     const [mutating, setMutating] = useState(false);
     const firstRun = useRef(true);
+
+    const loading = isPending && action === 'reload';
+    const loadingMore = isPending && action === 'more';
 
     const statusParam = useCallback((): LottoStatus | undefined => {
         if (lockWon) return 'won';
         return status || undefined;
     }, [lockWon, status]);
 
-    const reload = useCallback(async () => {
-        const list = await getLottoTickets({ game: game || undefined, status: statusParam(), page: 1, per_page: PER_PAGE });
-        setEntries(list);
-        setPage(1);
-        setHasMore(list.length >= PER_PAGE);
-    }, [game, statusParam]);
-
+    // filter 變動 → 重抓清單（首次 render 由 server 端資料 seed，跳過）
     useEffect(() => {
         if (firstRun.current) {
             firstRun.current = false;
             return;
         }
-        let cancelled = false;
-        setLoading(true);
-        reload()
-            .catch(() => { /* memberRequest 處理 401 redirect */ })
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
-    }, [reload]);
+        setAction('reload');
+        load(page => getLottoTickets({ game: game || undefined, status: statusParam(), page, per_page: PER_PAGE }));
+    }, [game, statusParam, load]);
 
-    async function loadMore() {
-        setLoadingMore(true);
-        try {
-            const next = page + 1;
-            const more = await getLottoTickets({ game: game || undefined, status: statusParam(), page: next, per_page: PER_PAGE });
-            setEntries(prev => [...prev, ...more]);
-            setPage(next);
-            setHasMore(more.length >= PER_PAGE);
-        } finally {
-            setLoadingMore(false);
-        }
+    function handleLoadMore() {
+        setAction('more');
+        loadMore();
     }
 
     async function handleDelete(id: string) {
@@ -198,7 +185,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
 
                     {hasMore && (
                         <button
-                            onClick={loadMore}
+                            onClick={handleLoadMore}
                             disabled={loadingMore}
                             className="mt-2 self-center flex items-center gap-2 px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
                         >

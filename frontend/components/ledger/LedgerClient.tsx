@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2, Loader2, X, ScanLine, Receipt } from "lucide-react";
 import { getLedger, getLedgerSummary, postLedger, putLedger, deleteLedger } from "@/api/ledger";
+import usePagedList from "@/hooks/usePagedList";
 import LedgerForm from "@/components/ledger/LedgerForm";
 import InvoiceImportModal from "@/components/ledger/InvoiceImportModal";
 import { CategoryPie, MonthlyBars } from "@/components/ledger/ledger-charts";
@@ -50,32 +51,33 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
 
 export default function LedgerClient({ categories, initialEntries, initialSummary }: Props) {
     const t = useTranslations('Ledger');
-    const [entries, setEntries] = useState<LedgerEntry[]>(initialEntries);
+    const { items: entries, hasMore, isPending, load, loadMore } = usePagedList<LedgerEntry>(PER_PAGE, {
+        items: initialEntries,
+        fetcher: page => getLedger({ kind: '', category: '', from: '', to: '', page, per_page: PER_PAGE }),
+    });
     const [summary, setSummary] = useState<LedgerSummary>(initialSummary);
     const [filters, setFilters] = useState<Filters>({ kind: '', category: '', from: '', to: '' });
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(initialEntries.length >= PER_PAGE);
     const [mode, setMode] = useState<Mode>({ type: 'list' });
-    const [loading, setLoading] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
+    // isPending 不分 load / loadMore，記下最後動作以維持「重抓=整區 spinner、載入更多=按鈕 spinner」
+    const [action, setAction] = useState<'reload' | 'more'>('reload');
     const [mutating, setMutating] = useState(false);
     const firstRun = useRef(true);
+
+    const loading = isPending && action === 'reload';
+    const loadingMore = isPending && action === 'more';
 
     // value→label 查表（清單與圓餅圖共用）
     const labelOf = useCallback((kind: LedgerKind, value: string) => {
         return categories[kind]?.find(o => o.value === value)?.label ?? value;
     }, [categories]);
 
-    const reload = useCallback(async () => {
-        const [list, sum] = await Promise.all([
-            getLedger({ ...filters, page: 1, per_page: PER_PAGE }),
-            getLedgerSummary({ from: filters.from, to: filters.to }),
-        ]);
-        setEntries(list);
-        setSummary(sum);
-        setPage(1);
-        setHasMore(list.length >= PER_PAGE);
-    }, [filters]);
+    const reload = useCallback(() => {
+        setAction('reload');
+        load(page => getLedger({ ...filters, page, per_page: PER_PAGE }));
+        getLedgerSummary({ from: filters.from, to: filters.to })
+            .then(setSummary)
+            .catch(() => { /* memberRequest 處理 401 redirect */ });
+    }, [filters, load]);
 
     // filter 變動 → 重抓清單與統計（首次 render 由 server 端資料 seed，跳過）
     useEffect(() => {
@@ -83,47 +85,24 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
             firstRun.current = false;
             return;
         }
-        let cancelled = false;
-        setLoading(true);
-        reload()
-            .catch(() => { /* memberRequest 處理 401 redirect */ })
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
+        reload();
     }, [reload]);
 
-    async function loadMore() {
-        setLoadingMore(true);
-        try {
-            const next = page + 1;
-            const more = await getLedger({ ...filters, page: next, per_page: PER_PAGE });
-            setEntries(prev => [...prev, ...more]);
-            setPage(next);
-            setHasMore(more.length >= PER_PAGE);
-        } finally {
-            setLoadingMore(false);
-        }
+    function handleLoadMore() {
+        setAction('more');
+        loadMore();
     }
 
     async function handleSave(input: LedgerInput, id?: string) {
         if (id) await putLedger(id, input);
         else await postLedger(input);
         setMode({ type: 'list' });
-        setLoading(true);
-        try {
-            await reload();
-        } finally {
-            setLoading(false);
-        }
+        reload();
     }
 
     async function handleImported() {
         setMode({ type: 'list' });
-        setLoading(true);
-        try {
-            await reload();
-        } finally {
-            setLoading(false);
-        }
+        reload();
     }
 
     async function handleDelete(id: string) {
@@ -131,7 +110,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
         setMutating(true);
         try {
             await deleteLedger(id);
-            await reload();
+            reload();
         } finally {
             setMutating(false);
         }
@@ -306,7 +285,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
 
                     {hasMore && (
                         <button
-                            onClick={loadMore}
+                            onClick={handleLoadMore}
                             disabled={loadingMore}
                             className="mt-2 self-center flex items-center gap-2 px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
                         >
