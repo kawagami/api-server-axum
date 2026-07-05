@@ -1,59 +1,29 @@
-//! 農場經營大廳 / 房間記憶體狀態（純資料，無 WS 依賴）。2–4 人，重啟即丟失。
-
-use std::collections::{HashMap, HashSet};
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+//! 農場經營房型參數。大廳 / 房間狀態走 `common::room` 泛型框架。2–4 人，重啟即丟失。
 
 use super::engine::GameState;
+use crate::games::common::room::{RoomHub, RoomKind};
 
 pub const MIN_PLAYERS: usize = 2;
 pub const MAX_PLAYERS: usize = 4;
 
-pub type FarmHub = Arc<Mutex<FarmHubInner>>;
+/// marker type：impl `RoomKind` 提供農場的靜態參數。
+pub struct FarmRoom;
 
-#[derive(Default)]
-pub struct FarmHubInner {
-    pub rooms: HashMap<u64, Room>,
-    pub conn_room: HashMap<SocketAddr, u64>,
-    pub lobby: HashSet<SocketAddr>,
-    pub next_id: u64,
-}
+impl RoomKind for FarmRoom {
+    type Playing = GameState;
+    type Options = ();
 
-impl FarmHubInner {
-    pub fn is_committed(&self, who: SocketAddr) -> bool {
-        self.conn_room.contains_key(&who)
+    const NAME: &'static str = super::NAME;
+    const MIN_PLAYERS: usize = MIN_PLAYERS;
+    const MAX_PLAYERS: usize = MAX_PLAYERS;
+    // 等待中有人離開會重編號，room_update 逐人帶當前 seat
+    const SEAT_IN_ROOM_UPDATE: bool = true;
+
+    fn default_room_name(id: u64) -> String {
+        format!("農場 #{id}")
     }
 }
 
-pub struct Room {
-    pub id: u64,
-    pub name: String,
-    /// 座位順序＝加入順序；對局開始後固定。index = 玩家。
-    pub players: Vec<SocketAddr>,
-    pub names: Vec<String>,
-    pub host: SocketAddr,
-    pub state: RoomState,
-}
-
-// 房間數少、Waiting 短命，Playing 大 payload 不 Box 也無記憶體壓力
-#[allow(clippy::large_enum_variant)]
-pub enum RoomState {
-    Waiting,
-    Playing(GameState),
-}
-
-impl Room {
-    pub fn seat_of(&self, who: SocketAddr) -> Option<usize> {
-        self.players.iter().position(|&p| p == who)
-    }
-
-    pub fn is_full(&self) -> bool {
-        self.players.len() >= MAX_PLAYERS
-    }
-
-    pub fn can_start(&self) -> bool {
-        matches!(self.state, RoomState::Waiting)
-            && (MIN_PLAYERS..=MAX_PLAYERS).contains(&self.players.len())
-    }
-}
+pub type FarmHub = RoomHub<FarmRoom>;
+pub type Room = crate::games::common::room::Room<FarmRoom>;
+pub use crate::games::common::room::RoomState;

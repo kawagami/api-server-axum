@@ -11,14 +11,15 @@ use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::games::avalon::hub::{AvalonHub, AvalonHubInner, RoomState as AvalonRoomState};
+use crate::games::avalon::hub::AvalonHub;
 use crate::games::avalon::service as avalon_service;
 use crate::games::banqi::game::BanqiGame;
 use crate::games::chess::game::ChessGame;
 use crate::games::common::engine::GameEngine;
 use crate::games::common::hub::{GameHub, HubInner, TableState};
+use crate::games::common::room::{RoomHub, RoomKind, RoomState};
 use crate::games::common::service;
-use crate::games::farm::hub::{FarmHub, FarmHubInner, RoomState as FarmRoomState};
+use crate::games::farm::hub::FarmHub;
 use crate::games::farm::service as farm_service;
 use crate::games::go::game::GoGame;
 use crate::games::gomoku::game::GomokuGame;
@@ -63,6 +64,31 @@ async fn summarize_2p<E>(game: &'static str, hub: &GameHub<E>) -> GameSummary {
         playing,
         players_in_game: playing * 2,
         queued: h.queue.len(),
+        lobby: h.lobby.len(),
+    }
+}
+
+/// N 人房泛型 hub 的統計。
+async fn summarize_room<K: RoomKind>(game: &'static str, hub: &RoomHub<K>) -> GameSummary {
+    let h = hub.lock().await;
+    let mut waiting = 0;
+    let mut playing = 0;
+    let mut players_in_game = 0;
+    for r in h.rooms.values() {
+        match r.state {
+            RoomState::Waiting => waiting += 1,
+            RoomState::Playing(_) => {
+                playing += 1;
+                players_in_game += r.players.len();
+            }
+        }
+    }
+    GameSummary {
+        game,
+        waiting,
+        playing,
+        players_in_game,
+        queued: 0,
         lobby: h.lobby.len(),
     }
 }
@@ -113,52 +139,8 @@ impl AnyHub {
             AnyHub::Banqi(h) => summarize_2p(game, h).await,
             AnyHub::WesternChess(h) => summarize_2p(game, h).await,
             AnyHub::Go(h) => summarize_2p(game, h).await,
-            AnyHub::Avalon(h) => {
-                let h = h.lock().await;
-                let mut waiting = 0;
-                let mut playing = 0;
-                let mut players_in_game = 0;
-                for r in h.rooms.values() {
-                    match r.state {
-                        AvalonRoomState::Waiting => waiting += 1,
-                        AvalonRoomState::Playing(_) => {
-                            playing += 1;
-                            players_in_game += r.players.len();
-                        }
-                    }
-                }
-                GameSummary {
-                    game,
-                    waiting,
-                    playing,
-                    players_in_game,
-                    queued: 0,
-                    lobby: h.lobby.len(),
-                }
-            }
-            AnyHub::Farm(h) => {
-                let h = h.lock().await;
-                let mut waiting = 0;
-                let mut playing = 0;
-                let mut players_in_game = 0;
-                for r in h.rooms.values() {
-                    match r.state {
-                        FarmRoomState::Waiting => waiting += 1,
-                        FarmRoomState::Playing(_) => {
-                            playing += 1;
-                            players_in_game += r.players.len();
-                        }
-                    }
-                }
-                GameSummary {
-                    game,
-                    waiting,
-                    playing,
-                    players_in_game,
-                    queued: 0,
-                    lobby: h.lobby.len(),
-                }
-            }
+            AnyHub::Avalon(h) => summarize_room(game, h).await,
+            AnyHub::Farm(h) => summarize_room(game, h).await,
         }
     }
 
@@ -185,8 +167,8 @@ impl GameRegistry {
         m.insert(BanqiGame::NAME, AnyHub::Banqi(new_hub()));
         m.insert(WesternChessGame::NAME, AnyHub::WesternChess(new_hub()));
         m.insert(GoGame::NAME, AnyHub::Go(new_hub()));
-        m.insert(crate::games::avalon::NAME, AnyHub::Avalon(Arc::new(Mutex::new(AvalonHubInner::default()))));
-        m.insert(crate::games::farm::NAME, AnyHub::Farm(Arc::new(Mutex::new(FarmHubInner::default()))));
+        m.insert(crate::games::avalon::NAME, AnyHub::Avalon(Arc::new(Mutex::new(Default::default()))));
+        m.insert(crate::games::farm::NAME, AnyHub::Farm(Arc::new(Mutex::new(Default::default()))));
         GameRegistry(m)
     }
 
