@@ -1,8 +1,10 @@
 import { getUsers, getUserRoles } from "@/api/users";
 import { getRoles } from "@/api/roles";
 import { getSettings } from "@/app/admin/(main)/settings/actions";
+import { requirePermission, getCurrentAdmin } from "@/libs/admin-permissions";
 import UserRolesPanel from "./user-roles-panel";
 import CreateUserForm from "./create-user-form";
+import DeleteUserButton from "./delete-user-button";
 import type { Metadata } from "next";
 import AdminTableContainer from "@/components/admin/admin-table-container";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
@@ -13,7 +15,8 @@ export const metadata: Metadata = {
 };
 
 export default async function Users() {
-    const [users, allRoles, settings] = await Promise.all([getUsers(), getRoles(), getSettings()]);
+    await requirePermission("user:read");
+    const [users, allRoles, settings, me] = await Promise.all([getUsers(), getRoles(), getSettings(), getCurrentAdmin()]);
 
     const usersWithRoles = await Promise.all(
         users.map(async user => ({
@@ -40,6 +43,7 @@ export default async function Users() {
                         <AdminTh>Name</AdminTh>
                         <AdminTh>Email</AdminTh>
                         <AdminTh>Roles</AdminTh>
+                        <AdminTh>操作</AdminTh>
                     </AdminHeadRow>
                 </thead>
                 <tbody>
@@ -54,6 +58,12 @@ export default async function Users() {
                                     userName={user.name ?? user.email}
                                     initialRoles={user.roles}
                                     allRoles={allRoles}
+                                />
+                            </AdminTd>
+                            <AdminTd>
+                                <DeleteUserButton
+                                    user={{ id: user.id, name: user.name ?? "", email: user.email }}
+                                    isSelf={user.email === me.email}
                                 />
                             </AdminTd>
                         </AdminRow>

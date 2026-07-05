@@ -2,6 +2,7 @@ import { getSettings } from "./actions";
 import SettingsClient from "./settings-client";
 import ThemePicker from "./theme-picker";
 import { resolveSiteThemeSetting, normalizeRotation } from "@/libs/site-theme";
+import { requirePermission } from "@/libs/admin-permissions";
 import type { SettingsResponse } from "@/types";
 import type { Metadata } from "next";
 
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function SettingsPage() {
+    await requirePermission("setting:read");
     const settings = await getSettings();
     const flat = Object.values(settings).flat();
 

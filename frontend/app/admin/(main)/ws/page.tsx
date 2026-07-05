@@ -2,6 +2,7 @@ import { getWsConnections } from "@/api/ws";
 import SaySomethingForm from "./say-something-form";
 import type { Metadata } from "next";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import { requirePermission } from "@/libs/admin-permissions";
 
 export const metadata: Metadata = {
     title: "WS Management",
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function WsAdminPage() {
+    await requirePermission("ws:read");
     const connections = await getWsConnections();
 
     return (

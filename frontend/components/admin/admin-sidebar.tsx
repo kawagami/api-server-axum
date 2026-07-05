@@ -6,9 +6,9 @@ import { usePathname } from "next/navigation";
 import { ChevronRight, Menu, X, LogOut } from "lucide-react";
 import { clearSession } from "@/app/admin/login/actions";
 import { stopTokenRefresh } from "@/libs/token-refresh";
-import { adminNavGroups as groups } from "@/components/admin/nav";
+import { adminNavGroups, filterNavByPermissions, type AdminNavGroup } from "@/components/admin/nav";
 
-function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function SidebarContent({ groups, pathname, onNavigate }: { groups: AdminNavGroup[]; pathname: string; onNavigate?: () => void }) {
     const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
         Object.fromEntries(groups.map(g => [
             g.label,
@@ -108,15 +108,16 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
     );
 }
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ permissions }: { permissions: string[] }) {
     const pathname = usePathname();
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const groups = filterNavByPermissions(adminNavGroups, permissions);
 
     return (
         <>
             {/* Desktop sidebar */}
             <aside className="hidden sm:flex flex-col w-52 shrink-0 border-r border-neutral-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 h-screen sticky top-0">
-                <SidebarContent pathname={pathname} />
+                <SidebarContent groups={groups} pathname={pathname} />
             </aside>
 
             {/* Mobile: hamburger button */}
@@ -147,7 +148,7 @@ export default function AdminSidebar() {
                         <X size={20} />
                     </button>
                 </div>
-                <SidebarContent pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
+                <SidebarContent groups={groups} pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
             </aside>
         </>
     );

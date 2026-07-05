@@ -1,6 +1,7 @@
 import { getRoles } from "@/api/roles";
 import { getPermissions } from "@/api/roles";
 import RolesManager from "@/components/roles/roles-manager";
+import { requirePermission } from "@/libs/admin-permissions";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RolesPage() {
+    await requirePermission("role:read");
     const [roles, permissions] = await Promise.all([getRoles(), getPermissions()]);
 
     return (

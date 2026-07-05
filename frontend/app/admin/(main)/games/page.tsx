@@ -1,5 +1,6 @@
 import { getGamesOverview } from "@/api/games";
 import GamesOverview from "./games-overview";
+import { requirePermission } from "@/libs/admin-permissions";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function GamesOverviewPage() {
+    await requirePermission("game:read");
     const initial = await getGamesOverview();
 
     return (

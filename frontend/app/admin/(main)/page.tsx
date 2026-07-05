@@ -5,7 +5,8 @@ import { getMembers } from "@/api/members";
 import { getImages } from "@/api/images";
 import { getWsConnections } from "@/api/ws";
 import { getGamesOverview } from "@/api/games";
-import { adminNavGroups } from "@/components/admin/nav";
+import { adminNavGroups, filterNavByPermissions } from "@/components/admin/nav";
+import { getMyPermissions } from "@/libs/admin-permissions";
 
 // 單一端點掛掉不應整頁白屏：取值失敗回 null（顯示 —）
 async function safe<T>(p: Promise<T>): Promise<T | null> {
@@ -22,6 +23,7 @@ interface Stat {
     hint?: string;
     href: string;
     icon: LucideIcon;
+    permission: string;
 }
 
 function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
@@ -45,7 +47,8 @@ function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
 }
 
 export default async function AdminDashboardPage() {
-    const [blogs, members, images, wsConns, games] = await Promise.all([
+    const [permissions, blogs, members, images, wsConns, games] = await Promise.all([
+        getMyPermissions(),
         safe(getBlogs({ per_page: 1 })),
         safe(getMembers()),
         safe(getImages()),
@@ -57,18 +60,21 @@ export default async function AdminDashboardPage() {
     const playersInGame = games?.reduce((sum, g) => sum + g.players_in_game, 0) ?? null;
 
     const stats: Stat[] = [
-        { label: "文章", value: blogs?.total ?? null, href: "/admin/blogs", icon: FileText },
-        { label: "會員", value: members?.length ?? null, href: "/admin/members", icon: Users },
+        { label: "文章", value: blogs?.total ?? null, href: "/admin/blogs", icon: FileText, permission: "blog:read" },
+        { label: "會員", value: members?.length ?? null, href: "/admin/members", icon: Users, permission: "member:read" },
         {
             label: "圖片",
             value: images?.length ?? null,
             hint: unusedImages > 0 ? `${unusedImages} 張待清除` : undefined,
             href: "/admin/images",
             icon: ImageIcon,
+            permission: "image:read",
         },
-        { label: "線上連線", value: wsConns?.length ?? null, href: "/admin/ws", icon: Radio },
-        { label: "對局中人數", value: playersInGame, href: "/admin/games", icon: Gamepad2 },
-    ];
+        { label: "線上連線", value: wsConns?.length ?? null, href: "/admin/ws", icon: Radio, permission: "ws:read" },
+        { label: "對局中人數", value: playersInGame, href: "/admin/games", icon: Gamepad2, permission: "game:read" },
+    ].filter((s) => permissions.includes(s.permission));
+
+    const navGroups = filterNavByPermissions(adminNavGroups, permissions);
 
     return (
         <div className="max-w-5xl mx-auto flex flex-col gap-8">
@@ -85,7 +91,7 @@ export default async function AdminDashboardPage() {
 
             {/* 依分組的快速入口 */}
             <section className="flex flex-col gap-6">
-                {adminNavGroups.map((group) => {
+                {navGroups.map((group) => {
                     const Icon = group.icon;
                     return (
                         <div key={group.label} className="flex flex-col gap-3">

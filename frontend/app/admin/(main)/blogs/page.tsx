@@ -1,7 +1,9 @@
 import { getBlogs } from '@/api/blogs';
 import { CreateButton, EditButton, DeleteButton } from '@/components/blogs/blog-action-buttons';
+import { requirePermission } from "@/libs/admin-permissions";
 
 export default async function BlogsPage() {
+    await requirePermission("blog:read");
     const { data: blogs } = await getBlogs({ per_page: 1000 });
 
     return (

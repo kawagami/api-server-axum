@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getTorrents, getTorrentStorage } from "@/api/torrents";
 import { ListTableSkeleton } from "@/components/loading/table-skeleton";
 import TorrentManager from "./torrent-manager";
+import { requirePermission } from "@/libs/admin-permissions";
 
 const PER_PAGE = 50;
 const STATUS_TABS = ["", "pending", "downloading", "completed", "failed"];
@@ -34,6 +35,7 @@ async function TorrentContent({ status, page }: { status: string; page: number }
 }
 
 export default async function TorrentsPage({ searchParams }: { searchParams: Promise<{ status?: string; page?: string }> }) {
+    await requirePermission("torrent:read");
     const { status: statusParam, page: pageStr } = await searchParams;
     const status = statusParam ?? "";
     const page = Math.max(1, Number(pageStr ?? 1) || 1);

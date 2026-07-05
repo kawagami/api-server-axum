@@ -17,3 +17,13 @@ export async function createUser(input: {
     });
     revalidatePath("/admin/users");
 }
+
+export async function deleteUser(user: { id: string; name: string; email: string }): Promise<void> {
+    await adminRequest<void>({
+        url: `${process.env.API_URL}/admin/users`,
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: Number(user.id), name: user.name, email: user.email }),
+    });
+    revalidatePath("/admin/users");
+}
