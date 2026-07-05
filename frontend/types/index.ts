@@ -8,4 +8,5 @@ export * from './stock';
 export * from './auth';
 export * from './ws';
 export * from './torrent';
+export * from './gov-tender';
 export * from './misc';

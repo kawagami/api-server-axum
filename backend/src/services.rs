@@ -3,6 +3,7 @@ pub mod email;
 pub mod audit_logs;
 pub mod auth;
 pub mod blogs;
+pub mod gov_tenders;
 pub mod images;
 pub mod invoice_lottery;
 pub mod invoices;

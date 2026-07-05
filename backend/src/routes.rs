@@ -1,5 +1,6 @@
 mod admin;
 mod admin_games;
+mod admin_gov_tenders;
 mod admin_invoice_lottery;
 mod admin_stats;
 mod app_settings;

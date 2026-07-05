@@ -1,6 +1,7 @@
 pub mod app_settings;
 pub mod audit_logs;
 pub mod blogs;
+pub mod gov_tenders;
 pub mod logs;
 pub mod images;
 pub mod invoices;
