@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from 'react';
-import { Trash2, ChevronDown, ChevronRight, Plus, Loader2 } from 'lucide-react';
+import { useMemo, useState, useTransition } from 'react';
+import { Trash2, ChevronDown, ChevronRight, Plus, Loader2, CheckCheck, X } from 'lucide-react';
 import { createRole, deleteRole, setRolePermissions } from '@/app/admin/(main)/roles/actions';
 import type { Role, Permission } from '@/types';
 
@@ -16,8 +16,43 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
     const [isPending, startTransition] = useTransition();
     const [createError, setCreateError] = useState<string | null>(null);
 
+    // 依 resource（XXX:YYY 的 XXX）分組，resource 與 action 皆字母排序
+    const permissionGroups = useMemo(() => {
+        const map = new Map<string, Permission[]>();
+        for (const perm of allPermissions) {
+            const list = map.get(perm.resource);
+            if (list) list.push(perm);
+            else map.set(perm.resource, [perm]);
+        }
+        return Array.from(map.entries())
+            .map(([resource, perms]) => ({
+                resource,
+                perms: [...perms].sort((a, b) => a.action.localeCompare(b.action)),
+            }))
+            .sort((a, b) => a.resource.localeCompare(b.resource));
+    }, [allPermissions]);
+
     function toggleExpand(id: number) {
         setExpandedId(prev => (prev === id ? null : id));
+    }
+
+    function applyPermissions(role: Role, next: Permission[]) {
+        startTransition(async () => {
+            await setRolePermissions(role.id, next.map(p => p.id));
+            setRoles(prev =>
+                prev.map(r => (r.id === role.id ? { ...r, permissions: next } : r))
+            );
+        });
+    }
+
+    // 一次全選 / 全不選某個 resource 底下的所有 permission
+    function handleGroupToggle(role: Role, perms: Permission[], selectAll: boolean) {
+        const current = role.permissions ?? [];
+        const groupIds = new Set(perms.map(p => p.id));
+        const next = selectAll
+            ? [...current, ...perms.filter(p => !current.some(c => c.id === p.id))]
+            : current.filter(p => !groupIds.has(p.id));
+        applyPermissions(role, next);
     }
 
     async function handleCreate(formData: FormData) {
@@ -43,13 +78,7 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
         const next = has
             ? current.filter(p => p.id !== permission.id)
             : [...current, permission];
-
-        startTransition(async () => {
-            await setRolePermissions(role.id, next.map(p => p.id));
-            setRoles(prev =>
-                prev.map(r => (r.id === role.id ? { ...r, permissions: next } : r))
-            );
-        });
+        applyPermissions(role, next);
     }
 
     return (
@@ -105,23 +134,53 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
 
                         {expandedId === role.id && (
                             <div className="px-4 pb-4 border-t dark:border-neutral-700">
-                                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-3 mb-2">權限設定（點擊切換）</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {allPermissions.map(perm => {
-                                        const active = role.permissions?.some(p => p.id === perm.id) ?? false;
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-3 mb-3">權限設定（點擊切換；每組可一次全選 / 全不選）</p>
+                                <div className="space-y-4">
+                                    {permissionGroups.map(({ resource, perms }) => {
+                                        const activeCount = perms.filter(
+                                            p => role.permissions?.some(rp => rp.id === p.id) ?? false
+                                        ).length;
+                                        const allActive = activeCount === perms.length;
                                         return (
-                                            <button
-                                                key={perm.id}
-                                                onClick={() => handlePermissionToggle(role, perm)}
-                                                disabled={isPending}
-                                                className={`px-2 py-1 text-xs rounded-full border transition-colors ${
-                                                    active
-                                                        ? 'bg-primary-100 border-primary-400 text-primary-700 dark:bg-primary-900 dark:border-primary-500 dark:text-primary-300'
-                                                        : 'bg-neutral-100 border-neutral-300 text-neutral-600 dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-400'
-                                                }`}
-                                            >
-                                                {perm.resource}:{perm.action}
-                                            </button>
+                                            <div key={resource}>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+                                                        {resource}
+                                                    </span>
+                                                    <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+                                                        {activeCount}/{perms.length}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => handleGroupToggle(role, perms, !allActive)}
+                                                        disabled={isPending}
+                                                        className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border border-neutral-300 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                                                    >
+                                                        {allActive
+                                                            ? <><X size={12} /> 全不選</>
+                                                            : <><CheckCheck size={12} /> 全選</>}
+                                                    </button>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {perms.map(perm => {
+                                                        const active = role.permissions?.some(p => p.id === perm.id) ?? false;
+                                                        return (
+                                                            <button
+                                                                key={perm.id}
+                                                                onClick={() => handlePermissionToggle(role, perm)}
+                                                                disabled={isPending}
+                                                                title={`${perm.resource}:${perm.action}`}
+                                                                className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                                                                    active
+                                                                        ? 'bg-primary-100 border-primary-400 text-primary-700 dark:bg-primary-900 dark:border-primary-500 dark:text-primary-300'
+                                                                        : 'bg-neutral-100 border-neutral-300 text-neutral-600 dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-400'
+                                                                }`}
+                                                            >
+                                                                {perm.action}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
                                         );
                                     })}
                                 </div>
