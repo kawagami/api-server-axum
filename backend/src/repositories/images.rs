@@ -10,10 +10,19 @@ pub struct ImageRecord {
     pub status: String,
 }
 
-pub async fn get_all_images(pool: &Pool<Postgres>) -> Result<Vec<ImageRecord>, AppError> {
-    let rows = sqlx::query("SELECT id, storage_key, url, status FROM images ORDER BY id DESC")
-        .fetch_all(pool)
-        .await?;
+/// `owner_id = None` → 不過濾（super_admin 看全部）；`Some(id)` → 只列該擁有者。
+pub async fn get_all_images(
+    pool: &Pool<Postgres>,
+    owner_id: Option<i64>,
+) -> Result<Vec<ImageRecord>, AppError> {
+    let rows = sqlx::query(
+        "SELECT id, storage_key, url, status FROM images
+         WHERE ($1::bigint IS NULL OR owner_id = $1)
+         ORDER BY id DESC",
+    )
+    .bind(owner_id)
+    .fetch_all(pool)
+    .await?;
 
     Ok(rows
         .iter()
@@ -26,16 +35,27 @@ pub async fn get_all_images(pool: &Pool<Postgres>) -> Result<Vec<ImageRecord>, A
         .collect())
 }
 
+/// 資料隔離用：取某圖片的擁有者 id；不存在回 NotFound。
+pub async fn get_owner(pool: &Pool<Postgres>, id: i32) -> Result<Option<i64>, AppError> {
+    let row: Option<(Option<i64>,)> = sqlx::query_as("SELECT owner_id FROM images WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|(owner,)| owner).ok_or_else(|| RequestError::NotFound.into())
+}
+
 pub async fn insert_image(
     pool: &Pool<Postgres>,
     storage_key: &str,
     url: &str,
+    owner_id: Option<i64>,
 ) -> Result<ImageRecord, AppError> {
     let row = sqlx::query(
-        "INSERT INTO images (storage_key, url) VALUES ($1, $2) RETURNING id, storage_key, url, status",
+        "INSERT INTO images (storage_key, url, owner_id) VALUES ($1, $2, $3) RETURNING id, storage_key, url, status",
     )
     .bind(storage_key)
     .bind(url)
+    .bind(owner_id)
     .fetch_one(pool)
     .await?;
 

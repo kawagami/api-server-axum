@@ -10,6 +10,29 @@ pub async fn get_users(pool: &Pool<Postgres>) -> Result<Vec<User>, AppError> {
         .await?)
 }
 
+/// 認證 middleware 用：以 email 一次查出 (user id, 是否 super_admin)。
+/// email 有唯一索引；找不到（帳號已刪但 token/session 未過期）回 None。
+pub async fn get_identity_by_email(
+    pool: &Pool<Postgres>,
+    email: &str,
+) -> Result<Option<(i64, bool)>, AppError> {
+    Ok(sqlx::query_as(
+        r#"
+        SELECT u.id,
+               EXISTS (
+                   SELECT 1 FROM user_roles ur
+                   JOIN roles r ON ur.role_id = r.id
+                   WHERE ur.user_id = u.id AND r.name = 'super_admin'
+               ) AS is_super_admin
+        FROM users u
+        WHERE u.email = $1
+        "#,
+    )
+    .bind(email)
+    .fetch_optional(pool)
+    .await?)
+}
+
 pub async fn check_email_exists(pool: &Pool<Postgres>, email: &str) -> Result<DbUser, AppError> {
     Ok(sqlx::query_as(
         "SELECT id, email, password FROM users WHERE email = $1 LIMIT 1",

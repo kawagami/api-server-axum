@@ -43,11 +43,26 @@ pub async fn get_blog(pool: &Pool<Postgres>, id: Uuid) -> Result<DbBlog, AppErro
     blogs_repo::get_blog_by_id(pool, id).await
 }
 
+/// 後台管理列表（依擁有者過濾；super_admin 傳 None 看全部）。公開列表仍走 get_blogs。
+pub async fn get_admin_blogs(
+    pool: &Pool<Postgres>,
+    owner_id: Option<i64>,
+    page: &PageQuery,
+) -> Result<BlogsResponse, AppError> {
+    let (per_page, offset) = page.to_limit_offset(50);
+    let (page_no, per_page_usize) = (page.page.unwrap_or(1).max(1) as usize, per_page as usize);
+    let (total, data) = tokio::try_join!(
+        blogs_repo::count_for_owner(pool, owner_id),
+        blogs_repo::list_for_owner(pool, owner_id, per_page, offset),
+    )?;
+    Ok(BlogsResponse { total, page: page_no, per_page: per_page_usize, data })
+}
+
 pub async fn get_tags(pool: &Pool<Postgres>) -> Result<Vec<String>, AppError> {
     blogs_repo::get_all_tags(pool).await
 }
 
-pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog) -> Result<String, AppError> {
+pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_id: i64) -> Result<String, AppError> {
     let tocs = blog.extract_toc_texts();
     let title = tocs.first().cloned().unwrap_or_default();
 
@@ -72,7 +87,7 @@ pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog) -> Resu
     };
 
     let mut tx = pool.begin().await?;
-    blogs_repo::upsert_blog_in_tx(&mut tx, id, blog.markdown, tocs, blog.tags).await?;
+    blogs_repo::upsert_blog_in_tx(&mut tx, id, blog.markdown, tocs, blog.tags, author_id).await?;
     if !new_urls.is_empty() {
         images_repo::mark_images_active_by_urls_in_tx(&mut tx, &new_urls).await?;
     }

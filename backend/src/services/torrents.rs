@@ -96,7 +96,7 @@ pub fn parse_info_hash(magnet_uri: &str) -> Result<String, AppError> {
 }
 
 /// 新增任務：容量檢查 → 寫入 pending → 嘗試啟動
-pub async fn create(state: &AppState, magnet_uri: &str, created_by: &str) -> Result<Torrent, AppError> {
+pub async fn create(state: &AppState, magnet_uri: &str, created_by: &str, owner_id: Option<i64>) -> Result<Torrent, AppError> {
     let info_hash = parse_info_hash(magnet_uri)?;
 
     let max_bytes = settings_i64(state, "torrent_max_total_size_gb", DEFAULT_MAX_TOTAL_SIZE_GB)
@@ -109,7 +109,7 @@ pub async fn create(state: &AppState, magnet_uri: &str, created_by: &str) -> Res
         .into());
     }
 
-    let torrent = torrents_repo::insert(state.get_pool(), &info_hash, magnet_uri, created_by).await?;
+    let torrent = torrents_repo::insert(state.get_pool(), &info_hash, magnet_uri, created_by, owner_id).await?;
     sync_active(state.clone()).await;
     Ok(torrent)
 }

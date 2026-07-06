@@ -20,6 +20,12 @@ export async function getBlogs({ page = 1, per_page = 10, tag }: GetBlogsParams 
     return fetchApi(`${process.env.API_URL}/blogs?${params}`, { next: { revalidate: 60, tags: ['blogs'] } });
 }
 
+// 後台管理列表：一般 admin 只拿自己的文章、super_admin 全拿（走 adminRequest 認證，不快取跨使用者）
+export async function getAdminBlogs({ page = 1, per_page = 200 }: { page?: number; per_page?: number } = {}): Promise<BlogPaginatedResponse> {
+    const params = new URLSearchParams({ page: String(page), per_page: String(per_page) });
+    return adminRequest<BlogPaginatedResponse>({ url: `${process.env.API_URL}/admin/blogs?${params}` });
+}
+
 export async function getBlog(id: string): Promise<Blog> {
     return fetchApi(`${process.env.API_URL}/blogs/${id}`, { next: { revalidate: 300, tags: ['blogs', `blog:${id}`] } });
 }

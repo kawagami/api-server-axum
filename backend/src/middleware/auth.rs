@@ -1,6 +1,6 @@
 use crate::{
     errors::{AppError, AuthError},
-    repositories::{redis, roles as roles_repo},
+    repositories::{redis, roles as roles_repo, users as users_repo},
     state::AppState,
     structs::{
         auth::{AuthenticatedUser, Claims},
@@ -34,7 +34,17 @@ pub async fn authorize_and_load(
         }
     };
 
-    req.extensions_mut().insert(AuthenticatedUser { email, permissions });
+    // 資料隔離用：一次查出 user id + 是否 super_admin（帳號已刪 → 視為未授權）
+    let (id, is_super_admin) = users_repo::get_identity_by_email(state.get_pool(), &email)
+        .await?
+        .ok_or(AppError::AuthError(AuthError::Unauthorized))?;
+
+    req.extensions_mut().insert(AuthenticatedUser {
+        id,
+        email,
+        permissions,
+        is_super_admin,
+    });
 
     Ok(next.run(req).await)
 }

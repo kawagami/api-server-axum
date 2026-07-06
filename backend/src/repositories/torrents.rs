@@ -11,13 +11,15 @@ pub async fn insert(
     info_hash: &str,
     magnet_uri: &str,
     created_by: &str,
+    owner_id: Option<i64>,
 ) -> Result<Torrent, AppError> {
     sqlx::query_as::<_, Torrent>(&format!(
-        "INSERT INTO torrents (info_hash, magnet_uri, created_by) VALUES ($1, $2, $3) RETURNING {COLUMNS}"
+        "INSERT INTO torrents (info_hash, magnet_uri, created_by, owner_id) VALUES ($1, $2, $3, $4) RETURNING {COLUMNS}"
     ))
     .bind(info_hash)
     .bind(magnet_uri)
     .bind(created_by)
+    .bind(owner_id)
     .fetch_one(pool)
     .await
     .map_err(|e| match &e {
@@ -37,28 +39,46 @@ pub async fn get_by_id(pool: &Pool<Postgres>, id: i32) -> Result<Torrent, AppErr
     )
 }
 
+/// 資料隔離用：取某任務的擁有者 id；任務不存在回 NotFound。
+pub async fn get_owner(pool: &Pool<Postgres>, id: i32) -> Result<Option<i64>, AppError> {
+    let row: Option<(Option<i64>,)> =
+        sqlx::query_as("SELECT owner_id FROM torrents WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+    row.map(|(owner,)| owner).ok_or_else(|| RequestError::NotFound.into())
+}
+
+/// `owner_id = None` → 不過濾（super_admin 看全部）；`Some(id)` → 只列該擁有者。
 pub async fn list(
     pool: &Pool<Postgres>,
     status: Option<String>,
+    owner_id: Option<i64>,
     limit: i64,
     offset: i64,
 ) -> Result<TorrentPaginatedResponse, AppError> {
     let data = sqlx::query_as::<_, Torrent>(&format!(
         "SELECT {COLUMNS} FROM torrents
          WHERE ($1::text IS NULL OR status = $1)
-         ORDER BY id DESC LIMIT $2 OFFSET $3"
+           AND ($2::bigint IS NULL OR owner_id = $2)
+         ORDER BY id DESC LIMIT $3 OFFSET $4"
     ))
     .bind(&status)
+    .bind(owner_id)
     .bind(limit)
     .bind(offset)
     .fetch_all(pool)
     .await?;
 
-    let total: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM torrents WHERE ($1::text IS NULL OR status = $1)")
-            .bind(&status)
-            .fetch_one(pool)
-            .await?;
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM torrents
+         WHERE ($1::text IS NULL OR status = $1)
+           AND ($2::bigint IS NULL OR owner_id = $2)",
+    )
+    .bind(&status)
+    .bind(owner_id)
+    .fetch_one(pool)
+    .await?;
 
     Ok(TorrentPaginatedResponse { data, total })
 }

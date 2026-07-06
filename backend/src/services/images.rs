@@ -7,8 +7,8 @@ use crate::{
 use axum::extract::Multipart;
 use sqlx::{Pool, Postgres};
 
-pub async fn get_images(pool: &Pool<Postgres>) -> Result<Vec<ImageRecord>, AppError> {
-    images_repo::get_all_images(pool).await
+pub async fn get_images(pool: &Pool<Postgres>, owner_id: Option<i64>) -> Result<Vec<ImageRecord>, AppError> {
+    images_repo::get_all_images(pool, owner_id).await
 }
 
 pub async fn cleanup_unused_images(pool: &Pool<Postgres>, storage: &Storage) {
@@ -38,6 +38,7 @@ pub async fn upload_images(
     pool: &Pool<Postgres>,
     storage: &Storage,
     base_url: &str,
+    owner_id: Option<i64>,
     mut multipart: Multipart,
 ) -> Result<Vec<ImageRecord>, AppError> {
     let mut records = vec![];
@@ -52,7 +53,7 @@ pub async fn upload_images(
             .upload(field, &content_type, base_url)
             .await
             .map_err(|e| RequestError::MultipartError(e.into()))?;
-        let record = images_repo::insert_image(pool, &storage_key, &url).await?;
+        let record = images_repo::insert_image(pool, &storage_key, &url, owner_id).await?;
         records.push(record);
     }
 

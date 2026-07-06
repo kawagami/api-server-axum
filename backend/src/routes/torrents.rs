@@ -43,7 +43,8 @@ async fn create_torrent(
     Json(payload): Json<CreateTorrent>,
 ) -> Result<(StatusCode, Json<Torrent>), AppError> {
     auth_user.require_permission(Perm::TorrentCreate)?;
-    let torrent = torrents_service::create(&state, &payload.magnet_uri, &auth_user.email).await?;
+    let torrent =
+        torrents_service::create(&state, &payload.magnet_uri, &auth_user.email, Some(auth_user.id)).await?;
     Ok((StatusCode::CREATED, Json(torrent)))
 }
 
@@ -61,7 +62,14 @@ async fn list_torrents(
     auth_user.require_permission(Perm::TorrentRead)?;
     let (limit, offset) = page.to_limit_offset(50);
     Ok(Json(
-        crate::repositories::torrents::list(state.get_pool(), filter.status, limit, offset).await?,
+        crate::repositories::torrents::list(
+            state.get_pool(),
+            filter.status,
+            auth_user.owner_filter(),
+            limit,
+            offset,
+        )
+        .await?,
     ))
 }
 
@@ -79,6 +87,7 @@ async fn get_torrent(
     Path(id): Path<i32>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     auth_user.require_permission(Perm::TorrentRead)?;
+    auth_user.require_owner(crate::repositories::torrents::get_owner(state.get_pool(), id).await?)?;
     Ok(Json(torrents_service::detail(&state, id).await?))
 }
 
@@ -88,6 +97,7 @@ async fn reset_torrent_pending(
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::TorrentCreate)?;
+    auth_user.require_owner(crate::repositories::torrents::get_owner(state.get_pool(), id).await?)?;
     torrents_service::reset_pending(&state, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -98,6 +108,7 @@ async fn delete_torrent(
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::TorrentDelete)?;
+    auth_user.require_owner(crate::repositories::torrents::get_owner(state.get_pool(), id).await?)?;
     torrents_service::delete(&state, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -108,6 +119,7 @@ async fn create_download_links(
     Path(id): Path<i32>,
 ) -> Result<(StatusCode, Json<Vec<DownloadLink>>), AppError> {
     auth_user.require_permission(Perm::TorrentRead)?;
+    auth_user.require_owner(crate::repositories::torrents::get_owner(state.get_pool(), id).await?)?;
     let links = torrents_service::create_download_links(&state, id, &auth_user.email).await?;
     Ok((StatusCode::CREATED, Json(links)))
 }

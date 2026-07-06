@@ -1,6 +1,6 @@
 use crate::{
     errors::AppError,
-    repositories::images::ImageRecord,
+    repositories::images::{self as images_repo, ImageRecord},
     services::images as images_service,
     state::AppState,
     structs::{auth::AuthenticatedUser, roles::Perm},
@@ -27,7 +27,7 @@ async fn get_images(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ImageRecord>>, AppError> {
     auth_user.require_permission(Perm::ImageRead)?;
-    Ok(Json(images_service::get_images(state.get_pool()).await?))
+    Ok(Json(images_service::get_images(state.get_pool(), auth_user.owner_filter()).await?))
 }
 
 async fn delete_image(
@@ -36,6 +36,7 @@ async fn delete_image(
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::ImageDelete)?;
+    auth_user.require_owner(images_repo::get_owner(state.get_pool(), id).await?)?;
     images_service::delete_image(state.get_pool(), state.get_storage(), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -50,7 +51,7 @@ async fn upload_multiple(
         .get_settings()
         .get("upload_base_url")
         .unwrap_or_else(|| "https://axum.kawa.homes/uploads".to_string());
-    let records = images_service::upload_images(state.get_pool(), state.get_storage(), &base_url, multipart).await?;
+    let records = images_service::upload_images(state.get_pool(), state.get_storage(), &base_url, Some(auth_user.id), multipart).await?;
     let body: Vec<_> = records
         .iter()
         .map(|r| serde_json::json!({ "id": r.id, "url": r.url }))
