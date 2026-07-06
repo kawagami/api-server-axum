@@ -1,6 +1,7 @@
-// Auth
+// Auth（GET /admin/auth/me）
 export interface AuthUser {
-  email: string;
+  id: number;
+  name: string;
   permissions: string[];
 }
 
@@ -18,11 +19,11 @@ export interface Role {
   permissions?: Permission[];
 }
 
-// User
+// User（後台管理員；name 為登入識別，email 選填）
 export interface User {
   id: string;
-  email: string;
-  name?: string;
+  name: string;
+  email?: string | null;
   created_at?: string;
 }
 

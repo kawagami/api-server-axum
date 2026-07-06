@@ -51,19 +51,19 @@ export default async function Users() {
                         <AdminRow key={user.id}>
                             <AdminTd className="text-xs">{user.id}</AdminTd>
                             <AdminTd>{user.name}</AdminTd>
-                            <AdminTd>{user.email}</AdminTd>
+                            <AdminTd>{user.email || "—"}</AdminTd>
                             <AdminTd>
                                 <UserRolesPanel
                                     userId={user.id}
-                                    userName={user.name ?? user.email}
+                                    userName={user.name}
                                     initialRoles={user.roles}
                                     allRoles={allRoles}
                                 />
                             </AdminTd>
                             <AdminTd>
                                 <DeleteUserButton
-                                    user={{ id: user.id, name: user.name ?? "", email: user.email }}
-                                    isSelf={user.email === me.email}
+                                    user={{ id: user.id, name: user.name }}
+                                    isSelf={String(user.id) === String(me.id)}
                                 />
                             </AdminTd>
                         </AdminRow>

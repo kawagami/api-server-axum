@@ -22,26 +22,26 @@ pub async fn authorize_and_load(
     next: Next,
 ) -> Result<Response<Body>, AppError> {
     let token = extract_token(&req)?;
-    let email = verify_admin_token(&state, token).await?;
+    let id = verify_admin_token(&state, token).await?;
 
-    let permissions = match redis::get_user_permissions(state.get_redis_pool(), &email).await? {
+    let permissions = match redis::get_user_permissions(state.get_redis_pool(), id).await? {
         Some(perms) => perms,
         None => {
             let perms =
-                roles_repo::get_user_permission_strings_by_email(state.get_pool(), &email).await?;
-            let _ = redis::set_user_permissions(state.get_redis_pool(), &email, &perms).await;
+                roles_repo::get_user_permission_strings_by_id(state.get_pool(), id).await?;
+            let _ = redis::set_user_permissions(state.get_redis_pool(), id, &perms).await;
             perms
         }
     };
 
-    // 資料隔離用：一次查出 user id + 是否 super_admin（帳號已刪 → 視為未授權）
-    let (id, is_super_admin) = users_repo::get_identity_by_email(state.get_pool(), &email)
+    // 取顯示名 + 是否 super_admin（帳號已刪 → 視為未授權）
+    let (name, is_super_admin) = users_repo::get_identity_by_id(state.get_pool(), id)
         .await?
         .ok_or(AppError::AuthError(AuthError::Unauthorized))?;
 
     req.extensions_mut().insert(AuthenticatedUser {
         id,
-        email,
+        name,
         permissions,
         is_super_admin,
     });
@@ -89,19 +89,23 @@ pub(crate) fn extract_token(req: &Request) -> Result<String, AppError> {
     }
 }
 
-/// 驗證 admin JWT（簽章、role、Redis login session），回傳 email。
+/// 驗證 admin JWT（簽章、role、Redis login session），回傳 user id。
 /// middleware 與 WS 升級握手共用，JWT 驗證邏輯只此一份。
-pub(crate) async fn verify_admin_token(state: &AppState, token: String) -> Result<String, AppError> {
+pub(crate) async fn verify_admin_token(state: &AppState, token: String) -> Result<i64, AppError> {
     let token_data = decode_jwt(token, &state.get_config().jwt_secret)?;
 
     if token_data.claims.role != "admin" {
         return Err(AppError::AuthError(AuthError::Forbidden));
     }
 
-    let email = token_data.claims.sub;
-    let login_key = format!("user:login:{}", email);
+    let id: i64 = token_data
+        .claims
+        .sub
+        .parse()
+        .map_err(|_| AppError::AuthError(AuthError::InvalidToken))?;
+    let login_key = format!("user:login:{}", id);
     verify_user_login(state, &login_key).await?;
-    Ok(email)
+    Ok(id)
 }
 
 async fn verify_user_login(state: &AppState, key: &str) -> Result<(), AppError> {

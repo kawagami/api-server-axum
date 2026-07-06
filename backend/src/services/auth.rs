@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{redis, roles as roles_repo, users},
-    structs::auth::{Claims, CurrentUser},
+    structs::auth::Claims,
 };
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
@@ -20,71 +20,67 @@ pub async fn sign_in(
     pool: &Pool<Postgres>,
     redis_pool: &RedisPool<RedisConnectionManager>,
     jwt_secret: &str,
-    email: &str,
+    name: &str,
     password: &str,
 ) -> Result<String, AppError> {
-    let db_user = match users::check_email_exists(pool, email).await {
-        Ok(user) => user,
-        Err(_) => {
+    let (id, password_hash) = match users::get_credentials_by_name(pool, name).await? {
+        Some(cred) => cred,
+        None => {
+            // 帳號不存在也跑一次 bcrypt，拉平回應時間防 timing 枚舉
             dummy_verify_password(password.to_string()).await;
             return Err(AppError::AuthError(AuthError::InvalidCredentials));
         }
     };
 
-    let user = CurrentUser {
-        email: db_user.email,
-        password_hash: db_user.password,
-    };
-
-    if !verify_password(password.to_string(), user.password_hash.clone()).await? {
+    if !verify_password(password.to_string(), password_hash).await? {
         return Err(AppError::AuthError(AuthError::InvalidCredentials));
     }
 
-    let login_key = format!("user:login:{}", user.email);
-    redis::redis_set(redis_pool, &login_key, &user.email).await?;
+    let login_key = format!("user:login:{}", id);
+    redis::redis_set(redis_pool, &login_key, &id.to_string()).await?;
 
-    let permissions =
-        roles_repo::get_user_permission_strings_by_email(pool, &user.email).await?;
-    redis::set_user_permissions(redis_pool, &user.email, &permissions).await?;
+    let permissions = roles_repo::get_user_permission_strings_by_id(pool, id).await?;
+    redis::set_user_permissions(redis_pool, id, &permissions).await?;
 
-    encode_jwt(user.email, jwt_secret)
+    encode_jwt(id, jwt_secret)
 }
 
 pub async fn refresh_admin_token(
     redis_pool: &RedisPool<RedisConnectionManager>,
     jwt_secret: &str,
-    email: String,
+    id: i64,
 ) -> Result<String, AppError> {
-    let login_key = format!("user:login:{}", email);
-    redis::redis_set(redis_pool, &login_key, &email).await?;
-    encode_jwt(email, jwt_secret)
+    let login_key = format!("user:login:{}", id);
+    redis::redis_set(redis_pool, &login_key, &id.to_string()).await?;
+    encode_jwt(id, jwt_secret)
 }
 
 pub async fn change_password(
     pool: &Pool<Postgres>,
-    email: &str,
+    id: i64,
     current_password: &str,
     new_password: &str,
 ) -> Result<(), AppError> {
-    let db_user = users::check_email_exists(pool, email)
-        .await
-        .map_err(|_| AppError::AuthError(AuthError::UserNotFound))?;
+    let current_hash = users::get_password_by_id(pool, id)
+        .await?
+        .ok_or(AppError::AuthError(AuthError::UserNotFound))?;
 
-    if !verify_password(current_password.to_string(), db_user.password).await? {
+    if !verify_password(current_password.to_string(), current_hash).await? {
         return Err(AppError::AuthError(AuthError::InvalidPassword));
     }
 
     let new_hash = hash_password(new_password.to_string()).await?;
 
-    users::update_password(pool, email, &new_hash).await
+    users::update_password(pool, id, &new_hash).await
 }
 
-fn encode_jwt(email: String, jwt_secret: &str) -> Result<String, AppError> {
+fn encode_jwt(id: i64, jwt_secret: &str) -> Result<String, AppError> {
     let now = Utc::now();
     let exp = (now + Duration::hours(1)).timestamp() as usize;
     let iat = now.timestamp() as usize;
 
-    let claim = Claims { iat, exp, sub: email, role: "admin".to_string() };
+    // sub 存 user id（字串），與前台 member token 一致；顯示名 name 不進 token
+    let claim = Claims { iat, exp, sub: id.to_string(), role: "admin".to_string() };
 
     encode(
         &Header::default(),

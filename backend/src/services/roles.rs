@@ -25,9 +25,9 @@ pub async fn set_role_permissions(
     role_id: i32,
     body: SetRolePermissions,
 ) -> Result<(), AppError> {
-    let emails = roles_repo::get_emails_by_role_id(pool, role_id).await?;
+    let ids = roles_repo::get_ids_by_role_id(pool, role_id).await?;
     roles_repo::set_role_permissions(pool, role_id, &body.permission_ids).await?;
-    redis::invalidate_permissions_for_emails(redis_pool, &emails).await;
+    redis::invalidate_permissions_for_ids(redis_pool, &ids).await;
     Ok(())
 }
 
@@ -36,9 +36,9 @@ pub async fn delete_role(
     redis_pool: &RedisPool<RedisConnectionManager>,
     role_id: i32,
 ) -> Result<(), AppError> {
-    let emails = roles_repo::get_emails_by_role_id(pool, role_id).await?;
+    let ids = roles_repo::get_ids_by_role_id(pool, role_id).await?;
     roles_repo::delete_role(pool, role_id).await?;
-    redis::invalidate_permissions_for_emails(redis_pool, &emails).await;
+    redis::invalidate_permissions_for_ids(redis_pool, &ids).await;
     Ok(())
 }
 

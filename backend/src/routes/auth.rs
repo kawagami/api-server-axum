@@ -33,7 +33,8 @@ pub fn new(state: AppState) -> Router<AppState> {
 
 #[derive(Serialize)]
 struct MeResponse {
-    email: String,
+    id: i64,
+    name: String,
     permissions: Vec<String>,
 }
 
@@ -45,7 +46,7 @@ async fn sign_in(
         state.get_pool(),
         state.get_redis_pool(),
         &state.get_config().jwt_secret,
-        &user_data.email,
+        &user_data.name,
         &user_data.password,
     )
     .await?;
@@ -56,7 +57,8 @@ async fn me(
     Extension(auth_user): Extension<AuthenticatedUser>,
 ) -> Json<MeResponse> {
     Json(MeResponse {
-        email: auth_user.email,
+        id: auth_user.id,
+        name: auth_user.name,
         permissions: auth_user.permissions,
     })
 }
@@ -68,7 +70,7 @@ async fn refresh(
     let token = auth_service::refresh_admin_token(
         state.get_redis_pool(),
         &state.get_config().jwt_secret,
-        auth_user.email,
+        auth_user.id,
     )
     .await?;
     Ok(Json(token))
@@ -81,7 +83,7 @@ async fn change_password(
 ) -> Result<(), AppError> {
     auth_service::change_password(
         state.get_pool(),
-        &auth_user.email,
+        auth_user.id,
         &body.current_password,
         &body.new_password,
     )

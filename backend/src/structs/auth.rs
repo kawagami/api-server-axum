@@ -17,15 +17,9 @@ pub struct RefreshClaims {
     pub jti: String,
 }
 
-#[derive(Clone)]
-pub struct CurrentUser {
-    pub email: String,
-    pub password_hash: String,
-}
-
 #[derive(Deserialize)]
 pub struct SignInData {
-    pub email: String,
+    pub name: String,
     pub password: String,
 }
 
@@ -38,7 +32,8 @@ pub struct ChangePasswordData {
 #[derive(Clone, Debug)]
 pub struct AuthenticatedUser {
     pub id: i64,
-    pub email: String,
+    /// 登入識別 + 顯示用（稽核 / WS / torrent created_by）；不再用 email
+    pub name: String,
     pub permissions: Vec<String>,
     /// super_admin 角色 → 資料隔離下看得到/管得到所有 admin 的資料
     pub is_super_admin: bool,

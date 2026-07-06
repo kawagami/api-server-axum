@@ -32,11 +32,11 @@ pub async fn redis_check_key_exists(
 
 pub async fn set_user_permissions(
     pool: &RedisPool<RedisConnectionManager>,
-    email: &str,
+    user_id: i64,
     permissions: &[String],
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    let key = format!("user:permissions:{}", email);
+    let key = format!("user:permissions:{}", user_id);
     let value = serde_json::to_string(permissions)
         .map_err(crate::errors::AppError::from)?;
     conn.set_ex::<_, _, ()>(key, value, 3600).await?;
@@ -45,20 +45,20 @@ pub async fn set_user_permissions(
 
 pub async fn get_user_permissions(
     pool: &RedisPool<RedisConnectionManager>,
-    email: &str,
+    user_id: i64,
 ) -> Result<Option<Vec<String>>, crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    let key = format!("user:permissions:{}", email);
+    let key = format!("user:permissions:{}", user_id);
     let value: Option<String> = conn.get(key).await?;
     Ok(value.and_then(|v| serde_json::from_str(&v).ok()))
 }
 
 pub async fn del_user_permissions(
     pool: &RedisPool<RedisConnectionManager>,
-    email: &str,
+    user_id: i64,
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    let key = format!("user:permissions:{}", email);
+    let key = format!("user:permissions:{}", user_id);
     conn.del::<_, ()>(key).await?;
     Ok(())
 }
@@ -106,33 +106,33 @@ pub async fn get_member_refresh_token(
 /// 失效單一 user 的權限快取 — 失敗只記 warn，不阻斷主流程
 pub async fn invalidate_user_permissions(
     pool: &RedisPool<RedisConnectionManager>,
-    email: &str,
+    user_id: i64,
 ) {
-    if let Err(e) = del_user_permissions(pool, email).await {
-        tracing::warn!("Failed to invalidate permissions cache for {}: {}", email, e);
+    if let Err(e) = del_user_permissions(pool, user_id).await {
+        tracing::warn!("Failed to invalidate permissions cache for {}: {}", user_id, e);
     }
 }
 
-pub async fn invalidate_permissions_for_emails(
+pub async fn invalidate_permissions_for_ids(
     pool: &RedisPool<RedisConnectionManager>,
-    emails: &[String],
+    ids: &[i64],
 ) {
-    for email in emails {
-        invalidate_user_permissions(pool, email).await;
+    for id in ids {
+        invalidate_user_permissions(pool, *id).await;
     }
 }
 
 pub async fn del_user_login(
     pool: &RedisPool<RedisConnectionManager>,
-    email: &str,
+    user_id: i64,
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    let key = format!("user:login:{}", email);
+    let key = format!("user:login:{}", user_id);
     conn.del::<_, ()>(key).await?;
     Ok(())
 }
 
-/// WS 一次性連線票：30 秒 TTL，value 為 admin email
+/// WS 一次性連線票：30 秒 TTL，value 為 admin 顯示名（name）
 pub async fn set_ws_ticket(
     pool: &RedisPool<RedisConnectionManager>,
     ticket: &str,

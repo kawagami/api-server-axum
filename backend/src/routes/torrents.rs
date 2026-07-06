@@ -44,7 +44,7 @@ async fn create_torrent(
 ) -> Result<(StatusCode, Json<Torrent>), AppError> {
     auth_user.require_permission(Perm::TorrentCreate)?;
     let torrent =
-        torrents_service::create(&state, &payload.magnet_uri, &auth_user.email, Some(auth_user.id)).await?;
+        torrents_service::create(&state, &payload.magnet_uri, &auth_user.name, Some(auth_user.id)).await?;
     Ok((StatusCode::CREATED, Json(torrent)))
 }
 
@@ -120,7 +120,7 @@ async fn create_download_links(
 ) -> Result<(StatusCode, Json<Vec<DownloadLink>>), AppError> {
     auth_user.require_permission(Perm::TorrentRead)?;
     auth_user.require_owner(crate::repositories::torrents::get_owner(state.get_pool(), id).await?)?;
-    let links = torrents_service::create_download_links(&state, id, &auth_user.email).await?;
+    let links = torrents_service::create_download_links(&state, id, auth_user.id).await?;
     Ok((StatusCode::CREATED, Json(links)))
 }
 

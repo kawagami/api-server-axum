@@ -6,7 +6,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { deleteUser } from "./actions";
 
 interface Props {
-    user: { id: string; name: string; email: string };
+    user: { id: string; name: string };
     // 目前登入者本人那列 → 停用，避免誤刪自己導致無人可管
     isSelf?: boolean;
 }
@@ -28,7 +28,7 @@ export default function DeleteUserButton({ user, isSelf }: Props) {
 
     const handleDelete = async () => {
         if (isDeleting) return;
-        if (!confirm(`確定要刪除管理員「${user.name || user.email}」嗎？此操作無法復原。`)) return;
+        if (!confirm(`確定要刪除管理員「${user.name}」嗎？此操作無法復原。`)) return;
 
         setIsDeleting(true);
         try {

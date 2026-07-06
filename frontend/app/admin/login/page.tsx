@@ -20,14 +20,14 @@ export default function Login() {
         setPending(true);
 
         const form = e.currentTarget;
-        const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+        const name = (form.elements.namedItem('name') as HTMLInputElement).value;
         const password = (form.elements.namedItem('password') as HTMLInputElement).value;
 
         try {
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ name, password }),
             });
 
             if (!res.ok) {
@@ -51,8 +51,8 @@ export default function Login() {
                 <h2 className="text-2xl font-bold text-center text-neutral-800 dark:text-neutral-100">Login</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Email</label>
-                        <input type="email" id="email" name="email" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="Enter your email" required />
+                        <label htmlFor="name" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">名稱</label>
+                        <input type="text" id="name" name="name" autoComplete="username" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="輸入管理員名稱" required />
                     </div>
                     <div>
                         <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Password</label>

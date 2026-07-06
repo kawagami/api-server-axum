@@ -421,7 +421,7 @@ pub async fn detail(state: &AppState, id: i32) -> Result<serde_json::Value, AppE
 pub async fn create_download_links(
     state: &AppState,
     id: i32,
-    issuer_email: &str,
+    issuer_id: i64,
 ) -> Result<Vec<DownloadLink>, AppError> {
     let torrent = torrents_repo::get_by_id(state.get_pool(), id).await?;
     if torrent.status != STATUS_COMPLETED {
@@ -443,7 +443,7 @@ pub async fn create_download_links(
             let claims = TorrentDownloadClaims {
                 exp: expires_at.timestamp() as usize,
                 purpose: DOWNLOAD_TOKEN_PURPOSE.to_string(),
-                sub: issuer_email.to_string(),
+                sub: issuer_id.to_string(),
                 torrent_id: id,
                 file_index: f.index,
             };
@@ -486,23 +486,29 @@ pub async fn resolve_download_file(
         return Err(AppError::AuthError(crate::errors::AuthError::InvalidToken));
     }
 
+    // 發行者 id（token sub）
+    let issuer_id: i64 = claims
+        .sub
+        .parse()
+        .map_err(|_| AppError::AuthError(crate::errors::AuthError::InvalidToken))?;
+
     // 即時重查發行者權限（Redis 快取，同 auth middleware）— 權限被拔掉，已發出的連結立即失效
     let permissions = match crate::repositories::redis::get_user_permissions(
         state.get_redis_pool(),
-        &claims.sub,
+        issuer_id,
     )
     .await?
     {
         Some(perms) => perms,
         None => {
-            let perms = crate::repositories::roles::get_user_permission_strings_by_email(
+            let perms = crate::repositories::roles::get_user_permission_strings_by_id(
                 state.get_pool(),
-                &claims.sub,
+                issuer_id,
             )
             .await?;
             let _ = crate::repositories::redis::set_user_permissions(
                 state.get_redis_pool(),
-                &claims.sub,
+                issuer_id,
                 &perms,
             )
             .await;

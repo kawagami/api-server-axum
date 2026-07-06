@@ -54,21 +54,20 @@ pub async fn get_role_ids_by_names(
         .await?)
 }
 
-pub async fn get_user_permission_strings_by_email(
+pub async fn get_user_permission_strings_by_id(
     pool: &Pool<Postgres>,
-    email: &str,
+    id: i64,
 ) -> Result<Vec<String>, AppError> {
     let is_super_admin: bool = sqlx::query_scalar(
         r#"
         SELECT EXISTS (
-            SELECT 1 FROM users u
-            JOIN user_roles ur ON u.id = ur.user_id
+            SELECT 1 FROM user_roles ur
             JOIN roles r ON ur.role_id = r.id
-            WHERE u.email = $1 AND r.name = 'super_admin'
+            WHERE ur.user_id = $1 AND r.name = 'super_admin'
         )
         "#,
     )
-    .bind(email)
+    .bind(id)
     .fetch_one(pool)
     .await?;
 
@@ -83,31 +82,29 @@ pub async fn get_user_permission_strings_by_email(
     let rows: Vec<(String, String)> = sqlx::query_as(
         r#"
         SELECT DISTINCT p.resource, p.action
-        FROM users u
-        JOIN user_roles ur ON u.id = ur.user_id
+        FROM user_roles ur
         JOIN role_permissions rp ON ur.role_id = rp.role_id
         JOIN permissions p ON rp.permission_id = p.id
-        WHERE u.email = $1
+        WHERE ur.user_id = $1
         "#,
     )
-    .bind(email)
+    .bind(id)
     .fetch_all(pool)
     .await?;
 
     Ok(rows.into_iter().map(|(r, a)| format!("{}:{}", r, a)).collect())
 }
 
-pub async fn get_emails_by_role_id(
+pub async fn get_ids_by_role_id(
     pool: &Pool<Postgres>,
     role_id: i32,
-) -> Result<Vec<String>, AppError> {
-    let rows: Vec<(String,)> = sqlx::query_as(
-        "SELECT u.email FROM users u JOIN user_roles ur ON u.id = ur.user_id WHERE ur.role_id = $1",
-    )
-    .bind(role_id)
-    .fetch_all(pool)
-    .await?;
-    Ok(rows.into_iter().map(|(e,)| e).collect())
+) -> Result<Vec<i64>, AppError> {
+    let rows: Vec<(i64,)> =
+        sqlx::query_as("SELECT user_id FROM user_roles WHERE role_id = $1")
+            .bind(role_id)
+            .fetch_all(pool)
+            .await?;
+    Ok(rows.into_iter().map(|(id,)| id).collect())
 }
 
 pub async fn create_role(pool: &Pool<Postgres>, new_role: &NewRole) -> Result<Role, AppError> {

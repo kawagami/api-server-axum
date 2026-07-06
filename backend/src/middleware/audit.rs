@@ -7,10 +7,11 @@ pub async fn audit_log(
     next: Next,
 ) -> Response<Body> {
     // auth middleware（外層）已驗證並塞入 AuthenticatedUser，直接讀，不重複 decode JWT
+    // audit log 的 user_email 欄現在存管理員顯示名（name）
     let user_email = req
         .extensions()
         .get::<AuthenticatedUser>()
-        .map(|u| u.email.clone());
+        .map(|u| u.name.clone());
 
     let method = req.method().to_string();
     // audit 掛在 nest 內層，req.uri() 前綴已被剝掉；用 OriginalUri 取完整原始路徑

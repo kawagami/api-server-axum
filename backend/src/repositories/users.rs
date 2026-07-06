@@ -1,6 +1,6 @@
 use crate::{
     errors::AppError,
-    structs::{roles::Role, users::{DbUser, NewUser, User}},
+    structs::{roles::Role, users::{NewUser, User}},
 };
 use sqlx::{Pool, Postgres};
 
@@ -10,36 +10,46 @@ pub async fn get_users(pool: &Pool<Postgres>) -> Result<Vec<User>, AppError> {
         .await?)
 }
 
-/// 認證 middleware 用：以 email 一次查出 (user id, 是否 super_admin)。
-/// email 有唯一索引；找不到（帳號已刪但 token/session 未過期）回 None。
-pub async fn get_identity_by_email(
+/// 認證 middleware 用：以 id 一次查出 (name, 是否 super_admin)。
+/// 找不到（帳號已刪但 token/session 未過期）回 None。
+pub async fn get_identity_by_id(
     pool: &Pool<Postgres>,
-    email: &str,
-) -> Result<Option<(i64, bool)>, AppError> {
+    id: i64,
+) -> Result<Option<(String, bool)>, AppError> {
     Ok(sqlx::query_as(
         r#"
-        SELECT u.id,
+        SELECT u.name,
                EXISTS (
                    SELECT 1 FROM user_roles ur
                    JOIN roles r ON ur.role_id = r.id
                    WHERE ur.user_id = u.id AND r.name = 'super_admin'
                ) AS is_super_admin
         FROM users u
-        WHERE u.email = $1
+        WHERE u.id = $1
         "#,
     )
-    .bind(email)
+    .bind(id)
     .fetch_optional(pool)
     .await?)
 }
 
-pub async fn check_email_exists(pool: &Pool<Postgres>, email: &str) -> Result<DbUser, AppError> {
-    Ok(sqlx::query_as(
-        "SELECT id, email, password FROM users WHERE email = $1 LIMIT 1",
-    )
-    .bind(email)
-    .fetch_one(pool)
-    .await?)
+/// 登入用：以 name（唯一）查出 (id, password hash)；帳號不存在回 None。
+pub async fn get_credentials_by_name(
+    pool: &Pool<Postgres>,
+    name: &str,
+) -> Result<Option<(i64, String)>, AppError> {
+    Ok(sqlx::query_as("SELECT id, password FROM users WHERE name = $1 LIMIT 1")
+        .bind(name)
+        .fetch_optional(pool)
+        .await?)
+}
+
+/// 改密碼用：以 id 取現有 password hash。
+pub async fn get_password_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar("SELECT password FROM users WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?)
 }
 
 pub async fn create_user(
@@ -74,13 +84,8 @@ pub async fn create_user(
     Ok(())
 }
 
-pub async fn delete_user(pool: &Pool<Postgres>, user_id: i64) -> Result<String, AppError> {
+pub async fn delete_user(pool: &Pool<Postgres>, user_id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
-
-    let (email,): (String,) = sqlx::query_as("SELECT email FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_one(&mut *tx)
-        .await?;
 
     sqlx::query("DELETE FROM user_roles WHERE user_id = $1")
         .bind(user_id)
@@ -93,7 +98,7 @@ pub async fn delete_user(pool: &Pool<Postgres>, user_id: i64) -> Result<String, 
         .await?;
 
     tx.commit().await?;
-    Ok(email)
+    Ok(())
 }
 
 pub async fn get_user_roles(pool: &Pool<Postgres>, user_id: i64) -> Result<Vec<Role>, AppError> {
@@ -109,23 +114,14 @@ pub async fn get_user_roles(pool: &Pool<Postgres>, user_id: i64) -> Result<Vec<R
     .await?)
 }
 
-pub async fn get_email_by_id(pool: &Pool<Postgres>, user_id: i64) -> Result<String, AppError> {
-    let (email,): (String,) =
-        sqlx::query_as("SELECT email FROM users WHERE id = $1")
-            .bind(user_id)
-            .fetch_one(pool)
-            .await?;
-    Ok(email)
-}
-
 pub async fn update_password(
     pool: &Pool<Postgres>,
-    email: &str,
+    id: i64,
     new_hash: &str,
 ) -> Result<(), AppError> {
-    sqlx::query("UPDATE users SET password = $1 WHERE email = $2")
+    sqlx::query("UPDATE users SET password = $1 WHERE id = $2")
         .bind(new_hash)
-        .bind(email)
+        .bind(id)
         .execute(pool)
         .await?;
     Ok(())

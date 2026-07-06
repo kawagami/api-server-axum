@@ -256,7 +256,7 @@ async fn say_something_to_someone(
                 let mut sender_guard = tracked_conn.sender.lock().await;
                 let payload = crate::structs::ws::envelope(
                     "admin_message",
-                    serde_json::json!({ "content": params.message, "from": auth_user.email }),
+                    serde_json::json!({ "content": params.message, "from": auth_user.name }),
                 );
                 let message = Message::Text(payload.into());
 
@@ -287,7 +287,7 @@ async fn create_ws_ticket(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let ticket = uuid::Uuid::new_v4().to_string();
-    redis_repo::set_ws_ticket(state.get_redis_pool(), &ticket, &auth_user.email).await?;
+    redis_repo::set_ws_ticket(state.get_redis_pool(), &ticket, &auth_user.name).await?;
     Ok(Json(serde_json::json!({ "ticket": ticket })))
 }
 

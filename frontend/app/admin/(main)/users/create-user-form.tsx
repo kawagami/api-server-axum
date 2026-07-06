@@ -65,14 +65,14 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="名稱"
+                    placeholder="名稱（登入帳號）"
                     className="px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <input
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="Email"
+                    placeholder="Email（選填）"
                     className="px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <input
@@ -113,7 +113,7 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
             <div className="flex gap-2">
                 <button
                     onClick={submit}
-                    disabled={isPending || !name || !email || !password}
+                    disabled={isPending || !name || !password}
                     className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
                     {isPending ? "建立中..." : "建立"}
