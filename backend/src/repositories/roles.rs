@@ -43,14 +43,6 @@ pub async fn get_role_with_permissions(
     })
 }
 
-pub async fn get_role_id_by_name(pool: &Pool<Postgres>, name: &str) -> Result<i32, AppError> {
-    let (id,): (i32,) = sqlx::query_as("SELECT id FROM roles WHERE name = $1")
-        .bind(name)
-        .fetch_one(pool)
-        .await?;
-    Ok(id)
-}
-
 /// 依角色名稱批次查 id，不存在的名稱直接略過（供建立管理員的預設角色 fallback 用）
 pub async fn get_role_ids_by_names(
     pool: &Pool<Postgres>,
