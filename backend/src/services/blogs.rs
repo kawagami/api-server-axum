@@ -28,13 +28,15 @@ pub async fn get_blogs(
     pool: &Pool<Postgres>,
     page: &PageQuery,
     tag: Option<String>,
+    author: Option<String>,
 ) -> Result<BlogsResponse, AppError> {
     let (per_page, offset) = page.to_limit_offset(10);
     let (page, per_page, offset) = (page.page.unwrap_or(1).max(1) as usize, per_page as usize, offset as usize);
     let tag_ref = tag.as_deref();
+    let author_ref = author.as_deref();
     let (total, data) = tokio::try_join!(
-        blogs_repo::count_blogs(pool, tag_ref),
-        blogs_repo::get_blogs_with_pagination(pool, per_page, offset, tag_ref),
+        blogs_repo::count_blogs(pool, tag_ref, author_ref),
+        blogs_repo::get_blogs_with_pagination(pool, per_page, offset, tag_ref, author_ref),
     )?;
     Ok(BlogsResponse { total, page, per_page, data })
 }

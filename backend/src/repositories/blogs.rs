@@ -6,37 +6,26 @@ pub async fn get_blogs_with_pagination(
     limit: usize,
     offset: usize,
     tag: Option<&str>,
+    author: Option<&str>,
 ) -> Result<Vec<DbBlog>, AppError> {
-    match tag {
-        Some(t) => sqlx::query_as(
-            r#"
-                SELECT id, markdown, tocs, tags, created_at, updated_at
-                FROM blogs
-                WHERE $1 = ANY(tags)
-                ORDER BY created_at DESC
-                LIMIT $2 OFFSET $3
-                "#,
-        )
-        .bind(t)
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(pool)
-        .await
-        .map_err(AppError::from),
-        None => sqlx::query_as(
-            r#"
-                SELECT id, markdown, tocs, tags, created_at, updated_at
-                FROM blogs
-                ORDER BY created_at DESC
-                LIMIT $1 OFFSET $2
-                "#,
-        )
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(pool)
-        .await
-        .map_err(AppError::from),
-    }
+    sqlx::query_as(
+        r#"
+            SELECT b.id, b.markdown, b.tocs, b.tags, b.created_at, b.updated_at, u.name AS author_name
+            FROM blogs b
+            LEFT JOIN users u ON u.id = b.author_id
+            WHERE ($1::text IS NULL OR $1 = ANY(b.tags))
+              AND ($2::text IS NULL OR u.name = $2)
+            ORDER BY b.created_at DESC
+            LIMIT $3 OFFSET $4
+            "#,
+    )
+    .bind(tag)
+    .bind(author)
+    .bind(limit as i64)
+    .bind(offset as i64)
+    .fetch_all(pool)
+    .await
+    .map_err(AppError::from)
 }
 
 /// 資料隔離用：取某文章的擁有者 id。外層 None = 文章不存在（＝視為新建）；內層 = author_id。
@@ -86,9 +75,10 @@ pub async fn count_for_owner(pool: &Pool<Postgres>, owner_id: Option<i64>) -> Re
 pub async fn get_blog_by_id(pool: &Pool<Postgres>, id: uuid::Uuid) -> Result<DbBlog, AppError> {
     sqlx::query_as(
         r#"
-            SELECT id, markdown, tocs, tags, created_at, updated_at
-            FROM blogs
-            WHERE id = $1
+            SELECT b.id, b.markdown, b.tocs, b.tags, b.created_at, b.updated_at, u.name AS author_name
+            FROM blogs b
+            LEFT JOIN users u ON u.id = b.author_id
+            WHERE b.id = $1
             "#,
     )
     .bind(id)
@@ -97,18 +87,25 @@ pub async fn get_blog_by_id(pool: &Pool<Postgres>, id: uuid::Uuid) -> Result<DbB
     .map_err(AppError::from)
 }
 
-pub async fn count_blogs(pool: &Pool<Postgres>, tag: Option<&str>) -> Result<i64, AppError> {
-    match tag {
-        Some(t) => sqlx::query_scalar("SELECT COUNT(*) FROM blogs WHERE $1 = ANY(tags)")
-            .bind(t)
-            .fetch_one(pool)
-            .await
-            .map_err(AppError::from),
-        None => sqlx::query_scalar("SELECT COUNT(*) FROM blogs")
-            .fetch_one(pool)
-            .await
-            .map_err(AppError::from),
-    }
+pub async fn count_blogs(
+    pool: &Pool<Postgres>,
+    tag: Option<&str>,
+    author: Option<&str>,
+) -> Result<i64, AppError> {
+    sqlx::query_scalar(
+        r#"
+            SELECT COUNT(*)
+            FROM blogs b
+            LEFT JOIN users u ON u.id = b.author_id
+            WHERE ($1::text IS NULL OR $1 = ANY(b.tags))
+              AND ($2::text IS NULL OR u.name = $2)
+            "#,
+    )
+    .bind(tag)
+    .bind(author)
+    .fetch_one(pool)
+    .await
+    .map_err(AppError::from)
 }
 
 pub async fn get_all_tags(pool: &Pool<Postgres>) -> Result<Vec<String>, AppError> {

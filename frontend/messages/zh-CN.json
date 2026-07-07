@@ -164,10 +164,12 @@
   },
   "BlogList": {
     "heading": "文章列表",
+    "authorHeading": "{author} 的文章",
     "empty": "目前没有符合的文章",
     "all": "全部",
     "metaTitle": "Kawa's Blog",
     "metaTaggedTitle": "Tag: {tag} | Kawa's Blog",
+    "metaAuthorTitle": "{author} 的文章 | Kawa's Blog",
     "metaDescription": "Kawa 的个人博客，分享程序开发、后端、前端与工具相关笔记。"
   },
   "Pagination": {
@@ -176,7 +178,8 @@
   },
   "BlogListCard": {
     "created": "创建",
-    "updated": "更新"
+    "updated": "更新",
+    "author": "作者"
   },
   "BlogArticle": {
     "toc": "目录"

@@ -164,10 +164,12 @@
   },
   "BlogList": {
     "heading": "Blog Posts",
+    "authorHeading": "Posts by {author}",
     "empty": "No matching posts yet",
     "all": "All",
     "metaTitle": "Kawa's Blog",
     "metaTaggedTitle": "Tag: {tag} | Kawa's Blog",
+    "metaAuthorTitle": "Posts by {author} | Kawa's Blog",
     "metaDescription": "Kawa's personal blog — notes on programming, backend, frontend, and developer tools."
   },
   "Pagination": {
@@ -176,7 +178,8 @@
   },
   "BlogListCard": {
     "created": "Created",
-    "updated": "Updated"
+    "updated": "Updated",
+    "author": "Author"
   },
   "BlogArticle": {
     "toc": "Contents"

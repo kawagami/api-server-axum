@@ -12,6 +12,7 @@ export interface Blog {
   tocs: string[];
   created_at?: string;
   updated_at?: string;
+  author_name?: string | null;
 }
 
 export interface BlogPaginatedResponse {

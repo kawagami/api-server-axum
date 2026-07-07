@@ -10,10 +10,12 @@ pub struct PutBlog {
     pub tags: Vec<String>,
 }
 
-/// blogs 列表的標籤過濾（分頁走共用 `PageQuery`）。
+/// blogs 公開列表的過濾條件（分頁走共用 `PageQuery`）。tag / author 可各自獨立或並用。
 #[derive(Deserialize)]
-pub struct TagFilter {
+pub struct BlogFilter {
     pub tag: Option<String>,
+    /// 作者頁用：只列此 admin（users.name）的文章
+    pub author: Option<String>,
 }
 
 impl PutBlog {
@@ -46,4 +48,7 @@ pub struct DbBlog {
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// 作者（admin）顯示名；公開列表/內文會 JOIN users 帶出，其餘查詢預設 None
+    #[sqlx(default)]
+    pub author_name: Option<String>,
 }

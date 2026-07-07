@@ -8,13 +8,15 @@ import { Suspense } from 'react';
 interface Props {
     selectedTag?: string | null
     page?: number
+    /** 作者頁：只列此 admin（users.name）的文章，並顯示作者標題 */
+    author?: string | null
 }
 
 const PER_PAGE = 10;
 
-export default async function BlogList({ selectedTag = null, page = 1 }: Props) {
+export default async function BlogList({ selectedTag = null, page = 1, author = null }: Props) {
     const [{ data: blogs, total }, tags, t] = await Promise.all([
-        getBlogs({ page, per_page: PER_PAGE, tag: selectedTag }),
+        getBlogs({ page, per_page: PER_PAGE, tag: selectedTag, author }),
         getBlogTags(),
         getTranslations('BlogList'),
     ]);
@@ -23,9 +25,14 @@ export default async function BlogList({ selectedTag = null, page = 1 }: Props) 
 
     return (
         <div className="w-full h-[calc(100svh-120px)] overflow-auto">
-            <h1 className="sr-only">{t('heading')}</h1>
+            <h1 className="sr-only">{author ? t('authorHeading', { author }) : t('heading')}</h1>
             <div className="max-w-4xl mx-auto flex gap-6 px-4">
                 <div className="flex-1 min-w-0">
+                    {author && (
+                        <h2 className="text-center text-lg font-semibold text-neutral-700 dark:text-neutral-200 pt-4">
+                            {t('authorHeading', { author })}
+                        </h2>
+                    )}
                     {tags.length > 0 && (
                         <div className="sm:hidden px-4 pt-2">
                             <TagFilterBar tags={tags} selectedTag={selectedTag} variant="bar" />
@@ -44,6 +51,7 @@ export default async function BlogList({ selectedTag = null, page = 1 }: Props) 
                                 tags={blog.tags || []}
                                 created_at={blog.created_at ?? ''}
                                 updated_at={blog.updated_at ?? ''}
+                                author_name={blog.author_name ?? null}
                             />
                         ))
                     )}

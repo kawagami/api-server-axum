@@ -9,14 +9,16 @@ interface GetBlogsParams {
     page?: number;
     per_page?: number;
     tag?: string | null;
+    author?: string | null;
 }
 
 // blog 內容近乎靜態：用 Next Data Cache + tag 失效取代 no-store
 // （layout 讀 cookies() 強制動態渲染，故只能靠 fetch data cache，無法 SSG）
 // 寫入時 putBlog / deleteBlog 會 revalidateTag('blogs')，故快取期間不會看到舊資料
-export async function getBlogs({ page = 1, per_page = 10, tag }: GetBlogsParams = {}): Promise<BlogPaginatedResponse> {
+export async function getBlogs({ page = 1, per_page = 10, tag, author }: GetBlogsParams = {}): Promise<BlogPaginatedResponse> {
     const params = new URLSearchParams({ page: String(page), per_page: String(per_page) });
     if (tag) params.set('tag', tag);
+    if (author) params.set('author', author);
     return fetchApi(`${process.env.API_URL}/blogs?${params}`, { next: { revalidate: 60, tags: ['blogs'] } });
 }
 

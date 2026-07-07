@@ -8,20 +8,19 @@ interface Props {
     tags: string[];
     created_at: string;
     updated_at: string;
+    author_name?: string | null;
 }
 
-export default function BlogListCard({ id, toc, tags, created_at, updated_at }: Props) {
+export default function BlogListCard({ id, toc, tags, created_at, updated_at, author_name }: Props) {
     const t = useTranslations("BlogListCard");
 
     // updated 只在有值且與 created 不同時顯示
     const showUpdated = updated_at && updated_at !== created_at;
 
     return (
-        <Link
-            href={`/blogs/${id}`}
-            className="block bg-white dark:bg-neutral-800 shadow-md rounded-xl hover:shadow-lg transition-shadow duration-300 m-4"
-        >
-            <div className="p-4">
+        // 外層容器：文章本體與作者是兩個獨立 Link（anchor 不可巢狀），故不整張包 Link
+        <div className="bg-white dark:bg-neutral-800 shadow-md rounded-xl hover:shadow-lg transition-shadow duration-300 m-4">
+            <Link href={`/blogs/${id}`} className="block p-4 pb-2">
                 <h2 className="text-center text-xl font-semibold text-neutral-800 dark:text-neutral-100 mb-2">
                     {toc || `Blog Post #${id}`}
                 </h2>
@@ -49,7 +48,18 @@ export default function BlogListCard({ id, toc, tags, created_at, updated_at }: 
                         </p>
                     )}
                 </div>
-            </div>
-        </Link>
+            </Link>
+            {author_name && (
+                <div className="px-4 pb-3 text-xs text-right">
+                    <span className="text-neutral-400 dark:text-neutral-500">{t("author")}: </span>
+                    <Link
+                        href={`/blogs/author/${encodeURIComponent(author_name)}`}
+                        className="text-primary-600 dark:text-primary-300 hover:underline"
+                    >
+                        {author_name}
+                    </Link>
+                </div>
+            )}
+        </div>
     );
 }
