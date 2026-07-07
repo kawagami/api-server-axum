@@ -4,9 +4,10 @@ import { useTransition } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useRouter, usePathname } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
+import type { TagCount } from '@/types'
 
 interface Props {
-    tags: string[]
+    tags: TagCount[]
     selectedTag: string | null
     // sidebar：桌機右側直向；bar：手機上方橫向可捲動
     variant?: 'sidebar' | 'bar'
@@ -48,9 +49,11 @@ export default function TagFilterBar({ tags, selectedTag, variant = 'sidebar' }:
         ? 'flex gap-1.5 overflow-x-auto pb-1'
         : 'sticky top-2 flex flex-col gap-1.5'
 
-    const btnBase = `text-xs font-semibold px-2.5 py-1 rounded transition-colors text-left ${
-        isBar ? 'whitespace-nowrap shrink-0' : ''
+    const btnBase = `text-xs font-semibold px-2.5 py-1 rounded transition-colors ${
+        isBar ? 'whitespace-nowrap shrink-0' : 'flex items-center justify-between gap-2 text-left'
     }`
+
+    const totalCount = tags.reduce((sum, { count }) => sum + count, 0)
 
     return (
         <div className={`${container} ${isPending ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -63,9 +66,10 @@ export default function TagFilterBar({ tags, selectedTag, variant = 'sidebar' }:
                         : 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-800'
                 }`}
             >
-                {t('all')}
+                <span>{t('all')}</span>
+                {!isBar && <span className="opacity-70 tabular-nums">{totalCount}</span>}
             </button>
-            {tags.map((tag) => (
+            {tags.map(({ tag, count }) => (
                 <button
                     key={tag}
                     onClick={() => selectTag(tag)}
@@ -76,7 +80,8 @@ export default function TagFilterBar({ tags, selectedTag, variant = 'sidebar' }:
                             : 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-800'
                     }`}
                 >
-                    {tag}
+                    <span className={isBar ? '' : 'truncate'}>{tag}</span>
+                    {!isBar && <span className="opacity-70 tabular-nums shrink-0">{count}</span>}
                 </button>
             ))}
         </div>

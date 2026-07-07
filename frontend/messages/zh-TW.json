@@ -170,7 +170,13 @@
     "metaTitle": "Kawa's Blog",
     "metaTaggedTitle": "Tag: {tag} | Kawa's Blog",
     "metaAuthorTitle": "{author} 的文章 | Kawa's Blog",
-    "metaDescription": "Kawa 的個人部落格，分享程式開發、後端、前端與工具相關筆記。"
+    "metaDescription": "Kawa 的個人部落格，分享程式開發、後端、前端與工具相關筆記。",
+    "searchPlaceholder": "搜尋文章…",
+    "searchClear": "清除搜尋",
+    "sortLabel": "排序",
+    "sortNewest": "最新",
+    "sortOldest": "最舊",
+    "clearFilters": "清除篩選條件"
   },
   "Pagination": {
     "prev": "上一頁",

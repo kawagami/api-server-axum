@@ -5,13 +5,14 @@ import ShowClientTime from "@/components/blogs/show-client-time";
 interface Props {
     id: string;
     toc: string;
+    excerpt: string;
     tags: string[];
     created_at: string;
     updated_at: string;
     author_name?: string | null;
 }
 
-export default function BlogListCard({ id, toc, tags, created_at, updated_at, author_name }: Props) {
+export default function BlogListCard({ id, toc, excerpt, tags, created_at, updated_at, author_name }: Props) {
     const t = useTranslations("BlogListCard");
 
     // updated 只在有值且與 created 不同時顯示
@@ -19,12 +20,17 @@ export default function BlogListCard({ id, toc, tags, created_at, updated_at, au
 
     return (
         // 外層容器：文章本體與作者是兩個獨立 Link（anchor 不可巢狀），故不整張包 Link
-        <div className="bg-white dark:bg-neutral-800 shadow-md rounded-xl hover:shadow-lg transition-shadow duration-300 m-4">
-            <Link href={`/blogs/${id}`} className="block p-4 pb-2">
-                <h2 className="text-center text-xl font-semibold text-neutral-800 dark:text-neutral-100 mb-2">
+        <div className="bg-white dark:bg-neutral-800 shadow-md rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all duration-300 m-4">
+            <Link href={`/blogs/${id}`} className="block p-5 pb-3">
+                <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100 mb-2 line-clamp-2">
                     {toc || `Blog Post #${id}`}
                 </h2>
-                <div className="flex flex-wrap justify-center gap-2 mb-3">
+                {excerpt && (
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3 line-clamp-2 leading-relaxed">
+                        {excerpt}
+                    </p>
+                )}
+                <div className="flex flex-wrap gap-2 mb-3">
                     {tags.map((tag) => (
                         <span
                             key={tag}
@@ -34,23 +40,23 @@ export default function BlogListCard({ id, toc, tags, created_at, updated_at, au
                         </span>
                     ))}
                 </div>
-                <div className="text-neutral-400 dark:text-neutral-500 text-xs text-right">
+                <div className="text-neutral-400 dark:text-neutral-500 text-xs flex flex-wrap gap-x-3 gap-y-0.5">
                     {created_at && (
-                        <p>
-                            <strong>{t("created")}:</strong>{" "}
+                        <span>
+                            <strong className="font-medium">{t("created")}:</strong>{" "}
                             <ShowClientTime datetimeString={created_at} />
-                        </p>
+                        </span>
                     )}
                     {showUpdated && (
-                        <p>
-                            <strong>{t("updated")}:</strong>{" "}
+                        <span>
+                            <strong className="font-medium">{t("updated")}:</strong>{" "}
                             <ShowClientTime datetimeString={updated_at} />
-                        </p>
+                        </span>
                     )}
                 </div>
             </Link>
             {author_name && (
-                <div className="px-4 pb-3 text-xs text-right">
+                <div className="px-5 pb-3 text-xs">
                     <span className="text-neutral-400 dark:text-neutral-500">{t("author")}: </span>
                     <Link
                         href={`/blogs/author/${encodeURIComponent(author_name)}`}

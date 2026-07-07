@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::{blogs as blogs_repo, images as images_repo},
-    structs::blogs::{BlogsResponse, DbBlog, PutBlog},
+    structs::blogs::{BlogsResponse, DbBlog, PutBlog, TagCount},
     structs::pagination::PageQuery,
 };
 use regex::Regex;
@@ -29,14 +29,19 @@ pub async fn get_blogs(
     page: &PageQuery,
     tag: Option<String>,
     author: Option<String>,
+    q: Option<String>,
+    sort: Option<String>,
 ) -> Result<BlogsResponse, AppError> {
     let (per_page, offset) = page.to_limit_offset(10);
     let (page, per_page, offset) = (page.page.unwrap_or(1).max(1) as usize, per_page as usize, offset as usize);
     let tag_ref = tag.as_deref();
     let author_ref = author.as_deref();
+    // 關鍵字空白視同無過濾；排序只認 oldest，其餘一律 newest
+    let q_ref = q.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let ascending = sort.as_deref() == Some("oldest");
     let (total, data) = tokio::try_join!(
-        blogs_repo::count_blogs(pool, tag_ref, author_ref),
-        blogs_repo::get_blogs_with_pagination(pool, per_page, offset, tag_ref, author_ref),
+        blogs_repo::count_blogs(pool, tag_ref, author_ref, q_ref),
+        blogs_repo::get_blogs_with_pagination(pool, per_page, offset, tag_ref, author_ref, q_ref, ascending),
     )?;
     Ok(BlogsResponse { total, page, per_page, data })
 }
@@ -62,6 +67,10 @@ pub async fn get_admin_blogs(
 
 pub async fn get_tags(pool: &Pool<Postgres>) -> Result<Vec<String>, AppError> {
     blogs_repo::get_all_tags(pool).await
+}
+
+pub async fn get_tag_counts(pool: &Pool<Postgres>) -> Result<Vec<TagCount>, AppError> {
+    blogs_repo::get_tag_counts(pool).await
 }
 
 pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_id: i64) -> Result<String, AppError> {

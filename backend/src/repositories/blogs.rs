@@ -1,4 +1,7 @@
-use crate::{errors::AppError, structs::blogs::DbBlog};
+use crate::{
+    errors::AppError,
+    structs::blogs::{DbBlog, TagCount},
+};
 use sqlx::{PgConnection, Pool, Postgres};
 
 pub async fn get_blogs_with_pagination(
@@ -7,25 +10,32 @@ pub async fn get_blogs_with_pagination(
     offset: usize,
     tag: Option<&str>,
     author: Option<&str>,
+    q: Option<&str>,
+    ascending: bool,
 ) -> Result<Vec<DbBlog>, AppError> {
-    sqlx::query_as(
+    // 排序方向白名單化後直接內插（不可 bind ORDER BY）；其餘條件仍走 bind 防注入
+    let order = if ascending { "ASC" } else { "DESC" };
+    let sql = format!(
         r#"
             SELECT b.id, b.markdown, b.tocs, b.tags, b.created_at, b.updated_at, u.name AS author_name
             FROM blogs b
             LEFT JOIN users u ON u.id = b.author_id
             WHERE ($1::text IS NULL OR $1 = ANY(b.tags))
               AND ($2::text IS NULL OR u.name = $2)
-            ORDER BY b.created_at DESC
-            LIMIT $3 OFFSET $4
+              AND ($3::text IS NULL OR b.markdown ILIKE '%' || $3 || '%')
+            ORDER BY b.created_at {order}
+            LIMIT $4 OFFSET $5
             "#,
-    )
-    .bind(tag)
-    .bind(author)
-    .bind(limit as i64)
-    .bind(offset as i64)
-    .fetch_all(pool)
-    .await
-    .map_err(AppError::from)
+    );
+    sqlx::query_as(&sql)
+        .bind(tag)
+        .bind(author)
+        .bind(q)
+        .bind(limit as i64)
+        .bind(offset as i64)
+        .fetch_all(pool)
+        .await
+        .map_err(AppError::from)
 }
 
 /// 資料隔離用：取某文章的擁有者 id。外層 None = 文章不存在（＝視為新建）；內層 = author_id。
@@ -91,6 +101,7 @@ pub async fn count_blogs(
     pool: &Pool<Postgres>,
     tag: Option<&str>,
     author: Option<&str>,
+    q: Option<&str>,
 ) -> Result<i64, AppError> {
     sqlx::query_scalar(
         r#"
@@ -99,10 +110,12 @@ pub async fn count_blogs(
             LEFT JOIN users u ON u.id = b.author_id
             WHERE ($1::text IS NULL OR $1 = ANY(b.tags))
               AND ($2::text IS NULL OR u.name = $2)
+              AND ($3::text IS NULL OR b.markdown ILIKE '%' || $3 || '%')
             "#,
     )
     .bind(tag)
     .bind(author)
+    .bind(q)
     .fetch_one(pool)
     .await
     .map_err(AppError::from)
@@ -113,6 +126,21 @@ pub async fn get_all_tags(pool: &Pool<Postgres>) -> Result<Vec<String>, AppError
         r#"
             SELECT DISTINCT unnest(tags) AS tag
             FROM blogs
+            ORDER BY tag
+            "#,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(AppError::from)
+}
+
+/// 每個 tag 的文章數（公開列表側欄用）；依 tag 字母排序
+pub async fn get_tag_counts(pool: &Pool<Postgres>) -> Result<Vec<TagCount>, AppError> {
+    sqlx::query_as(
+        r#"
+            SELECT tag, COUNT(*) AS count
+            FROM blogs, unnest(tags) AS tag
+            GROUP BY tag
             ORDER BY tag
             "#,
     )

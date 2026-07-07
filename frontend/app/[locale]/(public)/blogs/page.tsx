@@ -4,7 +4,7 @@ import BlogList from '@/components/blogs/blog-list';
 
 interface Props {
     params: Promise<{ locale: string }>
-    searchParams: Promise<{ tag?: string; page?: string }>
+    searchParams: Promise<{ tag?: string; page?: string; q?: string; sort?: string }>
 }
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
@@ -27,6 +27,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 }
 
 export default async function BlogsPage({ searchParams }: Props) {
-    const { tag, page } = await searchParams;
-    return <BlogList selectedTag={tag ?? null} page={page ? Number(page) : 1} />;
+    const { tag, page, q, sort } = await searchParams;
+    return (
+        <BlogList
+            selectedTag={tag ?? null}
+            page={page ? Number(page) : 1}
+            q={q ?? null}
+            sort={sort ?? null}
+        />
+    );
 }

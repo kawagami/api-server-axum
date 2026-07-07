@@ -170,7 +170,13 @@
     "metaTitle": "Kawa's Blog",
     "metaTaggedTitle": "Tag: {tag} | Kawa's Blog",
     "metaAuthorTitle": "Posts by {author} | Kawa's Blog",
-    "metaDescription": "Kawa's personal blog — notes on programming, backend, frontend, and developer tools."
+    "metaDescription": "Kawa's personal blog — notes on programming, backend, frontend, and developer tools.",
+    "searchPlaceholder": "Search posts…",
+    "searchClear": "Clear search",
+    "sortLabel": "Sort",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "clearFilters": "Clear filters"
   },
   "Pagination": {
     "prev": "Previous page",

@@ -16,6 +16,17 @@ pub struct BlogFilter {
     pub tag: Option<String>,
     /// 作者頁用：只列此 admin（users.name）的文章
     pub author: Option<String>,
+    /// 關鍵字：對 markdown 內容 ILIKE 模糊比對（含標題，因標題也在 markdown 內）
+    pub q: Option<String>,
+    /// 排序：`oldest` = 建立時間舊→新；其餘（含省略）= 新→舊
+    pub sort: Option<String>,
+}
+
+/// tag 與其文章數（公開列表側欄用）
+#[derive(Serialize, FromRow)]
+pub struct TagCount {
+    pub tag: String,
+    pub count: i64,
 }
 
 impl PutBlog {

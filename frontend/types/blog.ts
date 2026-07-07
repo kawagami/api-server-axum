@@ -15,6 +15,11 @@ export interface Blog {
   author_name?: string | null;
 }
 
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
 export interface BlogPaginatedResponse {
   total: number;
   page: number;
