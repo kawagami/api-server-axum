@@ -66,3 +66,25 @@ export async function deleteBlog(id: string): Promise<void> {
     revalidateTag('blogs', 'max');
     revalidateTag(`blog:${id}`, 'max');
 }
+
+// 全站改名/合併 tag（一般 admin 只影響自己的文章，super_admin 全站）。回受影響文章數。
+export async function renameBlogTag(from: string, to: string): Promise<number> {
+    const res = await adminRequest<{ affected: number }>({
+        url: `${process.env.API_URL}/admin/blogs/tags`,
+        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH',
+        body: JSON.stringify({ from, to }),
+    });
+    revalidateTag('blogs', 'max');
+    return res?.affected ?? 0;
+}
+
+// 全站移除某 tag。回受影響文章數。
+export async function deleteBlogTag(tag: string): Promise<number> {
+    const res = await adminRequest<{ affected: number }>({
+        url: `${process.env.API_URL}/admin/blogs/tags?tag=${encodeURIComponent(tag)}`,
+        method: 'DELETE',
+    });
+    revalidateTag('blogs', 'max');
+    return res?.affected ?? 0;
+}

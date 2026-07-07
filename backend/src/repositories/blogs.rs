@@ -20,7 +20,7 @@ pub async fn get_blogs_with_pagination(
             SELECT b.id, b.markdown, b.tocs, b.tags, b.created_at, b.updated_at, u.name AS author_name
             FROM blogs b
             LEFT JOIN users u ON u.id = b.author_id
-            WHERE ($1::text IS NULL OR $1 = ANY(b.tags))
+            WHERE ($1::text IS NULL OR b.tags @> ARRAY[$1])
               AND ($2::text IS NULL OR u.name = $2)
               AND ($3::text IS NULL OR b.markdown ILIKE '%' || $3 || '%')
             ORDER BY b.created_at {order}
@@ -108,7 +108,7 @@ pub async fn count_blogs(
             SELECT COUNT(*)
             FROM blogs b
             LEFT JOIN users u ON u.id = b.author_id
-            WHERE ($1::text IS NULL OR $1 = ANY(b.tags))
+            WHERE ($1::text IS NULL OR b.tags @> ARRAY[$1])
               AND ($2::text IS NULL OR u.name = $2)
               AND ($3::text IS NULL OR b.markdown ILIKE '%' || $3 || '%')
             "#,
@@ -147,6 +147,48 @@ pub async fn get_tag_counts(pool: &Pool<Postgres>) -> Result<Vec<TagCount>, AppE
     .fetch_all(pool)
     .await
     .map_err(AppError::from)
+}
+
+/// 全站改名/合併 tag：把 `from` 換成 `to`，並去重（原本同時有兩者的文章不會出現重複）。
+/// owner=None → super_admin 動全部；Some(id) → 只動自己的文章。不動 updated_at（taxonomy 維護非內容編輯）。
+/// 回傳受影響文章數。
+pub async fn rename_tag(
+    pool: &Pool<Postgres>,
+    owner: Option<i64>,
+    from: &str,
+    to: &str,
+) -> Result<u64, AppError> {
+    let result = sqlx::query(
+        r#"
+            UPDATE blogs
+            SET tags = ARRAY(SELECT DISTINCT unnest(array_replace(tags, $1, $2)) ORDER BY 1)
+            WHERE tags @> ARRAY[$1]
+              AND ($3::bigint IS NULL OR author_id = $3)
+            "#,
+    )
+    .bind(from)
+    .bind(to)
+    .bind(owner)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+/// 全站移除某 tag（保留其餘 tag 順序）。owner 語意同 `rename_tag`。回傳受影響文章數。
+pub async fn delete_tag(pool: &Pool<Postgres>, owner: Option<i64>, tag: &str) -> Result<u64, AppError> {
+    let result = sqlx::query(
+        r#"
+            UPDATE blogs
+            SET tags = array_remove(tags, $1)
+            WHERE tags @> ARRAY[$1]
+              AND ($2::bigint IS NULL OR author_id = $2)
+            "#,
+    )
+    .bind(tag)
+    .bind(owner)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
 }
 
 pub async fn delete_blog_in_tx(conn: &mut PgConnection, id: uuid::Uuid) -> Result<(), AppError> {

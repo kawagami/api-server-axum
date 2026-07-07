@@ -1,10 +1,17 @@
-import { getAdminBlogs } from '@/api/blogs';
+import { getAdminBlogs, getBlogTagCounts } from '@/api/blogs';
 import { CreateButton, EditButton, DeleteButton } from '@/components/blogs/blog-action-buttons';
-import { requirePermission } from "@/libs/admin-permissions";
+import TagManager from '@/components/blogs/tag-manager';
+import { requirePermission, getMyPermissions } from "@/libs/admin-permissions";
 
 export default async function BlogsPage() {
     await requirePermission("blog:read");
-    const { data: blogs } = await getAdminBlogs({ per_page: 200 });
+    const [{ data: blogs }, permissions] = await Promise.all([
+        getAdminBlogs({ per_page: 200 }),
+        getMyPermissions(),
+    ]);
+    const canManageTags = permissions.includes("blog:update");
+    // tag 篇數為全站統計；只有具改名/刪除權限時才載入與顯示管理面板
+    const tags = canManageTags ? await getBlogTagCounts() : [];
 
     return (
         <div className="w-full p-6 bg-neutral-100 dark:bg-neutral-900">
@@ -30,6 +37,7 @@ export default async function BlogsPage() {
                     <p className="text-neutral-500 dark:text-neutral-400 text-center">暫無 blog 內容</p>
                 )}
             </div>
+            {canManageTags && <TagManager tags={tags} />}
         </div>
     );
 }

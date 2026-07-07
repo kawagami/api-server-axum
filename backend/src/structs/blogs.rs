@@ -29,6 +29,25 @@ pub struct TagCount {
     pub count: i64,
 }
 
+/// 後台改名/合併 tag 請求
+#[derive(Deserialize)]
+pub struct RenameTagRequest {
+    pub from: String,
+    pub to: String,
+}
+
+/// 後台全站刪除 tag 的查詢參數
+#[derive(Deserialize)]
+pub struct DeleteTagQuery {
+    pub tag: String,
+}
+
+/// tag 變更結果：回受影響文章數
+#[derive(Serialize)]
+pub struct TagMutationResponse {
+    pub affected: u64,
+}
+
 impl PutBlog {
     /// 提取 tocs 中的 text 字段，返回 Vec<String>
     pub fn extract_toc_texts(&self) -> Vec<String> {

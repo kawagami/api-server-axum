@@ -12,6 +12,23 @@ use uuid::Uuid;
 
 static MD_IMAGE_RE: OnceLock<Regex> = OnceLock::new();
 
+/// 寫入前正規化 tag 陣列：去頭尾空白、去空字串、大小寫不敏感去重（保留首次出現的顯示形）。
+/// 避免同篇出現「Rust / rust」或含空白的重複標籤。跨篇的統一改由後台 rename/merge 處理。
+pub fn normalize_tags(tags: Vec<String>) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for tag in tags {
+        let trimmed = tag.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if seen.insert(trimmed.to_lowercase()) {
+            out.push(trimmed.to_string());
+        }
+    }
+    out
+}
+
 fn extract_upload_urls(markdown: &str) -> Vec<String> {
     let re = MD_IMAGE_RE
         .get_or_init(|| Regex::new(r"!\[[^\]]*\]\(([^)]+)\)").expect("static regex is always valid"));
@@ -73,6 +90,33 @@ pub async fn get_tag_counts(pool: &Pool<Postgres>) -> Result<Vec<TagCount>, AppE
     blogs_repo::get_tag_counts(pool).await
 }
 
+/// 全站改名/合併 tag。owner=None → super_admin 動全部；Some(id) → 只動自己的文章。
+pub async fn rename_tag(
+    pool: &Pool<Postgres>,
+    owner: Option<i64>,
+    from: String,
+    to: String,
+) -> Result<u64, AppError> {
+    let from = from.trim();
+    let to = to.trim();
+    if from.is_empty() || to.is_empty() {
+        return Err(RequestError::UnprocessableContent("tag 不可為空".into()).into());
+    }
+    if from == to {
+        return Ok(0);
+    }
+    blogs_repo::rename_tag(pool, owner, from, to).await
+}
+
+/// 全站移除某 tag。owner 語意同 `rename_tag`。
+pub async fn delete_tag(pool: &Pool<Postgres>, owner: Option<i64>, tag: String) -> Result<u64, AppError> {
+    let tag = tag.trim();
+    if tag.is_empty() {
+        return Err(RequestError::UnprocessableContent("tag 不可為空".into()).into());
+    }
+    blogs_repo::delete_tag(pool, owner, tag).await
+}
+
 pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_id: i64) -> Result<String, AppError> {
     let tocs = blog.extract_toc_texts();
     let title = tocs.first().cloned().unwrap_or_default();
@@ -97,8 +141,10 @@ pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_
             .collect()
     };
 
+    let tags = normalize_tags(blog.tags);
+
     let mut tx = pool.begin().await?;
-    blogs_repo::upsert_blog_in_tx(&mut tx, id, blog.markdown, tocs, blog.tags, author_id).await?;
+    blogs_repo::upsert_blog_in_tx(&mut tx, id, blog.markdown, tocs, tags, author_id).await?;
     if !new_urls.is_empty() {
         images_repo::mark_images_active_by_urls_in_tx(&mut tx, &new_urls).await?;
     }
@@ -132,4 +178,33 @@ pub async fn delete_blog_with_images(pool: &Pool<Postgres>, id: Uuid) -> Result<
     tx.commit().await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_tags;
+
+    fn v(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn trims_and_drops_empty() {
+        assert_eq!(normalize_tags(v(&["  rust ", "", "   ", "後端"])), v(&["rust", "後端"]));
+    }
+
+    #[test]
+    fn dedupes_case_insensitively_keeping_first_display_form() {
+        assert_eq!(normalize_tags(v(&["Rust", "rust", "RUST"])), v(&["Rust"]));
+    }
+
+    #[test]
+    fn dedupes_after_trim() {
+        assert_eq!(normalize_tags(v(&["tag", " tag "])), v(&["tag"]));
+    }
+
+    #[test]
+    fn preserves_order() {
+        assert_eq!(normalize_tags(v(&["b", "a", "c", "A"])), v(&["b", "a", "c"]));
+    }
 }
