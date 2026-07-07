@@ -13,6 +13,9 @@ struct ErrorResponse {
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     details: Option<String>,
+    // 對應該次請求的追蹤 id（同時放在 x-request-id header），使用者回報錯誤時可據此撈 log
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_id: Option<String>,
 }
 
 // 變體統一 *Error 後綴是本專案慣例，比去掉後綴的裸名（Connection / Request…）可讀
@@ -114,6 +117,7 @@ impl AppError {
             code: status.as_u16(),
             message: self.to_string(),
             details: self.error_details(),
+            request_id: crate::middleware::request_id::current_request_id(),
         }
     }
 

@@ -36,6 +36,7 @@ use axum::{
 use tokio::sync::mpsc;
 use tower_http::cors::AllowOrigin;
 use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::trace::TraceLayer;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
 pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<AppState> {
@@ -116,8 +117,30 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
                     Method::DELETE,
                 ])
                 .allow_origin(AllowOrigin::list(cors_origins))
-                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+                // 讓瀏覽器端 JS 可讀到追蹤 id，方便回報問題時附上
+                .expose_headers([header::HeaderName::from_static("x-request-id")]),
         )
+        // 每請求一條 span：method / path / status / 延遲，並帶上 request_id（由下方 middleware 塞入 extensions）
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|req: &axum::http::Request<_>| {
+                let request_id = req
+                    .extensions()
+                    .get::<crate::middleware::request_id::RequestId>()
+                    .map(|r| r.0.as_str())
+                    .unwrap_or("-");
+                tracing::info_span!(
+                    "request",
+                    method = %req.method(),
+                    path = %req.uri().path(),
+                    request_id = %request_id,
+                )
+            }),
+        )
+        // 最外層：產生 request_id → 供上面 span 讀取、寫回 response header、供錯誤 body 回溯
+        .layer(middleware::from_fn(
+            crate::middleware::request_id::request_id,
+        ))
         .with_state(state)
         .fallback(|| async { (StatusCode::NOT_FOUND, "empty page") })
 }
