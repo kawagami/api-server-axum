@@ -20,3 +20,4 @@ pub mod stocks;
 pub mod torrents;
 pub mod twse;
 pub mod users;
+pub mod vocab;

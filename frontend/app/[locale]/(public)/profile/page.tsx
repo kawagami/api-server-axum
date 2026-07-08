@@ -1,8 +1,9 @@
 import { getCurrentMember } from "@/api/members";
+import { getVocabMe } from "@/api/vocab";
 import { Link } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
-import { LayoutDashboard } from "lucide-react";
+import { GraduationCap, LayoutDashboard } from "lucide-react";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Profile");
@@ -16,11 +17,16 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 export default async function ProfilePage() {
-    const [member, t, locale] = await Promise.all([
+    const [member, vocabMe, t, locale] = await Promise.all([
         getCurrentMember(),
+        getVocabMe(),
         getTranslations("Profile"),
         getLocale(),
     ]);
+    const levelSpan = vocabMe.next_level_exp - vocabMe.level_exp;
+    const levelProgress = levelSpan > 0
+        ? Math.min(100, ((vocabMe.exp - vocabMe.level_exp) / levelSpan) * 100)
+        : 100;
 
     return (
         <div className="w-full max-w-2xl px-4 py-8 flex flex-col gap-6">
@@ -55,6 +61,28 @@ export default async function ProfilePage() {
                             <span className="text-sm text-neutral-500 dark:text-neutral-400">{member.email}</span>
                         )}
                     </div>
+                </div>
+
+                <div className="flex flex-col gap-2 border-t border-neutral-100 dark:border-neutral-700 pt-4">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm text-neutral-500 dark:text-neutral-400">{t("memberLevel")}</span>
+                        <Link
+                            href="/vocab"
+                            className="flex items-center gap-1 text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline"
+                        >
+                            <GraduationCap size={16} />
+                            Lv.{vocabMe.level}
+                        </Link>
+                    </div>
+                    <div className="h-2 rounded-full bg-neutral-100 dark:bg-neutral-700 overflow-hidden">
+                        <div
+                            className="h-full rounded-full bg-primary-500"
+                            style={{ width: `${levelProgress}%` }}
+                        />
+                    </div>
+                    <span className="text-xs text-neutral-400 dark:text-neutral-500 self-end">
+                        {vocabMe.exp} / {vocabMe.next_level_exp} EXP
+                    </span>
                 </div>
 
                 <div className="flex flex-col gap-2 text-sm text-neutral-500 dark:text-neutral-400 border-t border-neutral-100 dark:border-neutral-700 pt-4">

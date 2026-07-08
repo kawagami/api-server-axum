@@ -24,6 +24,7 @@ mod stocks;
 mod tools;
 mod torrents;
 mod users;
+mod vocab;
 mod ws;
 
 use crate::{logging::LogEntry, scheduler::initialize_scheduler, state::AppState};
@@ -101,6 +102,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/member/ledger", ledger::new(state.clone()))
         .nest("/member/invoices", invoices::new(state.clone()))
         .nest("/member/lotto", lotto::new(state.clone()))
+        .nest("/member/vocab", vocab::new(state.clone()))
         .nest("/oauth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))
         .nest("/settings", app_settings::public())

@@ -21,6 +21,7 @@
     "ledger": "Ledger",
     "invoices": "Invoices",
     "lotto": "Lottery",
+    "vocab": "Vocab Challenge",
     "openMenu": "Open navigation menu",
     "closeMenu": "Close navigation menu",
     "openToolsMenu": "Open tools menu",
@@ -136,7 +137,8 @@
     "title": "Profile",
     "dashboard": "Dashboard",
     "joinedAt": "Joined: ",
-    "linkedAccounts": "Linked accounts"
+    "linkedAccounts": "Linked accounts",
+    "memberLevel": "Member level"
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -153,7 +155,8 @@
       "portfolio": "Live holdings P&L and history.",
       "ledger": "Income/expense records and charts.",
       "invoices": "Registered invoices and winnings.",
-      "lotto": "Your picks and draw results."
+      "lotto": "Your picks and draw results.",
+      "vocab": "Vocabulary survival quiz — earn EXP and level up."
     }
   },
   "BlogError": {
@@ -823,5 +826,33 @@
       "farm": "Worker-placement farm management for 2–4 players.",
       "metalSlug": "A 2D side-scrolling action game built with Bevy (prototype)."
     }
+  },
+  "Vocab": {
+    "title": "Vocab Challenge",
+    "subtitle": "Answer streaks earn EXP and level up your account",
+    "levelBadge": "Lv.{level}",
+    "rules": "A mix of multiple-choice and spelling questions. Streaks earn bonus EXP and difficulty ramps up. Each miss costs a life; the run ends after 3.",
+    "start": "Start",
+    "playAgain": "Play again",
+    "runOver": "Run over",
+    "newBest": "New personal best!",
+    "answeredLabel": "Answered",
+    "correctLabel": "Correct",
+    "maxComboLabel": "Best streak",
+    "expGained": "EXP earned",
+    "levelUp": "Level up! Lv.{level}",
+    "totalRuns": "Runs",
+    "wordsLearned": "Words learned",
+    "bestCorrect": "Best correct",
+    "questionNumber": "Question {number}",
+    "comboLabel": "{count} streak",
+    "chooseMeaning": "Pick the correct meaning",
+    "spellingHint": "Hint: starts with {letter}, {length} letters",
+    "inputPlaceholder": "Type the English word",
+    "submit": "Submit",
+    "correct": "Correct!",
+    "wrong": "Wrong",
+    "correctAnswerIs": "Answer: {answer}",
+    "requestError": "Something went wrong, please try again"
   }
 }

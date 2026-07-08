@@ -17,4 +17,5 @@ pub mod stocks;
 pub mod tools;
 pub mod torrents;
 pub mod users;
+pub mod vocab;
 pub mod ws;

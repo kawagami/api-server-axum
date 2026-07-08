@@ -21,6 +21,7 @@
     "ledger": "记账",
     "invoices": "发票",
     "lotto": "乐透对奖",
+    "vocab": "单词闯关",
     "openMenu": "打开导航菜单",
     "closeMenu": "关闭导航菜单",
     "openToolsMenu": "打开工具菜单",
@@ -136,7 +137,8 @@
     "title": "个人资料",
     "dashboard": "仪表板",
     "joinedAt": "加入时间：",
-    "linkedAccounts": "已链接账号"
+    "linkedAccounts": "已链接账号",
+    "memberLevel": "会员等级"
   },
   "Dashboard": {
     "title": "仪表板",
@@ -153,7 +155,8 @@
       "portfolio": "持股实时损益与历史走势。",
       "ledger": "收支记录与分类统计图表。",
       "invoices": "发票登记列表与中奖查询。",
-      "lotto": "选号列表与开奖对照。"
+      "lotto": "选号列表与开奖对照。",
+      "vocab": "英文单词闯关，答题赚经验值升级。"
     }
   },
   "BlogError": {
@@ -823,5 +826,33 @@
       "farm": "2–4 人工人放置农场经营。",
       "metalSlug": "Bevy 制作的 2D 横向卷轴动作游戏（试作）。"
     }
+  },
+  "Vocab": {
+    "title": "单词闯关",
+    "subtitle": "连续答题累积经验值，升级你的会员等级",
+    "levelBadge": "Lv.{level}",
+    "rules": "英文选意思、拼写填空混合出题；连对有经验加成，难度随进度提升。答错扣一条命，3 条命用完结算经验值。",
+    "start": "开始挑战",
+    "playAgain": "再挑战一次",
+    "runOver": "挑战结束",
+    "newBest": "新的个人纪录！",
+    "answeredLabel": "作答题数",
+    "correctLabel": "答对题数",
+    "maxComboLabel": "最高连对",
+    "expGained": "获得经验值",
+    "levelUp": "升级！Lv.{level}",
+    "totalRuns": "挑战次数",
+    "wordsLearned": "学过单词",
+    "bestCorrect": "最佳答对数",
+    "questionNumber": "第 {number} 题",
+    "comboLabel": "{count} 连对",
+    "chooseMeaning": "选出正确的意思",
+    "spellingHint": "提示：{letter} 开头，共 {length} 个字母",
+    "inputPlaceholder": "输入英文单词",
+    "submit": "提交",
+    "correct": "答对了！",
+    "wrong": "答错了",
+    "correctAnswerIs": "正确答案：{answer}",
+    "requestError": "连接出了点问题，请再试一次"
   }
 }

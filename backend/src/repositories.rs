@@ -16,4 +16,5 @@ pub mod roles;
 pub mod stocks;
 pub mod torrents;
 pub mod users;
+pub mod vocab;
 pub mod visitors;

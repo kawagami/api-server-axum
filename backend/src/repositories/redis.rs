@@ -164,6 +164,15 @@ pub async fn cache_get(
     Ok(value)
 }
 
+pub async fn cache_del(
+    pool: &RedisPool<RedisConnectionManager>,
+    key: &str,
+) -> Result<(), crate::errors::AppError> {
+    let mut conn = get_redis_conn(pool).await?;
+    conn.del::<_, ()>(key).await?;
+    Ok(())
+}
+
 pub async fn cache_set(
     pool: &RedisPool<RedisConnectionManager>,
     key: &str,

@@ -21,6 +21,7 @@
     "ledger": "記帳",
     "invoices": "發票",
     "lotto": "樂透對獎",
+    "vocab": "單字闖關",
     "openMenu": "開啟導航菜單",
     "closeMenu": "關閉導航菜單",
     "openToolsMenu": "開啟工具選單",
@@ -136,7 +137,8 @@
     "title": "個人資料",
     "dashboard": "儀表板",
     "joinedAt": "加入時間：",
-    "linkedAccounts": "已連結帳號"
+    "linkedAccounts": "已連結帳號",
+    "memberLevel": "會員等級"
   },
   "Dashboard": {
     "title": "儀表板",
@@ -153,7 +155,8 @@
       "portfolio": "持股即時損益與歷史走勢。",
       "ledger": "收支記錄與分類統計圖表。",
       "invoices": "發票登錄列表與中獎查詢。",
-      "lotto": "選號列表與開獎對照。"
+      "lotto": "選號列表與開獎對照。",
+      "vocab": "英文單字闖關，答題賺經驗值升級。"
     }
   },
   "BlogError": {
@@ -823,5 +826,33 @@
       "farm": "2–4 人工人放置農場經營。",
       "metalSlug": "Bevy 製作的 2D 橫向捲軸動作遊戲（試作）。"
     }
+  },
+  "Vocab": {
+    "title": "單字闖關",
+    "subtitle": "連續答題累積經驗值，升級你的會員等級",
+    "levelBadge": "Lv.{level}",
+    "rules": "英文選意思、拼字填空混合出題；連對有經驗加成，難度隨進度提升。答錯扣一條命，3 條命用完結算經驗值。",
+    "start": "開始挑戰",
+    "playAgain": "再挑戰一次",
+    "runOver": "挑戰結束",
+    "newBest": "新的個人紀錄！",
+    "answeredLabel": "作答題數",
+    "correctLabel": "答對題數",
+    "maxComboLabel": "最高連對",
+    "expGained": "獲得經驗值",
+    "levelUp": "升級！Lv.{level}",
+    "totalRuns": "挑戰次數",
+    "wordsLearned": "學過單字",
+    "bestCorrect": "最佳答對數",
+    "questionNumber": "第 {number} 題",
+    "comboLabel": "{count} 連對",
+    "chooseMeaning": "選出正確的意思",
+    "spellingHint": "提示：{letter} 開頭，共 {length} 個字母",
+    "inputPlaceholder": "輸入英文單字",
+    "submit": "送出",
+    "correct": "答對了！",
+    "wrong": "答錯了",
+    "correctAnswerIs": "正確答案：{answer}",
+    "requestError": "連線出了點問題，請再試一次"
   }
 }

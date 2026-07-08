@@ -20,6 +20,7 @@ import {
     Wallet,
     ReceiptText,
     Ticket,
+    GraduationCap,
     type LucideIcon,
 } from "lucide-react";
 
@@ -60,4 +61,5 @@ export const MEMBER_LINKS: readonly SiteNavItem[] = [
     { key: "ledger", href: "/ledger", labelKey: "ledger", icon: Wallet },
     { key: "invoices", href: "/invoices", labelKey: "invoices", icon: ReceiptText },
     { key: "lotto", href: "/lotto", labelKey: "lotto", icon: Ticket },
+    { key: "vocab", href: "/vocab", labelKey: "vocab", icon: GraduationCap },
 ] as const;
