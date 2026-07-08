@@ -66,6 +66,7 @@ export default function useTimer() {
         minutes,
         setMinutes: updateMinutes,
         timeLeft,
+        targetTime,
         isRunning,
         isPaused,
         isBeeping,

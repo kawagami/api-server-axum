@@ -55,6 +55,7 @@ export default function useAlarm() {
         minute,
         setMinute,
         timeLeft,
+        targetTime,
         isRunning,
         isBeeping,
         startAlarm,

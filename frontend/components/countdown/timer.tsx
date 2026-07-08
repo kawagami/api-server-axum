@@ -11,6 +11,7 @@ export default function Timer() {
         minutes,
         setMinutes,
         timeLeft,
+        targetTime,
         isRunning,
         isPaused,
         isBeeping,
@@ -20,7 +21,7 @@ export default function Timer() {
         stopBeeping,
     } = useTimer();
 
-    const audioRef = useAudioBeeper(isBeeping, stopBeeping, resetCountdown);
+    const audioRef = useAudioBeeper(isBeeping, stopBeeping, resetCountdown, isRunning, targetTime);
 
     const handleEnterPress = () => {
         if (!isRunning && !isPaused && !isBeeping) startCountdown();

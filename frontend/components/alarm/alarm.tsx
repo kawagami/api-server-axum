@@ -13,6 +13,7 @@ export default function Alarm() {
         minute,
         setMinute,
         timeLeft,
+        targetTime,
         isRunning,
         isBeeping,
         startAlarm,
@@ -20,7 +21,7 @@ export default function Alarm() {
         stopBeeping,
     } = useAlarm();
 
-    const audioRef = useAudioBeeper(isBeeping, stopBeeping, resetAlarm);
+    const audioRef = useAudioBeeper(isBeeping, stopBeeping, resetAlarm, isRunning, targetTime);
 
     return (
         <div className="h-[calc(100svh-120px)] overflow-auto flex flex-col items-center justify-center p-4">
