@@ -763,9 +763,9 @@
         "title": "Blog",
         "desc": "Notes on development, frontend/backend and tooling, with Markdown and tag filtering."
       },
-      "notes": {
-        "title": "Notes",
-        "desc": "HackMD notes integrated for quick reading and sharing."
+      "vocab": {
+        "title": "Vocab Challenge",
+        "desc": "Answer streaks to earn EXP and level up."
       },
       "games": {
         "title": "Games",

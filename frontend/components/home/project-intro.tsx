@@ -3,7 +3,7 @@ import KawaLogo from "@/components/kawa-logo";
 import FeatureCard from "@/components/feature-card";
 import {
     FileText,
-    StickyNote,
+    GraduationCap,
     Gamepad2,
     Wallet,
     TrendingUp,
@@ -23,7 +23,7 @@ interface Feature {
 
 const FEATURES: Feature[] = [
     { key: "blog", href: "/blogs", icon: FileText },
-    { key: "notes", href: "/hackmd-notes", icon: StickyNote },
+    { key: "vocab", href: "/vocab", icon: GraduationCap },
     { key: "games", href: "/games", icon: Gamepad2 },
     { key: "ledger", href: "/ledger", icon: Wallet },
     { key: "portfolio", href: "/portfolio", icon: TrendingUp },
