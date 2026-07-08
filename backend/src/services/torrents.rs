@@ -110,7 +110,8 @@ pub async fn create(state: &AppState, magnet_uri: &str, created_by: &str, owner_
     }
 
     let torrent = torrents_repo::insert(state.get_pool(), &info_hash, magnet_uri, created_by, owner_id).await?;
-    sync_active(state.clone()).await;
+    // spawn 而非 await：add_torrent 解析 magnet metadata 可能卡數分鐘，會拖垮 HTTP 回應（nginx 60s 就斷）
+    tokio::spawn(sync_active(state.clone()));
     Ok(torrent)
 }
 
@@ -367,7 +368,7 @@ pub async fn reset_pending(state: &AppState, id: i32) -> Result<(), AppError> {
         torrents_repo::get_by_id(state.get_pool(), id).await?;
         return Err(RequestError::Conflict("任務進行中，無法重設".to_string()).into());
     }
-    sync_active(state.clone()).await;
+    tokio::spawn(sync_active(state.clone()));
     Ok(())
 }
 
@@ -384,7 +385,7 @@ pub async fn delete(state: &AppState, id: i32) -> Result<(), AppError> {
             tracing::warn!("torrent {id} remove dir {} failed: {e}", dir.display());
         }
     }
-    sync_active(state.clone()).await;
+    tokio::spawn(sync_active(state.clone()));
     Ok(())
 }
 
