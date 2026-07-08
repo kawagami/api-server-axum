@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Loader2, Bold, Italic, Code, Link2, Heading2, Quote, List } from 'lucide-react';
+import { Loader2, Bold, Italic, Code, Link2, Heading2, Quote, List, Plus, X } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import { putBlog } from '@/api/blogs';
 import { uploadImages } from '@/api/images';
@@ -110,12 +110,6 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
                         ) : '存檔'}
                     </button>
                     <button
-                        onClick={() => setShowTagModal(true)}
-                        className="px-6 py-2 font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                    >
-                        編輯類型
-                    </button>
-                    <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isSaving || isUploading}
                         className="px-6 py-2 font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-400 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
@@ -131,6 +125,30 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
                         className="hidden"
                         onChange={(e) => handleImageUpload(e.target.files)}
                     />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 px-4 mb-2">
+                    {tags.map((tag) => (
+                        <span
+                            key={tag}
+                            className="flex items-center gap-1 bg-primary-50 dark:bg-primary-900/40 border border-primary-200 dark:border-primary-800 rounded-lg pl-2.5 pr-1 py-0.5 text-sm text-neutral-700 dark:text-neutral-200"
+                        >
+                            {tag}
+                            <button
+                                onClick={() => setTags(tags.filter((t) => t !== tag))}
+                                aria-label={`移除 ${tag}`}
+                                className="p-0.5 rounded text-neutral-400 hover:text-red-600 transition-colors"
+                            >
+                                <X size={14} />
+                            </button>
+                        </span>
+                    ))}
+                    <button
+                        onClick={() => setShowTagModal(true)}
+                        className="flex items-center gap-1 px-2.5 py-0.5 text-sm rounded-lg border border-dashed border-neutral-300 dark:border-neutral-600 text-neutral-500 dark:text-neutral-400 hover:border-primary-400 hover:text-primary-600 dark:hover:text-primary-300 transition-colors"
+                    >
+                        <Plus size={14} /> 編輯 Tag
+                    </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1 px-4 mb-2 border-b border-neutral-200 dark:border-neutral-700 pb-2">
