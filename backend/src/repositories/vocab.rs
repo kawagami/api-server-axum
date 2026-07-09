@@ -77,15 +77,22 @@ pub async fn count_mastered_among(
 /// 在難度區間內隨機抽一字,排除本局已出過的;抽不到(題庫被出光)放寬排除重抽
 pub async fn random_word(
     pool: &Pool<Postgres>,
+    member_id: Option<i64>,
     min_difficulty: i16,
     max_difficulty: i16,
     exclude_ids: &[i64],
 ) -> Result<Option<Word>, AppError> {
+    // 加權隨機(Efraimidis–Spirakis):key = random()^(1/權重),取最大。
+    // 會員「沒測過」(member_word_stats 無 row)權重 4、測過權重 1 → 對應指數 0.25 / 1.0。
+    // 訪客 member_id 為 None,LEFT JOIN 全不命中 → 全部權重 4 → 退化成均勻隨機。
     let row: Option<Word> = sqlx::query_as(&format!(
-        "SELECT {WORD_COLS} FROM words
-         WHERE enabled AND difficulty BETWEEN $1 AND $2 AND NOT (id = ANY($3))
-         ORDER BY random() LIMIT 1"
+        "SELECT {WORD_COLS} FROM words w
+         LEFT JOIN member_word_stats s ON s.word_id = w.id AND s.member_id = $1
+         WHERE w.enabled AND w.difficulty BETWEEN $2 AND $3 AND NOT (w.id = ANY($4))
+         ORDER BY power(random(), CASE WHEN s.word_id IS NULL THEN 0.25 ELSE 1.0 END) DESC
+         LIMIT 1"
     ))
+    .bind(member_id)
     .bind(min_difficulty)
     .bind(max_difficulty)
     .bind(exclude_ids)
@@ -96,6 +103,7 @@ pub async fn random_word(
         return Ok(row);
     }
 
+    // 回退:整個難度區間都被本局出光,放寬本局已出過的排除
     let row = sqlx::query_as(&format!(
         "SELECT {WORD_COLS} FROM words
          WHERE enabled AND difficulty BETWEEN $1 AND $2

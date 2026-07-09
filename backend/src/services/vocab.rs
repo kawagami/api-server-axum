@@ -160,7 +160,7 @@ async fn next_question(
     run: &RunState,
 ) -> Result<(CurrentQuestion, QuestionDto), AppError> {
     let (min_d, max_d) = difficulty_window(run.answered);
-    let word = vocab_repo::random_word(state.get_pool(), min_d, max_d, &run.seen_word_ids)
+    let word = vocab_repo::random_word(state.get_pool(), run.member_id, min_d, max_d, &run.seen_word_ids)
         .await?
         .ok_or_else(|| {
             AppError::RequestError(RequestError::UnprocessableContent(
