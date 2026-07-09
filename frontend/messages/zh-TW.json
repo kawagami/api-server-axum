@@ -853,6 +853,19 @@
     "correct": "答對了！",
     "wrong": "答錯了",
     "correctAnswerIs": "正確答案：{answer}",
-    "requestError": "連線出了點問題，請再試一次"
+    "requestError": "連線出了點問題，請再試一次",
+    "reviewMistakes": "複習錯字 ({count})",
+    "noReview": "目前沒有需要複習的錯字",
+    "reviewMode": "複習模式",
+    "reviewOver": "複習完成",
+    "reviewedLabel": "複習題數",
+    "graduatedLabel": "已掌握",
+    "reviewHint": "答對次數追上答錯次數就會移出錯題本。",
+    "mistakeBook": "錯題本",
+    "mistakeCount": "共 {count} 字",
+    "mistakeEmpty": "還沒有答錯的單字,先去挑戰吧!",
+    "wrongCount": "答錯次數",
+    "correctCount": "答對次數",
+    "mastered": "已掌握"
   }
 }

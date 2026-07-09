@@ -853,6 +853,19 @@
     "correct": "答对了！",
     "wrong": "答错了",
     "correctAnswerIs": "正确答案：{answer}",
-    "requestError": "连接出了点问题，请再试一次"
+    "requestError": "连接出了点问题，请再试一次",
+    "reviewMistakes": "复习错字 ({count})",
+    "noReview": "目前没有需要复习的错字",
+    "reviewMode": "复习模式",
+    "reviewOver": "复习完成",
+    "reviewedLabel": "复习题数",
+    "graduatedLabel": "已掌握",
+    "reviewHint": "答对次数追上答错次数就会移出错题本。",
+    "mistakeBook": "错题本",
+    "mistakeCount": "共 {count} 字",
+    "mistakeEmpty": "还没有答错的单词,先去挑战吧!",
+    "wrongCount": "答错次数",
+    "correctCount": "答对次数",
+    "mastered": "已掌握"
   }
 }

@@ -1,4 +1,4 @@
-import { getVocabMe } from "@/api/vocab";
+import { getVocabMe, getVocabMistakes } from "@/api/vocab";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import VocabClient from "./VocabClient";
@@ -9,11 +9,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function VocabPage() {
-    const me = await getVocabMe();
+    const [me, mistakes] = await Promise.all([getVocabMe(), getVocabMistakes()]);
 
     return (
         <div className="w-full max-w-2xl px-4 py-8">
-            <VocabClient initialMe={me} />
+            <VocabClient initialMe={me} initialMistakes={mistakes} />
         </div>
     );
 }

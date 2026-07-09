@@ -1,11 +1,78 @@
 use crate::{
     errors::AppError,
-    structs::vocab::{BestRun, RunState, Word},
+    structs::vocab::{BestRun, MistakeEntry, RunState, Word},
 };
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
 const WORD_COLS: &str = "id, word, part_of_speech, meaning_zh, example_sentence, difficulty";
+
+/// 依 id 取單字(複習模式指定出題用);已下架回 None
+pub async fn word_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<Word>, AppError> {
+    let row = sqlx::query_as(&format!(
+        "SELECT {WORD_COLS} FROM words WHERE id = $1 AND enabled"
+    ))
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row)
+}
+
+/// 錯題本:答錯過(wrong_count > 0)的字,未掌握(答錯 > 答對)的排前面
+pub async fn mistakes(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+) -> Result<Vec<MistakeEntry>, AppError> {
+    let rows = sqlx::query_as(
+        "SELECT w.word, w.part_of_speech, w.meaning_zh, w.difficulty,
+                s.wrong_count, s.correct_count, s.last_seen_at
+         FROM member_word_stats s JOIN words w ON w.id = s.word_id
+         WHERE s.member_id = $1 AND s.wrong_count > 0
+         ORDER BY (s.correct_count >= s.wrong_count), s.wrong_count DESC, s.last_seen_at DESC",
+    )
+    .bind(member_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// 複習出題池:尚未掌握的錯字(答錯次數 > 答對次數),錯最多的優先
+pub async fn review_word_ids(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    limit: i64,
+) -> Result<Vec<i64>, AppError> {
+    let rows: Vec<(i64,)> = sqlx::query_as(
+        "SELECT s.word_id
+         FROM member_word_stats s JOIN words w ON w.id = s.word_id
+         WHERE s.member_id = $1 AND s.wrong_count > s.correct_count AND w.enabled
+         ORDER BY s.wrong_count DESC, s.last_seen_at DESC
+         LIMIT $2",
+    )
+    .bind(member_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().map(|(id,)| id).collect())
+}
+
+/// 在指定字集中,現已掌握(答對次數 >= 答錯次數)的數量
+pub async fn count_mastered_among(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    word_ids: &[i64],
+) -> Result<i64, AppError> {
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM member_word_stats
+         WHERE member_id = $1 AND word_id = ANY($2)
+           AND correct_count >= wrong_count AND wrong_count > 0",
+    )
+    .bind(member_id)
+    .bind(word_ids)
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
 
 /// 在難度區間內隨機抽一字,排除本局已出過的;抽不到(題庫被出光)放寬排除重抽
 pub async fn random_word(

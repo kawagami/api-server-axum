@@ -3,14 +3,16 @@ use crate::{
     repositories::{redis, vocab as vocab_repo},
     state::AppState,
     structs::vocab::{
-        AnswerRequest, AnswerResponse, CurrentQuestion, QuestionDto, QuestionKind, RunResult,
-        RunState, StartRunResponse, VocabMe, Word,
+        AnswerRequest, AnswerResponse, CurrentQuestion, MistakeEntry, QuestionDto, QuestionKind,
+        RunMode, RunResult, RunState, StartRunResponse, VocabMe, Word,
     },
 };
 use rand::Rng;
 use uuid::Uuid;
 
 const INITIAL_LIVES: i32 = 3;
+/// 複習模式單局最多出幾個錯字
+const REVIEW_BATCH: i64 = 20;
 /// 進行中對局的 Redis TTL(秒),每次答題續期;放著不玩自動蒸發、不結算
 const RUN_TTL_SECS: u64 = 1800;
 
@@ -168,6 +170,22 @@ async fn next_question(
     build_question(state, run, &word, pick_kind(run.answered)).await
 }
 
+/// 複習模式:從佇列取下一個字出題;佇列空(或剩餘字都已下架)回 None
+async fn pop_review_question(
+    state: &AppState,
+    run: &mut RunState,
+) -> Result<Option<(CurrentQuestion, QuestionDto)>, AppError> {
+    while !run.review_queue.is_empty() {
+        let id = run.review_queue.remove(0);
+        if let Some(word) = vocab_repo::word_by_id(state.get_pool(), id).await? {
+            run.seen_word_ids.push(id);
+            let q = build_question(state, run, &word, pick_kind(run.answered)).await?;
+            return Ok(Some(q));
+        }
+    }
+    Ok(None)
+}
+
 async fn save_run(state: &AppState, run_id: Uuid, run: &RunState) -> Result<(), AppError> {
     let json = serde_json::to_string(run)?;
     redis::cache_set(state.get_redis_pool(), &run_key(run_id), &json, RUN_TTL_SECS).await
@@ -187,9 +205,14 @@ async fn load_run(state: &AppState, run_id: Uuid, member_id: i64) -> Result<RunS
 
 // ---------- 對外服務 ----------
 
-pub async fn start_run(state: &AppState, member_id: i64) -> Result<StartRunResponse, AppError> {
+pub async fn start_run(
+    state: &AppState,
+    member_id: i64,
+    mode: RunMode,
+) -> Result<StartRunResponse, AppError> {
     let mut run = RunState {
         member_id,
+        mode,
         lives: INITIAL_LIVES,
         combo: 0,
         max_combo: 0,
@@ -198,6 +221,7 @@ pub async fn start_run(state: &AppState, member_id: i64) -> Result<StartRunRespo
         exp: 0,
         started_at: chrono::Utc::now(),
         seen_word_ids: vec![],
+        review_queue: vec![],
         current: CurrentQuestion {
             word_id: 0,
             kind: QuestionKind::Choice,
@@ -206,16 +230,38 @@ pub async fn start_run(state: &AppState, member_id: i64) -> Result<StartRunRespo
             answer_text: None,
         },
     };
-    let (current, question) = next_question(state, &run).await?;
-    run.seen_word_ids.push(current.word_id);
-    run.current = current;
+
+    let (total, question) = match mode {
+        RunMode::Survival => {
+            let (current, question) = next_question(state, &run).await?;
+            run.seen_word_ids.push(current.word_id);
+            run.current = current;
+            (None, question)
+        }
+        RunMode::Review => {
+            run.review_queue =
+                vocab_repo::review_word_ids(state.get_pool(), member_id, REVIEW_BATCH).await?;
+            let total = run.review_queue.len() as i32;
+            let (current, question) = pop_review_question(state, &mut run)
+                .await?
+                .ok_or_else(|| {
+                    AppError::RequestError(RequestError::UnprocessableContent(
+                        "目前沒有需要複習的錯字".to_string(),
+                    ))
+                })?;
+            run.current = current;
+            (Some(total), question)
+        }
+    };
 
     let run_id = Uuid::new_v4();
     save_run(state, run_id, &run).await?;
 
     Ok(StartRunResponse {
         run_id,
+        mode,
         lives: run.lives,
+        total,
         question,
     })
 }
@@ -258,80 +304,157 @@ pub async fn answer(
     let question_kind = current.kind;
 
     run.answered += 1;
-    let gained_exp = if correct {
-        run.correct += 1;
-        run.combo += 1;
-        run.max_combo = run.max_combo.max(run.combo);
-        let gained = answer_exp(question_difficulty, run.combo, question_kind);
-        run.exp += gained;
-        gained
-    } else {
-        run.combo = 0;
-        run.lives -= 1;
-        0
-    };
 
+    // 學習進度:對錯都記(驅動錯題本與複習畢業判定)
     vocab_repo::upsert_word_stat(state.get_pool(), member_id, question_word_id, correct).await?;
 
-    if run.lives <= 0 {
-        // 結束:清 Redis、落地對局、發經驗值、算等級與個人紀錄
-        redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
+    match run.mode {
+        RunMode::Survival => {
+            let gained_exp = if correct {
+                run.correct += 1;
+                run.combo += 1;
+                run.max_combo = run.max_combo.max(run.combo);
+                let gained = answer_exp(question_difficulty, run.combo, question_kind);
+                run.exp += gained;
+                gained
+            } else {
+                run.combo = 0;
+                run.lives -= 1;
+                0
+            };
 
-        let previous_best = vocab_repo::best_run(state.get_pool(), member_id).await?;
-        let new_best = previous_best.as_ref().is_none_or(|b| {
-            run.correct > b.correct_count
-                || (run.correct == b.correct_count && run.max_combo > b.max_combo)
-        });
+            if run.lives <= 0 {
+                // 結束:清 Redis、落地對局、發經驗值、算等級與個人紀錄
+                redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
 
-        vocab_repo::insert_run(state.get_pool(), run_id, &run).await?;
-        let total_exp = vocab_repo::add_member_exp(state.get_pool(), member_id, run.exp).await?;
-        let level = level_for_exp(total_exp);
-        let leveled_up = run.exp > 0 && level > level_for_exp(total_exp - run.exp);
+                let previous_best = vocab_repo::best_run(state.get_pool(), member_id).await?;
+                let new_best = previous_best.as_ref().is_none_or(|b| {
+                    run.correct > b.correct_count
+                        || (run.correct == b.correct_count && run.max_combo > b.max_combo)
+                });
 
-        return Ok(AnswerResponse {
-            correct,
-            correct_choice_index,
-            correct_text,
-            gained_exp,
-            lives: run.lives,
-            combo: run.combo,
-            answered: run.answered,
-            correct_count: run.correct,
-            run_exp: run.exp,
-            finished: true,
-            question: None,
-            result: Some(RunResult {
-                answered_count: run.answered,
+                vocab_repo::insert_run(state.get_pool(), run_id, &run).await?;
+                let total_exp =
+                    vocab_repo::add_member_exp(state.get_pool(), member_id, run.exp).await?;
+                let level = level_for_exp(total_exp);
+                let leveled_up = run.exp > 0 && level > level_for_exp(total_exp - run.exp);
+
+                return Ok(AnswerResponse {
+                    correct,
+                    correct_choice_index,
+                    correct_text,
+                    gained_exp,
+                    lives: run.lives,
+                    combo: run.combo,
+                    answered: run.answered,
+                    correct_count: run.correct,
+                    run_exp: run.exp,
+                    finished: true,
+                    question: None,
+                    result: Some(RunResult {
+                        answered_count: run.answered,
+                        correct_count: run.correct,
+                        max_combo: run.max_combo,
+                        exp_gained: run.exp,
+                        total_exp,
+                        level,
+                        leveled_up,
+                        new_best,
+                        graduated: None,
+                    }),
+                });
+            }
+
+            let (current, question) = next_question(state, &run).await?;
+            run.seen_word_ids.push(current.word_id);
+            run.current = current;
+            save_run(state, run_id, &run).await?;
+
+            Ok(AnswerResponse {
+                correct,
+                correct_choice_index,
+                correct_text,
+                gained_exp,
+                lives: run.lives,
+                combo: run.combo,
+                answered: run.answered,
                 correct_count: run.correct,
-                max_combo: run.max_combo,
-                exp_gained: run.exp,
-                total_exp,
-                level,
-                leveled_up,
-                new_best,
-            }),
-        });
+                run_exp: run.exp,
+                finished: false,
+                question: Some(question),
+                result: None,
+            })
+        }
+        RunMode::Review => {
+            // 複習不計命、不計 combo、不發經驗;答對只累加正確數(升級靠答對次數追上答錯次數)
+            if correct {
+                run.correct += 1;
+            }
+
+            match pop_review_question(state, &mut run).await? {
+                Some((current, question)) => {
+                    run.current = current;
+                    save_run(state, run_id, &run).await?;
+                    Ok(AnswerResponse {
+                        correct,
+                        correct_choice_index,
+                        correct_text,
+                        gained_exp: 0,
+                        lives: run.lives,
+                        combo: 0,
+                        answered: run.answered,
+                        correct_count: run.correct,
+                        run_exp: 0,
+                        finished: false,
+                        question: Some(question),
+                        result: None,
+                    })
+                }
+                None => {
+                    redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
+                    let graduated = vocab_repo::count_mastered_among(
+                        state.get_pool(),
+                        member_id,
+                        &run.seen_word_ids,
+                    )
+                    .await? as i32;
+                    let total_exp = vocab_repo::member_exp(state.get_pool(), member_id).await?;
+
+                    Ok(AnswerResponse {
+                        correct,
+                        correct_choice_index,
+                        correct_text,
+                        gained_exp: 0,
+                        lives: run.lives,
+                        combo: 0,
+                        answered: run.answered,
+                        correct_count: run.correct,
+                        run_exp: 0,
+                        finished: true,
+                        question: None,
+                        result: Some(RunResult {
+                            answered_count: run.answered,
+                            correct_count: run.correct,
+                            max_combo: 0,
+                            exp_gained: 0,
+                            total_exp,
+                            level: level_for_exp(total_exp),
+                            leveled_up: false,
+                            new_best: false,
+                            graduated: Some(graduated),
+                        }),
+                    })
+                }
+            }
+        }
     }
+}
 
-    let (current, question) = next_question(state, &run).await?;
-    run.seen_word_ids.push(current.word_id);
-    run.current = current;
-    save_run(state, run_id, &run).await?;
-
-    Ok(AnswerResponse {
-        correct,
-        correct_choice_index,
-        correct_text,
-        gained_exp,
-        lives: run.lives,
-        combo: run.combo,
-        answered: run.answered,
-        correct_count: run.correct,
-        run_exp: run.exp,
-        finished: false,
-        question: Some(question),
-        result: None,
-    })
+pub async fn mistakes(
+    state: &AppState,
+    member_id: i64,
+) -> Result<Vec<MistakeEntry>, AppError> {
+    vocab_repo::mistakes(state.get_pool(), member_id).await
 }
 
 pub async fn me(state: &AppState, member_id: i64) -> Result<VocabMe, AppError> {

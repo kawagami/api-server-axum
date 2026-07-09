@@ -853,6 +853,19 @@
     "correct": "Correct!",
     "wrong": "Wrong",
     "correctAnswerIs": "Answer: {answer}",
-    "requestError": "Something went wrong, please try again"
+    "requestError": "Something went wrong, please try again",
+    "reviewMistakes": "Review ({count})",
+    "noReview": "No words to review yet",
+    "reviewMode": "Review",
+    "reviewOver": "Review complete",
+    "reviewedLabel": "Reviewed",
+    "graduatedLabel": "Mastered",
+    "reviewHint": "A word leaves your mistake list once your correct count catches up.",
+    "mistakeBook": "Mistake list",
+    "mistakeCount": "{count} words",
+    "mistakeEmpty": "No wrong words yet — go take a challenge!",
+    "wrongCount": "Wrong",
+    "correctCount": "Correct",
+    "mastered": "Mastered"
   }
 }

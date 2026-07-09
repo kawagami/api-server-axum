@@ -1,8 +1,8 @@
 "use client";
 
-import { answerVocabRun, getVocabMe, startVocabRun } from "@/api/vocab";
-import type { VocabMe, VocabQuestion, VocabRunResult } from "@/types";
-import { Flame, GraduationCap, Heart, Loader2, Sparkles, Trophy } from "lucide-react";
+import { answerVocabRun, getVocabMe, getVocabMistakes, startVocabRun } from "@/api/vocab";
+import type { VocabMe, VocabMistake, VocabQuestion, VocabRunMode, VocabRunResult } from "@/types";
+import { BookOpenCheck, CheckCircle2, Flame, GraduationCap, Heart, Loader2, Sparkles, Trophy } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,10 +18,18 @@ interface Feedback {
 
 const FEEDBACK_MS = 1400;
 
-export default function VocabClient({ initialMe }: { initialMe: VocabMe }) {
+function isReviewable(m: VocabMistake) {
+    return m.wrong_count > m.correct_count;
+}
+
+export default function VocabClient({ initialMe, initialMistakes }: {
+    initialMe: VocabMe; initialMistakes: VocabMistake[];
+}) {
     const t = useTranslations("Vocab");
     const [me, setMe] = useState<VocabMe>(initialMe);
+    const [mistakes, setMistakes] = useState<VocabMistake[]>(initialMistakes);
     const [phase, setPhase] = useState<Phase>("idle");
+    const [mode, setMode] = useState<VocabRunMode>("survival");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(false);
 
@@ -29,6 +37,7 @@ export default function VocabClient({ initialMe }: { initialMe: VocabMe }) {
     const [lives, setLives] = useState(3);
     const [combo, setCombo] = useState(0);
     const [runExp, setRunExp] = useState(0);
+    const [total, setTotal] = useState(0);
     const [question, setQuestion] = useState<VocabQuestion | null>(null);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const [result, setResult] = useState<VocabRunResult | null>(null);
@@ -45,13 +54,17 @@ export default function VocabClient({ initialMe }: { initialMe: VocabMe }) {
         }
     }, [phase, question, feedback]);
 
-    async function start() {
+    const reviewableCount = mistakes.filter(isReviewable).length;
+
+    async function start(runMode: VocabRunMode) {
         setBusy(true);
         setError(false);
         try {
-            const res = await startVocabRun();
+            const res = await startVocabRun(runMode);
+            setMode(res.mode);
             setRunId(res.run_id);
             setLives(res.lives);
+            setTotal(res.total ?? 0);
             setCombo(0);
             setRunExp(0);
             setQuestion(res.question);
@@ -88,8 +101,9 @@ export default function VocabClient({ initialMe }: { initialMe: VocabMe }) {
                 if (res.finished && res.result) {
                     setResult(res.result);
                     setPhase("finished");
-                    // 重新抓最新等級 / 最佳紀錄(結算已含 total_exp,這裡補 best/words_learned)
+                    // 重新抓等級與錯題本(複習後掌握度會變)
                     getVocabMe().then(setMe).catch(() => { });
+                    getVocabMistakes().then(setMistakes).catch(() => { });
                 } else if (res.question) {
                     setQuestion(res.question);
                 }
@@ -104,7 +118,9 @@ export default function VocabClient({ initialMe }: { initialMe: VocabMe }) {
     if (phase === "playing" && question) {
         return (
             <div className="flex flex-col gap-6">
-                <GameHeader lives={lives} combo={combo} runExp={runExp} number={question.number} t={t} />
+                {mode === "review"
+                    ? <ReviewHeader number={question.number} total={total} t={t} />
+                    : <GameHeader lives={lives} combo={combo} runExp={runExp} number={question.number} t={t} />}
                 {question.kind === "choice" ? (
                     <ChoiceCard question={question} feedback={feedback} busy={busy} t={t}
                         onPick={(i) => submit({ choice_index: i })} />
@@ -122,41 +138,11 @@ export default function VocabClient({ initialMe }: { initialMe: VocabMe }) {
         return (
             <div className="flex flex-col gap-6">
                 <PageTitle t={t} />
-                <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col items-center gap-4">
-                    <Trophy size={40} className="text-primary-500" />
-                    <h2 className="text-xl font-bold">{t("runOver")}</h2>
-                    {result.new_best && (
-                        <span className="px-3 py-1 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300 text-sm font-semibold">
-                            {t("newBest")}
-                        </span>
-                    )}
-                    <div className="grid grid-cols-3 gap-4 w-full text-center">
-                        <Stat label={t("answeredLabel")} value={result.answered_count} />
-                        <Stat label={t("correctLabel")} value={result.correct_count} />
-                        <Stat label={t("maxComboLabel")} value={result.max_combo} />
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                        <span className="text-sm text-neutral-500 dark:text-neutral-400">{t("expGained")}</span>
-                        <span className="text-3xl font-bold text-primary-600 dark:text-primary-400">
-                            +{result.exp_gained}
-                        </span>
-                        {result.leveled_up && (
-                            <span className="flex items-center gap-1 text-primary-600 dark:text-primary-300 font-semibold">
-                                <Sparkles size={16} />
-                                {t("levelUp", { level: result.level })}
-                            </span>
-                        )}
-                    </div>
-                    <button
-                        onClick={start}
-                        disabled={busy}
-                        className="mt-2 px-6 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold transition-colors disabled:opacity-50"
-                    >
-                        {busy ? <Loader2 size={18} className="animate-spin" /> : t("playAgain")}
-                    </button>
-                    {error && <ErrorNote t={t} />}
-                </div>
+                {mode === "review"
+                    ? <ReviewResultCard result={result} busy={busy} onAgain={() => start("survival")} t={t} />
+                    : <SurvivalResultCard result={result} busy={busy} onAgain={() => start("survival")} t={t} />}
                 <LevelCard me={me} t={t} />
+                <MistakeBook mistakes={mistakes} t={t} />
             </div>
         );
     }
@@ -173,15 +159,27 @@ export default function VocabClient({ initialMe }: { initialMe: VocabMe }) {
                     <Stat label={t("bestCorrect")} value={me.best?.correct_count ?? 0} />
                 </div>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center">{t("rules")}</p>
-                <button
-                    onClick={start}
-                    disabled={busy}
-                    className="self-center px-8 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold text-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                    {busy ? <Loader2 size={20} className="animate-spin" /> : t("start")}
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button
+                        onClick={() => start("survival")}
+                        disabled={busy}
+                        className="px-8 py-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold text-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {busy ? <Loader2 size={20} className="animate-spin" /> : t("start")}
+                    </button>
+                    <button
+                        onClick={() => start("review")}
+                        disabled={busy || reviewableCount === 0}
+                        title={reviewableCount === 0 ? t("noReview") : undefined}
+                        className="px-8 py-3 rounded-lg border border-primary-500 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950 font-semibold text-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        <BookOpenCheck size={20} />
+                        {t("reviewMistakes", { count: reviewableCount })}
+                    </button>
+                </div>
                 {error && <ErrorNote t={t} />}
             </div>
+            <MistakeBook mistakes={mistakes} t={t} />
         </div>
     );
 }
@@ -255,6 +253,26 @@ function GameHeader({ lives, combo, runExp, number, t }: {
     );
 }
 
+function ReviewHeader({ number, total, t }: { number: number; total: number; t: T }) {
+    const progress = total > 0 ? Math.min(100, ((number - 1) / total) * 100) : 0;
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1 text-primary-600 dark:text-primary-400 font-semibold text-sm">
+                    <BookOpenCheck size={16} />
+                    {t("reviewMode")}
+                </span>
+                <span className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+                    {number} / {total}
+                </span>
+            </div>
+            <div className="h-2 rounded-full bg-neutral-100 dark:bg-neutral-700 overflow-hidden">
+                <div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${progress}%` }} />
+            </div>
+        </div>
+    );
+}
+
 function DifficultyDots({ difficulty }: { difficulty: number }) {
     return (
         <div className="flex gap-1" aria-hidden>
@@ -268,11 +286,11 @@ function DifficultyDots({ difficulty }: { difficulty: number }) {
     );
 }
 
-function FeedbackBanner({ feedback, t }: { feedback: Feedback; t: T }) {
+function FeedbackBanner({ feedback, showExp, t }: { feedback: Feedback; showExp: boolean; t: T }) {
     return (
         <div className={`text-center font-semibold ${feedback.correct ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>
             {feedback.correct
-                ? <>{t("correct")} <span className="ml-1">+{feedback.gainedExp} EXP</span></>
+                ? <>{t("correct")}{showExp && <span className="ml-1">+{feedback.gainedExp} EXP</span>}</>
                 : t("wrong")}
         </div>
     );
@@ -314,7 +332,7 @@ function ChoiceCard({ question, feedback, busy, onPick, t }: {
                     );
                 })}
             </div>
-            {feedback && <FeedbackBanner feedback={feedback} t={t} />}
+            {feedback && <FeedbackBanner feedback={feedback} showExp={feedback.gainedExp > 0} t={t} />}
         </div>
     );
 }
@@ -367,7 +385,7 @@ function SpellingCard({ question, feedback, busy, value, onChange, onSubmit, inp
             </form>
             {feedback && (
                 <div className="flex flex-col items-center gap-1">
-                    <FeedbackBanner feedback={feedback} t={t} />
+                    <FeedbackBanner feedback={feedback} showExp={feedback.gainedExp > 0} t={t} />
                     {!feedback.correct && feedback.correctText && (
                         <span className="text-sm text-neutral-500 dark:text-neutral-400">
                             {t("correctAnswerIs", { answer: feedback.correctText })}
@@ -375,6 +393,114 @@ function SpellingCard({ question, feedback, busy, value, onChange, onSubmit, inp
                     )}
                 </div>
             )}
+        </div>
+    );
+}
+
+function SurvivalResultCard({ result, busy, onAgain, t }: {
+    result: VocabRunResult; busy: boolean; onAgain: () => void; t: T;
+}) {
+    return (
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col items-center gap-4">
+            <Trophy size={40} className="text-primary-500" />
+            <h2 className="text-xl font-bold">{t("runOver")}</h2>
+            {result.new_best && (
+                <span className="px-3 py-1 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300 text-sm font-semibold">
+                    {t("newBest")}
+                </span>
+            )}
+            <div className="grid grid-cols-3 gap-4 w-full text-center">
+                <Stat label={t("answeredLabel")} value={result.answered_count} />
+                <Stat label={t("correctLabel")} value={result.correct_count} />
+                <Stat label={t("maxComboLabel")} value={result.max_combo} />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+                <span className="text-sm text-neutral-500 dark:text-neutral-400">{t("expGained")}</span>
+                <span className="text-3xl font-bold text-primary-600 dark:text-primary-400">
+                    +{result.exp_gained}
+                </span>
+                {result.leveled_up && (
+                    <span className="flex items-center gap-1 text-primary-600 dark:text-primary-300 font-semibold">
+                        <Sparkles size={16} />
+                        {t("levelUp", { level: result.level })}
+                    </span>
+                )}
+            </div>
+            <AgainButton busy={busy} onAgain={onAgain} label={t("playAgain")} />
+        </div>
+    );
+}
+
+function ReviewResultCard({ result, busy, onAgain, t }: {
+    result: VocabRunResult; busy: boolean; onAgain: () => void; t: T;
+}) {
+    return (
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col items-center gap-4">
+            <BookOpenCheck size={40} className="text-primary-500" />
+            <h2 className="text-xl font-bold">{t("reviewOver")}</h2>
+            <div className="grid grid-cols-3 gap-4 w-full text-center">
+                <Stat label={t("reviewedLabel")} value={result.answered_count} />
+                <Stat label={t("correctLabel")} value={result.correct_count} />
+                <Stat label={t("graduatedLabel")} value={result.graduated ?? 0} />
+            </div>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center">{t("reviewHint")}</p>
+            <AgainButton busy={busy} onAgain={onAgain} label={t("start")} />
+        </div>
+    );
+}
+
+function AgainButton({ busy, onAgain, label }: { busy: boolean; onAgain: () => void; label: string }) {
+    return (
+        <button
+            onClick={onAgain}
+            disabled={busy}
+            className="mt-2 px-6 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+        >
+            {busy ? <Loader2 size={18} className="animate-spin" /> : label}
+        </button>
+    );
+}
+
+function MistakeBook({ mistakes, t }: { mistakes: VocabMistake[]; t: T }) {
+    if (mistakes.length === 0) {
+        return (
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow text-center text-sm text-neutral-500 dark:text-neutral-400">
+                {t("mistakeEmpty")}
+            </div>
+        );
+    }
+    return (
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow flex flex-col gap-2">
+            <div className="flex items-center justify-between px-2">
+                <h2 className="font-bold flex items-center gap-1">
+                    <BookOpenCheck size={18} className="text-primary-500" />
+                    {t("mistakeBook")}
+                </h2>
+                <span className="text-xs text-neutral-400 dark:text-neutral-500">{t("mistakeCount", { count: mistakes.length })}</span>
+            </div>
+            <div className="max-h-80 overflow-auto flex flex-col divide-y divide-neutral-100 dark:divide-neutral-700">
+                {mistakes.map(m => {
+                    const mastered = m.correct_count >= m.wrong_count;
+                    return (
+                        <div key={m.word} className="flex items-center gap-3 py-2 px-2">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-semibold truncate">{m.word}</span>
+                                    <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">{m.part_of_speech}</span>
+                                </div>
+                                <div className="text-sm text-neutral-500 dark:text-neutral-400 truncate">{m.meaning_zh}</div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs text-red-500" title={t("wrongCount")}>✗{m.wrong_count}</span>
+                                <span className="text-xs text-green-600 dark:text-green-400" title={t("correctCount")}>✓{m.correct_count}</span>
+                                {mastered && (
+                                    <CheckCircle2 size={16} className="text-green-500" aria-label={t("mastered")} />
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }

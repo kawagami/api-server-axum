@@ -1,7 +1,7 @@
 "use server";
 
 import memberRequest from "@/libs/memberRequest";
-import type { VocabAnswer, VocabAnswerInput, VocabMe, VocabStartRun } from "@/types";
+import type { VocabAnswer, VocabAnswerInput, VocabMe, VocabMistake, VocabRunMode, VocabStartRun } from "@/types";
 
 export async function getVocabMe(): Promise<VocabMe> {
     return memberRequest<VocabMe>({
@@ -9,10 +9,18 @@ export async function getVocabMe(): Promise<VocabMe> {
     });
 }
 
-export async function startVocabRun(): Promise<VocabStartRun> {
+export async function getVocabMistakes(): Promise<VocabMistake[]> {
+    return memberRequest<VocabMistake[]>({
+        url: `${process.env.API_URL}/member/vocab/mistakes`,
+    });
+}
+
+export async function startVocabRun(mode: VocabRunMode = 'survival'): Promise<VocabStartRun> {
     return memberRequest<VocabStartRun>({
         url: `${process.env.API_URL}/member/vocab/runs`,
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
     });
 }
 

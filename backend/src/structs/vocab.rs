@@ -21,6 +21,15 @@ pub enum QuestionKind {
     Spelling,
 }
 
+/// 對局模式:生存(隨機出題賺經驗)/ 複習(只出答錯過的字,不計經驗)
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RunMode {
+    #[default]
+    Survival,
+    Review,
+}
+
 /// 進行中對局的當前題目(只存 Redis;正解不下發前端)
 #[derive(Serialize, Deserialize)]
 pub struct CurrentQuestion {
@@ -37,6 +46,8 @@ pub struct CurrentQuestion {
 #[derive(Serialize, Deserialize)]
 pub struct RunState {
     pub member_id: i64,
+    #[serde(default)]
+    pub mode: RunMode,
     pub lives: i32,
     pub combo: i32,
     pub max_combo: i32,
@@ -45,6 +56,9 @@ pub struct RunState {
     pub exp: i64,
     pub started_at: DateTime<Utc>,
     pub seen_word_ids: Vec<i64>,
+    /// 複習模式待出題的 word_id 佇列(生存模式為空)
+    #[serde(default)]
+    pub review_queue: Vec<i64>,
     pub current: CurrentQuestion,
 }
 
@@ -80,10 +94,20 @@ pub struct AnswerRequest {
     pub text: Option<String>,
 }
 
+#[derive(Deserialize, Default)]
+pub struct StartRunRequest {
+    #[serde(default)]
+    pub mode: RunMode,
+}
+
 #[derive(Serialize)]
 pub struct StartRunResponse {
     pub run_id: Uuid,
+    pub mode: RunMode,
     pub lives: i32,
+    /// 複習模式的本局題數(生存模式為 None)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<i32>,
     pub question: QuestionDto,
 }
 
@@ -120,6 +144,21 @@ pub struct RunResult {
     pub level: i32,
     pub leveled_up: bool,
     pub new_best: bool,
+    /// 複習模式:本局複習的字中,現在已「畢業」(答對次數追上答錯次數)的數量
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub graduated: Option<i32>,
+}
+
+/// 錯題本一列
+#[derive(Serialize, FromRow)]
+pub struct MistakeEntry {
+    pub word: String,
+    pub part_of_speech: String,
+    pub meaning_zh: String,
+    pub difficulty: i16,
+    pub wrong_count: i32,
+    pub correct_count: i32,
+    pub last_seen_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, FromRow)]
