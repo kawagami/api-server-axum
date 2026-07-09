@@ -876,6 +876,11 @@
     "bestShort": "Best {n}",
     "timeLimit": "Duration",
     "minutes": "{n} min",
-    "timeUpOver": "Time's up!"
+    "timeUpOver": "Time's up!",
+    "guestBanner": "Guests can play right away. Log in to earn EXP and unlock review & ranking.",
+    "login": "Log in",
+    "guestSavePrompt": "Log in to save this run's EXP and rank",
+    "loginToReview": "Log in to review mistakes",
+    "memberOnly": "Members only"
   }
 }

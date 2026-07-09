@@ -69,7 +69,8 @@ pub struct CurrentQuestion {
 /// 進行中對局狀態(存 Redis,JSON 序列化)
 #[derive(Serialize, Deserialize)]
 pub struct RunState {
-    pub member_id: i64,
+    /// 對局擁有者;訪客(未登入)為 None,不入 DB
+    pub member_id: Option<i64>,
     #[serde(default)]
     pub mode: RunMode,
     pub lives: i32,

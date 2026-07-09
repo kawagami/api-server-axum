@@ -134,6 +134,7 @@ pub async fn distractor_meanings(
 pub async fn insert_run(
     pool: &Pool<Postgres>,
     run_id: Uuid,
+    member_id: i64,
     state: &RunState,
 ) -> Result<(), AppError> {
     sqlx::query(
@@ -142,7 +143,7 @@ pub async fn insert_run(
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(run_id)
-    .bind(state.member_id)
+    .bind(member_id)
     .bind(state.answered)
     .bind(state.correct)
     .bind(state.max_combo)

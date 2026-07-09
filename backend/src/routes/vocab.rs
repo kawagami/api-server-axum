@@ -1,5 +1,5 @@
 use crate::{
-    errors::AppError,
+    errors::{AppError, AuthError},
     middleware::auth,
     services::vocab as vocab_service,
     state::AppState,
@@ -19,6 +19,7 @@ use axum::{
 };
 use uuid::Uuid;
 
+// 對局端點訪客也能用(選擇性驗證);me / mistakes / 複習模式仍需 member
 pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/runs", post(start_run))
@@ -26,54 +27,59 @@ pub fn new(state: AppState) -> Router<AppState> {
         .route("/runs/{id}/finish", post(finish))
         .route("/me", get(me))
         .route("/mistakes", get(mistakes))
-        .layer(middleware::from_fn_with_state(state, auth::authorize_member))
+        .layer(middleware::from_fn_with_state(
+            state,
+            auth::authorize_member_optional,
+        ))
+}
+
+/// 選擇性驗證下取出 member_id(訪客為 None)
+fn caller(member: Option<Extension<AuthenticatedMember>>) -> Option<i64> {
+    member.map(|Extension(m)| m.member_id)
 }
 
 async fn start_run(
-    Extension(auth_member): Extension<AuthenticatedMember>,
+    member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
     body: Option<Json<StartRunRequest>>,
 ) -> Result<(StatusCode, Json<StartRunResponse>), AppError> {
     let req = body.map(|Json(b)| b).unwrap_or_default();
     let res =
-        vocab_service::start_run(&state, auth_member.member_id, req.mode, req.duration_minutes)
-            .await?;
+        vocab_service::start_run(&state, caller(member), req.mode, req.duration_minutes).await?;
     Ok((StatusCode::CREATED, Json(res)))
 }
 
 async fn finish(
-    Extension(auth_member): Extension<AuthenticatedMember>,
+    member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AnswerResponse>, AppError> {
-    Ok(Json(
-        vocab_service::finish(&state, id, auth_member.member_id).await?,
-    ))
-}
-
-async fn mistakes(
-    Extension(auth_member): Extension<AuthenticatedMember>,
-    State(state): State<AppState>,
-) -> Result<Json<Vec<MistakeEntry>>, AppError> {
-    Ok(Json(
-        vocab_service::mistakes(&state, auth_member.member_id).await?,
-    ))
+    Ok(Json(vocab_service::finish(&state, id, caller(member)).await?))
 }
 
 async fn answer(
-    Extension(auth_member): Extension<AuthenticatedMember>,
+    member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(req): Json<AnswerRequest>,
 ) -> Result<Json<AnswerResponse>, AppError> {
     Ok(Json(
-        vocab_service::answer(&state, id, auth_member.member_id, &req).await?,
+        vocab_service::answer(&state, id, caller(member), &req).await?,
     ))
 }
 
+async fn mistakes(
+    member: Option<Extension<AuthenticatedMember>>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<MistakeEntry>>, AppError> {
+    let mid = caller(member).ok_or(AppError::AuthError(AuthError::Unauthorized))?;
+    Ok(Json(vocab_service::mistakes(&state, mid).await?))
+}
+
 async fn me(
-    Extension(auth_member): Extension<AuthenticatedMember>,
+    member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
 ) -> Result<Json<VocabMe>, AppError> {
-    Ok(Json(vocab_service::me(&state, auth_member.member_id).await?))
+    let mid = caller(member).ok_or(AppError::AuthError(AuthError::Unauthorized))?;
+    Ok(Json(vocab_service::me(&state, mid).await?))
 }

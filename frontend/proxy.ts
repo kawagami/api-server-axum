@@ -32,7 +32,7 @@ export default async function proxy(req: NextRequest) {
     }
 
     // Member-only routes — check access_token
-    const memberPaths = ['/dashboard', '/profile', '/settings', '/portfolio', '/ledger', '/invoices', '/lotto', '/vocab'];
+    const memberPaths = ['/dashboard', '/profile', '/settings', '/portfolio', '/ledger', '/invoices', '/lotto'];
     const isMemberRoute = routing.locales.some(locale =>
         memberPaths.some(p => path === `/${locale}${p}` || path.startsWith(`/${locale}${p}/`))
     );

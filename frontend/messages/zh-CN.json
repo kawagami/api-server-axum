@@ -876,6 +876,11 @@
     "bestShort": "最佳 {n}",
     "timeLimit": "时长",
     "minutes": "{n} 分",
-    "timeUpOver": "时间到!"
+    "timeUpOver": "时间到!",
+    "guestBanner": "访客可直接游玩,登入后才会累积经验、解锁复习与排名。",
+    "login": "登入",
+    "guestSavePrompt": "登入即可保存这局经验并上排名",
+    "loginToReview": "登入才能复习错字",
+    "memberOnly": "需登入"
   }
 }

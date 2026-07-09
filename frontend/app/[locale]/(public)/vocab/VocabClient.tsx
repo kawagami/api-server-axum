@@ -2,8 +2,9 @@
 
 import { answerVocabRun, finishVocabRun, getVocabMe, getVocabMistakes, startVocabRun } from "@/api/vocab";
 import type { VocabMe, VocabMistake, VocabQuestion, VocabRunMode, VocabRunResult } from "@/types";
-import { BookOpenCheck, CheckCircle2, Clock, Flame, GraduationCap, Heart, Loader2, Sparkles, Trophy } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
+import { BookOpenCheck, CheckCircle2, Clock, Flame, GraduationCap, Heart, Loader2, LogIn, Sparkles, Trophy } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 type Phase = "idle" | "playing" | "finished";
@@ -30,10 +31,13 @@ function isReviewable(m: VocabMistake) {
 }
 
 export default function VocabClient({ initialMe, initialMistakes }: {
-    initialMe: VocabMe; initialMistakes: VocabMistake[];
+    initialMe: VocabMe | null; initialMistakes: VocabMistake[];
 }) {
     const t = useTranslations("Vocab");
-    const [me, setMe] = useState<VocabMe>(initialMe);
+    const locale = useLocale();
+    const loginHref = `/login?redirect=${encodeURIComponent(`/${locale}/vocab`)}`;
+    const isMember = initialMe !== null; // 訪客為 false;整場 session 固定
+    const [me, setMe] = useState<VocabMe | null>(initialMe);
     const [mistakes, setMistakes] = useState<VocabMistake[]>(initialMistakes);
     const [phase, setPhase] = useState<Phase>("idle");
     const [mode, setMode] = useState<VocabRunMode>("survival");
@@ -60,6 +64,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
     function refreshAfterRun() {
+        if (!isMember) return; // 訪客不打會員端點(會 401 轉登入)
         getVocabMe().then(setMe).catch(() => { });
         getVocabMistakes().then(setMistakes).catch(() => { });
     }
@@ -172,7 +177,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     }
 
     const reviewableCount = mistakes.filter(isReviewable).length;
-    const bestOf = (m: VocabRunMode) => me.bests.find(b => b.mode === m);
+    const bestOf = (m: VocabRunMode) => me?.bests.find(b => b.mode === m);
 
     if (phase === "playing" && question) {
         return (
@@ -200,18 +205,19 @@ export default function VocabClient({ initialMe, initialMistakes }: {
                 <PageTitle t={t} />
                 {mode === "review"
                     ? <ReviewResultCard result={result} busy={busy} onAgain={() => start("survival")} t={t} />
-                    : <ScoredResultCard mode={mode} result={result} busy={busy} onAgain={() => start(mode)} t={t} />}
-                <LevelCard me={me} t={t} />
-                <MistakeBook mistakes={mistakes} t={t} />
+                    : <ScoredResultCard mode={mode} result={result} busy={busy} isMember={isMember} loginHref={loginHref} onAgain={() => start(mode)} t={t} />}
+                {me && <LevelCard me={me} t={t} />}
+                {isMember && <MistakeBook mistakes={mistakes} t={t} />}
             </div>
         );
     }
 
     // idle:入口畫面
+    const reviewDisabled = !isMember || reviewableCount === 0;
     return (
         <div className="flex flex-col gap-6">
             <PageTitle t={t} />
-            <LevelCard me={me} t={t} />
+            {me ? <LevelCard me={me} t={t} /> : <GuestBanner loginHref={loginHref} t={t} />}
             <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
                 <div className="grid grid-cols-2 gap-3">
                     <ModeButton label={t("modeSurvival")} desc={t("modeSurvivalDesc")}
@@ -225,12 +231,12 @@ export default function VocabClient({ initialMe, initialMistakes }: {
                         onClick={() => start("timed")} t={t} />
                     <button
                         onClick={() => start("review")}
-                        disabled={busy || reviewableCount === 0}
-                        title={reviewableCount === 0 ? t("noReview") : undefined}
+                        disabled={busy || reviewDisabled}
+                        title={!isMember ? t("loginToReview") : reviewableCount === 0 ? t("noReview") : undefined}
                         className="flex flex-col items-center justify-center gap-1 px-4 py-4 rounded-lg border border-primary-500 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950 font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        <span className="flex items-center gap-1"><BookOpenCheck size={18} />{t("reviewMistakes", { count: reviewableCount })}</span>
-                        <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500">{t("reviewMode")}</span>
+                        <span className="flex items-center gap-1"><BookOpenCheck size={18} />{t("reviewMistakes", { count: isMember ? reviewableCount : 0 })}</span>
+                        <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500">{isMember ? t("reviewMode") : t("memberOnly")}</span>
                     </button>
                 </div>
 
@@ -253,7 +259,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
 
                 {error && <ErrorNote t={t} />}
             </div>
-            <MistakeBook mistakes={mistakes} t={t} />
+            {isMember && <MistakeBook mistakes={mistakes} t={t} />}
         </div>
     );
 }
@@ -290,6 +296,20 @@ function PageTitle({ t }: { t: T }) {
                 <h1 className="text-2xl font-bold">{t("title")}</h1>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("subtitle")}</p>
             </div>
+        </div>
+    );
+}
+
+function GuestBanner({ loginHref, t }: { loginHref: string; t: T }) {
+    return (
+        <div className="bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 rounded-xl p-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-primary-700 dark:text-primary-300">{t("guestBanner")}</p>
+            <Link
+                href={loginHref}
+                className="shrink-0 flex items-center gap-1 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold transition-colors"
+            >
+                <LogIn size={16} />{t("login")}
+            </Link>
         </div>
     );
 }
@@ -462,15 +482,15 @@ function SpellingCard({ question, feedback, busy, value, onChange, onSubmit, inp
     );
 }
 
-function ScoredResultCard({ mode, result, busy, onAgain, t }: {
-    mode: VocabRunMode; result: VocabRunResult; busy: boolean; onAgain: () => void; t: T;
+function ScoredResultCard({ mode, result, busy, isMember, loginHref, onAgain, t }: {
+    mode: VocabRunMode; result: VocabRunResult; busy: boolean; isMember: boolean; loginHref: string; onAgain: () => void; t: T;
 }) {
     const overKey = mode === "timed" || mode === "timed_survival" ? "timeUpOver" : "runOver";
     return (
         <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col items-center gap-4">
             <Trophy size={40} className="text-primary-500" />
             <h2 className="text-xl font-bold">{t(overKey)}</h2>
-            {result.new_best && (
+            {isMember && result.new_best && (
                 <span className="px-3 py-1 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300 text-sm font-semibold">
                     {t("newBest")}
                 </span>
@@ -483,12 +503,20 @@ function ScoredResultCard({ mode, result, busy, onAgain, t }: {
             <div className="flex flex-col items-center gap-1">
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">{t("expGained")}</span>
                 <span className="text-3xl font-bold text-primary-600 dark:text-primary-400">+{result.exp_gained}</span>
-                {result.leveled_up && (
+                {isMember && result.leveled_up && (
                     <span className="flex items-center gap-1 text-primary-600 dark:text-primary-300 font-semibold">
                         <Sparkles size={16} />{t("levelUp", { level: result.level })}
                     </span>
                 )}
             </div>
+            {!isMember && (
+                <Link
+                    href={loginHref}
+                    className="flex items-center gap-1 text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                    <LogIn size={15} />{t("guestSavePrompt")}
+                </Link>
+            )}
             <AgainButton busy={busy} onAgain={onAgain} label={t("playAgain")} />
         </div>
     );

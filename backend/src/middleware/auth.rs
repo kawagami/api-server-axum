@@ -72,6 +72,26 @@ pub async fn authorize_member(
     Ok(next.run(req).await)
 }
 
+/// 選擇性 member 驗證:有有效 member token 就塞入 `AuthenticatedMember`,
+/// 沒有 / 無效一律放行(不擋),供「訪客也能用、登入才有額外功能」的端點使用。
+pub async fn authorize_member_optional(
+    State(state): State<AppState>,
+    mut req: Request,
+    next: Next,
+) -> Result<Response<Body>, AppError> {
+    if let Ok(token) = extract_token(&req) {
+        if let Ok(token_data) = decode_jwt(token, &state.get_config().jwt_secret) {
+            if token_data.claims.role == "member" {
+                if let Ok(member_id) = token_data.claims.sub.parse::<i64>() {
+                    req.extensions_mut()
+                        .insert(AuthenticatedMember { member_id });
+                }
+            }
+        }
+    }
+    Ok(next.run(req).await)
+}
+
 pub(crate) fn extract_token(req: &Request) -> Result<String, AppError> {
     let auth_header = req
         .headers()

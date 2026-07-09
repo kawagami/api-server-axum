@@ -191,14 +191,20 @@ async fn save_run(state: &AppState, run_id: Uuid, run: &RunState) -> Result<(), 
     redis::cache_set(state.get_redis_pool(), &run_key(run_id), &json, RUN_TTL_SECS).await
 }
 
-async fn load_run(state: &AppState, run_id: Uuid, member_id: i64) -> Result<RunState, AppError> {
+async fn load_run(
+    state: &AppState,
+    run_id: Uuid,
+    caller: Option<i64>,
+) -> Result<RunState, AppError> {
     let json = redis::cache_get(state.get_redis_pool(), &run_key(run_id))
         .await?
         .ok_or(AppError::RequestError(RequestError::NotFound))?;
     let run: RunState = serde_json::from_str(&json)?;
-    // 不是本人的局一律當不存在,不洩漏他人 run_id 有效性
-    if run.member_id != member_id {
-        return Err(AppError::RequestError(RequestError::NotFound));
+    // member 的局只有本人能操作;訪客的局(None)憑 run_id 即可,不做擁有者檢查
+    if let Some(owner) = run.member_id {
+        if caller != Some(owner) {
+            return Err(AppError::RequestError(RequestError::NotFound));
+        }
     }
     Ok(run)
 }
@@ -216,10 +222,15 @@ fn resolve_duration_minutes(m: Option<i64>) -> i64 {
 
 pub async fn start_run(
     state: &AppState,
-    member_id: i64,
+    member_id: Option<i64>,
     mode: RunMode,
     duration_minutes: Option<i64>,
 ) -> Result<StartRunResponse, AppError> {
+    // 複習模式需要已存的錯字紀錄,訪客不可用
+    if mode == RunMode::Review && member_id.is_none() {
+        return Err(AppError::AuthError(crate::errors::AuthError::Unauthorized));
+    }
+
     let now = chrono::Utc::now();
     let mut run = RunState {
         member_id,
@@ -252,8 +263,10 @@ pub async fn start_run(
 
     let (total, question) = match mode {
         RunMode::Review => {
+            // 上方已保證 member 存在
+            let mid = member_id.expect("review mode requires member");
             run.review_queue =
-                vocab_repo::review_word_ids(state.get_pool(), member_id, REVIEW_BATCH).await?;
+                vocab_repo::review_word_ids(state.get_pool(), mid, REVIEW_BATCH).await?;
             let total = run.review_queue.len() as i32;
             let (current, question) = pop_review_question(state, &mut run)
                 .await?
@@ -295,15 +308,29 @@ async fn finalize(
 ) -> Result<RunResult, AppError> {
     redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
 
-    let previous_best =
-        vocab_repo::best_run(state.get_pool(), run.member_id, run.mode.as_str()).await?;
+    // 訪客:不入 DB,結算只回本局成績(經驗值當登入誘餌)
+    let Some(mid) = run.member_id else {
+        return Ok(RunResult {
+            answered_count: run.answered,
+            correct_count: run.correct,
+            max_combo: run.max_combo,
+            exp_gained: run.exp,
+            total_exp: 0,
+            level: 0,
+            leveled_up: false,
+            new_best: false,
+            graduated: None,
+        });
+    };
+
+    let previous_best = vocab_repo::best_run(state.get_pool(), mid, run.mode.as_str()).await?;
     let new_best = previous_best.as_ref().is_none_or(|b| {
         run.correct > b.correct_count
             || (run.correct == b.correct_count && run.max_combo > b.max_combo)
     });
 
-    vocab_repo::insert_run(state.get_pool(), run_id, run).await?;
-    let total_exp = vocab_repo::add_member_exp(state.get_pool(), run.member_id, run.exp).await?;
+    vocab_repo::insert_run(state.get_pool(), run_id, mid, run).await?;
+    let total_exp = vocab_repo::add_member_exp(state.get_pool(), mid, run.exp).await?;
     let level = level_for_exp(total_exp);
     let leveled_up = run.exp > 0 && level > level_for_exp(total_exp - run.exp);
 
@@ -349,9 +376,9 @@ fn finished_response(
 pub async fn finish(
     state: &AppState,
     run_id: Uuid,
-    member_id: i64,
+    caller: Option<i64>,
 ) -> Result<AnswerResponse, AppError> {
-    let run = load_run(state, run_id, member_id).await?;
+    let run = load_run(state, run_id, caller).await?;
     if !run.mode.has_time() {
         return Err(AppError::RequestError(RequestError::UnprocessableContent(
             "此模式不支援手動結束".to_string(),
@@ -364,10 +391,10 @@ pub async fn finish(
 pub async fn answer(
     state: &AppState,
     run_id: Uuid,
-    member_id: i64,
+    caller: Option<i64>,
     req: &AnswerRequest,
 ) -> Result<AnswerResponse, AppError> {
-    let mut run = load_run(state, run_id, member_id).await?;
+    let mut run = load_run(state, run_id, caller).await?;
 
     // 限時已到:棄置此題直接結算(正常由前端倒數歸零呼叫 finish,此為伺服器端安全網)
     if run.mode.has_time() {
@@ -411,8 +438,10 @@ pub async fn answer(
 
     run.answered += 1;
 
-    // 學習進度:對錯都記(驅動錯題本與複習畢業判定)
-    vocab_repo::upsert_word_stat(state.get_pool(), member_id, question_word_id, correct).await?;
+    // 學習進度:對錯都記(驅動錯題本與複習畢業判定);訪客不寫 DB
+    if let Some(mid) = run.member_id {
+        vocab_repo::upsert_word_stat(state.get_pool(), mid, question_word_id, correct).await?;
+    }
 
     match run.mode {
         // 生存 / 限時 / 限時生存:隨機出題計分
@@ -492,13 +521,12 @@ pub async fn answer(
                 }
                 None => {
                     redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
-                    let graduated = vocab_repo::count_mastered_among(
-                        state.get_pool(),
-                        member_id,
-                        &run.seen_word_ids,
-                    )
-                    .await? as i32;
-                    let total_exp = vocab_repo::member_exp(state.get_pool(), member_id).await?;
+                    // 複習為 member-only,run.member_id 必為 Some
+                    let mid = run.member_id.expect("review mode requires member");
+                    let graduated =
+                        vocab_repo::count_mastered_among(state.get_pool(), mid, &run.seen_word_ids)
+                            .await? as i32;
+                    let total_exp = vocab_repo::member_exp(state.get_pool(), mid).await?;
 
                     Ok(AnswerResponse {
                         correct,
