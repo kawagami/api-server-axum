@@ -171,16 +171,16 @@ export default function VocabClient({ initialMe, initialMistakes }: {
                 gainedExp: res.gained_exp,
             });
             timerRef.current = setTimeout(() => {
-                if (endedRef.current) return; // 已被倒數結束
                 setFeedback(null);
                 setSpellInput("");
                 if (res.finished && res.result) {
-                    endedRef.current = true;
+                    // 本題結束對局:一定顯示結算(endedRef 已於上方設定,不可用來擋這裡)
                     if (res.result.leveled_up) vocabSound.levelUp();
                     setResult(res.result);
                     setPhase("finished");
                     refreshAfterRun();
-                } else if (res.question) {
+                } else if (!endedRef.current && res.question) {
+                    // 未結束才換下一題;若期間被倒數結束(endedRef)則不動,交給 timeUp 的結算
                     setQuestion(res.question);
                 }
             }, FEEDBACK_MS);
