@@ -881,6 +881,8 @@
     "login": "登入",
     "guestSavePrompt": "登入即可保存這局經驗並上排名",
     "loginToReview": "登入才能複習錯字",
-    "memberOnly": "需登入"
+    "memberOnly": "需登入",
+    "mute": "靜音",
+    "unmute": "開啟音效"
   }
 }

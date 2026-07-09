@@ -3,9 +3,10 @@
 import { answerVocabRun, finishVocabRun, getVocabMe, getVocabMistakes, startVocabRun } from "@/api/vocab";
 import type { VocabMe, VocabMistake, VocabQuestion, VocabRunMode, VocabRunResult } from "@/types";
 import { Link } from "@/i18n/navigation";
-import { BookOpenCheck, CheckCircle2, Clock, Flame, GraduationCap, Heart, Loader2, LogIn, Sparkles, Trophy } from "lucide-react";
+import { BookOpenCheck, CheckCircle2, Clock, Flame, GraduationCap, Heart, Loader2, LogIn, Sparkles, Trophy, Volume2, VolumeX } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
+import { vocabSound } from "./sound";
 
 type Phase = "idle" | "playing" | "finished";
 
@@ -55,6 +56,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const [result, setResult] = useState<VocabRunResult | null>(null);
     const [spellInput, setSpellInput] = useState("");
+    const [muted, setMutedState] = useState(false);
 
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +64,15 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     const deadlineRef = useRef<number | null>(null);
     const endedRef = useRef(false);
     useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+    // 讀持久化的靜音偏好:localStorage 是 client-only,mount 後同步以免 hydration 不一致
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => { setMutedState(vocabSound.isMuted()); }, []);
+
+    function toggleMute() {
+        const next = !muted;
+        setMutedState(next);
+        vocabSound.setMuted(next);
+    }
 
     function refreshAfterRun() {
         if (!isMember) return; // 訪客不打會員端點(會 401 轉登入)
@@ -73,6 +84,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
         if (endedRef.current) return;
         endedRef.current = true;
         if (timerRef.current) clearTimeout(timerRef.current);
+        vocabSound.timeUp();
         try {
             const res = await finishVocabRun(runIdRef.current);
             if (res.result) {
@@ -113,6 +125,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     }, [phase, mode]);
 
     async function start(runMode: VocabRunMode) {
+        vocabSound.warmup(); // 使用者手勢內解 autoplay 鎖
         setBusy(true);
         setError(false);
         try {
@@ -146,6 +159,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
         try {
             const res = await answerVocabRun(runId, input);
             if (res.finished) endedRef.current = true; // 立即封鎖倒數,避免重複結算
+            if (res.correct) vocabSound.correct(); else vocabSound.wrong();
             setLives(res.lives);
             setCombo(res.combo);
             setRunExp(res.run_exp);
@@ -162,6 +176,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
                 setSpellInput("");
                 if (res.finished && res.result) {
                     endedRef.current = true;
+                    if (res.result.leveled_up) vocabSound.levelUp();
                     setResult(res.result);
                     setPhase("finished");
                     refreshAfterRun();
@@ -180,20 +195,33 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     const bestOf = (m: VocabRunMode) => me?.bests.find(b => b.mode === m);
 
     if (phase === "playing" && question) {
+        const fxClass = feedback ? (feedback.correct ? "fx-pop" : "fx-shake") : "";
         return (
             <div className="flex flex-col gap-6">
-                {mode === "review"
-                    ? <ReviewHeader number={question.number} total={total} t={t} />
-                    : <PlayHeader mode={mode} lives={lives} combo={combo} runExp={runExp}
-                        number={question.number} remaining={remaining} t={t} />}
-                {question.kind === "choice" ? (
-                    <ChoiceCard question={question} feedback={feedback} busy={busy} t={t}
-                        onPick={(i) => submit({ choice_index: i })} />
-                ) : (
-                    <SpellingCard question={question} feedback={feedback} busy={busy} t={t}
-                        value={spellInput} onChange={setSpellInput} inputRef={inputRef}
-                        onSubmit={() => { if (spellInput.trim()) submit({ text: spellInput }); }} />
-                )}
+                <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                        {mode === "review"
+                            ? <ReviewHeader number={question.number} total={total} t={t} />
+                            : <PlayHeader mode={mode} lives={lives} combo={combo} runExp={runExp}
+                                number={question.number} remaining={remaining} t={t} />}
+                    </div>
+                    <MuteButton muted={muted} onToggle={toggleMute} t={t} />
+                </div>
+                <div className={`relative ${fxClass}`}>
+                    {question.kind === "choice" ? (
+                        <ChoiceCard question={question} feedback={feedback} busy={busy} t={t}
+                            onPick={(i) => submit({ choice_index: i })} />
+                    ) : (
+                        <SpellingCard question={question} feedback={feedback} busy={busy} t={t}
+                            value={spellInput} onChange={setSpellInput} inputRef={inputRef}
+                            onSubmit={() => { if (spellInput.trim()) submit({ text: spellInput }); }} />
+                    )}
+                    {feedback?.correct && feedback.gainedExp > 0 && (
+                        <span className="fx-float pointer-events-none absolute left-1/2 -translate-x-1/2 top-1 text-primary-500 font-bold text-lg">
+                            +{feedback.gainedExp} EXP
+                        </span>
+                    )}
+                </div>
                 {error && <ErrorNote t={t} />}
             </div>
         );
@@ -284,6 +312,19 @@ function ModeButton({ label, desc, best, busy, onClick, t }: {
             <span>{label}</span>
             <span className="text-xs font-normal text-primary-100">{desc}</span>
             {best != null && <span className="text-xs font-normal text-primary-100">{t("bestShort", { n: best })}</span>}
+        </button>
+    );
+}
+
+function MuteButton({ muted, onToggle, t }: { muted: boolean; onToggle: () => void; t: T }) {
+    return (
+        <button
+            onClick={onToggle}
+            aria-label={muted ? t("unmute") : t("mute")}
+            title={muted ? t("unmute") : t("mute")}
+            className="shrink-0 p-2 rounded-lg text-neutral-400 hover:text-primary-500 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+        >
+            {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
         </button>
     );
 }

@@ -881,6 +881,8 @@
     "login": "Log in",
     "guestSavePrompt": "Log in to save this run's EXP and rank",
     "loginToReview": "Log in to review mistakes",
-    "memberOnly": "Members only"
+    "memberOnly": "Members only",
+    "mute": "Mute",
+    "unmute": "Unmute"
   }
 }

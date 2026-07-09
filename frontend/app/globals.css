@@ -11,6 +11,27 @@
   80% { transform: translateX(5px); }
 }
 
+/* 單字闖關答題回饋特效 */
+@keyframes vocab-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@keyframes vocab-float {
+  0% { opacity: 0; transform: translateY(6px); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-32px); }
+}
+.fx-shake { animation: shake 0.4s; }
+.fx-pop { animation: vocab-pop 0.32s ease-out; }
+.fx-float { animation: vocab-float 0.9s ease-out forwards; }
+
+/* 尊重使用者的減量動態設定 */
+@media (prefers-reduced-motion: reduce) {
+  .fx-shake, .fx-pop, .fx-float { animation: none; }
+  .fx-float { display: none; }
+}
+
 /* ===== 主題色階（RGB 三元組，供 tailwind.config.js 的 rgb(var(--x) / alpha) 使用） =====
    換主題：<html data-theme="ocean">（由 site-theme cookie 控制，admin settings 可切換）
    新增主題：複製一段 [data-theme="..."] 區塊，11 階 primary + 11 階 neutral */
