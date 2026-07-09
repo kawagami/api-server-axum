@@ -866,6 +866,16 @@
     "mistakeEmpty": "还没有答错的单词,先去挑战吧!",
     "wrongCount": "答错次数",
     "correctCount": "答对次数",
-    "mastered": "已掌握"
+    "mastered": "已掌握",
+    "modeSurvival": "生存",
+    "modeSurvivalDesc": "3 命",
+    "modeTimed": "限时",
+    "modeTimedDesc": "冲题数",
+    "modeTimedSurvival": "限时生存",
+    "modeTimedSurvivalDesc": "限时 + 3 命",
+    "bestShort": "最佳 {n}",
+    "timeLimit": "时长",
+    "minutes": "{n} 分",
+    "timeUpOver": "时间到!"
   }
 }

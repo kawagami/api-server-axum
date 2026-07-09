@@ -23,6 +23,7 @@ pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/runs", post(start_run))
         .route("/runs/{id}/answer", post(answer))
+        .route("/runs/{id}/finish", post(finish))
         .route("/me", get(me))
         .route("/mistakes", get(mistakes))
         .layer(middleware::from_fn_with_state(state, auth::authorize_member))
@@ -33,9 +34,21 @@ async fn start_run(
     State(state): State<AppState>,
     body: Option<Json<StartRunRequest>>,
 ) -> Result<(StatusCode, Json<StartRunResponse>), AppError> {
-    let mode = body.map(|Json(b)| b.mode).unwrap_or_default();
-    let res = vocab_service::start_run(&state, auth_member.member_id, mode).await?;
+    let req = body.map(|Json(b)| b).unwrap_or_default();
+    let res =
+        vocab_service::start_run(&state, auth_member.member_id, req.mode, req.duration_minutes)
+            .await?;
     Ok((StatusCode::CREATED, Json(res)))
+}
+
+async fn finish(
+    Extension(auth_member): Extension<AuthenticatedMember>,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<AnswerResponse>, AppError> {
+    Ok(Json(
+        vocab_service::finish(&state, id, auth_member.member_id).await?,
+    ))
 }
 
 async fn mistakes(

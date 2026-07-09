@@ -866,6 +866,16 @@
     "mistakeEmpty": "還沒有答錯的單字,先去挑戰吧!",
     "wrongCount": "答錯次數",
     "correctCount": "答對次數",
-    "mastered": "已掌握"
+    "mastered": "已掌握",
+    "modeSurvival": "生存",
+    "modeSurvivalDesc": "3 命",
+    "modeTimed": "限時",
+    "modeTimedDesc": "衝題數",
+    "modeTimedSurvival": "限時生存",
+    "modeTimedSurvivalDesc": "限時 + 3 命",
+    "bestShort": "最佳 {n}",
+    "timeLimit": "時長",
+    "minutes": "{n} 分",
+    "timeUpOver": "時間到!"
   }
 }

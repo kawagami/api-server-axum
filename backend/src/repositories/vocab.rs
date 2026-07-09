@@ -138,8 +138,8 @@ pub async fn insert_run(
 ) -> Result<(), AppError> {
     sqlx::query(
         "INSERT INTO vocab_runs
-            (id, member_id, answered_count, correct_count, max_combo, exp_gained, started_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            (id, member_id, answered_count, correct_count, max_combo, exp_gained, started_at, mode)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(run_id)
     .bind(state.member_id)
@@ -148,24 +148,41 @@ pub async fn insert_run(
     .bind(state.max_combo)
     .bind(state.exp)
     .bind(state.started_at)
+    .bind(state.mode.as_str())
     .execute(pool)
     .await?;
     Ok(())
 }
 
+/// 指定模式的最佳紀錄(新紀錄判定用)
 pub async fn best_run(
     pool: &Pool<Postgres>,
     member_id: i64,
+    mode: &str,
 ) -> Result<Option<BestRun>, AppError> {
     let row = sqlx::query_as(
-        "SELECT correct_count, max_combo, exp_gained FROM vocab_runs
-         WHERE member_id = $1
+        "SELECT mode, correct_count, max_combo, exp_gained FROM vocab_runs
+         WHERE member_id = $1 AND mode = $2
          ORDER BY correct_count DESC, max_combo DESC LIMIT 1",
     )
     .bind(member_id)
+    .bind(mode)
     .fetch_optional(pool)
     .await?;
     Ok(row)
+}
+
+/// 各模式的最佳紀錄(每模式一筆)
+pub async fn bests(pool: &Pool<Postgres>, member_id: i64) -> Result<Vec<BestRun>, AppError> {
+    let rows = sqlx::query_as(
+        "SELECT DISTINCT ON (mode) mode, correct_count, max_combo, exp_gained
+         FROM vocab_runs WHERE member_id = $1
+         ORDER BY mode, correct_count DESC, max_combo DESC",
+    )
+    .bind(member_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
 }
 
 /// 加經驗值,回傳加完後的總 exp

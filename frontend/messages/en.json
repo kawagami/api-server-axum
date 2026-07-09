@@ -866,6 +866,16 @@
     "mistakeEmpty": "No wrong words yet — go take a challenge!",
     "wrongCount": "Wrong",
     "correctCount": "Correct",
-    "mastered": "Mastered"
+    "mastered": "Mastered",
+    "modeSurvival": "Survival",
+    "modeSurvivalDesc": "3 lives",
+    "modeTimed": "Timed",
+    "modeTimedDesc": "Beat the clock",
+    "modeTimedSurvival": "Timed Survival",
+    "modeTimedSurvivalDesc": "Timed + 3 lives",
+    "bestShort": "Best {n}",
+    "timeLimit": "Duration",
+    "minutes": "{n} min",
+    "timeUpOver": "Time's up!"
   }
 }

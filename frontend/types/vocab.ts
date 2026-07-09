@@ -2,7 +2,7 @@
 
 export type VocabQuestionKind = 'choice' | 'spelling';
 
-export type VocabRunMode = 'survival' | 'review';
+export type VocabRunMode = 'survival' | 'timed' | 'timed_survival' | 'review';
 
 export interface VocabQuestion {
     number: number; // 第幾題,1 起算
@@ -24,6 +24,7 @@ export interface VocabStartRun {
     mode: VocabRunMode;
     lives: number;
     total?: number; // 複習模式的本局題數
+    remaining_secs?: number; // 限時模式的剩餘秒數
     question: VocabQuestion;
 }
 
@@ -65,6 +66,7 @@ export interface VocabAnswer {
 }
 
 export interface VocabBestRun {
+    mode: VocabRunMode;
     correct_count: number;
     max_combo: number;
     exp_gained: number;
@@ -75,7 +77,7 @@ export interface VocabMe {
     level: number;
     level_exp: number;      // 本級起點累積 exp
     next_level_exp: number; // 升下一級所需累積 exp
-    best: VocabBestRun | null;
+    bests: VocabBestRun[];  // 各計分模式的最佳紀錄
     total_runs: number;
     words_learned: number;
 }

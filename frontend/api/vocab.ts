@@ -15,12 +15,22 @@ export async function getVocabMistakes(): Promise<VocabMistake[]> {
     });
 }
 
-export async function startVocabRun(mode: VocabRunMode = 'survival'): Promise<VocabStartRun> {
+export async function startVocabRun(
+    mode: VocabRunMode = 'survival',
+    durationMinutes?: number,
+): Promise<VocabStartRun> {
     return memberRequest<VocabStartRun>({
         url: `${process.env.API_URL}/member/vocab/runs`,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode, duration_minutes: durationMinutes }),
+    });
+}
+
+export async function finishVocabRun(runId: string): Promise<VocabAnswer> {
+    return memberRequest<VocabAnswer>({
+        url: `${process.env.API_URL}/member/vocab/runs/${runId}/finish`,
+        method: 'POST',
     });
 }
 

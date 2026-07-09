@@ -205,11 +205,22 @@ async fn load_run(state: &AppState, run_id: Uuid, member_id: i64) -> Result<RunS
 
 // ---------- 對外服務 ----------
 
+/// 限時時長:只接受 3 / 5 / 10 分,其他一律回退 10
+fn resolve_duration_minutes(m: Option<i64>) -> i64 {
+    match m {
+        Some(3) => 3,
+        Some(5) => 5,
+        _ => 10,
+    }
+}
+
 pub async fn start_run(
     state: &AppState,
     member_id: i64,
     mode: RunMode,
+    duration_minutes: Option<i64>,
 ) -> Result<StartRunResponse, AppError> {
+    let now = chrono::Utc::now();
     let mut run = RunState {
         member_id,
         mode,
@@ -219,7 +230,8 @@ pub async fn start_run(
         answered: 0,
         correct: 0,
         exp: 0,
-        started_at: chrono::Utc::now(),
+        started_at: now,
+        deadline: None,
         seen_word_ids: vec![],
         review_queue: vec![],
         current: CurrentQuestion {
@@ -231,13 +243,14 @@ pub async fn start_run(
         },
     };
 
+    let mut remaining_secs = None;
+    if mode.has_time() {
+        let mins = resolve_duration_minutes(duration_minutes);
+        run.deadline = Some(now + chrono::Duration::minutes(mins));
+        remaining_secs = Some(mins * 60);
+    }
+
     let (total, question) = match mode {
-        RunMode::Survival => {
-            let (current, question) = next_question(state, &run).await?;
-            run.seen_word_ids.push(current.word_id);
-            run.current = current;
-            (None, question)
-        }
         RunMode::Review => {
             run.review_queue =
                 vocab_repo::review_word_ids(state.get_pool(), member_id, REVIEW_BATCH).await?;
@@ -252,6 +265,13 @@ pub async fn start_run(
             run.current = current;
             (Some(total), question)
         }
+        // 生存 / 限時 / 限時生存:都是隨機出題
+        _ => {
+            let (current, question) = next_question(state, &run).await?;
+            run.seen_word_ids.push(current.word_id);
+            run.current = current;
+            (None, question)
+        }
     };
 
     let run_id = Uuid::new_v4();
@@ -262,8 +282,83 @@ pub async fn start_run(
         mode,
         lives: run.lives,
         total,
+        remaining_secs,
         question,
     })
+}
+
+/// 結算計分模式的對局:清 Redis、算新紀錄、落地、發經驗、回結算
+async fn finalize(
+    state: &AppState,
+    run_id: Uuid,
+    run: &RunState,
+) -> Result<RunResult, AppError> {
+    redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
+
+    let previous_best =
+        vocab_repo::best_run(state.get_pool(), run.member_id, run.mode.as_str()).await?;
+    let new_best = previous_best.as_ref().is_none_or(|b| {
+        run.correct > b.correct_count
+            || (run.correct == b.correct_count && run.max_combo > b.max_combo)
+    });
+
+    vocab_repo::insert_run(state.get_pool(), run_id, run).await?;
+    let total_exp = vocab_repo::add_member_exp(state.get_pool(), run.member_id, run.exp).await?;
+    let level = level_for_exp(total_exp);
+    let leveled_up = run.exp > 0 && level > level_for_exp(total_exp - run.exp);
+
+    Ok(RunResult {
+        answered_count: run.answered,
+        correct_count: run.correct,
+        max_combo: run.max_combo,
+        exp_gained: run.exp,
+        total_exp,
+        level,
+        leveled_up,
+        new_best,
+        graduated: None,
+    })
+}
+
+/// 結算後的 AnswerResponse(答題已計入或棄置皆可用;feedback 欄由 caller 決定)
+fn finished_response(
+    run: &RunState,
+    result: RunResult,
+    correct: bool,
+    correct_choice_index: Option<usize>,
+    correct_text: Option<String>,
+    gained_exp: i64,
+) -> AnswerResponse {
+    AnswerResponse {
+        correct,
+        correct_choice_index,
+        correct_text,
+        gained_exp,
+        lives: run.lives,
+        combo: run.combo,
+        answered: run.answered,
+        correct_count: run.correct,
+        run_exp: run.exp,
+        finished: true,
+        question: None,
+        result: Some(result),
+    }
+}
+
+/// 限時到時或玩家主動結束:結算並回結果(限時模式專用)
+pub async fn finish(
+    state: &AppState,
+    run_id: Uuid,
+    member_id: i64,
+) -> Result<AnswerResponse, AppError> {
+    let run = load_run(state, run_id, member_id).await?;
+    if !run.mode.has_time() {
+        return Err(AppError::RequestError(RequestError::UnprocessableContent(
+            "此模式不支援手動結束".to_string(),
+        )));
+    }
+    let result = finalize(state, run_id, &run).await?;
+    Ok(finished_response(&run, result, false, None, None, 0))
 }
 
 pub async fn answer(
@@ -273,6 +368,17 @@ pub async fn answer(
     req: &AnswerRequest,
 ) -> Result<AnswerResponse, AppError> {
     let mut run = load_run(state, run_id, member_id).await?;
+
+    // 限時已到:棄置此題直接結算(正常由前端倒數歸零呼叫 finish,此為伺服器端安全網)
+    if run.mode.has_time() {
+        if let Some(dl) = run.deadline {
+            if chrono::Utc::now() >= dl {
+                let result = finalize(state, run_id, &run).await?;
+                return Ok(finished_response(&run, result, false, None, None, 0));
+            }
+        }
+    }
+
     let current = &run.current;
 
     let correct = match current.kind {
@@ -309,7 +415,8 @@ pub async fn answer(
     vocab_repo::upsert_word_stat(state.get_pool(), member_id, question_word_id, correct).await?;
 
     match run.mode {
-        RunMode::Survival => {
+        // 生存 / 限時 / 限時生存:隨機出題計分
+        RunMode::Survival | RunMode::Timed | RunMode::TimedSurvival => {
             let gained_exp = if correct {
                 run.correct += 1;
                 run.combo += 1;
@@ -319,50 +426,23 @@ pub async fn answer(
                 gained
             } else {
                 run.combo = 0;
-                run.lives -= 1;
+                if run.mode.has_lives() {
+                    run.lives -= 1;
+                }
                 0
             };
 
-            if run.lives <= 0 {
-                // 結束:清 Redis、落地對局、發經驗值、算等級與個人紀錄
-                redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
-
-                let previous_best = vocab_repo::best_run(state.get_pool(), member_id).await?;
-                let new_best = previous_best.as_ref().is_none_or(|b| {
-                    run.correct > b.correct_count
-                        || (run.correct == b.correct_count && run.max_combo > b.max_combo)
-                });
-
-                vocab_repo::insert_run(state.get_pool(), run_id, &run).await?;
-                let total_exp =
-                    vocab_repo::add_member_exp(state.get_pool(), member_id, run.exp).await?;
-                let level = level_for_exp(total_exp);
-                let leveled_up = run.exp > 0 && level > level_for_exp(total_exp - run.exp);
-
-                return Ok(AnswerResponse {
+            // 有命模式命數歸零即結束(純限時模式靠時間到 / finish 結束)
+            if run.mode.has_lives() && run.lives <= 0 {
+                let result = finalize(state, run_id, &run).await?;
+                return Ok(finished_response(
+                    &run,
+                    result,
                     correct,
                     correct_choice_index,
                     correct_text,
                     gained_exp,
-                    lives: run.lives,
-                    combo: run.combo,
-                    answered: run.answered,
-                    correct_count: run.correct,
-                    run_exp: run.exp,
-                    finished: true,
-                    question: None,
-                    result: Some(RunResult {
-                        answered_count: run.answered,
-                        correct_count: run.correct,
-                        max_combo: run.max_combo,
-                        exp_gained: run.exp,
-                        total_exp,
-                        level,
-                        leveled_up,
-                        new_best,
-                        graduated: None,
-                    }),
-                });
+                ));
             }
 
             let (current, question) = next_question(state, &run).await?;
@@ -460,7 +540,7 @@ pub async fn mistakes(
 pub async fn me(state: &AppState, member_id: i64) -> Result<VocabMe, AppError> {
     let exp = vocab_repo::member_exp(state.get_pool(), member_id).await?;
     let level = level_for_exp(exp);
-    let best = vocab_repo::best_run(state.get_pool(), member_id).await?;
+    let bests = vocab_repo::bests(state.get_pool(), member_id).await?;
     let (total_runs, words_learned) = vocab_repo::member_stats(state.get_pool(), member_id).await?;
 
     Ok(VocabMe {
@@ -468,7 +548,7 @@ pub async fn me(state: &AppState, member_id: i64) -> Result<VocabMe, AppError> {
         level,
         level_exp: exp_for_level(level),
         next_level_exp: exp_for_level(level + 1),
-        best,
+        bests,
         total_runs,
         words_learned,
     })

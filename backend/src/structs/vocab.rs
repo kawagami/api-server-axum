@@ -21,13 +21,37 @@ pub enum QuestionKind {
     Spelling,
 }
 
-/// 對局模式:生存(隨機出題賺經驗)/ 複習(只出答錯過的字,不計經驗)
+/// 對局模式
+/// - Survival:3 命,答錯扣命歸零結束
+/// - Timed:限時,不限命,時間到結束
+/// - TimedSurvival:限時 + 3 命,先到先算
+/// - Review:只出答錯過的字,不計命/時間/經驗
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum RunMode {
     #[default]
     Survival,
+    Timed,
+    TimedSurvival,
     Review,
+}
+
+impl RunMode {
+    /// DB `vocab_runs.mode` 用值
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RunMode::Survival => "survival",
+            RunMode::Timed => "timed",
+            RunMode::TimedSurvival => "timed_survival",
+            RunMode::Review => "review",
+        }
+    }
+    pub fn has_lives(self) -> bool {
+        matches!(self, RunMode::Survival | RunMode::TimedSurvival)
+    }
+    pub fn has_time(self) -> bool {
+        matches!(self, RunMode::Timed | RunMode::TimedSurvival)
+    }
 }
 
 /// 進行中對局的當前題目(只存 Redis;正解不下發前端)
@@ -55,6 +79,9 @@ pub struct RunState {
     pub correct: i32,
     pub exp: i64,
     pub started_at: DateTime<Utc>,
+    /// 限時模式的截止時間(伺服器權威,非限時為 None)
+    #[serde(default)]
+    pub deadline: Option<DateTime<Utc>>,
     pub seen_word_ids: Vec<i64>,
     /// 複習模式待出題的 word_id 佇列(生存模式為空)
     #[serde(default)]
@@ -98,6 +125,8 @@ pub struct AnswerRequest {
 pub struct StartRunRequest {
     #[serde(default)]
     pub mode: RunMode,
+    /// 限時模式時長(分鐘),接受 3 / 5 / 10,其他值一律回退 10
+    pub duration_minutes: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -105,9 +134,12 @@ pub struct StartRunResponse {
     pub run_id: Uuid,
     pub mode: RunMode,
     pub lives: i32,
-    /// 複習模式的本局題數(生存模式為 None)
+    /// 複習模式的本局題數(其他模式為 None)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<i32>,
+    /// 限時模式的剩餘秒數(其他模式為 None),前端據此本地倒數
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remaining_secs: Option<i64>,
     pub question: QuestionDto,
 }
 
@@ -163,6 +195,7 @@ pub struct MistakeEntry {
 
 #[derive(Serialize, FromRow)]
 pub struct BestRun {
+    pub mode: String,
     pub correct_count: i32,
     pub max_combo: i32,
     pub exp_gained: i64,
@@ -177,7 +210,8 @@ pub struct VocabMe {
     pub level_exp: i64,
     /// 升下一級所需累積 exp
     pub next_level_exp: i64,
-    pub best: Option<BestRun>,
+    /// 各計分模式的最佳紀錄(每模式一筆,無紀錄的模式不出現)
+    pub bests: Vec<BestRun>,
     pub total_runs: i64,
     pub words_learned: i64,
 }
