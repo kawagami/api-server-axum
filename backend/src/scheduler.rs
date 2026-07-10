@@ -11,7 +11,6 @@ pub async fn initialize_scheduler(state: AppState) {
         AppJob::FetchStockDayAll,
         AppJob::FetchBuybackPeriods,
         AppJob::FetchGovTenders,
-        AppJob::FetchNotes,
         AppJob::FetchHistoricalClosingPrices,
         AppJob::ConsumePendingStockChange,
         AppJob::SyncBuybackToPending,

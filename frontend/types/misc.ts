@@ -6,20 +6,6 @@ export interface Image {
   status?: string;
 }
 
-// HackMD — fields use snake_case matching API response
-export interface HackmdNote {
-  id: string;
-  title: string;
-  tags: string[];
-  publish_link: string;
-  last_changed_at: string;
-}
-
-export interface HackmdTag {
-  id: string;
-  name: string;
-}
-
 // Setting
 export interface Setting {
   key: string;

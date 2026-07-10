@@ -1,14 +1,5 @@
 {
-  "Hackmd": {
-    "count": "{count} notes total",
-    "showFilter": "Show categories",
-    "hideFilter": "Hide categories",
-    "selectAll": "Select all",
-    "deselectAll": "Deselect all",
-    "empty": "No notes yet"
-  },
   "Header": {
-    "notes": "Notes",
     "tools": "Tools",
     "games": "Games",
     "about": "About",
@@ -204,13 +195,6 @@
           "Blog pages rendered with react-markdown",
           "UI/UX continuously improving",
           "More features added as ideas come up"
-        ]
-      },
-      {
-        "title": "Notes page",
-        "contents": [
-          "Uses React Context to share state between client components",
-          "Pairs with the Rust backend API — an axum + Next.js combo"
         ]
       },
       {

@@ -1,7 +1,7 @@
 import IndexInfo from "@/components/index-info";
 import { getTranslations } from "next-intl/server";
 
-const CARD_HREFS = ["/", "/hackmd-notes", "/tools/countdown"];
+const CARD_HREFS = ["/", "/tools/countdown"];
 
 export default async function About() {
     const t = await getTranslations("About");

@@ -1,14 +1,5 @@
 {
-  "Hackmd": {
-    "count": "總共 {count} 個筆記",
-    "showFilter": "顯示分類",
-    "hideFilter": "隱藏分類",
-    "selectAll": "全選",
-    "deselectAll": "全不選",
-    "empty": "目前沒有筆記"
-  },
   "Header": {
-    "notes": "Notes",
     "tools": "工具",
     "games": "遊戲",
     "about": "關於",
@@ -204,13 +195,6 @@
           "blogs 頁面使用 react-markdown render",
           "UI/UX 持續完善中",
           "其餘的想到甚麼就會加進來"
-        ]
-      },
-      {
-        "title": "Notes 頁面",
-        "contents": [
-          "使用 React Context 完成在 client component 間的 state 資訊共用",
-          "搭配 rust 的後端 API 完成 axum + NextJS 的組合"
         ]
       },
       {

@@ -8,7 +8,6 @@ pub mod jobs;
 pub mod ledger;
 pub mod lotto;
 pub mod members;
-pub mod notes;
 pub mod pagination;
 pub mod portfolio;
 pub mod roles;

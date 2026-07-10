@@ -1,14 +1,5 @@
 {
-  "Hackmd": {
-    "count": "总共 {count} 个笔记",
-    "showFilter": "显示分类",
-    "hideFilter": "隐藏分类",
-    "selectAll": "全选",
-    "deselectAll": "全不选",
-    "empty": "目前没有笔记"
-  },
   "Header": {
-    "notes": "Notes",
     "tools": "工具",
     "games": "游戏",
     "about": "关于",
@@ -204,13 +195,6 @@
           "blogs 页面使用 react-markdown render",
           "UI/UX 持续完善中",
           "其余的想到什么就会加进来"
-        ]
-      },
-      {
-        "title": "Notes 页面",
-        "contents": [
-          "使用 React Context 完成在 client component 间的 state 信息共享",
-          "搭配 rust 的后端 API 完成 axum + NextJS 的组合"
         ]
       },
       {

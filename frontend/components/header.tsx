@@ -47,7 +47,6 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
 
     const isBlogActive = pathname.startsWith('/blogs');
     const isVocabActive = pathname.startsWith('/vocab');
-    const isNotesActive = pathname.startsWith('/hackmd-notes');
     const isAboutActive = pathname.startsWith('/about');
     const isToolsActive = pathname.startsWith('/tools');
     const isGamesActive = pathname.startsWith('/games');
@@ -96,7 +95,6 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                 <nav ref={navRef} className="hidden md:flex items-center gap-2">
                     <Link href="/blogs" aria-label={t('blog')} className={`${navLinkClass} ${isBlogActive ? activeNavClass : ''}`}>{t('blog')}</Link>
                     <Link href="/vocab" aria-label={t('vocab')} className={`${navLinkClass} ${isVocabActive ? activeNavClass : ''}`}>{t('vocab')}</Link>
-                    <Link href="/hackmd-notes" aria-label={t('notes')} className={`${navLinkClass} ${isNotesActive ? activeNavClass : ''}`}>{t('notes')}</Link>
                     <div
                         className="relative"
                         onMouseEnter={() => setIsResourcesOpen(true)}
@@ -203,7 +201,6 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                     <nav className="md:hidden fixed top-[50px] left-0 right-0 z-40 bg-white dark:bg-neutral-900 shadow-lg border-t border-neutral-200 dark:border-neutral-700 flex flex-col p-4 gap-1">
                         <Link href="/blogs" className={`${mobileItemClass} ${isBlogActive ? activeNavClass : ''}`} onClick={closeAll}>{t('blog')}</Link>
                         <Link href="/vocab" className={`${mobileItemClass} ${isVocabActive ? activeNavClass : ''}`} onClick={closeAll}>{t('vocab')}</Link>
-                        <Link href="/hackmd-notes" className={`${mobileItemClass} ${isNotesActive ? activeNavClass : ''}`} onClick={closeAll}>{t('notes')}</Link>
 
                         <div className="flex items-center">
                             <Link href="/tools" className={`${mobileItemClass} flex-1 ${isToolsActive ? activeNavClass : ''}`} onClick={closeAll}>
