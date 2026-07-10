@@ -92,3 +92,31 @@ export interface VocabAnswerInput {
     choice_index?: number;
     text?: string;
 }
+
+// ---------- 後台題庫管理(/admin/vocab) ----------
+
+export interface AdminVocabWord {
+    id: number;
+    language: VocabLanguage;
+    word: string;
+    reading: string | null;
+    accepted_readings: string[] | null;
+    part_of_speech: string;
+    meaning_zh: string;
+    example_sentence: string;
+    difficulty: number;
+    enabled: boolean;
+    wrong_total: number;
+    correct_total: number;
+}
+
+/** 全欄位覆寫;表記與語言不可改 */
+export interface UpdateVocabWordInput {
+    reading: string | null;
+    accepted_readings: string[] | null;
+    part_of_speech: string;
+    meaning_zh: string;
+    example_sentence: string;
+    difficulty: number;
+    enabled: boolean;
+}

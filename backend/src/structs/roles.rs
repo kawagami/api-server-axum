@@ -31,6 +31,8 @@ pub enum Perm {
     InvoiceLotteryWrite,
     StatRead,
     GovTenderRead,
+    VocabRead,
+    VocabUpdate,
 }
 
 impl Perm {
@@ -65,6 +67,8 @@ impl Perm {
             Self::InvoiceLotteryWrite => "invoice_lottery:write",
             Self::StatRead       => "stat:read",
             Self::GovTenderRead  => "gov_tender:read",
+            Self::VocabRead      => "vocab:read",
+            Self::VocabUpdate    => "vocab:update",
         }
     }
 }

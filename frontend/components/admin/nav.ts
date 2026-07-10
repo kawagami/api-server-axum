@@ -29,6 +29,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         items: [
             { label: "文章", href: "/admin/blogs", permission: "blog:read" },
             { label: "圖片", href: "/admin/images", permission: "image:read" },
+            { label: "單字題庫", href: "/admin/vocab", permission: "vocab:read" },
         ],
     },
     {

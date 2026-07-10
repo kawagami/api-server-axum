@@ -248,6 +248,54 @@ pub struct MistakeEntry {
     pub last_seen_at: DateTime<Utc>,
 }
 
+// ---------- 後台題庫管理 ----------
+
+/// 後台題庫列表一列(含全會員答題統計,揪出高錯誤率的爛字用)
+#[derive(Serialize, FromRow)]
+pub struct AdminWord {
+    pub id: i64,
+    pub language: String,
+    pub word: String,
+    pub reading: Option<String>,
+    pub accepted_readings: Option<Vec<String>>,
+    pub part_of_speech: String,
+    pub meaning_zh: String,
+    pub example_sentence: String,
+    pub difficulty: i16,
+    pub enabled: bool,
+    pub wrong_total: i64,
+    pub correct_total: i64,
+}
+
+#[derive(Deserialize)]
+pub struct AdminWordListQuery {
+    pub language: Option<String>,
+    pub difficulty: Option<i16>,
+    pub enabled: Option<bool>,
+    /// 表記 / 讀音 / 釋義模糊搜尋
+    pub q: Option<String>,
+    /// `wrong` = 錯最多優先(預設依 id)
+    pub sort: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct AdminWordListResponse {
+    pub data: Vec<AdminWord>,
+    pub total: i64,
+}
+
+/// 全欄位覆寫更新;表記與語言不可改(改表記等於換字,走 seed 流程)
+#[derive(Deserialize)]
+pub struct UpdateWordRequest {
+    pub reading: Option<String>,
+    pub accepted_readings: Option<Vec<String>>,
+    pub part_of_speech: String,
+    pub meaning_zh: String,
+    pub example_sentence: String,
+    pub difficulty: i16,
+    pub enabled: bool,
+}
+
 #[derive(Serialize, FromRow)]
 pub struct BestRun {
     pub mode: String,
