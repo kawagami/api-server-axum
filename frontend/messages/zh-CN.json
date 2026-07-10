@@ -875,6 +875,12 @@
     "readingIs": "读音:{reading}",
     "switchToJa": "日语版 →",
     "switchToEn": "← 英语版",
-    "jmdictAttribution": "词汇数据取自 JMdict(EDRDG),依 CC BY-SA 4.0 授权使用;JLPT 分级为社区整理的估计值。"
+    "jmdictAttribution": "词汇数据取自 JMdict(EDRDG),依 CC BY-SA 4.0 授权使用;JLPT 分级为社区整理的估计值。",
+    "leaderboard": "排行榜",
+    "lbWeekly": "周榜",
+    "lbMonthly": "月榜",
+    "lbEmpty": "这个周期还没有纪录,抢下第一个名次吧!",
+    "lbRuns": "{count} 局",
+    "lbMyRank": "我的名次:第 {rank} 名 · {exp} EXP"
   }
 }

@@ -875,6 +875,12 @@
     "readingIs": "Reading: {reading}",
     "switchToJa": "Japanese →",
     "switchToEn": "← English",
-    "jmdictAttribution": "Vocabulary data from JMdict (EDRDG), used under CC BY-SA 4.0; JLPT levels are community estimates."
+    "jmdictAttribution": "Vocabulary data from JMdict (EDRDG), used under CC BY-SA 4.0; JLPT levels are community estimates.",
+    "leaderboard": "Leaderboard",
+    "lbWeekly": "Weekly",
+    "lbMonthly": "Monthly",
+    "lbEmpty": "No records this period yet — be the first!",
+    "lbRuns": "{count} runs",
+    "lbMyRank": "My rank: #{rank} · {exp} EXP"
   }
 }

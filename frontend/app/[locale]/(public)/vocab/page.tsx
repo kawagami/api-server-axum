@@ -1,4 +1,4 @@
-import { getVocabMe, getVocabMistakes } from "@/api/vocab";
+import { getVocabLeaderboard, getVocabMe, getVocabMistakes } from "@/api/vocab";
 import { getTranslations } from "next-intl/server";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
@@ -15,10 +15,11 @@ export default async function VocabPage() {
     const [me, mistakes] = isMember
         ? await Promise.all([getVocabMe(), getVocabMistakes()])
         : [null, []];
+    const leaderboard = await getVocabLeaderboard("en", "weekly").catch(() => null);
 
     return (
         <div className="w-full max-w-2xl px-4 py-8">
-            <VocabClient initialMe={me} initialMistakes={mistakes} />
+            <VocabClient initialMe={me} initialMistakes={mistakes} initialLeaderboard={leaderboard} />
         </div>
     );
 }

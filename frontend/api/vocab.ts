@@ -1,7 +1,7 @@
 "use server";
 
 import memberRequest from "@/libs/memberRequest";
-import type { VocabAnswer, VocabAnswerInput, VocabLanguage, VocabMe, VocabMistake, VocabRunMode, VocabStartRun } from "@/types";
+import type { VocabAnswer, VocabAnswerInput, VocabLanguage, VocabLeaderboard, VocabLeaderboardPeriod, VocabMe, VocabMistake, VocabRunMode, VocabStartRun } from "@/types";
 
 export async function getVocabMe(language: VocabLanguage = 'en'): Promise<VocabMe> {
     return memberRequest<VocabMe>({
@@ -12,6 +12,16 @@ export async function getVocabMe(language: VocabLanguage = 'en'): Promise<VocabM
 export async function getVocabMistakes(language: VocabLanguage = 'en'): Promise<VocabMistake[]> {
     return memberRequest<VocabMistake[]>({
         url: `${process.env.API_URL}/member/vocab/mistakes?language=${language}`,
+    });
+}
+
+// 訪客也能看榜(端點選擇性驗證);登入時回應多帶自己的名次
+export async function getVocabLeaderboard(
+    language: VocabLanguage = 'en',
+    period: VocabLeaderboardPeriod = 'weekly',
+): Promise<VocabLeaderboard> {
+    return memberRequest<VocabLeaderboard>({
+        url: `${process.env.API_URL}/member/vocab/leaderboard?language=${language}&period=${period}`,
     });
 }
 

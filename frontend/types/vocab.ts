@@ -88,6 +88,22 @@ export interface VocabMe {
     words_learned: number;
 }
 
+// 排行榜週期(台北時間;weekly = 本週一起、monthly = 本月 1 日起)
+export type VocabLeaderboardPeriod = 'weekly' | 'monthly';
+
+export interface VocabLeaderboardRow {
+    rank: number;
+    name: string;
+    avatar_url: string | null;
+    exp: number;
+    runs: number;
+}
+
+export interface VocabLeaderboard {
+    top: VocabLeaderboardRow[];
+    me?: { rank: number; exp: number }; // 登入且該週期有紀錄才有
+}
+
 export interface VocabAnswerInput {
     choice_index?: number;
     text?: string;

@@ -6,8 +6,8 @@ use crate::{
     structs::{
         members::AuthenticatedMember,
         vocab::{
-            AnswerRequest, AnswerResponse, Language, MistakeEntry, StartRunRequest,
-            StartRunResponse, VocabMe,
+            AnswerRequest, AnswerResponse, Language, LeaderboardPeriod, LeaderboardResponse,
+            MistakeEntry, StartRunRequest, StartRunResponse, VocabMe,
         },
     },
 };
@@ -28,6 +28,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         .route("/runs/{id}/finish", post(finish))
         .route("/me", get(me))
         .route("/mistakes", get(mistakes))
+        .route("/leaderboard", get(leaderboard))
         .layer(middleware::from_fn_with_state(
             state,
             auth::authorize_member_optional,
@@ -79,6 +80,26 @@ async fn answer(
 ) -> Result<Json<AnswerResponse>, AppError> {
     Ok(Json(
         vocab_service::answer(&state, id, caller(member), &req).await?,
+    ))
+}
+
+/// 排行榜 query(?language=ja&period=monthly),缺省 en + weekly
+#[derive(serde::Deserialize, Default)]
+struct LeaderboardQuery {
+    #[serde(default)]
+    language: Language,
+    #[serde(default)]
+    period: LeaderboardPeriod,
+}
+
+/// 訪客也能看榜;登入時額外回自己的名次
+async fn leaderboard(
+    member: Option<Extension<AuthenticatedMember>>,
+    State(state): State<AppState>,
+    Query(q): Query<LeaderboardQuery>,
+) -> Result<Json<LeaderboardResponse>, AppError> {
+    Ok(Json(
+        vocab_service::leaderboard(&state, caller(member), q.language, q.period).await?,
     ))
 }
 

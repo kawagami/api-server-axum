@@ -1,9 +1,11 @@
 use crate::{
     errors::AppError,
     structs::vocab::{
-        AdminWord, AdminWordListQuery, BestRun, MistakeEntry, RunState, UpdateWordRequest, Word,
+        AdminWord, AdminWordListQuery, BestRun, LeaderboardMe, LeaderboardRow, MistakeEntry,
+        RunState, UpdateWordRequest, Word,
     },
 };
+use chrono::{DateTime, Utc};
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
@@ -265,6 +267,56 @@ pub async fn vocab_exp(
             .fetch_optional(pool)
             .await?;
     Ok(row.map_or(0, |(exp,)| exp))
+}
+
+/// 週期聚合(exp 總和 + 局數):複習局不計經驗也不計局數
+const LEADERBOARD_AGG: &str = "SELECT member_id, SUM(exp_gained)::BIGINT AS exp,
+            COUNT(*) AS runs, MAX(ended_at) AS last_at
+     FROM vocab_runs
+     WHERE language = $1 AND ended_at >= $2 AND mode <> 'review'
+     GROUP BY member_id";
+
+/// 週期排行榜 top N:期間內 exp 總和;同分先達成者(最後一局較早)在前
+pub async fn leaderboard_top(
+    pool: &Pool<Postgres>,
+    language: &str,
+    from: DateTime<Utc>,
+    limit: i64,
+) -> Result<Vec<LeaderboardRow>, AppError> {
+    let rows = sqlx::query_as(&format!(
+        "SELECT RANK() OVER (ORDER BY a.exp DESC) AS rank,
+                m.name, m.avatar_url, a.exp, a.runs
+         FROM ({LEADERBOARD_AGG}) a
+         JOIN members m ON m.id = a.member_id
+         ORDER BY a.exp DESC, a.last_at LIMIT $3"
+    ))
+    .bind(language)
+    .bind(from)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// 自己在該週期的名次與 exp;期間內沒打過(計分)局回 None
+pub async fn leaderboard_me(
+    pool: &Pool<Postgres>,
+    language: &str,
+    from: DateTime<Utc>,
+    member_id: i64,
+) -> Result<Option<LeaderboardMe>, AppError> {
+    let row = sqlx::query_as(&format!(
+        "SELECT rank, exp FROM (
+            SELECT member_id, RANK() OVER (ORDER BY exp DESC) AS rank, exp
+            FROM ({LEADERBOARD_AGG}) a
+         ) r WHERE member_id = $3"
+    ))
+    .bind(language)
+    .bind(from)
+    .bind(member_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row)
 }
 
 // ---------- 後台題庫管理 ----------

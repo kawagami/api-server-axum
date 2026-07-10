@@ -4,10 +4,12 @@ use crate::{
     services::vocab_ja,
     state::AppState,
     structs::vocab::{
-        AnswerRequest, AnswerResponse, CurrentQuestion, Language, MistakeEntry, QuestionDto,
-        QuestionKind, RunMode, RunResult, RunState, StartRunResponse, VocabMe, Word,
+        AnswerRequest, AnswerResponse, CurrentQuestion, Language, LeaderboardPeriod,
+        LeaderboardResponse, MistakeEntry, QuestionDto, QuestionKind, RunMode, RunResult, RunState,
+        StartRunResponse, VocabMe, Word,
     },
 };
+use chrono::{DateTime, Datelike, Duration, FixedOffset, TimeZone, Utc};
 use rand::Rng;
 use uuid::Uuid;
 
@@ -667,6 +669,41 @@ pub async fn mistakes(
     vocab_repo::mistakes(state.get_pool(), member_id, language.as_str()).await
 }
 
+/// 排行榜 top N 名額
+const LEADERBOARD_SIZE: i64 = 20;
+
+/// 週期起點:台北時間(UTC+8)本週一 00:00 / 本月 1 日 00:00,轉回 UTC 給查詢用
+fn period_start(now: DateTime<Utc>, period: LeaderboardPeriod) -> DateTime<Utc> {
+    let tz = FixedOffset::east_opt(8 * 3600).expect("UTC+8 合法偏移");
+    let today = now.with_timezone(&tz).date_naive();
+    let start = match period {
+        LeaderboardPeriod::Weekly => {
+            today - Duration::days(i64::from(today.weekday().num_days_from_monday()))
+        }
+        LeaderboardPeriod::Monthly => today.with_day(1).expect("每月必有 1 日"),
+    };
+    tz.from_local_datetime(&start.and_hms_opt(0, 0, 0).expect("00:00:00 合法"))
+        .single()
+        .expect("固定偏移無 DST,本地時間唯一")
+        .with_timezone(&Utc)
+}
+
+pub async fn leaderboard(
+    state: &AppState,
+    member_id: Option<i64>,
+    language: Language,
+    period: LeaderboardPeriod,
+) -> Result<LeaderboardResponse, AppError> {
+    let from = period_start(Utc::now(), period);
+    let lang = language.as_str();
+    let top = vocab_repo::leaderboard_top(state.get_pool(), lang, from, LEADERBOARD_SIZE).await?;
+    let me = match member_id {
+        Some(mid) => vocab_repo::leaderboard_me(state.get_pool(), lang, from, mid).await?,
+        None => None,
+    };
+    Ok(LeaderboardResponse { top, me })
+}
+
 pub async fn me(
     state: &AppState,
     member_id: i64,
@@ -749,6 +786,37 @@ mod tests {
         // 英文全分布(1–5):clamp 後行為不變
         assert_eq!(clamped_window(0, 1, 5), (1, 2));
         assert_eq!(clamped_window(100, 1, 5), (2, 5));
+    }
+
+    #[test]
+    fn period_start_uses_taipei_boundaries() {
+        // 2026-07-11(六)台北中午:週起點 = 台北 07-06(一)00:00 = UTC 07-05 16:00
+        let now = Utc.with_ymd_and_hms(2026, 7, 11, 4, 0, 0).unwrap();
+        assert_eq!(
+            period_start(now, LeaderboardPeriod::Weekly),
+            Utc.with_ymd_and_hms(2026, 7, 5, 16, 0, 0).unwrap()
+        );
+        // 月起點 = 台北 07-01 00:00 = UTC 06-30 16:00
+        assert_eq!(
+            period_start(now, LeaderboardPeriod::Monthly),
+            Utc.with_ymd_and_hms(2026, 6, 30, 16, 0, 0).unwrap()
+        );
+    }
+
+    #[test]
+    fn period_start_respects_taipei_date_line() {
+        // UTC 週日 20:00 = 台北週一 04:00,已跨進新的一週
+        let now = Utc.with_ymd_and_hms(2026, 7, 5, 20, 0, 0).unwrap();
+        assert_eq!(
+            period_start(now, LeaderboardPeriod::Weekly),
+            Utc.with_ymd_and_hms(2026, 7, 5, 16, 0, 0).unwrap()
+        );
+        // UTC 06-30 20:00 = 台北 07-01 04:00,月榜已換到 7 月
+        let now = Utc.with_ymd_and_hms(2026, 6, 30, 20, 0, 0).unwrap();
+        assert_eq!(
+            period_start(now, LeaderboardPeriod::Monthly),
+            Utc.with_ymd_and_hms(2026, 6, 30, 16, 0, 0).unwrap()
+        );
     }
 
     #[test]

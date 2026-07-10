@@ -304,6 +304,40 @@ pub struct BestRun {
     pub exp_gained: i64,
 }
 
+/// 排行榜週期(台北時間;weekly = 本週一起、monthly = 本月 1 日起)
+#[derive(Deserialize, Clone, Copy, PartialEq, Default, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum LeaderboardPeriod {
+    #[default]
+    Weekly,
+    Monthly,
+}
+
+/// 排行榜一列(top N;name/avatar 取自 members,公開顯示)
+#[derive(Serialize, FromRow)]
+pub struct LeaderboardRow {
+    pub rank: i64,
+    pub name: String,
+    pub avatar_url: Option<String>,
+    pub exp: i64,
+    pub runs: i64,
+}
+
+/// 自己的名次(登入且該週期有紀錄才有)
+#[derive(Serialize, FromRow)]
+pub struct LeaderboardMe {
+    pub rank: i64,
+    pub exp: i64,
+}
+
+/// GET /member/vocab/leaderboard 回傳
+#[derive(Serialize)]
+pub struct LeaderboardResponse {
+    pub top: Vec<LeaderboardRow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub me: Option<LeaderboardMe>,
+}
+
 /// GET /member/vocab/me 回傳
 #[derive(Serialize)]
 pub struct VocabMe {
