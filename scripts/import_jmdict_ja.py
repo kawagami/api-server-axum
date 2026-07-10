@@ -108,7 +108,12 @@ def classify_pos(text: str) -> str | None:
 
 
 def map_pos(pos_texts: list[str]) -> str:
-    """逐個 pos 依序分類,先分出來的贏(JMdict 把主要詞性放前面)。"""
+    """逐個 pos 依序分類,先分出來的贏(JMdict 把主要詞性放前面)。
+    例外:する動詞優先——勉強/結婚這類 JMdict 標 [noun, vs],
+    對學習者「する動詞」比「名詞」有用。"""
+    joined = " / ".join(pos_texts)
+    if "takes the aux. verb suru" in joined or "suru verb" in joined:
+        return "する動詞"
     for text in pos_texts:
         zh = classify_pos(text)
         if zh:
@@ -254,15 +259,28 @@ def cmd_extract(args) -> int:
         with open(csv_path, newline="", encoding="utf-8") as f:
             for line in csv.DictReader(f):
                 # 字表偶有「足; 脚」「いく; ゆく」多形式列:各取第一形,
-                # 其餘讀音反正會從 JMdict 的 accepted_readings 補回
-                expr = line["expression"].split(";")[0].strip()
-                reading_raw = line["reading"].split(";")[0].strip()
+                # 其餘讀音反正會從 JMdict 的 accepted_readings 補回。
+                # 另清掉字表慣用注記:量詞/接尾的「～」、する動詞的「(する)」
+                expr = line["expression"].split(";")[0].replace("～", "").strip()
+                reading_raw = line["reading"].split(";")[0].replace("～", "")
+                reading_raw = re.sub(r"\s*[((]する[))]\s*$", "", reading_raw).strip()
                 csv_meaning = line.get("meaning", "")
+                # 字表雜訊:reading 欄反而是漢字(あいさつする(挨拶))→ 兩欄對調
+                if has_kanji(reading_raw) and not has_kanji(expr):
+                    expr, reading_raw = reading_raw, expr
+                # 「運動(うんどうする)」型:讀音尾帶する但表記沒有 → 去掉
+                if reading_raw.endswith("する") and not expr.endswith("する"):
+                    reading_raw = reading_raw[:-2]
                 reading_h = kata_to_hira(reading_raw)
                 if not expr or not READING_RE.match(reading_raw):
                     unmatched.append((expr, line["reading"], "讀音非假名"))
                     continue
                 matched = match_entry(expr, reading_h, csv_meaning, by_keb, by_reb)
+                # 「コピーする」型:去尾する當名詞/する動詞再試一次
+                if matched is None and expr.endswith("する") and reading_h.endswith("する"):
+                    expr, reading_raw = expr[:-2], reading_raw[:-2]
+                    reading_h = reading_h[:-2]
+                    matched = match_entry(expr, reading_h, csv_meaning, by_keb, by_reb)
                 if matched is None:
                     unmatched.append((expr, line["reading"], "JMdict 無配對"))
                     continue
