@@ -57,3 +57,5 @@ lettre = { version = "0.11", default-features = false, features = ["tokio1-rustl
 libc = "0.2"
 librqbit = { version = "8", default-features = false, features = ["rust-tls"] }
 tower = { version = "0.5", features = ["util"] }
+wana_kana = "5.0.0"
+unicode-normalization = "0.1.25"

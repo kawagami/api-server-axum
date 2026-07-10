@@ -6,12 +6,13 @@ use crate::{
     structs::{
         members::AuthenticatedMember,
         vocab::{
-            AnswerRequest, AnswerResponse, MistakeEntry, StartRunRequest, StartRunResponse, VocabMe,
+            AnswerRequest, AnswerResponse, Language, MistakeEntry, StartRunRequest,
+            StartRunResponse, VocabMe,
         },
     },
 };
 use axum::{
-    extract::{Extension, Path, State},
+    extract::{Extension, Path, Query, State},
     http::StatusCode,
     middleware,
     routing::{get, post},
@@ -38,14 +39,27 @@ fn caller(member: Option<Extension<AuthenticatedMember>>) -> Option<i64> {
     member.map(|Extension(m)| m.member_id)
 }
 
+/// me / mistakes 的題庫語言 query(?language=ja),缺省 en
+#[derive(serde::Deserialize, Default)]
+struct LangQuery {
+    #[serde(default)]
+    language: Language,
+}
+
 async fn start_run(
     member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
     body: Option<Json<StartRunRequest>>,
 ) -> Result<(StatusCode, Json<StartRunResponse>), AppError> {
     let req = body.map(|Json(b)| b).unwrap_or_default();
-    let res =
-        vocab_service::start_run(&state, caller(member), req.mode, req.duration_minutes).await?;
+    let res = vocab_service::start_run(
+        &state,
+        caller(member),
+        req.mode,
+        req.language,
+        req.duration_minutes,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(res)))
 }
 
@@ -71,15 +85,17 @@ async fn answer(
 async fn mistakes(
     member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
+    Query(q): Query<LangQuery>,
 ) -> Result<Json<Vec<MistakeEntry>>, AppError> {
     let mid = caller(member).ok_or(AppError::AuthError(AuthError::Unauthorized))?;
-    Ok(Json(vocab_service::mistakes(&state, mid).await?))
+    Ok(Json(vocab_service::mistakes(&state, mid, q.language).await?))
 }
 
 async fn me(
     member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
+    Query(q): Query<LangQuery>,
 ) -> Result<Json<VocabMe>, AppError> {
     let mid = caller(member).ok_or(AppError::AuthError(AuthError::Unauthorized))?;
-    Ok(Json(vocab_service::me(&state, mid).await?))
+    Ok(Json(vocab_service::me(&state, mid, q.language).await?))
 }

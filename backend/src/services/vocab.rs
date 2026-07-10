@@ -1,10 +1,11 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::{redis, vocab as vocab_repo},
+    services::vocab_ja,
     state::AppState,
     structs::vocab::{
-        AnswerRequest, AnswerResponse, CurrentQuestion, MistakeEntry, QuestionDto, QuestionKind,
-        RunMode, RunResult, RunState, StartRunResponse, VocabMe, Word,
+        AnswerRequest, AnswerResponse, CurrentQuestion, Language, MistakeEntry, QuestionDto,
+        QuestionKind, RunMode, RunResult, RunState, StartRunResponse, VocabMe, Word,
     },
 };
 use rand::Rng;
@@ -60,6 +61,14 @@ fn difficulty_window(answered: i32) -> (i16, i16) {
     }
 }
 
+/// 難度窗口 clamp 到該語言題庫的實際上下界。
+/// 曲線是照英文難度 1–5 全分布調的;日文題庫可能只有 N5+N4(難度 1–2),
+/// 不 clamp 的話中後段窗口會整個落在題庫外抽不到字。
+fn clamped_window(answered: i32, diff_min: i16, diff_max: i16) -> (i16, i16) {
+    let (lo, hi) = difficulty_window(answered);
+    (lo.clamp(diff_min, diff_max), hi.clamp(diff_min, diff_max))
+}
+
 /// 前 5 題全選擇題暖身,之後 30% 出拼字題
 fn pick_kind(answered: i32) -> QuestionKind {
     if answered < 5 {
@@ -97,6 +106,7 @@ async fn build_question(
             let distractors = vocab_repo::distractor_meanings(
                 state.get_pool(),
                 word.id,
+                run.language.as_str(),
                 word.difficulty,
                 &word.meaning_zh,
             )
@@ -116,6 +126,9 @@ async fn build_question(
                     difficulty: word.difficulty,
                     answer_index: Some(answer_index),
                     answer_text: None,
+                    accepted_texts: vec![],
+                    // 題面不下發 reading(未來讀音題型視其為正解),答後才回饋
+                    reading: word.reading.clone(),
                 },
                 QuestionDto {
                     number,
@@ -131,27 +144,71 @@ async fn build_question(
                 },
             ))
         }
-        QuestionKind::Spelling => Ok((
-            CurrentQuestion {
-                word_id: word.id,
-                kind,
-                difficulty: word.difficulty,
-                answer_index: None,
-                answer_text: Some(word.word.clone()),
-            },
-            QuestionDto {
-                number,
-                kind,
-                difficulty: word.difficulty,
-                word: None,
-                part_of_speech: Some(word.part_of_speech.clone()),
-                options: None,
-                meaning_zh: Some(word.meaning_zh.clone()),
-                sentence_masked: mask_sentence(&word.example_sentence, &word.word),
-                hint_first_letter: word.word.chars().next().map(|c| c.to_string()),
-                hint_length: Some(word.word.chars().count()),
-            },
-        )),
+        QuestionKind::Spelling => match run.language {
+            Language::En => Ok((
+                CurrentQuestion {
+                    word_id: word.id,
+                    kind,
+                    difficulty: word.difficulty,
+                    answer_index: None,
+                    answer_text: Some(word.word.clone()),
+                    accepted_texts: vec![],
+                    reading: None,
+                },
+                QuestionDto {
+                    number,
+                    kind,
+                    difficulty: word.difficulty,
+                    word: None,
+                    part_of_speech: Some(word.part_of_speech.clone()),
+                    options: None,
+                    meaning_zh: Some(word.meaning_zh.clone()),
+                    sentence_masked: mask_sentence(&word.example_sentence, &word.word),
+                    hint_first_letter: word.word.chars().next().map(|c| c.to_string()),
+                    hint_length: Some(word.word.chars().count()),
+                },
+            )),
+            // 日文拼字題 = 意思 → 讀音:輸入羅馬字/假名,轉平假名後比對;
+            // 不做例句挖空(例句是變化形,洞的形狀對不上辭書形讀音)
+            Language::Ja => {
+                let reading = word.reading.clone().ok_or_else(|| {
+                    AppError::RequestError(RequestError::UnprocessableContent(
+                        "日文單字缺讀音,無法出拼字題".to_string(),
+                    ))
+                })?;
+                let accepted_texts: Vec<String> = word
+                    .accepted_readings
+                    .clone()
+                    .unwrap_or_else(|| vec![reading.clone()])
+                    .iter()
+                    .map(|r| vocab_ja::normalize_reading(r))
+                    .collect();
+                Ok((
+                    CurrentQuestion {
+                        word_id: word.id,
+                        kind,
+                        difficulty: word.difficulty,
+                        answer_index: None,
+                        answer_text: Some(reading.clone()),
+                        accepted_texts,
+                        reading: Some(reading.clone()),
+                    },
+                    QuestionDto {
+                        number,
+                        kind,
+                        difficulty: word.difficulty,
+                        word: None,
+                        part_of_speech: Some(word.part_of_speech.clone()),
+                        options: None,
+                        meaning_zh: Some(word.meaning_zh.clone()),
+                        sentence_masked: None,
+                        // 提示用假名維度:首假名 + 拍數(玩家看的是轉換後的假名框)
+                        hint_first_letter: reading.chars().next().map(|c| c.to_string()),
+                        hint_length: Some(reading.chars().count()),
+                    },
+                ))
+            }
+        },
     }
 }
 
@@ -159,9 +216,16 @@ async fn next_question(
     state: &AppState,
     run: &RunState,
 ) -> Result<(CurrentQuestion, QuestionDto), AppError> {
-    let (min_d, max_d) = difficulty_window(run.answered);
-    let word = vocab_repo::random_word(state.get_pool(), run.member_id, min_d, max_d, &run.seen_word_ids)
-        .await?
+    let (min_d, max_d) = clamped_window(run.answered, run.diff_min, run.diff_max);
+    let word = vocab_repo::random_word(
+        state.get_pool(),
+        run.member_id,
+        run.language.as_str(),
+        min_d,
+        max_d,
+        &run.seen_word_ids,
+    )
+    .await?
         .ok_or_else(|| {
             AppError::RequestError(RequestError::UnprocessableContent(
                 "題庫沒有可出題的單字".to_string(),
@@ -224,6 +288,7 @@ pub async fn start_run(
     state: &AppState,
     member_id: Option<i64>,
     mode: RunMode,
+    language: Language,
     duration_minutes: Option<i64>,
 ) -> Result<StartRunResponse, AppError> {
     // 複習模式需要已存的錯字紀錄,訪客不可用
@@ -231,10 +296,22 @@ pub async fn start_run(
         return Err(AppError::AuthError(crate::errors::AuthError::Unauthorized));
     }
 
+    // 該語言題庫的難度上下界(窗口 clamp 用);題庫為空直接擋下
+    let (diff_min, diff_max) = vocab_repo::difficulty_bounds(state.get_pool(), language.as_str())
+        .await?
+        .ok_or_else(|| {
+            AppError::RequestError(RequestError::UnprocessableContent(
+                "題庫沒有可出題的單字".to_string(),
+            ))
+        })?;
+
     let now = chrono::Utc::now();
     let mut run = RunState {
         member_id,
         mode,
+        language,
+        diff_min,
+        diff_max,
         lives: INITIAL_LIVES,
         combo: 0,
         max_combo: 0,
@@ -251,6 +328,8 @@ pub async fn start_run(
             difficulty: 1,
             answer_index: None,
             answer_text: None,
+            accepted_texts: vec![],
+            reading: None,
         },
     };
 
@@ -266,7 +345,8 @@ pub async fn start_run(
             // 上方已保證 member 存在
             let mid = member_id.expect("review mode requires member");
             run.review_queue =
-                vocab_repo::review_word_ids(state.get_pool(), mid, REVIEW_BATCH).await?;
+                vocab_repo::review_word_ids(state.get_pool(), mid, language.as_str(), REVIEW_BATCH)
+                    .await?;
             let total = run.review_queue.len() as i32;
             let (current, question) = pop_review_question(state, &mut run)
                 .await?
@@ -293,6 +373,7 @@ pub async fn start_run(
     Ok(StartRunResponse {
         run_id,
         mode,
+        language,
         lives: run.lives,
         total,
         remaining_secs,
@@ -323,14 +404,18 @@ async fn finalize(
         });
     };
 
-    let previous_best = vocab_repo::best_run(state.get_pool(), mid, run.mode.as_str()).await?;
+    let previous_best =
+        vocab_repo::best_run(state.get_pool(), mid, run.language.as_str(), run.mode.as_str())
+            .await?;
     let new_best = previous_best.as_ref().is_none_or(|b| {
         run.correct > b.correct_count
             || (run.correct == b.correct_count && run.max_combo > b.max_combo)
     });
 
     vocab_repo::insert_run(state.get_pool(), run_id, mid, run).await?;
-    let total_exp = vocab_repo::add_member_exp(state.get_pool(), mid, run.exp).await?;
+    let total_exp =
+        vocab_repo::upsert_vocab_exp(state.get_pool(), mid, run.language.as_str(), run.exp)
+            .await?;
     let level = level_for_exp(total_exp);
     let leveled_up = run.exp > 0 && level > level_for_exp(total_exp - run.exp);
 
@@ -354,12 +439,14 @@ fn finished_response(
     correct: bool,
     correct_choice_index: Option<usize>,
     correct_text: Option<String>,
+    reading: Option<String>,
     gained_exp: i64,
 ) -> AnswerResponse {
     AnswerResponse {
         correct,
         correct_choice_index,
         correct_text,
+        reading,
         gained_exp,
         lives: run.lives,
         combo: run.combo,
@@ -385,7 +472,7 @@ pub async fn finish(
         )));
     }
     let result = finalize(state, run_id, &run).await?;
-    Ok(finished_response(&run, result, false, None, None, 0))
+    Ok(finished_response(&run, result, false, None, None, None, 0))
 }
 
 pub async fn answer(
@@ -401,7 +488,7 @@ pub async fn answer(
         if let Some(dl) = run.deadline {
             if chrono::Utc::now() >= dl {
                 let result = finalize(state, run_id, &run).await?;
-                return Ok(finished_response(&run, result, false, None, None, 0));
+                return Ok(finished_response(&run, result, false, None, None, None, 0));
             }
         }
     }
@@ -423,15 +510,24 @@ pub async fn answer(
                     "拼字題須帶 text".to_string(),
                 ))
             })?;
-            current
-                .answer_text
-                .as_deref()
-                .is_some_and(|a| a.eq_ignore_ascii_case(text.trim()))
+            if current.accepted_texts.is_empty() {
+                // 英文:忽略大小寫比對
+                current
+                    .answer_text
+                    .as_deref()
+                    .is_some_and(|a| a.eq_ignore_ascii_case(text.trim()))
+            } else {
+                // 日文:轉平假名後與任一合法讀音完全比對
+                current
+                    .accepted_texts
+                    .contains(&vocab_ja::normalize_reading(text))
+            }
         }
     };
 
     let correct_choice_index = current.answer_index;
     let correct_text = current.answer_text.clone();
+    let question_reading = current.reading.clone();
     let question_word_id = current.word_id;
     let question_difficulty = current.difficulty;
     let question_kind = current.kind;
@@ -470,6 +566,7 @@ pub async fn answer(
                     correct,
                     correct_choice_index,
                     correct_text,
+                    question_reading,
                     gained_exp,
                 ));
             }
@@ -483,6 +580,7 @@ pub async fn answer(
                 correct,
                 correct_choice_index,
                 correct_text,
+                reading: question_reading,
                 gained_exp,
                 lives: run.lives,
                 combo: run.combo,
@@ -508,6 +606,7 @@ pub async fn answer(
                         correct,
                         correct_choice_index,
                         correct_text,
+                        reading: question_reading,
                         gained_exp: 0,
                         lives: run.lives,
                         combo: 0,
@@ -526,12 +625,14 @@ pub async fn answer(
                     let graduated =
                         vocab_repo::count_mastered_among(state.get_pool(), mid, &run.seen_word_ids)
                             .await? as i32;
-                    let total_exp = vocab_repo::member_exp(state.get_pool(), mid).await?;
+                    let total_exp =
+                        vocab_repo::vocab_exp(state.get_pool(), mid, run.language.as_str()).await?;
 
                     Ok(AnswerResponse {
                         correct,
                         correct_choice_index,
                         correct_text,
+                        reading: question_reading,
                         gained_exp: 0,
                         lives: run.lives,
                         combo: 0,
@@ -561,15 +662,22 @@ pub async fn answer(
 pub async fn mistakes(
     state: &AppState,
     member_id: i64,
+    language: Language,
 ) -> Result<Vec<MistakeEntry>, AppError> {
-    vocab_repo::mistakes(state.get_pool(), member_id).await
+    vocab_repo::mistakes(state.get_pool(), member_id, language.as_str()).await
 }
 
-pub async fn me(state: &AppState, member_id: i64) -> Result<VocabMe, AppError> {
-    let exp = vocab_repo::member_exp(state.get_pool(), member_id).await?;
+pub async fn me(
+    state: &AppState,
+    member_id: i64,
+    language: Language,
+) -> Result<VocabMe, AppError> {
+    let lang = language.as_str();
+    let exp = vocab_repo::vocab_exp(state.get_pool(), member_id, lang).await?;
     let level = level_for_exp(exp);
-    let bests = vocab_repo::bests(state.get_pool(), member_id).await?;
-    let (total_runs, words_learned) = vocab_repo::member_stats(state.get_pool(), member_id).await?;
+    let bests = vocab_repo::bests(state.get_pool(), member_id, lang).await?;
+    let (total_runs, words_learned) =
+        vocab_repo::member_stats(state.get_pool(), member_id, lang).await?;
 
     Ok(VocabMe {
         exp,
@@ -630,6 +738,17 @@ mod tests {
         assert_eq!(difficulty_window(10), (1, 3));
         assert_eq!(difficulty_window(25), (2, 4));
         assert_eq!(difficulty_window(100), (2, 5));
+    }
+
+    #[test]
+    fn clamped_window_respects_language_bounds() {
+        // 日文只 seed N5+N4(難度 1–2):中後段窗口不能整個落在題庫外
+        assert_eq!(clamped_window(0, 1, 2), (1, 2));
+        assert_eq!(clamped_window(25, 1, 2), (2, 2));
+        assert_eq!(clamped_window(100, 1, 2), (2, 2));
+        // 英文全分布(1–5):clamp 後行為不變
+        assert_eq!(clamped_window(0, 1, 5), (1, 2));
+        assert_eq!(clamped_window(100, 1, 5), (2, 5));
     }
 
     #[test]

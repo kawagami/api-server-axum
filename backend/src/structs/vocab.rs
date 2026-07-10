@@ -3,6 +3,25 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+/// 題庫語言
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Default, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    #[default]
+    En,
+    Ja,
+}
+
+impl Language {
+    /// DB `words.language` / `vocab_runs.language` 用值
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Language::En => "en",
+            Language::Ja => "ja",
+        }
+    }
+}
+
 /// 題庫單字(DB 對應)
 #[derive(Clone, FromRow)]
 pub struct Word {
@@ -12,6 +31,10 @@ pub struct Word {
     pub meaning_zh: String,
     pub example_sentence: String,
     pub difficulty: i16,
+    /// 顯示用主讀音(平假名);英文為 None
+    pub reading: Option<String>,
+    /// 比對用全部合法讀音;None = 只接受 reading
+    pub accepted_readings: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq)]
@@ -62,8 +85,21 @@ pub struct CurrentQuestion {
     pub difficulty: i16,
     /// 選擇題正解選項 index(spelling 為 None)
     pub answer_index: Option<usize>,
-    /// 拼字題正解單字(choice 為 None)
+    /// 拼字題正解單字(choice 為 None);日文拼字題為顯示用主讀音
     pub answer_text: Option<String>,
+    /// 日文拼字題:正規化後的全部合法讀音(比對用);英文留空走 ASCII 比對
+    #[serde(default)]
+    pub accepted_texts: Vec<String>,
+    /// 該字讀音(答後回饋用;英文為 None)
+    #[serde(default)]
+    pub reading: Option<String>,
+}
+
+fn default_diff_min() -> i16 {
+    1
+}
+fn default_diff_max() -> i16 {
+    5
 }
 
 /// 進行中對局狀態(存 Redis,JSON 序列化)
@@ -73,6 +109,14 @@ pub struct RunState {
     pub member_id: Option<i64>,
     #[serde(default)]
     pub mode: RunMode,
+    /// 題庫語言(serde default 保證部署瞬間進行中的英文局照常)
+    #[serde(default)]
+    pub language: Language,
+    /// 該語言題庫的難度上下界(開局查一次;難度窗口 clamp 用)
+    #[serde(default = "default_diff_min")]
+    pub diff_min: i16,
+    #[serde(default = "default_diff_max")]
+    pub diff_max: i16,
     pub lives: i32,
     pub combo: i32,
     pub max_combo: i32,
@@ -126,6 +170,9 @@ pub struct AnswerRequest {
 pub struct StartRunRequest {
     #[serde(default)]
     pub mode: RunMode,
+    /// 題庫語言,缺省 en(舊 client 相容)
+    #[serde(default)]
+    pub language: Language,
     /// 限時模式時長(分鐘),接受 3 / 5 / 10,其他值一律回退 10
     pub duration_minutes: Option<i64>,
 }
@@ -134,6 +181,7 @@ pub struct StartRunRequest {
 pub struct StartRunResponse {
     pub run_id: Uuid,
     pub mode: RunMode,
+    pub language: Language,
     pub lives: i32,
     /// 複習模式的本局題數(其他模式為 None)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -153,6 +201,9 @@ pub struct AnswerResponse {
     /// 拼字題正解單字
     #[serde(skip_serializing_if = "Option::is_none")]
     pub correct_text: Option<String>,
+    /// 該題單字讀音(日文局答後回饋;英文為 None)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reading: Option<String>,
     pub gained_exp: i64,
     pub lives: i32,
     pub combo: i32,
@@ -188,6 +239,9 @@ pub struct MistakeEntry {
     pub word: String,
     pub part_of_speech: String,
     pub meaning_zh: String,
+    /// 讀音(日文;英文為 None)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reading: Option<String>,
     pub difficulty: i16,
     pub wrong_count: i32,
     pub correct_count: i32,
