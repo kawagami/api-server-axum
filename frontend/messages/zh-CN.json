@@ -883,6 +883,14 @@
     "loginToReview": "登入才能复习错字",
     "memberOnly": "需登入",
     "mute": "静音",
-    "unmute": "开启音效"
+    "unmute": "开启音效",
+    "titleJa": "日语单词闯关",
+    "subtitleJa": "连续答题积累经验值,汉字与读音一起练",
+    "spellingHintJa": "提示:{letter} 开头,共 {length} 拍",
+    "inputPlaceholderJa": "输入罗马字或假名",
+    "readingIs": "读音:{reading}",
+    "switchToJa": "日语版 →",
+    "switchToEn": "← 英语版",
+    "jmdictAttribution": "词汇数据取自 JMdict(EDRDG),依 CC BY-SA 4.0 授权使用;JLPT 分级为社区整理的估计值。"
   }
 }

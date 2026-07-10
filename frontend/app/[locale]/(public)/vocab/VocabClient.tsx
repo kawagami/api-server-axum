@@ -1,7 +1,7 @@
 "use client";
 
 import { answerVocabRun, finishVocabRun, getVocabMe, getVocabMistakes, startVocabRun } from "@/api/vocab";
-import type { VocabMe, VocabMistake, VocabQuestion, VocabRunMode, VocabRunResult } from "@/types";
+import type { VocabLanguage, VocabMe, VocabMistake, VocabQuestion, VocabRunMode, VocabRunResult } from "@/types";
 import { Link } from "@/i18n/navigation";
 import { BookOpenCheck, CheckCircle2, Clock, Flame, GraduationCap, Heart, Loader2, LogIn, Sparkles, Trophy, Volume2, VolumeX } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -15,6 +15,7 @@ interface Feedback {
     selectedIndex: number | null;
     correctChoiceIndex: number | null;
     correctText: string | null;
+    reading: string | null; // 日文局答後回饋的讀音
     gainedExp: number;
 }
 
@@ -31,12 +32,14 @@ function isReviewable(m: VocabMistake) {
     return m.wrong_count > m.correct_count;
 }
 
-export default function VocabClient({ initialMe, initialMistakes }: {
-    initialMe: VocabMe | null; initialMistakes: VocabMistake[];
+export default function VocabClient({ initialMe, initialMistakes, language = "en" }: {
+    initialMe: VocabMe | null; initialMistakes: VocabMistake[]; language?: VocabLanguage;
 }) {
     const t = useTranslations("Vocab");
     const locale = useLocale();
-    const loginHref = `/login?redirect=${encodeURIComponent(`/${locale}/vocab`)}`;
+    const ja = language === "ja";
+    const pagePath = ja ? "/vocab-ja" : "/vocab";
+    const loginHref = `/login?redirect=${encodeURIComponent(`/${locale}${pagePath}`)}`;
     const isMember = initialMe !== null; // 訪客為 false;整場 session 固定
     const [me, setMe] = useState<VocabMe | null>(initialMe);
     const [mistakes, setMistakes] = useState<VocabMistake[]>(initialMistakes);
@@ -63,6 +66,12 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     const runIdRef = useRef("");
     const deadlineRef = useRef<number | null>(null);
     const endedRef = useRef(false);
+    // 日文拼字:羅馬字即打即轉假名(wanakana 只在日文版載入);IME 組字中不轉、不送出
+    const toKanaRef = useRef<((s: string, opt?: object) => string) | null>(null);
+    const composingRef = useRef(false);
+    useEffect(() => {
+        if (ja) import("wanakana").then(m => { toKanaRef.current = m.toKana; }).catch(() => { });
+    }, [ja]);
     useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
     // 讀持久化的靜音偏好:localStorage 是 client-only,mount 後同步以免 hydration 不一致
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -76,8 +85,16 @@ export default function VocabClient({ initialMe, initialMistakes }: {
 
     function refreshAfterRun() {
         if (!isMember) return; // 訪客不打會員端點(會 401 轉登入)
-        getVocabMe().then(setMe).catch(() => { });
-        getVocabMistakes().then(setMistakes).catch(() => { });
+        getVocabMe(language).then(setMe).catch(() => { });
+        getVocabMistakes(language).then(setMistakes).catch(() => { });
+    }
+
+    function handleSpellChange(v: string) {
+        if (ja && toKanaRef.current && !composingRef.current) {
+            setSpellInput(toKanaRef.current(v, { IMEMode: true }));
+        } else {
+            setSpellInput(v);
+        }
     }
 
     async function timeUp() {
@@ -129,7 +146,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
         setBusy(true);
         setError(false);
         try {
-            const res = await startVocabRun(runMode, hasTimer(runMode) ? durationMin : undefined);
+            const res = await startVocabRun(runMode, hasTimer(runMode) ? durationMin : undefined, language);
             endedRef.current = false;
             runIdRef.current = res.run_id;
             deadlineRef.current = res.remaining_secs != null ? Date.now() + res.remaining_secs * 1000 : null;
@@ -168,6 +185,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
                 selectedIndex: input.choice_index ?? null,
                 correctChoiceIndex: res.correct_choice_index ?? null,
                 correctText: res.correct_text ?? null,
+                reading: res.reading ?? null,
                 gainedExp: res.gained_exp,
             });
             timerRef.current = setTimeout(() => {
@@ -209,11 +227,12 @@ export default function VocabClient({ initialMe, initialMistakes }: {
                 </div>
                 <div className={`relative ${fxClass}`}>
                     {question.kind === "choice" ? (
-                        <ChoiceCard question={question} feedback={feedback} busy={busy} t={t}
+                        <ChoiceCard question={question} feedback={feedback} busy={busy} ja={ja} t={t}
                             onPick={(i) => submit({ choice_index: i })} />
                     ) : (
-                        <SpellingCard question={question} feedback={feedback} busy={busy} t={t}
-                            value={spellInput} onChange={setSpellInput} inputRef={inputRef}
+                        <SpellingCard question={question} feedback={feedback} busy={busy} ja={ja} t={t}
+                            value={spellInput} onChange={handleSpellChange} inputRef={inputRef}
+                            composingRef={composingRef}
                             onSubmit={() => { if (spellInput.trim()) submit({ text: spellInput }); }} />
                     )}
                     {feedback?.correct && feedback.gainedExp > 0 && (
@@ -230,7 +249,7 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     if (phase === "finished" && result) {
         return (
             <div className="flex flex-col gap-6">
-                <PageTitle t={t} />
+                <PageTitle ja={ja} t={t} />
                 {mode === "review"
                     ? <ReviewResultCard result={result} busy={busy} onAgain={() => start("survival")} t={t} />
                     : <ScoredResultCard mode={mode} result={result} busy={busy} isMember={isMember} loginHref={loginHref} onAgain={() => start(mode)} t={t} />}
@@ -244,7 +263,13 @@ export default function VocabClient({ initialMe, initialMistakes }: {
     const reviewDisabled = !isMember || reviewableCount === 0;
     return (
         <div className="flex flex-col gap-6">
-            <PageTitle t={t} />
+            <div className="flex items-start justify-between gap-2">
+                <PageTitle ja={ja} t={t} />
+                <Link href={ja ? "/vocab" : "/vocab-ja"}
+                    className="shrink-0 text-sm text-primary-600 dark:text-primary-400 hover:underline mt-1">
+                    {ja ? t("switchToEn") : t("switchToJa")}
+                </Link>
+            </div>
             {me ? <LevelCard me={me} t={t} /> : <GuestBanner loginHref={loginHref} t={t} />}
             <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
                 <div className="grid grid-cols-2 gap-3">
@@ -329,13 +354,13 @@ function MuteButton({ muted, onToggle, t }: { muted: boolean; onToggle: () => vo
     );
 }
 
-function PageTitle({ t }: { t: T }) {
+function PageTitle({ ja, t }: { ja: boolean; t: T }) {
     return (
         <div className="flex items-center gap-2">
             <GraduationCap size={28} className="text-primary-500" />
             <div>
-                <h1 className="text-2xl font-bold">{t("title")}</h1>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("subtitle")}</p>
+                <h1 className="text-2xl font-bold">{t(ja ? "titleJa" : "title")}</h1>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">{t(ja ? "subtitleJa" : "subtitle")}</p>
             </div>
         </div>
     );
@@ -447,14 +472,16 @@ function FeedbackBanner({ feedback, t }: { feedback: Feedback; t: T }) {
     );
 }
 
-function ChoiceCard({ question, feedback, busy, onPick, t }: {
-    question: VocabQuestion; feedback: Feedback | null; busy: boolean; onPick: (i: number) => void; t: T;
+function ChoiceCard({ question, feedback, busy, ja, onPick, t }: {
+    question: VocabQuestion; feedback: Feedback | null; busy: boolean; ja: boolean; onPick: (i: number) => void; t: T;
 }) {
     return (
         <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
             <div className="flex flex-col items-center gap-2">
                 <DifficultyDots difficulty={question.difficulty} />
-                <span className="text-3xl font-bold tracking-wide">{question.word}</span>
+                {/* lang="ja" + 日文字型:避免瀏覽器用中文字形渲染日文漢字 */}
+                <span className={`text-3xl font-bold tracking-wide ${ja ? "font-ja" : ""}`}
+                    lang={ja ? "ja" : undefined}>{question.word}</span>
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">{question.part_of_speech}</span>
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">{t("chooseMeaning")}</span>
             </div>
@@ -474,15 +501,26 @@ function ChoiceCard({ question, feedback, busy, onPick, t }: {
                     );
                 })}
             </div>
-            {feedback && <FeedbackBanner feedback={feedback} t={t} />}
+            {feedback && (
+                <div className="flex flex-col items-center gap-1">
+                    <FeedbackBanner feedback={feedback} t={t} />
+                    {/* 日文:答後回饋讀音(題面不顯示 furigana,避免白給讀音) */}
+                    {ja && feedback.reading && (
+                        <span className="text-sm text-neutral-500 dark:text-neutral-400 font-ja" lang="ja">
+                            {t("readingIs", { reading: feedback.reading })}
+                        </span>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
 
-function SpellingCard({ question, feedback, busy, value, onChange, onSubmit, inputRef, t }: {
-    question: VocabQuestion; feedback: Feedback | null; busy: boolean;
+function SpellingCard({ question, feedback, busy, ja, value, onChange, onSubmit, inputRef, composingRef, t }: {
+    question: VocabQuestion; feedback: Feedback | null; busy: boolean; ja: boolean;
     value: string; onChange: (v: string) => void; onSubmit: () => void;
-    inputRef: React.RefObject<HTMLInputElement | null>; t: T;
+    inputRef: React.RefObject<HTMLInputElement | null>;
+    composingRef: React.RefObject<boolean>; t: T;
 }) {
     return (
         <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
@@ -496,14 +534,19 @@ function SpellingCard({ question, feedback, busy, value, onChange, onSubmit, inp
                     </p>
                 )}
                 <span className="text-xs text-neutral-400 dark:text-neutral-500">
-                    {t("spellingHint", { letter: question.hint_first_letter ?? "?", length: question.hint_length ?? 0 })}
+                    {t(ja ? "spellingHintJa" : "spellingHint", { letter: question.hint_first_letter ?? "?", length: question.hint_length ?? 0 })}
                 </span>
             </div>
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
                 <input ref={inputRef} value={value} onChange={(e) => onChange(e.target.value)}
-                    disabled={busy || !!feedback} placeholder={t("inputPlaceholder")}
+                    disabled={busy || !!feedback} placeholder={t(ja ? "inputPlaceholderJa" : "inputPlaceholder")}
                     autoComplete="off" autoCapitalize="off" spellCheck={false}
-                    className="flex-1 px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-transparent focus:outline-none focus:border-primary-400 font-mono" />
+                    lang={ja ? "ja" : undefined}
+                    // IME 組字中的 Enter 是選字確認,不能觸發送出
+                    onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }}
+                    onCompositionStart={() => { composingRef.current = true; }}
+                    onCompositionEnd={(e) => { composingRef.current = false; onChange(e.currentTarget.value); }}
+                    className={`flex-1 px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-transparent focus:outline-none focus:border-primary-400 ${ja ? "font-ja" : "font-mono"}`} />
                 <button type="submit" disabled={busy || !!feedback || !value.trim()}
                     className="px-5 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold transition-colors disabled:opacity-50">
                     {t("submit")}
@@ -513,7 +556,8 @@ function SpellingCard({ question, feedback, busy, value, onChange, onSubmit, inp
                 <div className="flex flex-col items-center gap-1">
                     <FeedbackBanner feedback={feedback} t={t} />
                     {!feedback.correct && feedback.correctText && (
-                        <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                        <span className={`text-sm text-neutral-500 dark:text-neutral-400 ${ja ? "font-ja" : ""}`}
+                            lang={ja ? "ja" : undefined}>
                             {t("correctAnswerIs", { answer: feedback.correctText })}
                         </span>
                     )}
@@ -610,10 +654,17 @@ function MistakeBook({ mistakes, t }: { mistakes: VocabMistake[]; t: T }) {
                 {mistakes.map(m => {
                     const mastered = m.correct_count >= m.wrong_count;
                     return (
-                        <div key={m.word} className="flex items-center gap-3 py-2 px-2">
+                        // 日文同表記可有多讀音(辛い=からい/つらい),key 要含讀音
+                        <div key={`${m.word}|${m.reading ?? ""}`} className="flex items-center gap-3 py-2 px-2">
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className="font-semibold truncate">{m.word}</span>
+                                    <span className={`font-semibold truncate ${m.reading ? "font-ja" : ""}`}
+                                        lang={m.reading ? "ja" : undefined}>{m.word}</span>
+                                    {m.reading && (
+                                        <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0 font-ja" lang="ja">
+                                            {m.reading}
+                                        </span>
+                                    )}
                                     <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">{m.part_of_speech}</span>
                                 </div>
                                 <div className="text-sm text-neutral-500 dark:text-neutral-400 truncate">{m.meaning_zh}</div>

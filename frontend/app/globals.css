@@ -32,6 +32,13 @@
   .fx-float { display: none; }
 }
 
+/* 日文內容字型:日文漢字字形與中文不同(食、直、令),
+   日文字型排在前面避免瀏覽器用中文字形渲染;搭配 lang="ja" 使用 */
+.font-ja {
+  font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+    "Yu Gothic", Meiryo, sans-serif;
+}
+
 /* ===== 主題色階（RGB 三元組，供 tailwind.config.js 的 rgb(var(--x) / alpha) 使用） =====
    換主題：<html data-theme="ocean">（由 site-theme cookie 控制，admin settings 可切換）
    新增主題：複製一段 [data-theme="..."] 區塊，11 階 primary + 11 階 neutral */

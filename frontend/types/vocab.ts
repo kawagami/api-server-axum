@@ -1,8 +1,10 @@
-// 英文單字闖關(/member/vocab)
+// 單字闖關(/member/vocab;英文 en / 日文 ja 共用一套對局 API)
 
 export type VocabQuestionKind = 'choice' | 'spelling';
 
 export type VocabRunMode = 'survival' | 'timed' | 'timed_survival' | 'review';
+
+export type VocabLanguage = 'en' | 'ja';
 
 export interface VocabQuestion {
     number: number; // 第幾題,1 起算
@@ -13,6 +15,7 @@ export interface VocabQuestion {
     part_of_speech?: string;
     options?: string[];
     // spelling:中文釋義 + 挖空例句拼單字
+    // 日文語意:hint_first_letter = 首假名、hint_length = 假名拍數、無挖空例句
     meaning_zh?: string;
     sentence_masked?: string;
     hint_first_letter?: string;
@@ -22,6 +25,7 @@ export interface VocabQuestion {
 export interface VocabStartRun {
     run_id: string;
     mode: VocabRunMode;
+    language: VocabLanguage;
     lives: number;
     total?: number; // 複習模式的本局題數
     remaining_secs?: number; // 限時模式的剩餘秒數
@@ -44,6 +48,7 @@ export interface VocabMistake {
     word: string;
     part_of_speech: string;
     meaning_zh: string;
+    reading?: string; // 日文讀音;英文無
     difficulty: number;
     wrong_count: number;
     correct_count: number;
@@ -54,6 +59,7 @@ export interface VocabAnswer {
     correct: boolean;
     correct_choice_index?: number;
     correct_text?: string;
+    reading?: string; // 該題讀音(日文局答後回饋)
     gained_exp: number;
     lives: number;
     combo: number;

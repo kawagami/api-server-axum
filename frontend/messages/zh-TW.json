@@ -883,6 +883,14 @@
     "loginToReview": "登入才能複習錯字",
     "memberOnly": "需登入",
     "mute": "靜音",
-    "unmute": "開啟音效"
+    "unmute": "開啟音效",
+    "titleJa": "日文單字闖關",
+    "subtitleJa": "連續答題累積經驗值,漢字與讀音一起練",
+    "spellingHintJa": "提示:{letter} 開頭,共 {length} 拍",
+    "inputPlaceholderJa": "輸入羅馬字或假名",
+    "readingIs": "讀音:{reading}",
+    "switchToJa": "日文版 →",
+    "switchToEn": "← 英文版",
+    "jmdictAttribution": "詞彙資料取自 JMdict(EDRDG),依 CC BY-SA 4.0 授權使用;JLPT 分級為社群整理之估計值。"
   }
 }

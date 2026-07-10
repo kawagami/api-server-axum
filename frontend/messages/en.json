@@ -883,6 +883,14 @@
     "loginToReview": "Log in to review mistakes",
     "memberOnly": "Members only",
     "mute": "Mute",
-    "unmute": "Unmute"
+    "unmute": "Unmute",
+    "titleJa": "Japanese Vocab Challenge",
+    "subtitleJa": "Answer streaks earn EXP — practice kanji and readings together",
+    "spellingHintJa": "Hint: starts with {letter}, {length} kana",
+    "inputPlaceholderJa": "Type romaji or kana",
+    "readingIs": "Reading: {reading}",
+    "switchToJa": "Japanese →",
+    "switchToEn": "← English",
+    "jmdictAttribution": "Vocabulary data from JMdict (EDRDG), used under CC BY-SA 4.0; JLPT levels are community estimates."
   }
 }
