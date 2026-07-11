@@ -1,40 +1,16 @@
 import { getTranslations } from "next-intl/server";
 import KawaLogo from "@/components/kawa-logo";
 import FeatureCard from "@/components/feature-card";
-import {
-    FileText,
-    GraduationCap,
-    Gamepad2,
-    Wallet,
-    TrendingUp,
-    ReceiptText,
-    Ticket,
-    Wrench,
-    Info,
-    type LucideIcon,
-} from "lucide-react";
-
-// 介紹頁功能卡片單一來源：新增功能只要加一行（icon + 目標路徑 + i18n key）
-interface Feature {
-    key: string;
-    href: string;
-    icon: LucideIcon;
-}
-
-const FEATURES: Feature[] = [
-    { key: "blog", href: "/blogs", icon: FileText },
-    { key: "vocab", href: "/vocab", icon: GraduationCap },
-    { key: "games", href: "/games", icon: Gamepad2 },
-    { key: "ledger", href: "/ledger", icon: Wallet },
-    { key: "portfolio", href: "/portfolio", icon: TrendingUp },
-    { key: "invoices", href: "/invoices", icon: ReceiptText },
-    { key: "lotto", href: "/lotto", icon: Ticket },
-    { key: "tools", href: "/tools", icon: Wrench },
-    { key: "about", href: "/about", icon: Info },
-];
+import { getPublicSettings } from "@/api/settings";
+import { resolveHomeFeatures } from "@/libs/home-features";
 
 export default async function ProjectIntro() {
-    const t = await getTranslations("Home");
+    const [t, settings] = await Promise.all([
+        getTranslations("Home"),
+        getPublicSettings(),
+    ]);
+    // 卡片清單（顯示+排序）由後台 home_features 設定控制，registry 在 libs/home-features.ts
+    const features = resolveHomeFeatures(settings.home_features);
 
     return (
         <div className="w-full h-[calc(100svh-120px)] overflow-auto">
@@ -57,7 +33,7 @@ export default async function ProjectIntro() {
 
                 {/* 功能卡片 */}
                 <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {FEATURES.map(({ key, href, icon }) => (
+                    {features.map(({ key, href, icon }) => (
                         <FeatureCard
                             key={key}
                             href={href}

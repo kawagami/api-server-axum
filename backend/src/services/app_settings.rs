@@ -8,7 +8,12 @@ use sqlx::{Pool, Postgres};
 use std::collections::BTreeMap;
 
 /// 可由無認證端點讀取的設定白名單 — 新增公開設定時在此加 key
-const PUBLIC_KEYS: &[&str] = &["site_theme", "default_color_mode", "theme_rotation"];
+const PUBLIC_KEYS: &[&str] = &[
+    "site_theme",
+    "default_color_mode",
+    "theme_rotation",
+    "home_features",
+];
 
 /// 全部主題清單 — 與前端 libs/site-theme.ts 的 SITE_THEMES 一致
 const SITE_THEMES: &[&str] = &["forest", "ocean", "sky", "sunset", "sakura", "grape", "mono"];
@@ -40,10 +45,35 @@ fn validate_theme_rotation(value: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// home_features 驗證：JSON 字串陣列、不重複。只驗形狀不驗 key 名 ——
+/// 功能清單由前端 registry（libs/home-features.ts）定義，未知 key 前端會忽略，
+/// 新增卡片只需改前端、後端不用同步。
+fn validate_home_features(value: &str) -> Result<(), AppError> {
+    let items: Vec<String> = serde_json::from_str(value)
+        .map_err(|_| unprocessable("home_features 必須是 JSON 字串陣列".into()))?;
+
+    if items.len() > 50 {
+        return Err(unprocessable("home_features 最多 50 項".into()));
+    }
+    let mut seen = std::collections::HashSet::new();
+    for item in &items {
+        if item.is_empty() || item.len() > 64 {
+            return Err(unprocessable("home_features 項目須為 1–64 字元的字串".into()));
+        }
+        if !seen.insert(item.as_str()) {
+            return Err(unprocessable(format!("home_features 有重複項目 {item}")));
+        }
+    }
+    Ok(())
+}
+
 /// 設定值驗證 — key 不在表內就不驗證
 fn validate(key: &str, value: &str) -> Result<(), AppError> {
     if key == "theme_rotation" {
         return validate_theme_rotation(value);
+    }
+    if key == "home_features" {
+        return validate_home_features(value);
     }
 
     let allowed: Vec<&str> = match key {
@@ -86,4 +116,26 @@ pub async fn update(
     let setting = repo::update(pool, key, value).await?;
     settings.reload(pool).await;
     Ok(setting)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn home_features_accepts_string_array() {
+        assert!(validate("home_features", r#"["blog","vocab","about"]"#).is_ok());
+        assert!(validate("home_features", "[]").is_ok());
+        // 未知 key 名不驗（由前端 registry 過濾）
+        assert!(validate("home_features", r#"["not_a_feature"]"#).is_ok());
+    }
+
+    #[test]
+    fn home_features_rejects_bad_shape() {
+        assert!(validate("home_features", "not json").is_err());
+        assert!(validate("home_features", r#"{"blog":true}"#).is_err());
+        assert!(validate("home_features", r#"[1,2]"#).is_err());
+        assert!(validate("home_features", r#"[""]"#).is_err());
+        assert!(validate("home_features", r#"["blog","blog"]"#).is_err());
+    }
 }

@@ -32,3 +32,10 @@ export async function updateThemeRotation(rotation: Record<string, string>): Pro
     revalidatePath("/", "layout");
     return response;
 }
+
+/** 改首頁功能卡片（顯示+排序，JSON 字串陣列）。改完失效整站 layout 讓首頁立即生效 */
+export async function updateHomeFeatures(keys: string[]): Promise<Setting> {
+    const response = await updateSetting("home_features", JSON.stringify(keys));
+    revalidatePath("/", "layout");
+    return response;
+}
