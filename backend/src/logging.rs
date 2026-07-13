@@ -42,8 +42,8 @@ impl<S: Subscriber> Layer<S> for DbLogLayer {
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
         let meta = event.metadata();
 
-        // skip DEBUG and TRACE
-        if *meta.level() > tracing::Level::INFO {
+        // 只落地 WARN / ERROR（業務事件走 admin_audit_logs，不在此表）
+        if *meta.level() > tracing::Level::WARN {
             return;
         }
 

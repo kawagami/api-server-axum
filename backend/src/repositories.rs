@@ -13,6 +13,7 @@ pub mod portfolio;
 pub mod redis;
 pub mod roles;
 pub mod stocks;
+pub mod system_metrics;
 pub mod torrents;
 pub mod users;
 pub mod vocab;

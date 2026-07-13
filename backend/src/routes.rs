@@ -15,6 +15,7 @@ mod invoices;
 mod ledger;
 mod lotto;
 mod members;
+mod metrics;
 mod oauth;
 mod permissions;
 mod portfolio;
@@ -104,6 +105,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/member/vocab", vocab::new(state.clone()))
         .nest("/oauth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))
+        .nest("/metrics", metrics::new(state.clone()))
         .nest("/settings", app_settings::public())
         .nest_service("/uploads", ServeDir::new(&upload_path))
         // fallback 需在 layer 之前註冊，否則不會被下面的 request_id / TraceLayer 包住（404 也要有追蹤 id）

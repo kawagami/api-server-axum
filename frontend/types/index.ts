@@ -11,3 +11,4 @@ export * from './torrent';
 export * from './gov-tender';
 export * from './misc';
 export * from './vocab';
+export * from './metrics';

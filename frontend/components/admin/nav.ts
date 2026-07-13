@@ -67,6 +67,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         items: [
             { label: "政府標案", href: "/admin/gov_tenders", permission: "gov_tender:read" },
             { label: "到訪統計", href: "/admin/stats", permission: "stat:read" },
+            { label: "系統指標", href: "/admin/metrics", permission: "metric:read" },
             { label: "Logs", href: "/admin/logs", permission: "log:read" },
             { label: "Audit Logs", href: "/admin/audit_logs", permission: "audit:read" },
         ],

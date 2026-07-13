@@ -12,6 +12,8 @@ pub enum AppJob {
     CheckInvoiceLottery,
     CheckLottoWins,
     AggregateVisitors,
+    CollectSystemMetrics,
+    CleanupObservability,
 }
 
 impl AppJob {
@@ -28,6 +30,8 @@ impl AppJob {
             AppJob::CheckInvoiceLottery => "CheckInvoiceLottery",
             AppJob::CheckLottoWins => "CheckLottoWins",
             AppJob::AggregateVisitors => "AggregateVisitors",
+            AppJob::CollectSystemMetrics => "CollectSystemMetrics",
+            AppJob::CleanupObservability => "CleanupObservability",
         }
     }
 
@@ -48,6 +52,10 @@ impl AppJob {
             AppJob::CheckLottoWins => "0 30 13 * * *",
             // 每日 UTC 16:05（= UTC+8 隔日 00:05）；台北日界剛過，落地前一日不重複到訪
             AppJob::AggregateVisitors => "0 5 16 * * *",
+            // 每分鐘採集一筆系統指標
+            AppJob::CollectSystemMetrics => "0 * * * * *",
+            // 每日 UTC 16:20（= UTC+8 隔日 00:20）清理過期 logs / system_metrics
+            AppJob::CleanupObservability => "0 20 16 * * *",
         }
     }
 
@@ -64,6 +72,8 @@ impl AppJob {
             AppJob::CheckInvoiceLottery => crate::jobs::check_invoice_lottery::run(state).await,
             AppJob::CheckLottoWins => crate::jobs::check_lotto_wins::run(state).await,
             AppJob::AggregateVisitors => crate::jobs::aggregate_visitors::run(state).await,
+            AppJob::CollectSystemMetrics => crate::jobs::collect_system_metrics::run(state).await,
+            AppJob::CleanupObservability => crate::jobs::cleanup_observability::run(state).await,
         }
     }
 }
