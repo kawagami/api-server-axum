@@ -1,9 +1,9 @@
-FROM rust:1.96-alpine AS builder
+FROM rust:1.96-bookworm AS builder
 
 WORKDIR /app
 
-# cmake/make/gcc/perl/linux-headers：librqbit → aws-lc-sys 編譯 C 原始碼用
-RUN apk add --no-cache musl-dev pkgconfig tzdata cmake make gcc perl linux-headers
+# cmake：librqbit → aws-lc-sys 編譯 C 原始碼用（gcc/make/perl 基底 image 已內建）
+RUN apt-get update && apt-get install -y --no-install-recommends cmake && rm -rf /var/lib/apt/lists/*
 
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -16,9 +16,10 @@ RUN touch src/main.rs && cargo build --release --locked
 
 RUN strip -s /app/target/release/api-server-axum
 
-FROM scratch
+# distroless/cc：glibc + libgcc 動態連結基底，內建 tzdata 與 ca-certificates
+# builder 與基底同為 Debian 12（bookworm），glibc 版本對齊
+FROM gcr.io/distroless/cc-debian12
 
-COPY --from=builder /usr/share/zoneinfo/Asia/Taipei /usr/share/zoneinfo/Asia/Taipei
 ENV TZ=Asia/Taipei
 
 COPY --from=builder /app/migrations/ /app/migrations/
