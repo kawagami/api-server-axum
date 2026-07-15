@@ -59,5 +59,6 @@ librqbit = { version = "8", default-features = false, features = ["rust-tls"] }
 tower = { version = "0.5", features = ["util"] }
 wana_kana = "5.0.0"
 unicode-normalization = "0.1.25"
-# 圖片驗證 + 轉 WebP（純 Rust，webp feature = lossless 編碼，無新 C 依賴）
+# 圖片上傳處理：image 負責 decode 驗證，webp（libwebp/C，靜態連結）負責 lossy 編碼
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
+webp = { version = "0.3.1", default-features = false }

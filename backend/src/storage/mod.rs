@@ -1,6 +1,4 @@
 pub mod local;
-use axum::body::Bytes;
-use futures_util::Stream;
 pub use local::{LocalStorage, LocalStorageError};
 
 pub enum Storage {
@@ -14,18 +12,16 @@ impl Storage {
         Storage::Local(LocalStorage::new(&base_path))
     }
 
-    pub async fn upload<S, E>(
+    /// 寫入已處理完成的檔案 bytes，回傳 (storage_key, 公開 url)。
+    /// 內容驗證/轉檔是 caller（services/images.rs）的責任，storage 只管落地。
+    pub async fn upload(
         &self,
-        stream: S,
-        content_type: &str,
+        data: &[u8],
+        ext: &str,
         base_url: &str,
-    ) -> Result<(String, String), LocalStorageError>
-    where
-        S: Stream<Item = Result<Bytes, E>>,
-        E: Into<axum::BoxError>,
-    {
+    ) -> Result<(String, String), LocalStorageError> {
         match self {
-            Storage::Local(s) => s.upload(stream, content_type, base_url).await,
+            Storage::Local(s) => s.upload(data, ext, base_url).await,
         }
     }
 

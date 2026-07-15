@@ -27,7 +27,7 @@
 |---|---|---|
 | 語言 / 框架 | Rust 2021 · Axum 0.8 · Tokio | Next.js 16 · React 19 (App Router) |
 | 資料 | PostgreSQL(sqlx)· Redis/Valkey(bb8) | — |
-| 其他 | JWT 認證 · tokio-cron 排程 · WebSocket · librqbit | Tailwind CSS · next-intl(zh-TW/zh-CN/en)· JWT(jose) |
+| 其他 | JWT 認證 · tokio-cron 排程 · WebSocket · librqbit · 圖片轉 WebP(image + libwebp) | Tailwind CSS · next-intl(zh-TW/zh-CN/en)· JWT(jose) |
 | 套件管理 | cargo | pnpm |
 
 ## 主要功能

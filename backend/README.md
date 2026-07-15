@@ -86,7 +86,8 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://axum.kawa.homes`。
 - `bcrypt` — 密碼 hash
 - `lettre` — SMTP email 通知
 - `scraper` — 庫藏股 HTML 解析
-- `librqbit 8` — 內嵌 BitTorrent session（rustls，musl 靜態編譯）
+- `librqbit 8` — 內嵌 BitTorrent session（rustls）
+- `image 0.25` + `webp 0.3` — 圖片上傳 decode 驗證 + lossy WebP 轉檔（libwebp）
 
 ## 環境變數
 

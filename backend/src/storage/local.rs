@@ -1,8 +1,5 @@
-use axum::body::Bytes;
-use futures_util::{Stream, TryStreamExt};
-use std::{io, path::PathBuf, pin::pin};
-use tokio::{fs, fs::File, io::BufWriter};
-use tokio_util::io::StreamReader;
+use std::{io, path::PathBuf};
+use tokio::fs;
 use uuid::Uuid;
 
 pub struct LocalStorage {
@@ -16,17 +13,12 @@ impl LocalStorage {
         }
     }
 
-    pub async fn upload<S, E>(
+    pub async fn upload(
         &self,
-        stream: S,
-        content_type: &str,
+        data: &[u8],
+        ext: &str,
         base_url: &str,
-    ) -> Result<(String, String), LocalStorageError>
-    where
-        S: Stream<Item = Result<Bytes, E>>,
-        E: Into<axum::BoxError>,
-    {
-        let ext = ext_from_content_type(content_type);
+    ) -> Result<(String, String), LocalStorageError> {
         let key = format!("{}.{}", Uuid::new_v4(), ext);
 
         if !key_is_valid(&key) {
@@ -34,14 +26,7 @@ impl LocalStorage {
         }
 
         fs::create_dir_all(&self.base_path).await?;
-
-        let path = self.base_path.join(&key);
-
-        // stream 直接寫入檔案，不先載入記憶體
-        let body_with_io_error = stream.map_err(|e| io::Error::other(e.into()));
-        let mut body_reader = pin!(StreamReader::new(body_with_io_error));
-        let mut file = BufWriter::new(File::create(&path).await?);
-        tokio::io::copy(&mut body_reader, &mut file).await?;
+        fs::write(self.base_path.join(&key), data).await?;
 
         let url = format!("{}/{}", base_url, key);
         Ok((key, url))
@@ -70,15 +55,6 @@ fn key_is_valid(key: &str) -> bool {
     }
 
     components.count() == 1
-}
-
-fn ext_from_content_type(ct: &str) -> &str {
-    match ct {
-        "image/png" => "png",
-        "image/webp" => "webp",
-        "image/gif" => "gif",
-        _ => "jpg",
-    }
 }
 
 #[derive(Debug, thiserror::Error)]
