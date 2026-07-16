@@ -13,7 +13,7 @@ export default async function GamesOverviewPage() {
     const initial = await getGamesOverview();
 
     return (
-        <div className="w-full h-[calc(100svh-180px)] overflow-auto p-6">
+        <div className="w-full">
             <div className="max-w-4xl mx-auto">
                 <GamesOverview initial={initial} />
             </div>

@@ -67,7 +67,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
     const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary-400";
 
     return (
-        <div className="w-full p-3 sm:p-6">
+        <div className="w-full">
             <div className="flex flex-col gap-4">
                 <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">
                     單字題庫
@@ -177,7 +177,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                                                 <AdminTd className="whitespace-nowrap">
                                                     <div className="flex items-center gap-2">
                                                         <button onClick={() => setEditing(w)}
-                                                            className="p-1 rounded text-neutral-400 hover:text-primary-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                                            className="p-2 rounded text-neutral-400 hover:text-primary-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                                                             title="編輯" aria-label={`編輯 ${w.word}`}>
                                                             <Pencil size={15} />
                                                         </button>
@@ -278,7 +278,7 @@ function EditModal({ word, onClose, onSaved }: {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            <div className="w-full max-w-md bg-white dark:bg-neutral-900 rounded-lg shadow-xl p-5 flex flex-col gap-3"
+            <div className="w-full max-w-md max-h-[90svh] overflow-y-auto bg-white dark:bg-neutral-900 rounded-lg shadow-xl p-5 flex flex-col gap-3"
                 onClick={e => e.stopPropagation()}>
                 <h2 className="font-semibold text-neutral-800 dark:text-neutral-100">
                     編輯:<span lang={ja ? 'ja' : undefined}>{word.word}</span>

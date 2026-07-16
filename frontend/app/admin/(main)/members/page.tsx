@@ -17,7 +17,7 @@ export default async function MembersPage() {
             <AdminTable>
                 <thead>
                     <AdminHeadRow>
-                        <AdminTh>ID</AdminTh>
+                        <AdminTh className="hidden sm:table-cell">ID</AdminTh>
                         <AdminTh>Name</AdminTh>
                         <AdminTh>Email</AdminTh>
                         <AdminTh>Created At</AdminTh>
@@ -26,7 +26,7 @@ export default async function MembersPage() {
                 <tbody>
                     {members.map(member => (
                         <AdminRow key={member.id}>
-                            <AdminTd className="text-xs">
+                            <AdminTd className="text-xs hidden sm:table-cell">
                                 <Link href={`/admin/members/${member.id}`} className="text-primary-600 dark:text-primary-400 hover:underline">
                                     {member.id}
                                 </Link>
@@ -36,7 +36,7 @@ export default async function MembersPage() {
                                     {member.name}
                                 </Link>
                             </AdminTd>
-                            <AdminTd>{member.email ?? '—'}</AdminTd>
+                            <AdminTd className="break-all">{member.email ?? '—'}</AdminTd>
                             <AdminTd className="text-sm">
                                 {new Date(member.created_at).toLocaleString()}
                             </AdminTd>

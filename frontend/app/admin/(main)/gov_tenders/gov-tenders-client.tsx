@@ -37,7 +37,7 @@ export default function GovTendersClient() {
     const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary-400";
 
     return (
-        <div className="w-full p-3 sm:p-6">
+        <div className="w-full">
             <div className="flex flex-col gap-4">
                 <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">政府標案</h1>
 
@@ -89,8 +89,8 @@ export default function GovTendersClient() {
                             <thead>
                                 <AdminHeadRow>
                                     <AdminTh className="whitespace-nowrap">公告日</AdminTh>
-                                    <AdminTh className="whitespace-nowrap">類型</AdminTh>
-                                    <AdminTh>標案名稱</AdminTh>
+                                    <AdminTh className="whitespace-nowrap hidden sm:table-cell">類型</AdminTh>
+                                    <AdminTh className="min-w-[14rem]">標案名稱</AdminTh>
                                     <AdminTh className="whitespace-nowrap">機關</AdminTh>
                                     <AdminTh className="hidden lg:table-cell">廠商</AdminTh>
                                     <AdminTh className="whitespace-nowrap">關鍵字</AdminTh>
@@ -109,10 +109,10 @@ export default function GovTendersClient() {
                                             <AdminTd className="whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
                                                 {t.date}
                                             </AdminTd>
-                                            <AdminTd className="whitespace-nowrap text-xs">
+                                            <AdminTd className="whitespace-nowrap text-xs hidden sm:table-cell">
                                                 {t.tender_type}
                                             </AdminTd>
-                                            <AdminTd>
+                                            <AdminTd className="max-w-[18rem] sm:max-w-md">
                                                 <a
                                                     href={t.detail_url}
                                                     target="_blank"

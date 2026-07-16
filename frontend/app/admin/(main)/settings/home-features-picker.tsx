@@ -67,14 +67,14 @@ export default function HomeFeaturesPicker({ initialEnabled }: { initialEnabled:
                     return (
                         <div key={key} className={rowClass}>
                             <Icon size={16} className="text-primary-600 dark:text-primary-400 shrink-0" />
-                            <span className="flex-1 text-sm text-neutral-800 dark:text-neutral-200">
+                            <span className="flex-1 min-w-0 truncate text-sm text-neutral-800 dark:text-neutral-200">
                                 {feature.label}
-                                <span className="ml-2 text-xs text-neutral-400 dark:text-neutral-500 font-mono">{key}</span>
+                                <span className="ml-2 text-xs text-neutral-400 dark:text-neutral-500 font-mono hidden sm:inline">{key}</span>
                             </span>
                             <button
                                 onClick={() => move(key, -1)}
                                 disabled={saving || index === 0}
-                                className="p-1.5 rounded text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors"
+                                className="p-2 rounded text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors"
                                 aria-label="上移"
                             >
                                 <ArrowUp size={14} />
@@ -82,7 +82,7 @@ export default function HomeFeaturesPicker({ initialEnabled }: { initialEnabled:
                             <button
                                 onClick={() => move(key, 1)}
                                 disabled={saving || index === enabled.length - 1}
-                                className="p-1.5 rounded text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors"
+                                className="p-2 rounded text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors"
                                 aria-label="下移"
                             >
                                 <ArrowDown size={14} />

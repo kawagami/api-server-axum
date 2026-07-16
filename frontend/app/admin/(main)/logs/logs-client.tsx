@@ -65,12 +65,12 @@ export default function LogsClient() {
                     <table className="w-full border-collapse text-sm">
                         <thead>
                             <tr className="bg-neutral-100 dark:bg-neutral-800">
-                                <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-16">ID</th>
+                                <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-16 hidden sm:table-cell">ID</th>
                                 <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-20">Level</th>
                                 <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700">Message</th>
                                 <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 hidden lg:table-cell">Target</th>
                                 <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 hidden xl:table-cell">File</th>
-                                <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-44">Time</th>
+                                <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-32 md:w-44">Time</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -86,7 +86,7 @@ export default function LogsClient() {
                                         key={log.id}
                                         className={`border-b border-neutral-100 dark:border-neutral-800 ${LEVEL_ROW_BG[log.level]}`}
                                     >
-                                        <td className="px-4 py-2 text-neutral-500 dark:text-neutral-500 font-mono">{log.id}</td>
+                                        <td className="px-4 py-2 text-neutral-500 dark:text-neutral-500 font-mono hidden sm:table-cell">{log.id}</td>
                                         <td className="px-4 py-2">
                                             <span className={`px-2 py-0.5 rounded text-xs font-semibold ${LEVEL_BADGE[log.level]}`}>
                                                 {log.level}

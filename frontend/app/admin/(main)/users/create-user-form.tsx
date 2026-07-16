@@ -95,7 +95,7 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
                                 key={role.id}
                                 type="button"
                                 onClick={() => toggleRole(role.id)}
-                                className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                                className={`px-2.5 py-1.5 text-xs rounded-full border transition-colors ${
                                     active
                                         ? "bg-primary-100 border-primary-400 text-primary-700 dark:bg-primary-900 dark:border-primary-500 dark:text-primary-300"
                                         : "bg-neutral-100 border-neutral-300 text-neutral-600 dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-400"

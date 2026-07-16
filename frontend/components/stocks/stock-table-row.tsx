@@ -18,7 +18,7 @@ export default function StockTableRow({ stock }: { stock: StockChange }) {
             <Td>
                 <form action={patchStockPendingAction} className="inline">
                     <input type="hidden" name="id" value={String(stock.id)} />
-                    <button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded mr-2">
+                    <button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded mr-2">
                         再查詢
                     </button>
                 </form>

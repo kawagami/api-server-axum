@@ -46,7 +46,7 @@ export default function DeleteUserButton({ user, isSelf }: Props) {
         <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg text-white transition-colors ${
+            className={`inline-flex items-center gap-1 px-3 py-2 text-xs font-medium rounded-lg text-white transition-colors ${
                 isDeleting ? "bg-neutral-400 cursor-not-allowed" : "bg-red-500 hover:bg-red-600"
             }`}
         >

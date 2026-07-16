@@ -86,7 +86,7 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
             <h1 className="text-2xl font-bold text-neutral-800 dark:text-white">角色管理</h1>
 
             {/* Create form */}
-            <form action={handleCreate} className="flex gap-2">
+            <form action={handleCreate} className="flex flex-col sm:flex-row gap-2">
                 <input
                     name="name"
                     required
@@ -100,7 +100,7 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
                 />
                 <button
                     type="submit"
-                    className="flex items-center gap-1 px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                    className="flex items-center justify-center gap-1 px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
                 >
                     <Plus size={14} />
                     新增
@@ -126,7 +126,7 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
                             <button
                                 onClick={() => handleDelete(role.id)}
                                 disabled={isPending}
-                                className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 disabled:opacity-50"
+                                className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 disabled:opacity-50"
                             >
                                 {isPending ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                             </button>
@@ -169,7 +169,7 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
                                                                 onClick={() => handlePermissionToggle(role, perm)}
                                                                 disabled={isPending}
                                                                 title={`${perm.resource}:${perm.action}`}
-                                                                className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                                                                className={`px-2.5 py-1.5 text-xs rounded-full border transition-colors ${
                                                                     active
                                                                         ? 'bg-primary-100 border-primary-400 text-primary-700 dark:bg-primary-900 dark:border-primary-500 dark:text-primary-300'
                                                                         : 'bg-neutral-100 border-neutral-300 text-neutral-600 dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-400'

@@ -12,7 +12,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     const member = await getMember(id);
 
     return (
-        <div className="w-full h-[calc(100svh-180px)] overflow-auto p-3 sm:p-6">
+        <div className="w-full">
             <div className="max-w-2xl mx-auto bg-white dark:bg-neutral-900 shadow-lg rounded-lg p-4 sm:p-6 space-y-4">
                 <div className="flex items-center gap-4">
                     {member.avatar_url ? (

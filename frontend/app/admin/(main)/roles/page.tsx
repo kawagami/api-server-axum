@@ -14,7 +14,7 @@ export default async function RolesPage() {
     const [roles, permissions] = await Promise.all([getRoles(), getPermissions()]);
 
     return (
-        <div className="w-full h-[calc(100svh-180px)] overflow-auto p-3 sm:p-6">
+        <div className="w-full">
             <RolesManager initialRoles={roles} allPermissions={permissions} />
         </div>
     );

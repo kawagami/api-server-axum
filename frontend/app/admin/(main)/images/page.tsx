@@ -14,7 +14,7 @@ export default async function Images() {
     const managedImages = images.map(img => ({ name: img.id, url: img.url, status: img.status }));
 
     return (
-        <div className="w-full h-[calc(100svh-180px)] overflow-auto p-3 sm:p-6">
+        <div className="w-full">
             <ImageManager initialImages={managedImages} />
         </div>
     );

@@ -62,14 +62,14 @@ export default function TagManager({ tags }: { tags: TagCount[] }) {
                                 <button
                                     onClick={() => handleRename(tag)}
                                     aria-label={`改名 ${tag}`}
-                                    className="ml-1 p-1 rounded text-neutral-400 hover:text-primary-600 dark:hover:text-primary-300 transition-colors"
+                                    className="ml-1 p-1.5 rounded text-neutral-400 hover:text-primary-600 dark:hover:text-primary-300 transition-colors"
                                 >
                                     <Pencil size={14} />
                                 </button>
                                 <button
                                     onClick={() => handleDelete(tag)}
                                     aria-label={`刪除 ${tag}`}
-                                    className="p-1 rounded text-neutral-400 hover:text-red-600 transition-colors"
+                                    className="p-1.5 rounded text-neutral-400 hover:text-red-600 transition-colors"
                                 >
                                     <Trash2 size={14} />
                                 </button>

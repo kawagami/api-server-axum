@@ -14,7 +14,7 @@ export default async function BlogsPage() {
     const tags = canManageTags ? await getBlogTagCounts() : [];
 
     return (
-        <div className="w-full p-6 bg-neutral-100 dark:bg-neutral-900">
+        <div className="w-full p-3 sm:p-6 bg-neutral-100 dark:bg-neutral-900">
             <div className="mb-8 flex justify-center">
                 <CreateButton />
             </div>
@@ -23,10 +23,10 @@ export default async function BlogsPage() {
                     <ul className="divide-y divide-neutral-200 dark:divide-neutral-700">
                         {blogs.map((blog) => (
                             <li key={blog.id} className="flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition">
-                                <span className="text-neutral-800 dark:text-neutral-100 font-medium truncate max-w-xs">
+                                <span className="text-neutral-800 dark:text-neutral-100 font-medium min-w-0 flex-1 truncate">
                                     {blog.tocs[0] || '未命名 blog'}
                                 </span>
-                                <div className="flex space-x-2">
+                                <div className="flex space-x-2 shrink-0 ml-2">
                                     <EditButton uuid={blog.id} />
                                     <DeleteButton uuid={blog.id} />
                                 </div>

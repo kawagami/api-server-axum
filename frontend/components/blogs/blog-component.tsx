@@ -137,7 +137,7 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
                             <button
                                 onClick={() => setTags(tags.filter((t) => t !== tag))}
                                 aria-label={`移除 ${tag}`}
-                                className="p-0.5 rounded text-neutral-400 hover:text-red-600 transition-colors"
+                                className="p-1.5 rounded text-neutral-400 hover:text-red-600 transition-colors"
                             >
                                 <X size={14} />
                             </button>

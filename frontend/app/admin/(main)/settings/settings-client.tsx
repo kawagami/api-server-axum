@@ -63,12 +63,12 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
 
     return (
         <div>
-            <div className="flex gap-1 border-b border-neutral-200 dark:border-neutral-700 mb-6">
+            <div className="flex gap-1 border-b border-neutral-200 dark:border-neutral-700 mb-6 overflow-x-auto">
                 {categories.map(cat => (
                     <button
                         key={cat}
                         onClick={() => setActiveTab(cat)}
-                        className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px
+                        className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px whitespace-nowrap shrink-0
                             ${activeTab === cat
                                 ? "border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400"
                                 : "border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"

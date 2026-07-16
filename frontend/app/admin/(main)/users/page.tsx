@@ -39,7 +39,7 @@ export default async function Users() {
             <AdminTable>
                 <thead>
                     <AdminHeadRow>
-                        <AdminTh>ID</AdminTh>
+                        <AdminTh className="hidden sm:table-cell">ID</AdminTh>
                         <AdminTh>Name</AdminTh>
                         <AdminTh>Email</AdminTh>
                         <AdminTh>Roles</AdminTh>
@@ -49,9 +49,9 @@ export default async function Users() {
                 <tbody>
                     {usersWithRoles.map(user => (
                         <AdminRow key={user.id}>
-                            <AdminTd className="text-xs">{user.id}</AdminTd>
+                            <AdminTd className="text-xs hidden sm:table-cell">{user.id}</AdminTd>
                             <AdminTd>{user.name}</AdminTd>
-                            <AdminTd>{user.email || "—"}</AdminTd>
+                            <AdminTd className="break-all">{user.email || "—"}</AdminTd>
                             <AdminTd>
                                 <UserRolesPanel
                                     userId={user.id}

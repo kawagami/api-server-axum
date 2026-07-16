@@ -29,7 +29,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                     <label className="text-sm text-neutral-600 dark:text-neutral-400">頁碼</label>
                     <input type="number" name="page" defaultValue={page} min={1} className="border dark:border-neutral-600 px-2 py-1 text-sm rounded w-20 bg-white dark:bg-neutral-700 dark:text-neutral-200" />
                 </div>
-                <button type="submit" className="px-3 py-1 bg-primary-600 text-white text-sm rounded hover:bg-primary-700">查詢</button>
+                <button type="submit" className="px-4 py-1.5 bg-primary-600 text-white text-sm rounded hover:bg-primary-700">查詢</button>
             </form>
             <div className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">共 {data.length} 筆</div>
             <div className="overflow-x-auto">
@@ -45,8 +45,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                             <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">收盤</th>
                             <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">漲跌</th>
                             <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">成交量</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">成交金額</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">成交筆數</th>
+                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200 hidden sm:table-cell">成交金額</th>
+                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200 hidden sm:table-cell">成交筆數</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -61,8 +61,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                                 <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.close_price}</td>
                                 <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.price_change}</td>
                                 <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.trade_volume?.toLocaleString()}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.trade_amount?.toLocaleString()}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.transaction_count?.toLocaleString()}</td>
+                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right hidden sm:table-cell">{item.trade_amount?.toLocaleString()}</td>
+                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right hidden sm:table-cell">{item.transaction_count?.toLocaleString()}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -70,10 +70,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
             </div>
             <div className="flex gap-2 mt-4">
                 {page > 1 && (
-                    <a href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page - 1}`} className="px-3 py-1 bg-neutral-300 dark:bg-neutral-600 dark:text-neutral-200 rounded text-sm hover:bg-neutral-400 dark:hover:bg-neutral-500">上一頁</a>
+                    <a href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page - 1}`} className="px-4 py-2 bg-neutral-300 dark:bg-neutral-600 dark:text-neutral-200 rounded text-sm hover:bg-neutral-400 dark:hover:bg-neutral-500">上一頁</a>
                 )}
                 {data.length === perPage && (
-                    <a href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page + 1}`} className="px-3 py-1 bg-neutral-300 dark:bg-neutral-600 dark:text-neutral-200 rounded text-sm hover:bg-neutral-400 dark:hover:bg-neutral-500">下一頁</a>
+                    <a href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page + 1}`} className="px-4 py-2 bg-neutral-300 dark:bg-neutral-600 dark:text-neutral-200 rounded text-sm hover:bg-neutral-400 dark:hover:bg-neutral-500">下一頁</a>
                 )}
             </div>
         </div>

@@ -155,8 +155,8 @@ export default function AuditLogsClient() {
                         <table className="w-full border-collapse text-sm">
                             <thead>
                                 <tr className="bg-neutral-100 dark:bg-neutral-800">
-                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-44">Time</th>
-                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700">User</th>
+                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-32 md:w-44">Time</th>
+                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 hidden md:table-cell">User</th>
                                     <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-20">Method</th>
                                     <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700">Path</th>
                                     <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 hidden lg:table-cell">Query</th>
@@ -179,7 +179,7 @@ export default function AuditLogsClient() {
                                             <td className="px-4 py-2 text-neutral-500 dark:text-neutral-400 text-xs whitespace-nowrap">
                                                 {new Date(log.created_at).toLocaleString()}
                                             </td>
-                                            <td className="px-4 py-2 text-neutral-900 dark:text-neutral-100 text-xs font-mono">
+                                            <td className="px-4 py-2 text-neutral-900 dark:text-neutral-100 text-xs font-mono hidden md:table-cell">
                                                 {log.user_email}
                                             </td>
                                             <td className="px-4 py-2">

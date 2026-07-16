@@ -8,7 +8,7 @@ export default async function AdminMainLayout({ children }: { children: React.Re
         <div className="flex w-full h-screen">
             <TokenRefreshInit />
             <AdminSidebar permissions={permissions} />
-            <div className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="flex-1 overflow-auto px-4 pb-4 pt-14 sm:p-6">
                 {children}
             </div>
         </div>

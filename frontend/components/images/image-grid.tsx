@@ -27,7 +27,7 @@ const ImageGrid = ({ images, deletingImage, copiedImage, onDelete, onCopy }: Pro
                     {pathname === '/admin/images' && (
                         <button
                             onClick={() => { if (window.confirm('確定刪除此圖片？')) onDelete(image.name); }}
-                            className={`mt-2 py-1 px-4 rounded transition ${deletingImage === image.name ? 'bg-neutral-500 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                            className={`mt-2 py-2 px-4 rounded transition ${deletingImage === image.name ? 'bg-neutral-500 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
                             disabled={deletingImage === image.name}
                         >
                             {deletingImage === image.name ? (
@@ -35,7 +35,7 @@ const ImageGrid = ({ images, deletingImage, copiedImage, onDelete, onCopy }: Pro
                             ) : 'Delete'}
                         </button>
                     )}
-                    <button onClick={() => onCopy(image.url)} className="mt-2 py-1 px-4 rounded bg-green-500 hover:bg-green-600 text-white">
+                    <button onClick={() => onCopy(image.url)} className="mt-2 py-2 px-4 rounded bg-green-500 hover:bg-green-600 text-white">
                         Copy URL
                     </button>
                     {copiedImage === image.url && <span className="mt-2 text-sm text-green-500">URL 已複製！</span>}

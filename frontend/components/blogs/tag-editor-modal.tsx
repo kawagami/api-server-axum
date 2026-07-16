@@ -103,7 +103,7 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
                             <button
                                 onClick={() => removeTag(tag)}
                                 aria-label={`移除 ${tag}`}
-                                className="p-0.5 rounded text-neutral-400 hover:text-red-600 transition-colors"
+                                className="p-1.5 rounded text-neutral-400 hover:text-red-600 transition-colors"
                             >
                                 <X size={14} />
                             </button>
@@ -145,7 +145,7 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
                                 key={tag}
                                 onClick={() => (added ? removeTag(tag) : addTag(tag))}
                                 aria-pressed={added}
-                                className={`flex items-center gap-1 px-2.5 py-0.5 text-sm rounded-lg border transition-colors ${added
+                                className={`flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border transition-colors ${added
                                     ? 'bg-primary-600 border-primary-600 text-white'
                                     : 'bg-white dark:bg-neutral-700 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 hover:border-primary-400'}`}
                             >

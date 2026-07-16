@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useRef, useState } from "react";
 import type { VisitorDayCount } from "@/types";
 
 function fmtAxisDate(date: string) {
@@ -12,6 +12,9 @@ function fmtAxisDate(date: string) {
 // 純 SVG 折線圖：history 一律排序成舊→新再畫
 export default function VisitorTrendChart({ history }: { history: VisitorDayCount[] }) {
     const gradId = useId();
+    const svgRef = useRef<SVGSVGElement>(null);
+    // 觸控裝置沒有 hover，改點擊/拖曳選取資料點顯示數值
+    const [selected, setSelected] = useState<number | null>(null);
     const rows = [...history].sort((a, b) => a.date.localeCompare(b.date));
 
     if (rows.length === 0) {
@@ -45,13 +48,26 @@ export default function VisitorTrendChart({ history }: { history: VisitorDayCoun
     // X 軸最多顯示約 6 個標籤
     const labelStep = Math.max(1, Math.ceil(rows.length / 6));
 
+    // 依 pointer X 座標換算最近的資料點 index
+    function pick(e: React.PointerEvent<SVGSVGElement>) {
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const px = ((e.clientX - rect.left) / rect.width) * W;
+        const i = rows.length === 1 ? 0 : Math.round(((px - padL) / innerW) * (rows.length - 1));
+        setSelected(Math.max(0, Math.min(rows.length - 1, i)));
+    }
+
     return (
         <div className="overflow-x-auto">
             <svg
+                ref={svgRef}
                 viewBox={`0 0 ${W} ${H}`}
-                className="w-full min-w-[480px] h-auto"
+                className="w-full min-w-[480px] h-auto select-none cursor-crosshair"
                 role="img"
                 aria-label="每日不重複到訪趨勢"
+                onPointerDown={pick}
+                onPointerMove={e => { if (e.buttons) pick(e); }}
             >
                 <defs>
                     <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -111,6 +127,32 @@ export default function VisitorTrendChart({ history }: { history: VisitorDayCoun
                         )}
                     </g>
                 ))}
+
+                {/* 選取點：垂直參考線 + 數值標籤（觸控可用） */}
+                {selected !== null && rows[selected] && (() => {
+                    const r = rows[selected];
+                    const cx = x(selected);
+                    const anchor = cx > W - 130 ? "end" : cx < padL + 110 ? "start" : "middle";
+                    return (
+                        <g pointerEvents="none">
+                            <line
+                                x1={cx} y1={padT} x2={cx} y2={padT + innerH}
+                                stroke="rgb(var(--primary-400))" strokeDasharray="3 3" strokeWidth={1}
+                            />
+                            <circle
+                                cx={cx} cy={y(r.unique_visitors)} r={4}
+                                fill="rgb(var(--primary-600))"
+                                className="stroke-white dark:stroke-neutral-900" strokeWidth={1.5}
+                            />
+                            <text
+                                x={cx} y={padT + 10} textAnchor={anchor}
+                                className="fill-neutral-600 dark:fill-neutral-300 text-[11px] font-medium tabular-nums"
+                            >
+                                {`${r.date}：${r.unique_visitors.toLocaleString()}`}
+                            </text>
+                        </g>
+                    );
+                })()}
             </svg>
         </div>
     );

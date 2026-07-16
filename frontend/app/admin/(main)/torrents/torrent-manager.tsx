@@ -196,7 +196,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                                 <button
                                                     onClick={() => handleDownload(t)}
                                                     disabled={downloadingKey !== null}
-                                                    className="p-1.5 rounded text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors disabled:opacity-50"
+                                                    className="p-2 rounded text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors disabled:opacity-50"
                                                     title="下載"
                                                 >
                                                     {downloadingKey?.startsWith(`${t.id}:`) && !modalTorrent
@@ -208,7 +208,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                                 <button
                                                     onClick={() => copyLink(t.id, t.files?.[0]?.index ?? 0)}
                                                     disabled={downloadingKey !== null}
-                                                    className="p-1.5 rounded text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                                    className="p-2 rounded text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
                                                     title="複製下載連結"
                                                 >
                                                     {copiedKey === `${t.id}:${t.files?.[0]?.index ?? 0}`
@@ -220,7 +220,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                                 <button
                                                     onClick={() => handleRetry(t)}
                                                     disabled={isBusy}
-                                                    className="p-1.5 rounded text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 transition-colors disabled:opacity-50"
+                                                    className="p-2 rounded text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 transition-colors disabled:opacity-50"
                                                     title={`重試${t.error ? `（${t.error}）` : ""}`}
                                                 >
                                                     {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
@@ -229,7 +229,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                             <button
                                                 onClick={() => handleDelete(t)}
                                                 disabled={isBusy}
-                                                className="p-1.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                className="p-2 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                                                 title="刪除"
                                             >
                                                 {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}

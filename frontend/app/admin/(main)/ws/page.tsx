@@ -14,13 +14,14 @@ export default async function WsAdminPage() {
     const connections = await getWsConnections();
 
     return (
-        <div className="w-full h-[calc(100svh-180px)] overflow-auto p-6">
+        <div className="w-full">
             <div className="max-w-4xl mx-auto flex flex-col gap-8">
                 <section>
                     <h2 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100 mb-4">
                         Online Connections ({connections.length})
                     </h2>
                     <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
                         <AdminTable>
                             <thead>
                                 <AdminHeadRow>
@@ -49,6 +50,7 @@ export default async function WsAdminPage() {
                                 )}
                             </tbody>
                         </AdminTable>
+                        </div>
                     </div>
                 </section>
 

@@ -62,7 +62,7 @@ export default function FileDownloadModal({ torrent, downloadingKey, copiedKey, 
                                     {downloadingKey === key
                                         ? <Loader2 className="w-4 h-4 animate-spin" />
                                         : <Download className="w-4 h-4" />}
-                                    下載
+                                    <span className="hidden sm:inline">下載</span>
                                 </button>
                                 <button
                                     onClick={() => onCopy(torrent.id, f.index)}
@@ -73,7 +73,7 @@ export default function FileDownloadModal({ torrent, downloadingKey, copiedKey, 
                                     {copiedKey === key
                                         ? <Check className="w-4 h-4 text-green-500" />
                                         : <Copy className="w-4 h-4" />}
-                                    複製
+                                    <span className="hidden sm:inline">複製</span>
                                 </button>
                             </li>
                         );

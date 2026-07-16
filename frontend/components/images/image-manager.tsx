@@ -13,7 +13,7 @@ export default function ImageManager({ initialImages }: { initialImages: Managed
     } = useImageManager(initialImages);
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto">
             {pathname === '/admin/images' && (
                 <UploadSection
                     fileInputRef={fileInputRef}
