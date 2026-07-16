@@ -10,6 +10,7 @@ import { Loader2, Bold, Italic, Code, Link2, Heading2, Quote, List, Plus, X } fr
 import 'highlight.js/styles/github-dark.css';
 import { putBlog } from '@/api/blogs';
 import { uploadImages } from '@/api/images';
+import { validateFileSizes, splitIntoBatches, uploadErrorMessage } from '@/libs/upload-limits';
 import { useMarkdownTextarea } from '@/hooks/useMarkdownTextarea';
 import { useBlogDraft } from './useBlogDraft';
 import TagEditorModal from './tag-editor-modal';
@@ -35,6 +36,7 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [showTagModal, setShowTagModal] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -64,17 +66,28 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
         if (!files || isUploading) return;
         const fileArray = files instanceof File ? [files] : Array.from(files);
         if (!fileArray.length) return;
+        const sizeError = validateFileSizes(fileArray);
+        if (sizeError) {
+            setUploadError(sizeError);
+            return;
+        }
         setIsUploading(true);
         setUploadError(null);
-        const formData = new FormData();
-        fileArray.forEach(f => formData.append('file', f));
         try {
-            const data = await uploadImages(formData);
-            insertAtCursor(data.map(d => `![image](${d.url})`).join('\n') + '\n');
+            // 總大小超過單次請求上限時切批連打，每批完成即插入 markdown
+            const batches = splitIntoBatches(fileArray);
+            for (let i = 0; i < batches.length; i++) {
+                if (batches.length > 1) setUploadProgress({ current: i + 1, total: batches.length });
+                const formData = new FormData();
+                batches[i].forEach(f => formData.append('file', f));
+                const data = await uploadImages(formData);
+                insertAtCursor(data.map(d => `![image](${d.url})`).join('\n') + '\n');
+            }
         } catch (err) {
-            setUploadError('圖片上傳失敗，請再試一次');
+            setUploadError(uploadErrorMessage(err));
         } finally {
             setIsUploading(false);
+            setUploadProgress(null);
         }
     }
 
@@ -115,7 +128,7 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
                         className="px-6 py-2 font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-400 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
                     >
                         {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {isUploading ? '上傳中...' : '上傳圖片'}
+                        {isUploading ? (uploadProgress ? `上傳中 (${uploadProgress.current}/${uploadProgress.total})...` : '上傳中...') : '上傳圖片'}
                     </button>
                     <input
                         ref={fileInputRef}

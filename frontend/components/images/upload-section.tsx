@@ -7,12 +7,15 @@ interface Props {
     fileInputRef: React.RefObject<HTMLInputElement | null>;
     selectedFiles: File[];
     isUploading: boolean;
+    uploadProgress: { current: number; total: number } | null;
+    uploadError: string | null;
+    canUpload: boolean;
     onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onRemoveSelectedImage: () => void;
     onUpload: () => void;
 }
 
-const UploadSection = ({ fileInputRef, selectedFiles, isUploading, onImageChange, onRemoveSelectedImage, onUpload }: Props) => {
+const UploadSection = ({ fileInputRef, selectedFiles, isUploading, uploadProgress, uploadError, canUpload, onImageChange, onRemoveSelectedImage, onUpload }: Props) => {
     const previewUrls = useMemo(() => selectedFiles.map(f => URL.createObjectURL(f)), [selectedFiles]);
 
     useEffect(() => {
@@ -35,13 +38,14 @@ const UploadSection = ({ fileInputRef, selectedFiles, isUploading, onImageChange
                     </button>
                 </div>
             )}
+            {uploadError && <p className="text-red-500 text-sm text-center mt-4">{uploadError}</p>}
             <button
-                className={`flex items-center gap-1 py-2 px-4 rounded mt-4 ${isUploading ? 'bg-neutral-500 cursor-not-allowed' : 'bg-primary-500 text-white'}`}
+                className={`flex items-center gap-1 py-2 px-4 rounded mt-4 ${isUploading || !canUpload ? 'bg-neutral-500 text-white cursor-not-allowed' : 'bg-primary-500 text-white'}`}
                 onClick={onUpload}
-                disabled={isUploading}
+                disabled={isUploading || !canUpload}
             >
                 {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isUploading ? '上傳中...' : '上傳圖片'}
+                {isUploading ? (uploadProgress ? `上傳中 (${uploadProgress.current}/${uploadProgress.total})...` : '上傳中...') : '上傳圖片'}
             </button>
         </div>
     );
