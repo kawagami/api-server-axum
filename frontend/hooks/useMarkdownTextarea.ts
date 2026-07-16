@@ -80,10 +80,13 @@ export function useMarkdownTextarea(
 
     /** Insert text at the current caret (e.g. uploaded image markdown). */
     const insertText = (text: string) => {
+        // 讀 DOM 即時值而非 closure 的 value:async 呼叫端(分批上傳)握著舊 render
+        // 的 insert,用 closure 值會把前一批的插入蓋掉
         const ta = ref.current;
-        const start = ta?.selectionStart ?? value.length;
-        const end = ta?.selectionEnd ?? value.length;
-        apply(insert(value, start, end, text));
+        const v = ta?.value ?? value;
+        const start = ta?.selectionStart ?? v.length;
+        const end = ta?.selectionEnd ?? v.length;
+        apply(insert(v, start, end, text));
     };
 
     /** Wrap the selection with markers (toolbar bold/italic/code/...). */
