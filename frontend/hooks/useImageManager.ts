@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { uploadImages } from '@/api/images';
 import { deleteImage } from '@/api/images';
-import { validateFileSizes, splitIntoBatches, uploadErrorMessage } from '@/libs/upload-limits';
+import { validateFileSizes, splitIntoBatches, uploadErrorMessage, type UploadProgress } from '@/libs/upload-limits';
+import { compressImages } from '@/libs/client-image';
 
 export interface ManagedImage {
     name: string;
@@ -14,14 +15,11 @@ export const useImageManager = (initialImages: ManagedImage[]) => {
     const [deletingImage, setDeletingImage] = useState<string | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+    const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [copiedImage, setCopiedImage] = useState<string | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // 總大小超限會自動切批上傳；只有「單檔就超限」才擋住上傳鈕（隨 selectedFiles 派生）
-    const sizeError = validateFileSizes(selectedFiles);
 
     const imageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.length) {
@@ -37,13 +35,25 @@ export const useImageManager = (initialImages: ManagedImage[]) => {
     };
 
     const handleUpload = async () => {
-        if (!selectedFiles.length || sizeError) return;
+        if (!selectedFiles.length || isUploading) return;
         setIsUploading(true);
         setUploadError(null);
-        const batches = splitIntoBatches(selectedFiles);
         try {
+            const compressed = await compressImages(selectedFiles, (current, total) =>
+                setUploadProgress({ phase: 'compress', current, total }));
+            // 大小檢查在壓縮後做:多數超限原圖壓完就過了,擋不住的只剩大 GIF / 解不開的檔
+            const sizeError = validateFileSizes(compressed);
+            if (sizeError) {
+                setUploadError(sizeError);
+                return;
+            }
+            // 壓縮檔對映回原檔,批次成功時才能從選取移除對應原檔
+            const originalOf = new Map<File, File>();
+            compressed.forEach((c, i) => originalOf.set(c, selectedFiles[i]));
+
+            const batches = splitIntoBatches(compressed);
             for (let i = 0; i < batches.length; i++) {
-                if (batches.length > 1) setUploadProgress({ current: i + 1, total: batches.length });
+                setUploadProgress({ phase: 'upload', current: i + 1, total: batches.length });
                 const formData = new FormData();
                 batches[i].forEach(f => formData.append('file', f));
 
@@ -51,7 +61,7 @@ export const useImageManager = (initialImages: ManagedImage[]) => {
                 const newImages = responses.map(r => ({ name: r.id, url: r.url, status: r.status }));
                 setImages((prev) => [...prev, ...newImages]);
                 // 已成功的批次移出選取，中途失敗時重按上傳只會送剩下的
-                const uploaded = new Set(batches[i]);
+                const uploaded = new Set(batches[i].map(f => originalOf.get(f)!));
                 setSelectedFiles((prev) => prev.filter(f => !uploaded.has(f)));
             }
             removeSelectedImage();
@@ -92,8 +102,8 @@ export const useImageManager = (initialImages: ManagedImage[]) => {
         selectedFiles,
         isUploading,
         uploadProgress,
-        uploadError: sizeError ?? uploadError,
-        canUpload: selectedFiles.length > 0 && !sizeError,
+        uploadError,
+        canUpload: selectedFiles.length > 0,
         copiedImage,
         fileInputRef,
         imageChange,

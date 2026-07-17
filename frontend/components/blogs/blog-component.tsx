@@ -10,7 +10,8 @@ import { Loader2, Bold, Italic, Code, Link2, Heading2, Quote, List, Plus, X } fr
 import 'highlight.js/styles/github-dark.css';
 import { putBlog } from '@/api/blogs';
 import { uploadImages } from '@/api/images';
-import { validateFileSizes, splitIntoBatches, uploadErrorMessage } from '@/libs/upload-limits';
+import { validateFileSizes, splitIntoBatches, uploadErrorMessage, uploadProgressLabel, type UploadProgress } from '@/libs/upload-limits';
+import { compressImages } from '@/libs/client-image';
 import { useMarkdownTextarea } from '@/hooks/useMarkdownTextarea';
 import { useBlogDraft } from './useBlogDraft';
 import TagEditorModal from './tag-editor-modal';
@@ -36,7 +37,7 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
-    const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+    const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [showTagModal, setShowTagModal] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -66,18 +67,21 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
         if (!files || isUploading) return;
         const fileArray = files instanceof File ? [files] : Array.from(files);
         if (!fileArray.length) return;
-        const sizeError = validateFileSizes(fileArray);
-        if (sizeError) {
-            setUploadError(sizeError);
-            return;
-        }
         setIsUploading(true);
         setUploadError(null);
         try {
+            const compressed = await compressImages(fileArray, (current, total) =>
+                setUploadProgress({ phase: 'compress', current, total }));
+            // 大小檢查在壓縮後做:多數超限原圖壓完就過了,擋不住的只剩大 GIF / 解不開的檔
+            const sizeError = validateFileSizes(compressed);
+            if (sizeError) {
+                setUploadError(sizeError);
+                return;
+            }
             // 總大小超過單次請求上限時切批連打，每批完成即插入 markdown
-            const batches = splitIntoBatches(fileArray);
+            const batches = splitIntoBatches(compressed);
             for (let i = 0; i < batches.length; i++) {
-                if (batches.length > 1) setUploadProgress({ current: i + 1, total: batches.length });
+                setUploadProgress({ phase: 'upload', current: i + 1, total: batches.length });
                 const formData = new FormData();
                 batches[i].forEach(f => formData.append('file', f));
                 const data = await uploadImages(formData);
@@ -128,7 +132,7 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
                         className="px-6 py-2 font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-400 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
                     >
                         {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {isUploading ? (uploadProgress ? `上傳中 (${uploadProgress.current}/${uploadProgress.total})...` : '上傳中...') : '上傳圖片'}
+                        {isUploading ? uploadProgressLabel(uploadProgress) : '上傳圖片'}
                     </button>
                     <input
                         ref={fileInputRef}

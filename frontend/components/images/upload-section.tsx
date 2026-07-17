@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo } from "react";
 import { Loader2 } from "lucide-react";
+import { uploadProgressLabel, type UploadProgress } from "@/libs/upload-limits";
 
 interface Props {
     fileInputRef: React.RefObject<HTMLInputElement | null>;
     selectedFiles: File[];
     isUploading: boolean;
-    uploadProgress: { current: number; total: number } | null;
+    uploadProgress: UploadProgress | null;
     uploadError: string | null;
     canUpload: boolean;
     onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -45,7 +46,7 @@ const UploadSection = ({ fileInputRef, selectedFiles, isUploading, uploadProgres
                 disabled={isUploading || !canUpload}
             >
                 {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isUploading ? (uploadProgress ? `上傳中 (${uploadProgress.current}/${uploadProgress.total})...` : '上傳中...') : '上傳圖片'}
+                {isUploading ? uploadProgressLabel(uploadProgress) : '上傳圖片'}
             </button>
         </div>
     );

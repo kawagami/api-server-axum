@@ -7,6 +7,16 @@ function formatMB(bytes: number): string {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** 上傳流程的階段進度（compress = 前端壓縮、upload = 分批上傳）。 */
+export type UploadProgress = { phase: 'compress' | 'upload'; current: number; total: number };
+
+/** 上傳鈕的進行中文案。 */
+export function uploadProgressLabel(p: UploadProgress | null): string {
+    if (!p) return '上傳中...';
+    const label = p.phase === 'compress' ? '處理圖片' : '上傳中';
+    return p.total > 1 ? `${label} (${p.current}/${p.total})...` : `${label}...`;
+}
+
 /** 找出單檔就超過上限的圖片（分批也救不了），回錯誤訊息；沒有回 null。 */
 export function validateFileSizes(files: File[]): string | null {
     const over = files.filter(f => f.size > MAX_UPLOAD_TOTAL_BYTES);
