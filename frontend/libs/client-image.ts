@@ -1,3 +1,5 @@
+import { validateFileSizes, type UploadProgress } from '@/libs/upload-limits';
+
 // 上傳前在瀏覽器端縮圖 + 轉 WebP q80（長邊上限 2560px），大幅縮小上傳流量與後端轉檔負擔。
 // 這只是最佳化,不是信任邊界——後端 process_image 的 decode 驗證/重編照舊,送什麼都會被驗。
 // 任何一步失敗都回傳原檔,交給後端處理(行為等同未壓縮的舊流程)。
@@ -45,15 +47,26 @@ export async function compressImage(file: File): Promise<File> {
     }
 }
 
-/** 逐張壓縮（避免同時解多張大圖吃爆手機記憶體），回報進度。 */
-export async function compressImages(
+/**
+ * Pipeline 逐張上傳:上傳第 i 張的同時壓縮第 i+1 張(上傳等網路/後端時,瀏覽器
+ * 正好做下一張的解碼/編碼),總時間 ≈ max(壓縮總時, 上傳總時) 而非兩者相加。
+ * 順序保持(onUploaded 依 index 循序觸發);單檔超限(大 GIF/解不開退回的原檔)
+ * 在輪到該張時丟錯中斷,已完成的張數不受影響。
+ */
+export async function compressAndUploadEach<T>(
     files: File[],
-    onProgress?: (current: number, total: number) => void,
-): Promise<File[]> {
-    const out: File[] = [];
+    upload: (file: File) => Promise<T>,
+    onProgress: (progress: UploadProgress) => void,
+    onUploaded: (result: T, index: number) => void,
+): Promise<void> {
+    let pending = compressImage(files[0]);
+    onProgress({ phase: 'compress', current: 1, total: files.length });
     for (let i = 0; i < files.length; i++) {
-        onProgress?.(i + 1, files.length);
-        out.push(await compressImage(files[i]));
+        const compressed = await pending;
+        if (i + 1 < files.length) pending = compressImage(files[i + 1]);
+        const sizeError = validateFileSizes([compressed]);
+        if (sizeError) throw Object.assign(new Error(sizeError), { userMessage: sizeError });
+        onProgress({ phase: 'upload', current: i + 1, total: files.length });
+        onUploaded(await upload(compressed), i);
     }
-    return out;
 }

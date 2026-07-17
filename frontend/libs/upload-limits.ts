@@ -43,6 +43,8 @@ export function validateFileSizes(files: File[]): string | null {
 
 /** 上傳失敗時依錯誤型態給使用者看得懂的訊息。 */
 export function uploadErrorMessage(err: unknown): string {
+    const userMessage = (err as { userMessage?: string }).userMessage;
+    if (userMessage) return userMessage;
     if ((err as { mark?: string }).mark === TIMEOUT_MARK) return '上傳逾時（網路可能中斷），請再試一次';
     const status = (err as { status?: number }).status;
     if (status === 413) return '圖片總大小超過伺服器限制，請分批上傳';
