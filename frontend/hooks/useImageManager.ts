@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { uploadImages } from '@/api/images';
 import { deleteImage } from '@/api/images';
-import { validateFileSizes, splitIntoBatches, uploadErrorMessage, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
+import { validateFileSizes, uploadErrorMessage, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressImages } from '@/libs/client-image';
 
 export interface ManagedImage {
@@ -47,22 +47,18 @@ export const useImageManager = (initialImages: ManagedImage[]) => {
                 setUploadError(sizeError);
                 return;
             }
-            // 壓縮檔對映回原檔,批次成功時才能從選取移除對應原檔
-            const originalOf = new Map<File, File>();
-            compressed.forEach((c, i) => originalOf.set(c, selectedFiles[i]));
-
-            const batches = splitIntoBatches(compressed);
-            for (let i = 0; i < batches.length; i++) {
-                setUploadProgress({ phase: 'upload', current: i + 1, total: batches.length });
+            // 一張一請求逐張上傳:part 數最少(避 WAF 誤殺)、後端單張處理遠低於 30 秒逾時
+            for (let i = 0; i < compressed.length; i++) {
+                setUploadProgress({ phase: 'upload', current: i + 1, total: compressed.length });
                 const formData = new FormData();
-                batches[i].forEach(f => formData.append('file', f));
+                formData.append('file', compressed[i]);
 
                 const responses = await withUploadTimeout(uploadImages(formData));
                 const newImages = responses.map(r => ({ name: r.id, url: r.url, status: r.status }));
                 setImages((prev) => [...prev, ...newImages]);
-                // 已成功的批次移出選取，中途失敗時重按上傳只會送剩下的
-                const uploaded = new Set(batches[i].map(f => originalOf.get(f)!));
-                setSelectedFiles((prev) => prev.filter(f => !uploaded.has(f)));
+                // 已成功的移出選取，中途失敗時重按上傳只會送剩下的
+                const original = selectedFiles[i];
+                setSelectedFiles((prev) => prev.filter(f => f !== original));
             }
             removeSelectedImage();
         } catch (err) {

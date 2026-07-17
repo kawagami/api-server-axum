@@ -1,11 +1,8 @@
-// 上傳大小限制對齊 server 端最緊的一道：backend RequestBodyLimitLayer 10*1000*1000 bytes
+// 單檔大小上限,對齊 server 端最緊的一道：backend RequestBodyLimitLayer 10*1000*1000 bytes
 // （nginx client_max_body_size 10M 與 Next server action bodySizeLimit 10mb 都是 10*1024*1024，較寬）。
-// 限制的是「整個請求」，多檔超過時前端自動切批連打；預留 multipart 邊界/標頭開銷，取 9.5MB。
-export const MAX_UPLOAD_TOTAL_BYTES = 9_500_000;
-
-// 每批張數上限:後端逐張 decode+轉 WebP(1核 VPS 約 1~3 秒/張),張數太多會撞
-// adminRequest 的 30 秒逾時;5 張約 10~15 秒,留有餘裕
-export const MAX_UPLOAD_FILES_PER_BATCH = 5;
+// 多圖走「一張一請求」逐張上傳(part 數最少避開 WAF 誤殺、後端單張處理遠低於 30 秒逾時),
+// 所以請求上限=單檔上限;預留 multipart 邊界/標頭開銷,取 9.5MB。
+export const MAX_UPLOAD_FILE_BYTES = 9_500_000;
 
 // 瀏覽器端整體逾時:傳輸層卡死(如 QUIC 上傳停滯)時讓請求明確失敗,而非無限 pending
 const UPLOAD_TIMEOUT_MS = 90_000;
@@ -35,31 +32,13 @@ export function uploadProgressLabel(p: UploadProgress | null): string {
     return p.total > 1 ? `${label} (${p.current}/${p.total})...` : `${label}...`;
 }
 
-/** 找出單檔就超過上限的圖片（分批也救不了），回錯誤訊息；沒有回 null。 */
+/** 找出單檔就超過上限的圖片（壓縮後仍超限＝大 GIF / 解不開的檔），回錯誤訊息；沒有回 null。 */
 export function validateFileSizes(files: File[]): string | null {
-    const over = files.filter(f => f.size > MAX_UPLOAD_TOTAL_BYTES);
+    const over = files.filter(f => f.size > MAX_UPLOAD_FILE_BYTES);
     if (!over.length) return null;
     const names = over.slice(0, 3).map(f => `${f.name}（${formatMB(f.size)}）`).join('、');
     const suffix = over.length > 3 ? ` 等 ${over.length} 張` : '';
-    return `${names}${suffix} 超過單檔上限 ${formatMB(MAX_UPLOAD_TOTAL_BYTES)}，請改選較小的圖片`;
-}
-
-/** 依序把檔案切批，每批加總 ≤ byte 上限、張數 ≤ 張數上限；呼叫前先用 validateFileSizes 排除單檔超限。 */
-export function splitIntoBatches(files: File[]): File[][] {
-    const batches: File[][] = [];
-    let current: File[] = [];
-    let currentSize = 0;
-    for (const f of files) {
-        if (current.length && (currentSize + f.size > MAX_UPLOAD_TOTAL_BYTES || current.length >= MAX_UPLOAD_FILES_PER_BATCH)) {
-            batches.push(current);
-            current = [];
-            currentSize = 0;
-        }
-        current.push(f);
-        currentSize += f.size;
-    }
-    if (current.length) batches.push(current);
-    return batches;
+    return `${names}${suffix} 超過單檔上限 ${formatMB(MAX_UPLOAD_FILE_BYTES)}，請改選較小的圖片`;
 }
 
 /** 上傳失敗時依錯誤型態給使用者看得懂的訊息。 */
