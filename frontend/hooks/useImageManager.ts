@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { uploadImages } from '@/api/images';
 import { deleteImage } from '@/api/images';
-import { validateFileSizes, splitIntoBatches, uploadErrorMessage, type UploadProgress } from '@/libs/upload-limits';
+import { validateFileSizes, splitIntoBatches, uploadErrorMessage, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressImages } from '@/libs/client-image';
 
 export interface ManagedImage {
@@ -57,7 +57,7 @@ export const useImageManager = (initialImages: ManagedImage[]) => {
                 const formData = new FormData();
                 batches[i].forEach(f => formData.append('file', f));
 
-                const responses = await uploadImages(formData);
+                const responses = await withUploadTimeout(uploadImages(formData));
                 const newImages = responses.map(r => ({ name: r.id, url: r.url, status: r.status }));
                 setImages((prev) => [...prev, ...newImages]);
                 // 已成功的批次移出選取，中途失敗時重按上傳只會送剩下的

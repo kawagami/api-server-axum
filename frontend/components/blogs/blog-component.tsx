@@ -10,7 +10,7 @@ import { Loader2, Bold, Italic, Code, Link2, Heading2, Quote, List, Plus, X } fr
 import 'highlight.js/styles/github-dark.css';
 import { putBlog } from '@/api/blogs';
 import { uploadImages } from '@/api/images';
-import { validateFileSizes, splitIntoBatches, uploadErrorMessage, uploadProgressLabel, type UploadProgress } from '@/libs/upload-limits';
+import { validateFileSizes, splitIntoBatches, uploadErrorMessage, uploadProgressLabel, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressImages } from '@/libs/client-image';
 import { useMarkdownTextarea } from '@/hooks/useMarkdownTextarea';
 import { useBlogDraft } from './useBlogDraft';
@@ -84,7 +84,7 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
                 setUploadProgress({ phase: 'upload', current: i + 1, total: batches.length });
                 const formData = new FormData();
                 batches[i].forEach(f => formData.append('file', f));
-                const data = await uploadImages(formData);
+                const data = await withUploadTimeout(uploadImages(formData));
                 insertAtCursor(data.map(d => `![image](${d.url})`).join('\n') + '\n');
             }
         } catch (err) {

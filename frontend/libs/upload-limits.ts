@@ -3,6 +3,24 @@
 // 限制的是「整個請求」，多檔超過時前端自動切批連打；預留 multipart 邊界/標頭開銷，取 9.5MB。
 export const MAX_UPLOAD_TOTAL_BYTES = 9_500_000;
 
+// 每批張數上限:後端逐張 decode+轉 WebP(1核 VPS 約 1~3 秒/張),張數太多會撞
+// adminRequest 的 30 秒逾時;5 張約 10~15 秒,留有餘裕
+export const MAX_UPLOAD_FILES_PER_BATCH = 5;
+
+// 瀏覽器端整體逾時:傳輸層卡死(如 QUIC 上傳停滯)時讓請求明確失敗,而非無限 pending
+const UPLOAD_TIMEOUT_MS = 90_000;
+const TIMEOUT_MARK = 'upload-timeout';
+
+/** 包住單批上傳,逾時丟帶記號的錯誤(底層請求無法取消,但 UI 能脫身重試)。 */
+export function withUploadTimeout<T>(promise: Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(Object.assign(new Error('upload timeout'), { mark: TIMEOUT_MARK }));
+        }, UPLOAD_TIMEOUT_MS);
+        promise.then(resolve, reject).finally(() => clearTimeout(timer));
+    });
+}
+
 function formatMB(bytes: number): string {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -26,13 +44,13 @@ export function validateFileSizes(files: File[]): string | null {
     return `${names}${suffix} 超過單檔上限 ${formatMB(MAX_UPLOAD_TOTAL_BYTES)}，請改選較小的圖片`;
 }
 
-/** 依序把檔案切批，每批加總 ≤ 上限；呼叫前先用 validateFileSizes 排除單檔超限。 */
+/** 依序把檔案切批，每批加總 ≤ byte 上限、張數 ≤ 張數上限；呼叫前先用 validateFileSizes 排除單檔超限。 */
 export function splitIntoBatches(files: File[]): File[][] {
     const batches: File[][] = [];
     let current: File[] = [];
     let currentSize = 0;
     for (const f of files) {
-        if (current.length && currentSize + f.size > MAX_UPLOAD_TOTAL_BYTES) {
+        if (current.length && (currentSize + f.size > MAX_UPLOAD_TOTAL_BYTES || current.length >= MAX_UPLOAD_FILES_PER_BATCH)) {
             batches.push(current);
             current = [];
             currentSize = 0;
@@ -44,8 +62,9 @@ export function splitIntoBatches(files: File[]): File[][] {
     return batches;
 }
 
-/** 上傳失敗時依 HTTP 狀態碼給使用者看得懂的訊息。 */
+/** 上傳失敗時依錯誤型態給使用者看得懂的訊息。 */
 export function uploadErrorMessage(err: unknown): string {
+    if ((err as { mark?: string }).mark === TIMEOUT_MARK) return '上傳逾時（網路可能中斷），請再試一次';
     const status = (err as { status?: number }).status;
     if (status === 413) return '圖片總大小超過伺服器限制，請分批上傳';
     return '圖片上傳失敗，請再試一次';
