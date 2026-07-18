@@ -17,7 +17,9 @@ use crate::games::registry::GameRegistry;
 use crate::services::torrents::TorrentManager;
 use crate::storage::Storage;
 use crate::structs::config::AppConfig;
+use crate::structs::features::Feature;
 use crate::structs::ws::WsEvent;
+use std::collections::HashSet;
 
 pub struct AppStateInner {
     pub pg_pool: Pool<Postgres>,
@@ -27,6 +29,8 @@ pub struct AppStateInner {
     pub storage: Storage,
     pub config: AppConfig,
     pub settings: Arc<RwLock<HashMap<String, String>>>,
+    /// enabled_features 設定的 parse 結果（reload 時更新）；None = 全開
+    pub enabled_features: Arc<RwLock<Option<HashSet<Feature>>>>,
     pub torrents: TorrentManager,
     pub games: GameRegistry,
 }
@@ -63,6 +67,7 @@ impl AppStateInner {
             storage: Storage::from_env(),
             config: AppConfig::from_env(),
             settings: Arc::new(RwLock::new(HashMap::new())),
+            enabled_features: Arc::new(RwLock::new(None)),
             torrents: TorrentManager::new().await,
             games: GameRegistry::new(),
         }
@@ -88,17 +93,41 @@ pub struct DisplayTrackedConnection {
 }
 
 #[derive(Clone)]
-pub struct Settings(Arc<RwLock<HashMap<String, String>>>);
+pub struct Settings {
+    map: Arc<RwLock<HashMap<String, String>>>,
+    /// None = 全開；reload 時由 enabled_features 設定值 parse 而來，檢查是 sync set lookup
+    enabled_features: Arc<RwLock<Option<HashSet<Feature>>>>,
+}
 
 impl Settings {
+    pub fn new(
+        map: Arc<RwLock<HashMap<String, String>>>,
+        enabled_features: Arc<RwLock<Option<HashSet<Feature>>>>,
+    ) -> Self {
+        Self { map, enabled_features }
+    }
+
     pub fn get(&self, key: &str) -> Option<String> {
-        self.0.read().unwrap().get(key).cloned()
+        self.map.read().unwrap().get(key).cloned()
+    }
+
+    pub fn feature_enabled(&self, feature: Feature) -> bool {
+        match self.enabled_features.read().unwrap().as_ref() {
+            None => true,
+            Some(set) => set.contains(&feature),
+        }
     }
 
     pub async fn reload(&self, pool: &Pool<Postgres>) {
         match crate::repositories::app_settings::get_all(pool).await {
             Ok(rows) => {
-                *self.0.write().unwrap() = rows.into_iter().map(|s| (s.key, s.value)).collect();
+                let map: HashMap<String, String> =
+                    rows.into_iter().map(|s| (s.key, s.value)).collect();
+                let enabled = map
+                    .get("enabled_features")
+                    .and_then(|v| Feature::parse_setting(v));
+                *self.map.write().unwrap() = map;
+                *self.enabled_features.write().unwrap() = enabled;
             }
             Err(e) => {
                 tracing::error!("Failed to reload app_settings: {:?}", e);
@@ -181,7 +210,7 @@ impl AppState {
     }
 
     pub fn get_settings(&self) -> Settings {
-        Settings(self.0.settings.clone())
+        Settings::new(self.0.settings.clone(), self.0.enabled_features.clone())
     }
 
     pub async fn reload_settings(&self) {

@@ -8,7 +8,8 @@ import { logout } from '@/actions/auth';
 import { User, ChevronDown, X, Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import LocaleSwitcher from '@/components/locale-switcher';
-import { TOOLS, GAMES, MEMBER_LINKS } from '@/libs/site-nav';
+import { TOOLS, GAMES, MEMBER_LINKS, filterNavByFeatures } from '@/libs/site-nav';
+import { isFeatureEnabled } from '@/libs/enabled-features';
 
 import type { UserColorMode } from "@/libs/color-mode";
 
@@ -16,6 +17,8 @@ interface HeaderProps {
     member: { id: string } | null
     colorMode: UserColorMode
     defaultIsDark: boolean | null
+    // instance 功能開關（resolveEnabledFeatures 結果，null = 全開），關閉的功能不出現在導航
+    enabledFeatures: string[] | null
 }
 
 const navLinkClass = "block px-4 rounded hover:text-primary-600 dark:hover:text-primary-300 hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-primary-400 whitespace-nowrap";
@@ -36,7 +39,7 @@ function DesktopDropdown({ isOpen, align = 'left', children }: { isOpen: boolean
     );
 }
 
-export default function Header({ member, colorMode, defaultIsDark }: HeaderProps) {
+export default function Header({ member, colorMode, defaultIsDark, enabledFeatures }: HeaderProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isResourcesOpen, setIsResourcesOpen] = useState(false);
     const [isGamesOpen, setIsGamesOpen] = useState(false);
@@ -44,6 +47,13 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
     const t = useTranslations('Header');
     const pathname = usePathname();
     const navRef = useRef<HTMLElement>(null);
+
+    const showBlog = isFeatureEnabled(enabledFeatures, 'blog');
+    const showVocab = isFeatureEnabled(enabledFeatures, 'vocab');
+    // hub 連結顯示與否跟著剩餘項目走（tools 關但 roster 開時，/tools index 仍有東西可看）
+    const tools = filterNavByFeatures(TOOLS, enabledFeatures);
+    const games = filterNavByFeatures(GAMES, enabledFeatures);
+    const memberLinks = filterNavByFeatures(MEMBER_LINKS, enabledFeatures);
 
     const isBlogActive = pathname.startsWith('/blogs');
     const isVocabActive = pathname.startsWith('/vocab');
@@ -93,9 +103,9 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
 
                 {/* Desktop nav */}
                 <nav ref={navRef} className="hidden md:flex items-center gap-2">
-                    <Link href="/blogs" aria-label={t('blog')} className={`${navLinkClass} ${isBlogActive ? activeNavClass : ''}`}>{t('blog')}</Link>
-                    <Link href="/vocab" aria-label={t('vocab')} className={`${navLinkClass} ${isVocabActive ? activeNavClass : ''}`}>{t('vocab')}</Link>
-                    <div
+                    {showBlog && <Link href="/blogs" aria-label={t('blog')} className={`${navLinkClass} ${isBlogActive ? activeNavClass : ''}`}>{t('blog')}</Link>}
+                    {showVocab && <Link href="/vocab" aria-label={t('vocab')} className={`${navLinkClass} ${isVocabActive ? activeNavClass : ''}`}>{t('vocab')}</Link>}
+                    {tools.length > 0 && <div
                         className="relative"
                         onMouseEnter={() => setIsResourcesOpen(true)}
                         onMouseLeave={() => setIsResourcesOpen(false)}
@@ -114,14 +124,14 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                             </button>
                         </span>
                         <DesktopDropdown isOpen={isResourcesOpen}>
-                            {TOOLS.map(({ href, labelKey }) => (
+                            {tools.map(({ href, labelKey }) => (
                                 <Link key={href} href={href} tabIndex={isResourcesOpen ? 0 : -1} className={dropdownItemClass} onClick={() => setIsResourcesOpen(false)}>
                                     {t(labelKey)}
                                 </Link>
                             ))}
                         </DesktopDropdown>
-                    </div>
-                    <div
+                    </div>}
+                    {games.length > 0 && <div
                         className="relative"
                         onMouseEnter={() => setIsGamesOpen(true)}
                         onMouseLeave={() => setIsGamesOpen(false)}
@@ -140,13 +150,13 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                             </button>
                         </span>
                         <DesktopDropdown isOpen={isGamesOpen}>
-                            {GAMES.map(({ href, labelKey }) => (
+                            {games.map(({ href, labelKey }) => (
                                 <Link key={href} href={href} tabIndex={isGamesOpen ? 0 : -1} className={dropdownItemClass} onClick={() => setIsGamesOpen(false)}>
                                     {t(labelKey)}
                                 </Link>
                             ))}
                         </DesktopDropdown>
-                    </div>
+                    </div>}
                     <Link href="/about" aria-label={t('about')} className={`${navLinkClass} ${isAboutActive ? activeNavClass : ''}`}>{t('about')}</Link>
                     <LocaleSwitcher />
                     <ThemeButton initialMode={colorMode} defaultIsDark={defaultIsDark} />
@@ -166,7 +176,7 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                                 <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isMemberOpen ? 'rotate-180' : ''}`} />
                             </button>
                             <DesktopDropdown isOpen={isMemberOpen} align="right">
-                                {MEMBER_LINKS.map(({ href, labelKey, icon: Icon }) => (
+                                {memberLinks.map(({ href, labelKey, icon: Icon }) => (
                                     <Link key={href} href={href} tabIndex={isMemberOpen ? 0 : -1} className={`${dropdownItemClass} text-sm`} onClick={() => setIsMemberOpen(false)}>
                                         <Icon size={14} />
                                         {t(labelKey)}
@@ -199,54 +209,58 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
                 <>
                     <div className="md:hidden fixed inset-0 z-30 bg-black/40" onClick={closeAll} aria-hidden="true" />
                     <nav className="md:hidden fixed top-[50px] left-0 right-0 z-40 bg-white dark:bg-neutral-900 shadow-lg border-t border-neutral-200 dark:border-neutral-700 flex flex-col p-4 gap-1">
-                        <Link href="/blogs" className={`${mobileItemClass} ${isBlogActive ? activeNavClass : ''}`} onClick={closeAll}>{t('blog')}</Link>
-                        <Link href="/vocab" className={`${mobileItemClass} ${isVocabActive ? activeNavClass : ''}`} onClick={closeAll}>{t('vocab')}</Link>
+                        {showBlog && <Link href="/blogs" className={`${mobileItemClass} ${isBlogActive ? activeNavClass : ''}`} onClick={closeAll}>{t('blog')}</Link>}
+                        {showVocab && <Link href="/vocab" className={`${mobileItemClass} ${isVocabActive ? activeNavClass : ''}`} onClick={closeAll}>{t('vocab')}</Link>}
 
-                        <div className="flex items-center">
-                            <Link href="/tools" className={`${mobileItemClass} flex-1 ${isToolsActive ? activeNavClass : ''}`} onClick={closeAll}>
-                                {t('tools')}
-                            </Link>
-                            <button
-                                className={mobileItemClass}
-                                aria-label={t('openToolsMenu')}
-                                aria-expanded={isResourcesOpen}
-                                onClick={() => setIsResourcesOpen(o => !o)}
-                            >
-                                <ChevronDown size={14} className={`transition-transform ${isResourcesOpen ? 'rotate-180' : ''}`} />
-                            </button>
-                        </div>
-                        {isResourcesOpen && (
-                            <div className="ml-4 flex flex-col gap-1">
-                                {TOOLS.map(({ href, labelKey }) => (
-                                    <Link key={href} href={href} className={`${mobileItemClass} text-sm`} onClick={closeAll}>
-                                        {t(labelKey)}
-                                    </Link>
-                                ))}
+                        {tools.length > 0 && <>
+                            <div className="flex items-center">
+                                <Link href="/tools" className={`${mobileItemClass} flex-1 ${isToolsActive ? activeNavClass : ''}`} onClick={closeAll}>
+                                    {t('tools')}
+                                </Link>
+                                <button
+                                    className={mobileItemClass}
+                                    aria-label={t('openToolsMenu')}
+                                    aria-expanded={isResourcesOpen}
+                                    onClick={() => setIsResourcesOpen(o => !o)}
+                                >
+                                    <ChevronDown size={14} className={`transition-transform ${isResourcesOpen ? 'rotate-180' : ''}`} />
+                                </button>
                             </div>
-                        )}
+                            {isResourcesOpen && (
+                                <div className="ml-4 flex flex-col gap-1">
+                                    {tools.map(({ href, labelKey }) => (
+                                        <Link key={href} href={href} className={`${mobileItemClass} text-sm`} onClick={closeAll}>
+                                            {t(labelKey)}
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+                        </>}
 
-                        <div className="flex items-center">
-                            <Link href="/games" className={`${mobileItemClass} flex-1 ${isGamesActive ? activeNavClass : ''}`} onClick={closeAll}>
-                                {t('games')}
-                            </Link>
-                            <button
-                                className={mobileItemClass}
-                                aria-label={t('openGamesMenu')}
-                                aria-expanded={isGamesOpen}
-                                onClick={() => setIsGamesOpen(o => !o)}
-                            >
-                                <ChevronDown size={14} className={`transition-transform ${isGamesOpen ? 'rotate-180' : ''}`} />
-                            </button>
-                        </div>
-                        {isGamesOpen && (
-                            <div className="ml-4 flex flex-col gap-1">
-                                {GAMES.map(({ href, labelKey }) => (
-                                    <Link key={href} href={href} className={`${mobileItemClass} text-sm`} onClick={closeAll}>
-                                        {t(labelKey)}
-                                    </Link>
-                                ))}
+                        {games.length > 0 && <>
+                            <div className="flex items-center">
+                                <Link href="/games" className={`${mobileItemClass} flex-1 ${isGamesActive ? activeNavClass : ''}`} onClick={closeAll}>
+                                    {t('games')}
+                                </Link>
+                                <button
+                                    className={mobileItemClass}
+                                    aria-label={t('openGamesMenu')}
+                                    aria-expanded={isGamesOpen}
+                                    onClick={() => setIsGamesOpen(o => !o)}
+                                >
+                                    <ChevronDown size={14} className={`transition-transform ${isGamesOpen ? 'rotate-180' : ''}`} />
+                                </button>
                             </div>
-                        )}
+                            {isGamesOpen && (
+                                <div className="ml-4 flex flex-col gap-1">
+                                    {games.map(({ href, labelKey }) => (
+                                        <Link key={href} href={href} className={`${mobileItemClass} text-sm`} onClick={closeAll}>
+                                            {t(labelKey)}
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+                        </>}
 
                         <Link href="/about" className={`${mobileItemClass} ${isAboutActive ? activeNavClass : ''}`} onClick={closeAll}>{t('about')}</Link>
                         <div className="px-4 py-2">
@@ -258,7 +272,7 @@ export default function Header({ member, colorMode, defaultIsDark }: HeaderProps
 
                         {member ? (
                             <>
-                                {MEMBER_LINKS.map(({ href, labelKey, icon: Icon }) => (
+                                {memberLinks.map(({ href, labelKey, icon: Icon }) => (
                                     <Link key={href} href={href} className={`${mobileItemClass} flex items-center gap-2 text-sm`} onClick={closeAll}>
                                         <Icon size={14} />
                                         {t(labelKey)}

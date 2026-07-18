@@ -39,3 +39,10 @@ export async function updateHomeFeatures(keys: string[]): Promise<Setting> {
     revalidatePath("/", "layout");
     return response;
 }
+
+/** 改 instance 功能開關（"all" 或 JSON 字串陣列）。影響 API 路由/排程與全站導航，失效整站 layout */
+export async function updateEnabledFeatures(value: string): Promise<Setting> {
+    const response = await updateSetting("enabled_features", value);
+    revalidatePath("/", "layout");
+    return response;
+}

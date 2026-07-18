@@ -28,11 +28,15 @@ mod users;
 mod vocab;
 mod ws;
 
-use crate::{logging::LogEntry, scheduler::initialize_scheduler, state::AppState};
+use crate::{
+    logging::LogEntry, scheduler::initialize_scheduler, state::AppState,
+    structs::features::Feature,
+};
 use axum::{
-    extract::DefaultBodyLimit,
+    extract::{DefaultBodyLimit, Request, State},
     http::{header, HeaderValue, Method, StatusCode},
-    middleware,
+    middleware::{self, Next},
+    response::IntoResponse,
     Router,
 };
 use tokio::sync::mpsc;
@@ -40,6 +44,25 @@ use tower_http::cors::AllowOrigin;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
 use tower_http::{cors::CorsLayer, services::ServeDir};
+
+/// instance 級功能開關：未啟用一律 404（回應與 fallback 一致，不暴露功能存在）。
+/// 掛在 nest 點、包在 with_auth 外層 —— 關閉的功能連 401 都不回。
+pub(super) fn with_feature(
+    state: AppState,
+    feature: Feature,
+    router: Router<AppState>,
+) -> Router<AppState> {
+    router.layer(middleware::from_fn_with_state(
+        state,
+        move |State(state): State<AppState>, req: Request, next: Next| async move {
+            if state.get_settings().feature_enabled(feature) {
+                next.run(req).await
+            } else {
+                (StatusCode::NOT_FOUND, "empty page").into_response()
+            }
+        },
+    ))
+}
 
 pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<AppState> {
     // audit 掛在 auth 內層：auth 先跑塞入 AuthenticatedUser，audit 直接讀 extension，不重複 decode JWT
@@ -81,8 +104,10 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
 
     initialize_scheduler(state.clone()).await;
 
-    // 重啟 resume：把 pending / downloading 的 torrent 補回 session
-    tokio::spawn(crate::services::torrents::sync_active(state.clone()));
+    // 重啟 resume：把 pending / downloading 的 torrent 補回 session（功能關閉時跳過）
+    if state.get_settings().feature_enabled(Feature::Torrents) {
+        tokio::spawn(crate::services::torrents::sync_active(state.clone()));
+    }
 
     // 遊戲計時掃描：偵測行棋方時鐘耗盡卻無人走步 → 主動判負（每遊戲一個 watcher）
     for hub in state.games().all() {
@@ -93,16 +118,16 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
 
     Router::new()
         .nest("/admin", admin::new(state.clone()))
-        .nest("/blogs", blogs::new())
-        .nest("/tools", tools::new(state.clone()))
+        .nest("/blogs", with_feature(state.clone(), Feature::Blog, blogs::new()))
+        .nest("/tools", with_feature(state.clone(), Feature::Tools, tools::new(state.clone())))
         .nest("/ws", ws::new(state.clone()))
-        .nest("/roster", roster::new())
+        .nest("/roster", with_feature(state.clone(), Feature::Roster, roster::new()))
         .nest("/members", members::new(state.clone()))
-        .nest("/member/portfolio", portfolio::new(state.clone()))
-        .nest("/member/ledger", ledger::new(state.clone()))
-        .nest("/member/invoices", invoices::new(state.clone()))
-        .nest("/member/lotto", lotto::new(state.clone()))
-        .nest("/member/vocab", vocab::new(state.clone()))
+        .nest("/member/portfolio", with_feature(state.clone(), Feature::Portfolio, portfolio::new(state.clone())))
+        .nest("/member/ledger", with_feature(state.clone(), Feature::Ledger, ledger::new(state.clone())))
+        .nest("/member/invoices", with_feature(state.clone(), Feature::Invoices, invoices::new(state.clone())))
+        .nest("/member/lotto", with_feature(state.clone(), Feature::Lotto, lotto::new(state.clone())))
+        .nest("/member/vocab", with_feature(state.clone(), Feature::Vocab, vocab::new(state.clone())))
         .nest("/oauth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))
         .nest("/metrics", metrics::new(state.clone()))

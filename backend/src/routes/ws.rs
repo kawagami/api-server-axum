@@ -181,6 +181,21 @@ async fn dispatch_game(state: &AppState, who: SocketAddr, value: &serde_json::Va
     let Some(game) = value.get("game").and_then(|v| v.as_str()) else {
         return false;
     };
+    // instance 級功能開關：games 關閉時擋下所有遊戲訊息（watcher 照常跑，熱開關不需重啟）
+    if !state
+        .get_settings()
+        .feature_enabled(crate::structs::features::Feature::Games)
+    {
+        state.send_to(
+            who,
+            crate::structs::ws::game_envelope(
+                game,
+                "error",
+                serde_json::json!({ "reason": "feature_disabled" }),
+            ),
+        );
+        return true;
+    }
     match state.games().get(game) {
         Some(hub) => hub.handle(state, who, value).await,
         None => false,

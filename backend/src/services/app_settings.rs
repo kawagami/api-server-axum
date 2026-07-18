@@ -2,7 +2,7 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::app_settings as repo,
     state::Settings,
-    structs::app_settings::AppSetting,
+    structs::{app_settings::AppSetting, features::Feature},
 };
 use sqlx::{Pool, Postgres};
 use std::collections::BTreeMap;
@@ -13,6 +13,7 @@ const PUBLIC_KEYS: &[&str] = &[
     "default_color_mode",
     "theme_rotation",
     "home_features",
+    "enabled_features",
 ];
 
 /// 全部主題清單 — 與前端 libs/site-theme.ts 的 SITE_THEMES 一致
@@ -67,6 +68,39 @@ fn validate_home_features(value: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// enabled_features 驗證：`all`，或全部是合法 feature key 的不重複 JSON 字串陣列。
+/// 與 home_features 相反這裡驗 key 名 —— feature key 權威在後端 Feature enum，
+/// 未知 key = 打錯字或前後端不同步，直接擋下。
+fn validate_enabled_features(value: &str) -> Result<(), AppError> {
+    if value == "all" {
+        return Ok(());
+    }
+    let items: Vec<String> = serde_json::from_str(value).map_err(|_| {
+        unprocessable("enabled_features 必須是 \"all\" 或 JSON 字串陣列".into())
+    })?;
+
+    let mut seen = std::collections::HashSet::new();
+    for item in &items {
+        let Some(feature) = Feature::from_key(item) else {
+            let allowed: Vec<&str> = Feature::ALL.iter().map(|f| f.as_str()).collect();
+            return Err(unprocessable(format!(
+                "enabled_features 有未知功能 {item}，只接受 {}",
+                allowed.join(" / ")
+            )));
+        };
+        if !seen.insert(feature) {
+            return Err(unprocessable(format!("enabled_features 有重複項目 {item}")));
+        }
+    }
+    // 依賴規則：portfolio 的市價/股名靠 stocks 的排程 job 餵資料
+    if seen.contains(&Feature::Portfolio) && !seen.contains(&Feature::Stocks) {
+        return Err(unprocessable(
+            "enabled_features 啟用 portfolio 時必須同時啟用 stocks".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// 設定值驗證 — key 不在表內就不驗證
 fn validate(key: &str, value: &str) -> Result<(), AppError> {
     if key == "theme_rotation" {
@@ -74,6 +108,9 @@ fn validate(key: &str, value: &str) -> Result<(), AppError> {
     }
     if key == "home_features" {
         return validate_home_features(value);
+    }
+    if key == "enabled_features" {
+        return validate_enabled_features(value);
     }
 
     let allowed: Vec<&str> = match key {
@@ -128,6 +165,26 @@ mod tests {
         assert!(validate("home_features", "[]").is_ok());
         // 未知 key 名不驗（由前端 registry 過濾）
         assert!(validate("home_features", r#"["not_a_feature"]"#).is_ok());
+    }
+
+    #[test]
+    fn enabled_features_accepts_all_or_valid_keys() {
+        assert!(validate("enabled_features", "all").is_ok());
+        assert!(validate("enabled_features", "[]").is_ok());
+        assert!(validate("enabled_features", r#"["blog","tools","games"]"#).is_ok());
+        assert!(validate("enabled_features", r#"["portfolio","stocks"]"#).is_ok());
+    }
+
+    #[test]
+    fn enabled_features_rejects_bad_values() {
+        assert!(validate("enabled_features", "not json").is_err());
+        assert!(validate("enabled_features", r#"{"blog":true}"#).is_err());
+        // 未知 key（權威在後端 enum）
+        assert!(validate("enabled_features", r#"["not_a_feature"]"#).is_err());
+        // 重複
+        assert!(validate("enabled_features", r#"["blog","blog"]"#).is_err());
+        // portfolio 依賴 stocks
+        assert!(validate("enabled_features", r#"["portfolio"]"#).is_err());
     }
 
     #[test]

@@ -7,6 +7,8 @@ import { getWsConnections } from "@/api/ws";
 import { getGamesOverview } from "@/api/games";
 import { adminNavGroups, filterNavByPermissions } from "@/components/admin/nav";
 import { getMyPermissions } from "@/libs/admin-permissions";
+import { getPublicSettings } from "@/api/settings";
+import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
 
 // 單一端點掛掉不應整頁白屏：取值失敗回 null（顯示 —）
 async function safe<T>(p: Promise<T>): Promise<T | null> {
@@ -24,6 +26,7 @@ interface Stat {
     href: string;
     icon: LucideIcon;
     permission: string;
+    feature?: string;
 }
 
 function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
@@ -47,20 +50,22 @@ function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
 }
 
 export default async function AdminDashboardPage() {
-    const [permissions, blogs, members, images, wsConns, games] = await Promise.all([
+    const [permissions, publicSettings, blogs, members, images, wsConns, games] = await Promise.all([
         getMyPermissions(),
+        getPublicSettings(),
         safe(getBlogs({ per_page: 1 })),
         safe(getMembers()),
         safe(getImages()),
         safe(getWsConnections()),
         safe(getGamesOverview()),
     ]);
+    const enabledFeatures = resolveEnabledFeatures(publicSettings.enabled_features);
 
     const unusedImages = images?.filter((i) => i.status === "unused").length ?? 0;
     const playersInGame = games?.reduce((sum, g) => sum + g.players_in_game, 0) ?? null;
 
     const stats: Stat[] = [
-        { label: "文章", value: blogs?.total ?? null, href: "/admin/blogs", icon: FileText, permission: "blog:read" },
+        { label: "文章", value: blogs?.total ?? null, href: "/admin/blogs", icon: FileText, permission: "blog:read", feature: "blog" },
         { label: "會員", value: members?.length ?? null, href: "/admin/members", icon: Users, permission: "member:read" },
         {
             label: "圖片",
@@ -69,12 +74,13 @@ export default async function AdminDashboardPage() {
             href: "/admin/images",
             icon: ImageIcon,
             permission: "image:read",
+            feature: "blog",
         },
         { label: "線上連線", value: wsConns?.length ?? null, href: "/admin/ws", icon: Radio, permission: "ws:read" },
-        { label: "對局中人數", value: playersInGame, href: "/admin/games", icon: Gamepad2, permission: "game:read" },
-    ].filter((s) => permissions.includes(s.permission));
+        { label: "對局中人數", value: playersInGame, href: "/admin/games", icon: Gamepad2, permission: "game:read", feature: "games" },
+    ].filter((s) => permissions.includes(s.permission) && isFeatureEnabled(enabledFeatures, s.feature));
 
-    const navGroups = filterNavByPermissions(adminNavGroups, permissions);
+    const navGroups = filterNavByPermissions(adminNavGroups, permissions, enabledFeatures);
 
     return (
         <div className="max-w-5xl mx-auto flex flex-col gap-8">

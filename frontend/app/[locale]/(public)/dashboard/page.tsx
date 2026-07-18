@@ -4,7 +4,9 @@ import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { ScanLine, Ticket } from "lucide-react";
 import FeatureCard from "@/components/feature-card";
-import { MEMBER_LINKS } from "@/libs/site-nav";
+import { MEMBER_LINKS, filterNavByFeatures } from "@/libs/site-nav";
+import { getPublicSettings } from "@/api/settings";
+import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Dashboard");
@@ -13,16 +15,20 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // 快速操作是 deep-link 捷徑（非導航），留在本頁維護，不進 site-nav
 const QUICK_ACTIONS = [
-    { href: "/invoices/scan", labelKey: "scanInvoice", descKey: "scanInvoiceDesc", icon: ScanLine },
-    { href: "/lotto/register", labelKey: "registerLotto", descKey: "registerLottoDesc", icon: Ticket },
+    { href: "/invoices/scan", labelKey: "scanInvoice", descKey: "scanInvoiceDesc", icon: ScanLine, feature: "invoices" },
+    { href: "/lotto/register", labelKey: "registerLotto", descKey: "registerLottoDesc", icon: Ticket, feature: "lotto" },
 ] as const;
 
 export default async function DashboardPage() {
-    const [member, t, tHeader] = await Promise.all([
+    const [member, t, tHeader, settings] = await Promise.all([
         getCurrentMember(),
         getTranslations("Dashboard"),
         getTranslations("Header"),
+        getPublicSettings(),
     ]);
+    const enabled = resolveEnabledFeatures(settings.enabled_features);
+    const quickActions = QUICK_ACTIONS.filter(({ feature }) => isFeatureEnabled(enabled, feature));
+    const memberLinks = filterNavByFeatures(MEMBER_LINKS, enabled);
 
     return (
         <div className="w-full max-w-3xl px-4 py-8 flex flex-col gap-8">
@@ -48,7 +54,7 @@ export default async function DashboardPage() {
             <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">{t("quickActions")}</h2>
                 <div className="flex flex-col sm:flex-row gap-3">
-                    {QUICK_ACTIONS.map(({ href, labelKey, descKey, icon: Icon }) => (
+                    {quickActions.map(({ href, labelKey, descKey, icon: Icon }) => (
                         <Link
                             key={href}
                             href={href}
@@ -67,7 +73,7 @@ export default async function DashboardPage() {
             <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">{t("myFeatures")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {MEMBER_LINKS.filter(({ key }) => key !== "dashboard").map(({ key, href, labelKey, icon }) => (
+                    {memberLinks.filter(({ key }) => key !== "dashboard").map(({ key, href, labelKey, icon }) => (
                         <FeatureCard
                             key={key}
                             href={href}

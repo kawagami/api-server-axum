@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::{state::AppState, structs::features::Feature};
 
 pub enum AppJob {
     CleanupExpiredTorrents,
@@ -32,6 +32,26 @@ impl AppJob {
             AppJob::AggregateVisitors => "AggregateVisitors",
             AppJob::CollectSystemMetrics => "CollectSystemMetrics",
             AppJob::CleanupObservability => "CleanupObservability",
+        }
+    }
+
+    /// job 所屬的可開關功能；None = 核心 job，不受 enabled_features 控制。
+    /// scheduler 每次觸發時檢查（非註冊時），設定熱更新即時生效。
+    pub fn feature(&self) -> Option<Feature> {
+        match self {
+            AppJob::CleanupExpiredTorrents => Some(Feature::Torrents),
+            AppJob::CleanupUnusedImages => Some(Feature::Blog),
+            AppJob::FetchStockDayAll
+            | AppJob::FetchBuybackPeriods
+            | AppJob::FetchHistoricalClosingPrices
+            | AppJob::ConsumePendingStockChange
+            | AppJob::SyncBuybackToPending => Some(Feature::Stocks),
+            AppJob::FetchGovTenders => Some(Feature::GovTenders),
+            AppJob::CheckInvoiceLottery => Some(Feature::Invoices),
+            AppJob::CheckLottoWins => Some(Feature::Lotto),
+            AppJob::AggregateVisitors
+            | AppJob::CollectSystemMetrics
+            | AppJob::CleanupObservability => None,
         }
     }
 

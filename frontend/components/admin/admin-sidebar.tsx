@@ -108,10 +108,10 @@ function SidebarContent({ groups, pathname, onNavigate }: { groups: AdminNavGrou
     );
 }
 
-export default function AdminSidebar({ permissions }: { permissions: string[] }) {
+export default function AdminSidebar({ permissions, enabledFeatures }: { permissions: string[]; enabledFeatures: string[] | null }) {
     const pathname = usePathname();
     const [drawerOpen, setDrawerOpen] = useState(false);
-    const groups = filterNavByPermissions(adminNavGroups, permissions);
+    const groups = filterNavByPermissions(adminNavGroups, permissions, enabledFeatures);
 
     return (
         <>

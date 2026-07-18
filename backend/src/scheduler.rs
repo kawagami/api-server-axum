@@ -37,6 +37,17 @@ async fn add_job(scheduler: &JobScheduler, state: AppState, job: AppJob) {
         let job = job.clone();
         let running = running.clone();
         Box::pin(async move {
+            // instance 級功能開關：每次觸發時檢查，設定熱更新即時生效
+            if let Some(feature) = job.feature() {
+                if !state.get_settings().feature_enabled(feature) {
+                    tracing::debug!(
+                        "job {} skipped: feature {} disabled",
+                        job.name(),
+                        feature.as_str()
+                    );
+                    return;
+                }
+            }
             let Ok(_guard) = running.try_lock() else {
                 tracing::warn!("job {} still running, skip this tick", job.name());
                 return;

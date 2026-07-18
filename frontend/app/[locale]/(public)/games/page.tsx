@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import FeatureCard from '@/components/feature-card';
-import { GAMES } from '@/libs/site-nav';
+import { GAMES, filterNavByFeatures } from '@/libs/site-nav';
+import { getPublicSettings } from '@/api/settings';
+import { resolveEnabledFeatures } from '@/libs/enabled-features';
 
 interface Props {
     params: Promise<{ locale: string }>
@@ -25,8 +27,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function GamesHub() {
-    const t = await getTranslations('GamesHub');
-    const tHeader = await getTranslations('Header');
+    const [t, tHeader, settings] = await Promise.all([
+        getTranslations('GamesHub'),
+        getTranslations('Header'),
+        getPublicSettings(),
+    ]);
+    const games = filterNavByFeatures(GAMES, resolveEnabledFeatures(settings.enabled_features));
 
     return (
         <div className="w-full h-[calc(100svh-120px)] overflow-auto">
@@ -40,7 +46,7 @@ export default async function GamesHub() {
                     </p>
                 </section>
                 <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {GAMES.map(({ key, href, labelKey, icon }) => (
+                    {games.map(({ key, href, labelKey, icon }) => (
                         <FeatureCard
                             key={key}
                             href={href}

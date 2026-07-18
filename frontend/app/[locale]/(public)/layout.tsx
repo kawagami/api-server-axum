@@ -3,6 +3,7 @@ import Header from "@/components/header";
 import WsToast from "@/components/ws/ws-toast";
 import { getPublicSettings } from "@/api/settings";
 import { resolveDefaultColorMode, type UserColorMode } from "@/libs/color-mode";
+import { resolveEnabledFeatures } from "@/libs/enabled-features";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 
@@ -31,10 +32,11 @@ export default async function PublicLayout({ children }: { children: React.React
         themeCookie === 'dark' ? 'dark' : themeCookie === 'light' ? 'light' : 'auto';
     const defaultMode = resolveDefaultColorMode(publicSettings.default_color_mode);
     const defaultIsDark = defaultMode === 'system' ? null : defaultMode === 'dark';
+    const enabledFeatures = resolveEnabledFeatures(publicSettings.enabled_features);
 
     return (
         <>
-            <Header member={member} colorMode={colorMode} defaultIsDark={defaultIsDark} />
+            <Header member={member} colorMode={colorMode} defaultIsDark={defaultIsDark} enabledFeatures={enabledFeatures} />
             <main className="min-h-[calc(100svh-50px-50px)] overflow-hidden flex flex-col items-center justify-start pt-4">
                 {children}
             </main>
