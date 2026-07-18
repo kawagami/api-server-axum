@@ -13,9 +13,9 @@ function pct(v: number) {
     return `${v.toFixed(1)}%`;
 }
 
-// MB → GB（顯示用），保留 1 位小數
-function gb(mb: number) {
-    return (mb / 1024).toFixed(1);
+// MB → GB（顯示用），預設保留 1 位小數
+function gb(mb: number, digits = 1) {
+    return (mb / 1024).toFixed(digits);
 }
 
 function fmtSnapshotTime(iso: string) {
@@ -168,7 +168,7 @@ export default function MetricsView({
                         <SnapshotCard
                             icon={MemoryStick}
                             label="記憶體"
-                            value={`${gb(latest.mem_used_mb)} / ${gb(latest.mem_total_mb)} GB`}
+                            value={`${gb(latest.mem_used_mb, 2)} / ${gb(latest.mem_total_mb, 2)} GB`}
                             hint={`${pct((latest.mem_used_mb / Math.max(1, latest.mem_total_mb)) * 100)} 已用`}
                         />
                         <SnapshotCard
@@ -199,7 +199,7 @@ export default function MetricsView({
                             title="記憶體使用量趨勢"
                             yMax={latest.mem_total_mb / 1024}
                             points={metrics.map(m => ({ t: m.created_at, v: m.mem_used_mb / 1024 }))}
-                            format={v => `${v.toFixed(1)}`}
+                            format={v => `${v.toFixed(2)}`}
                         />
                     </ChartSection>
 
