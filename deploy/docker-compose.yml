@@ -12,6 +12,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: nginx
+    restart: unless-stopped
     stop_signal: SIGTERM
     # 定期 reload 讓 certbot renew 後的新憑證生效
     command: /bin/sh -c "while :; do sleep 6h; nginx -s reload; done & exec nginx -g 'daemon off;'"
@@ -42,6 +43,7 @@ services:
     # 資料目錄由 image 決定為 <mount>/18/docker，未來大版本升級可用 image 的 pg_upgrade 流程
     image: postgres:18-alpine
     container_name: database
+    restart: unless-stopped
     volumes:
       - /srv/kawa/dbdata:/var/lib/postgresql
     env_file:
@@ -60,12 +62,14 @@ services:
   valkey:
     image: "valkey/valkey:alpine"
     container_name: valkey
+    restart: unless-stopped
     ulimits:
       memlock: -1
 
   backend:
     image: kawagami77/api-server:latest
     container_name: backend
+    restart: unless-stopped
     working_dir: /app   # distroless image 無預設 workdir；UPLOAD_PATH 等相對路徑以 /app 為基準
     env_file:
       - /srv/kawa/env/kawa.env
@@ -79,6 +83,7 @@ services:
   frontend:
     image: kawagami77/my-next-blog:latest
     container_name: frontend
+    restart: unless-stopped
     stop_grace_period: 1s
     env_file:
       - /srv/kawa/env/kawa.env
