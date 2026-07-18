@@ -38,7 +38,8 @@ async fn get_all(
     State(state): State<AppState>,
 ) -> Result<Json<BTreeMap<String, Vec<AppSetting>>>, AppError> {
     auth_user.require_permission(Perm::SettingRead)?;
-    Ok(Json(settings_service::get_all(state.get_pool()).await?))
+    let include_reserved = auth_user.has_permission(Perm::PlatformRead);
+    Ok(Json(settings_service::get_all(state.get_pool(), include_reserved).await?))
 }
 
 async fn update(
@@ -47,7 +48,12 @@ async fn update(
     Path(key): Path<String>,
     Json(payload): Json<UpdateSetting>,
 ) -> Result<Json<AppSetting>, AppError> {
-    auth_user.require_permission(Perm::SettingUpdate)?;
+    // 平台保留 key（如 enabled_features）走 platform:update，一般設定走 setting:update
+    if settings_service::is_reserved(&key) {
+        auth_user.require_permission(Perm::PlatformUpdate)?;
+    } else {
+        auth_user.require_permission(Perm::SettingUpdate)?;
+    }
     let settings = state.get_settings();
     Ok(Json(settings_service::update(state.get_pool(), &settings, &key, &payload.value).await?))
 }

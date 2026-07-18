@@ -16,6 +16,14 @@ const PUBLIC_KEYS: &[&str] = &[
     "enabled_features",
 ];
 
+/// 平台保留設定 — 只有 platform:read 能在 GET /admin/settings 看到、platform:update 能改。
+/// 商家 instance 的管理員拿 setting:read/update 管日常設定，碰不到這些 key。
+const RESERVED_KEYS: &[&str] = &["enabled_features"];
+
+pub fn is_reserved(key: &str) -> bool {
+    RESERVED_KEYS.contains(&key)
+}
+
 /// 全部主題清單 — 與前端 libs/site-theme.ts 的 SITE_THEMES 一致
 const SITE_THEMES: &[&str] = &["forest", "ocean", "sky", "sunset", "sakura", "grape", "mono"];
 
@@ -134,10 +142,17 @@ pub fn get_public(settings: &Settings) -> BTreeMap<String, String> {
         .collect()
 }
 
-pub async fn get_all(pool: &Pool<Postgres>) -> Result<BTreeMap<String, Vec<AppSetting>>, AppError> {
+/// include_reserved = caller 是否有 platform:read；無則濾掉平台保留 key
+pub async fn get_all(
+    pool: &Pool<Postgres>,
+    include_reserved: bool,
+) -> Result<BTreeMap<String, Vec<AppSetting>>, AppError> {
     let rows = repo::get_all(pool).await?;
     let mut grouped: BTreeMap<String, Vec<AppSetting>> = BTreeMap::new();
     for setting in rows {
+        if !include_reserved && is_reserved(&setting.key) {
+            continue;
+        }
         grouped.entry(setting.category.clone()).or_default().push(setting);
     }
     Ok(grouped)

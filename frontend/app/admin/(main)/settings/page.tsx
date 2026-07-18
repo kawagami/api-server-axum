@@ -2,7 +2,6 @@ import { getSettings } from "./actions";
 import SettingsClient from "./settings-client";
 import ThemePicker from "./theme-picker";
 import HomeFeaturesPicker from "./home-features-picker";
-import EnabledFeaturesPicker from "./enabled-features-picker";
 import { resolveSiteThemeSetting, normalizeRotation } from "@/libs/site-theme";
 import { resolveHomeFeatures } from "@/libs/home-features";
 import { requirePermission } from "@/libs/admin-permissions";
@@ -23,7 +22,7 @@ export default async function SettingsPage() {
     const siteTheme = resolveSiteThemeSetting(flat.find(s => s.key === 'site_theme')?.value);
     const rotation = normalizeRotation(flat.find(s => s.key === 'theme_rotation')?.value);
     const homeFeatureKeys = resolveHomeFeatures(flat.find(s => s.key === 'home_features')?.value).map(f => f.key);
-    const enabledFeaturesValue = flat.find(s => s.key === 'enabled_features')?.value ?? 'all';
+    // enabled_features 由 /admin/platform 專頁管理（platform:read 才看得到；無權限者後端 GET 已濾掉）
     const MANAGED_KEYS = ['site_theme', 'theme_rotation', 'home_features', 'enabled_features'];
     const restSettings: SettingsResponse = Object.fromEntries(
         Object.entries(settings)
@@ -35,7 +34,6 @@ export default async function SettingsPage() {
         <div className="w-full max-w-2xl">
             <h1 className="text-xl font-semibold text-neutral-900 dark:text-white mb-6">設定</h1>
             <ThemePicker initialSetting={siteTheme} initialRotation={rotation} />
-            <EnabledFeaturesPicker initialValue={enabledFeaturesValue} />
             <HomeFeaturesPicker initialEnabled={homeFeatureKeys} />
             <SettingsClient initialSettings={restSettings} />
         </div>

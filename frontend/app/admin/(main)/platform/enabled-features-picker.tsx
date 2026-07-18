@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Power, PowerOff } from "lucide-react";
-import { updateEnabledFeatures } from "./actions";
+import { updateEnabledFeatures } from "../settings/actions";
 import { BACKEND_FEATURES } from "@/libs/enabled-features";
 
 // instance 功能開關管理：存 app_settings 的 enabled_features（"all" 或 JSON 字串陣列）。
