@@ -88,6 +88,15 @@ pub async fn list(
     Ok(rows)
 }
 
+/// 所有出現過的標案類型（去重、字母排序）
+pub async fn distinct_types(pool: &Pool<Postgres>) -> Result<Vec<String>, AppError> {
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT DISTINCT tender_type FROM gov_tenders ORDER BY tender_type")
+            .fetch_all(pool)
+            .await?;
+    Ok(rows.into_iter().map(|(t,)| t).collect())
+}
+
 pub async fn count(pool: &Pool<Postgres>, query: &GovTenderListQuery) -> Result<i64, AppError> {
     let (total,): (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM gov_tenders

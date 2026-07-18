@@ -16,7 +16,12 @@ use axum::{
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
-    super::with_auth(state, Router::new().route("/", get(list_tenders)))
+    super::with_auth(
+        state,
+        Router::new()
+            .route("/", get(list_tenders))
+            .route("/types", get(list_types)),
+    )
 }
 
 /// 標案公告分頁列表（?keyword=&tender_type=&q=&page=&per_page=）
@@ -31,4 +36,13 @@ async fn list_tenders(
     Ok(Json(
         gov_tenders_service::list(state.get_pool(), &filter, limit, offset).await?,
     ))
+}
+
+/// 所有出現過的標案類型（去重、排序，供篩選下拉）
+async fn list_types(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<String>>, AppError> {
+    auth_user.require_permission(Perm::GovTenderRead)?;
+    Ok(Json(gov_tenders_service::types(state.get_pool()).await?))
 }

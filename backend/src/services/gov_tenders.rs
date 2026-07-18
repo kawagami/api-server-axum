@@ -24,6 +24,11 @@ pub async fn list(
     Ok(GovTenderPaginatedResponse { data, total })
 }
 
+/// 所有出現過的標案類型（供前端下拉選單）
+pub async fn types(pool: &Pool<Postgres>) -> Result<Vec<String>, AppError> {
+    repo::distinct_types(pool).await
+}
+
 /// 以關鍵字搜尋標案公告（第 1 頁 100 筆，依公告日新到舊，足以涵蓋每日增量）
 pub async fn fetch_by_keyword(
     client: &Client,

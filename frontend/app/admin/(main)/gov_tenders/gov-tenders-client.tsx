@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
-import { getGovTenders } from "@/api/gov-tenders";
+import { getGovTenders, getGovTenderTypes } from "@/api/gov-tenders";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
 import usePagedList from "@/hooks/usePagedList";
 import type { GovTender } from "@/types";
@@ -12,16 +12,19 @@ const LIMIT = 50;
 interface Filters {
     q: string;
     keyword: string;
+    tender_type: string;
 }
 
-const defaultFilters: Filters = { q: '', keyword: '' };
+const defaultFilters: Filters = { q: '', keyword: '', tender_type: '' };
 
 export default function GovTendersClient() {
     const { items: tenders, hasMore, isPending, load, loadMore } = usePagedList<GovTender>(LIMIT);
     const [filters, setFilters] = useState<Filters>(defaultFilters);
+    const [types, setTypes] = useState<string[]>([]);
 
     useEffect(() => {
         load(page => getGovTenders({ page, per_page: LIMIT }));
+        getGovTenderTypes().then(setTypes).catch(() => setTypes([]));
     }, [load]);
 
     function handleSearch() {
@@ -53,6 +56,19 @@ export default function GovTendersClient() {
                             placeholder="弱點掃描"
                             className={`${inputClass} w-48`}
                         />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-neutral-500 dark:text-neutral-400">類型</label>
+                        <select
+                            value={filters.tender_type}
+                            onChange={e => setFilters(f => ({ ...f, tender_type: e.target.value }))}
+                            className={`${inputClass} w-48`}
+                        >
+                            <option value="">全部</option>
+                            {types.map(t => (
+                                <option key={t} value={t}>{t}</option>
+                            ))}
+                        </select>
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-neutral-500 dark:text-neutral-400">追蹤關鍵字</label>

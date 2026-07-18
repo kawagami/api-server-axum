@@ -35,3 +35,10 @@ export async function getGovTenders({
     });
     return res?.data ?? [];
 }
+
+export async function getGovTenderTypes(): Promise<string[]> {
+    const res = await adminRequest<string[]>({
+        url: `${process.env.API_URL}/admin/gov_tenders/types`,
+    });
+    return res ?? [];
+}
