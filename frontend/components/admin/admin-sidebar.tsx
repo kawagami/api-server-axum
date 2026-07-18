@@ -117,6 +117,14 @@ export default function AdminSidebar({ permissions }: { permissions: string[] })
         <>
             {/* Desktop sidebar */}
             <aside className="hidden sm:flex flex-col w-52 shrink-0 border-r border-neutral-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 h-screen sticky top-0">
+                <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
+                    <Link
+                        href="/admin"
+                        className="font-semibold text-neutral-800 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                    >
+                        Admin
+                    </Link>
+                </div>
                 <SidebarContent groups={groups} pathname={pathname} />
             </aside>
 
@@ -143,7 +151,13 @@ export default function AdminSidebar({ permissions }: { permissions: string[] })
                     ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`}
             >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
-                    <span className="font-semibold text-neutral-800 dark:text-white">Admin</span>
+                    <Link
+                        href="/admin"
+                        onClick={() => setDrawerOpen(false)}
+                        className="font-semibold text-neutral-800 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                    >
+                        Admin
+                    </Link>
                     <button onClick={() => setDrawerOpen(false)} aria-label="關閉選單">
                         <X size={20} />
                     </button>
