@@ -173,6 +173,16 @@ pub async fn cache_del(
     Ok(())
 }
 
+/// 取出並刪除（一次性消費，GETDEL 原子操作）；不存在回 None。
+pub async fn cache_getdel(
+    pool: &RedisPool<RedisConnectionManager>,
+    key: &str,
+) -> Result<Option<String>, crate::errors::AppError> {
+    let mut conn = get_redis_conn(pool).await?;
+    let value: Option<String> = redis::cmd("GETDEL").arg(key).query_async(&mut *conn).await?;
+    Ok(value)
+}
+
 pub async fn cache_set(
     pool: &RedisPool<RedisConnectionManager>,
     key: &str,

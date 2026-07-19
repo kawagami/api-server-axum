@@ -62,3 +62,11 @@ unicode-normalization = "0.1.25"
 # 圖片上傳處理：image 負責 decode 驗證，webp（libwebp/C，靜態連結）負責 lossy 編碼
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
 webp = { version = "0.3.1", default-features = false }
+# passkey 登入：danger-allow-state-serialisation 讓挑戰狀態可序列化存 Redis（server 端一次性消費，無 client 重放面）；
+# conditional-ui 提供 discoverable authentication（登入頁 autofill 免輸帳號）
+webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation", "conditional-ui"] }
+# ResidentKeyRequirement 等 wire 型別不在 webauthn-rs prelude，需直接引 proto crate（版本跟 webauthn-rs 對齊）
+webauthn-rs-proto = "0.5"
+# webauthn-rs 硬依賴 OpenSSL ≥3.0；vendored = 隨原始碼編譯靜態連結，不吃系統版本
+# （本機 WSL 是 1.1.1、distroless 也免帶 runtime libssl；builder 已有 perl/make/gcc）
+openssl = { version = "0.10", features = ["vendored"] }

@@ -33,6 +33,9 @@ pub struct AppStateInner {
     pub enabled_features: Arc<RwLock<Option<HashSet<Feature>>>>,
     pub torrents: TorrentManager,
     pub games: GameRegistry,
+    /// 由 app_settings 的 webauthn_rp_id / webauthn_rp_origin 建構（reload 時重建）；
+    /// None = 設定缺漏或無效，passkey 端點回錯、密碼登入不受影響
+    pub webauthn: Arc<RwLock<Option<webauthn_rs::Webauthn>>>,
 }
 
 impl AppStateInner {
@@ -70,6 +73,7 @@ impl AppStateInner {
             enabled_features: Arc::new(RwLock::new(None)),
             torrents: TorrentManager::new().await,
             games: GameRegistry::new(),
+            webauthn: Arc::new(RwLock::new(None)),
         }
     }
 }
@@ -97,14 +101,40 @@ pub struct Settings {
     map: Arc<RwLock<HashMap<String, String>>>,
     /// None = 全開；reload 時由 enabled_features 設定值 parse 而來，檢查是 sync set lookup
     enabled_features: Arc<RwLock<Option<HashSet<Feature>>>>,
+    /// reload 時由 webauthn_rp_id / webauthn_rp_origin 建構；None = 未設定/無效
+    webauthn: Arc<RwLock<Option<webauthn_rs::Webauthn>>>,
+}
+
+/// 從 settings map 建 Webauthn instance；缺值/無效回 None（只記 log，不擋其他設定重載）
+fn build_webauthn(map: &HashMap<String, String>) -> Option<webauthn_rs::Webauthn> {
+    let rp_id = map.get("webauthn_rp_id").filter(|v| !v.is_empty())?;
+    let rp_origin = map.get("webauthn_rp_origin").filter(|v| !v.is_empty())?;
+
+    let url = match webauthn_rs::prelude::Url::parse(rp_origin) {
+        Ok(url) => url,
+        Err(e) => {
+            tracing::error!("webauthn_rp_origin 不是合法 URL: {:?}", e);
+            return None;
+        }
+    };
+    match webauthn_rs::WebauthnBuilder::new(rp_id, &url)
+        .and_then(|b| b.rp_name("Kawa Admin").build())
+    {
+        Ok(webauthn) => Some(webauthn),
+        Err(e) => {
+            tracing::error!("Webauthn 建構失敗（檢查 webauthn_rp_id / webauthn_rp_origin）: {:?}", e);
+            None
+        }
+    }
 }
 
 impl Settings {
     pub fn new(
         map: Arc<RwLock<HashMap<String, String>>>,
         enabled_features: Arc<RwLock<Option<HashSet<Feature>>>>,
+        webauthn: Arc<RwLock<Option<webauthn_rs::Webauthn>>>,
     ) -> Self {
-        Self { map, enabled_features }
+        Self { map, enabled_features, webauthn }
     }
 
     pub fn get(&self, key: &str) -> Option<String> {
@@ -118,6 +148,11 @@ impl Settings {
         }
     }
 
+    /// Webauthn instance（Clone 出去用）；None = 設定缺漏或無效
+    pub fn webauthn(&self) -> Option<webauthn_rs::Webauthn> {
+        self.webauthn.read().unwrap().clone()
+    }
+
     pub async fn reload(&self, pool: &Pool<Postgres>) {
         match crate::repositories::app_settings::get_all(pool).await {
             Ok(rows) => {
@@ -126,8 +161,10 @@ impl Settings {
                 let enabled = map
                     .get("enabled_features")
                     .and_then(|v| Feature::parse_setting(v));
+                let webauthn = build_webauthn(&map);
                 *self.map.write().unwrap() = map;
                 *self.enabled_features.write().unwrap() = enabled;
+                *self.webauthn.write().unwrap() = webauthn;
             }
             Err(e) => {
                 tracing::error!("Failed to reload app_settings: {:?}", e);
@@ -210,7 +247,11 @@ impl AppState {
     }
 
     pub fn get_settings(&self) -> Settings {
-        Settings::new(self.0.settings.clone(), self.0.enabled_features.clone())
+        Settings::new(
+            self.0.settings.clone(),
+            self.0.enabled_features.clone(),
+            self.0.webauthn.clone(),
+        )
     }
 
     pub async fn reload_settings(&self) {

@@ -1,5 +1,6 @@
 import { getSettings } from "../settings/actions";
 import EnabledFeaturesPicker from "./enabled-features-picker";
+import WebauthnSettings from "./webauthn-settings";
 import { requirePermission } from "@/libs/admin-permissions";
 import type { Metadata } from "next";
 
@@ -15,6 +16,8 @@ export default async function PlatformSettingsPage() {
     const settings = await getSettings();
     const flat = Object.values(settings).flat();
     const enabledFeaturesValue = flat.find(s => s.key === 'enabled_features')?.value ?? 'all';
+    const rpId = flat.find(s => s.key === 'webauthn_rp_id')?.value ?? '';
+    const rpOrigin = flat.find(s => s.key === 'webauthn_rp_origin')?.value ?? '';
 
     return (
         <div className="w-full max-w-2xl">
@@ -23,6 +26,7 @@ export default async function PlatformSettingsPage() {
                 平台保留設定，修改需要 platform:update 權限，一般設定權限（setting:*）碰不到這裡的項目。
             </p>
             <EnabledFeaturesPicker initialValue={enabledFeaturesValue} />
+            <WebauthnSettings initialRpId={rpId} initialRpOrigin={rpOrigin} />
         </div>
     );
 }

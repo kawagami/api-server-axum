@@ -12,6 +12,9 @@ use std::net::SocketAddr;
 const TOOLS_MAX_REQUESTS: i64 = 20;
 // 登入爆破防護：每次失敗都燒一次 bcrypt（~百毫秒 CPU），限流門檻收緊
 const AUTH_MAX_REQUESTS: i64 = 5;
+// passkey 登入獨立額度：Conditional UI 每次載入登入頁就打一發 begin，不與密碼登入互搶；
+// 且簽章驗證無 bcrypt CPU 面、無爆破意義，可放寬
+const WEBAUTHN_MAX_REQUESTS: i64 = 10;
 const WINDOW_SECS: i64 = 60;
 
 pub async fn tools_rate_limit(
@@ -28,6 +31,14 @@ pub async fn auth_rate_limit(
     next: Next,
 ) -> Result<Response<Body>, AppError> {
     rate_limit(state, req, next, "auth", AUTH_MAX_REQUESTS).await
+}
+
+pub async fn webauthn_rate_limit(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Result<Response<Body>, AppError> {
+    rate_limit(state, req, next, "webauthn", WEBAUTHN_MAX_REQUESTS).await
 }
 
 async fn rate_limit(

@@ -36,6 +36,17 @@ pub async fn sign_in(
         return Err(AppError::AuthError(AuthError::InvalidCredentials));
     }
 
+    complete_admin_login(pool, redis_pool, jwt_secret, id).await
+}
+
+/// 身分驗證通過後的共同收尾（密碼與 passkey 登入共用）：
+/// Redis 寫 login key + 快取 permissions + 簽發 JWT。
+pub async fn complete_admin_login(
+    pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    jwt_secret: &str,
+    id: i64,
+) -> Result<String, AppError> {
     let login_key = format!("user:login:{}", id);
     redis::redis_set(redis_pool, &login_key, &id.to_string()).await?;
 

@@ -19,6 +19,14 @@ export interface Role {
   permissions?: Permission[];
 }
 
+// Passkey（GET /admin/auth/passkeys；不含公鑰/credential_id）
+export interface PasskeyItem {
+  id: number;
+  label: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
 // User（後台管理員；name 為登入識別，email 選填）
 export interface User {
   id: string;

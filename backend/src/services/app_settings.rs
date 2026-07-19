@@ -18,7 +18,7 @@ const PUBLIC_KEYS: &[&str] = &[
 
 /// 平台保留設定 — 只有 platform:read 能在 GET /admin/settings 看到、platform:update 能改。
 /// 商家 instance 的管理員拿 setting:read/update 管日常設定，碰不到這些 key。
-const RESERVED_KEYS: &[&str] = &["enabled_features"];
+const RESERVED_KEYS: &[&str] = &["enabled_features", "webauthn_rp_id", "webauthn_rp_origin"];
 
 pub fn is_reserved(key: &str) -> bool {
     RESERVED_KEYS.contains(&key)
@@ -109,6 +109,30 @@ fn validate_enabled_features(value: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// webauthn 設定只驗單值形狀，**不驗兩 key 配對**——用另一半現值驗會讓「整組換新網域」
+/// 先存哪個都 422（死鎖，永遠遷不出預設值）。配對規則（rp_id 是 origin 的有效網域）
+/// 由前端 /admin/platform 存檔前檢查 + Settings::reload 時建構失敗記 error log、instance 設 None。
+fn validate_webauthn_rp_id(value: &str) -> Result<(), AppError> {
+    if value.is_empty() || value.contains('/') || value.contains(':') || value.contains(' ') {
+        return Err(unprocessable(
+            "webauthn_rp_id 必須是裸網域（如 kawa.homes，不含 scheme / port / 路徑）".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_webauthn_rp_origin(value: &str) -> Result<(), AppError> {
+    let ok = webauthn_rs::prelude::Url::parse(value)
+        .map(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some())
+        .unwrap_or(false);
+    if !ok {
+        return Err(unprocessable(
+            "webauthn_rp_origin 必須是合法 http(s) URL（如 https://kawa.homes）".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// 設定值驗證 — key 不在表內就不驗證
 fn validate(key: &str, value: &str) -> Result<(), AppError> {
     if key == "theme_rotation" {
@@ -119,6 +143,12 @@ fn validate(key: &str, value: &str) -> Result<(), AppError> {
     }
     if key == "enabled_features" {
         return validate_enabled_features(value);
+    }
+    if key == "webauthn_rp_id" {
+        return validate_webauthn_rp_id(value);
+    }
+    if key == "webauthn_rp_origin" {
+        return validate_webauthn_rp_origin(value);
     }
 
     let allowed: Vec<&str> = match key {
@@ -200,6 +230,26 @@ mod tests {
         assert!(validate("enabled_features", r#"["blog","blog"]"#).is_err());
         // portfolio 依賴 stocks
         assert!(validate("enabled_features", r#"["portfolio"]"#).is_err());
+    }
+
+    #[test]
+    fn webauthn_settings_validate_shape_only() {
+        // rp_id：裸網域
+        assert!(validate("webauthn_rp_id", "kawa.homes").is_ok());
+        assert!(validate("webauthn_rp_id", "localhost").is_ok());
+        assert!(validate("webauthn_rp_id", "").is_err());
+        assert!(validate("webauthn_rp_id", "https://kawa.homes").is_err());
+        assert!(validate("webauthn_rp_id", "kawa.homes/admin").is_err());
+
+        // origin：合法 http(s) URL
+        assert!(validate("webauthn_rp_origin", "https://kawa.homes").is_ok());
+        assert!(validate("webauthn_rp_origin", "http://localhost:3000").is_ok());
+        assert!(validate("webauthn_rp_origin", "not-a-url").is_err());
+        assert!(validate("webauthn_rp_origin", "ftp://kawa.homes").is_err());
+        assert!(validate("webauthn_rp_origin", "").is_err());
+
+        // 不驗配對——整組換新網域時單 key PATCH 不會被另一半現值卡死
+        assert!(validate("webauthn_rp_id", "totally-unrelated.example").is_ok());
     }
 
     #[test]

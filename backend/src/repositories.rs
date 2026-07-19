@@ -8,6 +8,7 @@ pub mod invoices;
 pub mod ledger;
 pub mod lotto;
 pub mod members;
+pub mod passkeys;
 pub mod permissions;
 pub mod portfolio;
 pub mod redis;

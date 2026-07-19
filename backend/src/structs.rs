@@ -18,4 +18,5 @@ pub mod tools;
 pub mod torrents;
 pub mod users;
 pub mod vocab;
+pub mod webauthn;
 pub mod ws;

@@ -81,6 +81,7 @@ export const adminNavGroups: AdminNavGroup[] = [
             { label: "Settings", href: "/admin/settings", permission: "setting:read" },
             { label: "平台設定", href: "/admin/platform", permission: "platform:read" },
             { label: "修改密碼", href: "/admin/change-password" },
+            { label: "Passkey 管理", href: "/admin/passkeys" },
         ],
     },
 ];

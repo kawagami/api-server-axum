@@ -44,6 +44,28 @@ pub async fn get_credentials_by_name(
         .await?)
 }
 
+/// passkey 註冊 begin 用：以 id 查出 (webauthn user handle, name)。
+pub async fn get_webauthn_identity_by_id(
+    pool: &Pool<Postgres>,
+    id: i64,
+) -> Result<Option<(uuid::Uuid, String)>, AppError> {
+    Ok(sqlx::query_as("SELECT webauthn_user_handle, name FROM users WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?)
+}
+
+/// passkey 登入 finish 用：以 user handle 反查 user id。
+pub async fn get_id_by_webauthn_handle(
+    pool: &Pool<Postgres>,
+    handle: uuid::Uuid,
+) -> Result<Option<i64>, AppError> {
+    Ok(sqlx::query_scalar("SELECT id FROM users WHERE webauthn_user_handle = $1")
+        .bind(handle)
+        .fetch_optional(pool)
+        .await?)
+}
+
 /// 改密碼用：以 id 取現有 password hash。
 pub async fn get_password_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<String>, AppError> {
     Ok(sqlx::query_scalar("SELECT password FROM users WHERE id = $1")

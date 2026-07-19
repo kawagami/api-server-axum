@@ -89,6 +89,10 @@ pub enum AuthError {
     // 登入失敗統一回此訊息，不區分帳號不存在/密碼錯誤，防帳號枚舉
     #[error("帳號或密碼錯誤")]
     InvalidCredentials,
+
+    // WebAuthn 挑戰過期/驗證失敗/憑證不存在統一回此訊息，不外洩細節
+    #[error("Passkey 驗證失敗")]
+    WebauthnFailed,
 }
 
 #[derive(Error, Debug)]
@@ -142,6 +146,7 @@ impl AppError {
                 AuthError::UserNotFound => StatusCode::UNAUTHORIZED,
                 AuthError::InvalidPassword => StatusCode::UNAUTHORIZED,
                 AuthError::InvalidCredentials => StatusCode::UNAUTHORIZED,
+                AuthError::WebauthnFailed => StatusCode::UNAUTHORIZED,
             },
             Self::SystemError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
