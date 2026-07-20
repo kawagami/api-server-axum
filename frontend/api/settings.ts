@@ -9,6 +9,9 @@ export interface PublicSettings {
     theme_rotation?: unknown;     // 星期→主題對應表（物件或 JSON 字串），normalizeRotation 收斂
     home_features?: string;       // 首頁功能卡片 JSON 字串陣列，resolveHomeFeatures 收斂
     enabled_features?: string;    // instance 功能開關（"all" 或 JSON 字串陣列），resolveEnabledFeatures 收斂
+    image_client_compress?: string; // 前端上傳前壓縮開關（"true" / "false"）
+    image_client_quality?: string;  // 前端壓縮品質（1–100）
+    image_client_max_edge?: string; // 前端壓縮長邊上限 px
 }
 
 export async function getPublicSettings(): Promise<PublicSettings> {

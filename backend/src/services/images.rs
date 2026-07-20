@@ -15,8 +15,8 @@ const MAX_DECODE_ALLOC: u64 = 128 * 1024 * 1024;
 const MAX_DIMENSION: u32 = 16383;
 /// 總像素上限（40MP ≈ RGBA 160MB），約束 decode 後色彩正規化的第二份緩衝，避免 1G RAM 上 OOM。
 const MAX_PIXELS: u64 = 40_000_000;
-/// lossy WebP 品質（0-100）。
-const WEBP_QUALITY: f32 = 80.0;
+/// lossy WebP 預設品質（0-100）；設定缺失/無法解析時的 fallback。
+pub const DEFAULT_WEBP_QUALITY: f32 = 80.0;
 
 #[derive(Debug)]
 pub struct ProcessedImage {
@@ -24,16 +24,17 @@ pub struct ProcessedImage {
     pub ext: &'static str,
 }
 
-/// 驗證 bytes 確實是可解碼的圖片，並重編碼為 lossy WebP（q80）。
+/// 驗證 bytes 確實是可解碼的圖片，並重編碼為 lossy WebP。
 ///
 /// - 用 `image` crate 實際 decode 一次 = 最強的「真的是圖片」驗證（不是只看副檔名/magic bytes）。
 /// - 非圖片、損毀、尺寸/像素超限 → `InvalidContent`（400），不會存進磁碟。
 /// - GIF 例外：decode 驗證後保留原檔（重編碼只會取第一幀，動畫會被毀掉）。
 /// - libwebp encoder 僅收 RGB8 / RGBA8，故先依有無 alpha 正規化色彩型別。
 /// - 重編碼順帶剝除 EXIF 等 metadata。
+/// - `quality`（0–100）為 WebP 品質，由 caller 從 `app_settings.image_webp_quality` 傳入。
 ///
 /// CPU 密集（decode + encode 可達秒級），caller 必須包在 `spawn_blocking` 執行。
-pub fn process_image(data: &[u8]) -> Result<ProcessedImage, AppError> {
+pub fn process_image(data: &[u8], quality: f32) -> Result<ProcessedImage, AppError> {
     let mut reader = ImageReader::new(Cursor::new(data))
         .with_guessed_format()
         .map_err(|e| RequestError::InvalidContent(format!("無法辨識圖片格式: {e}")))?;
@@ -59,10 +60,11 @@ pub fn process_image(data: &[u8]) -> Result<ProcessedImage, AppError> {
         return Err(RequestError::InvalidContent(format!("圖片像素過大: {w}x{h}")).into());
     }
 
+    let quality = quality.clamp(1.0, 100.0);
     let webp = if img.color().has_alpha() {
-        webp::Encoder::from_rgba(&img.into_rgba8(), w, h).encode_simple(false, WEBP_QUALITY)
+        webp::Encoder::from_rgba(&img.into_rgba8(), w, h).encode_simple(false, quality)
     } else {
-        webp::Encoder::from_rgb(&img.into_rgb8(), w, h).encode_simple(false, WEBP_QUALITY)
+        webp::Encoder::from_rgb(&img.into_rgb8(), w, h).encode_simple(false, quality)
     }
     .map_err(|e| SystemError::Internal(format!("WebP 編碼失敗: {e:?}")))?;
 
@@ -106,6 +108,7 @@ pub async fn upload_image(
     storage: &Storage,
     base_url: &str,
     owner_id: Option<i64>,
+    quality: f32,
     mut multipart: Multipart,
 ) -> Result<ImageRecord, AppError> {
     while let Some(field) = multipart
@@ -125,7 +128,7 @@ pub async fn upload_image(
             .map_err(|e| RequestError::MultipartError(e.into()))?;
 
         // CPU 密集的 decode + encode 走 spawn_blocking，不卡住 tokio worker（1 核機上會凍結全站）
-        let processed = tokio::task::spawn_blocking(move || process_image(&data))
+        let processed = tokio::task::spawn_blocking(move || process_image(&data, quality))
             .await
             .map_err(|e| SystemError::Internal(format!("圖片處理任務失敗: {e}")))??;
 
@@ -159,7 +162,7 @@ mod tests {
     #[test]
     fn valid_png_becomes_webp() {
         for alpha in [false, true] {
-            let processed = process_image(&make_png(4, 4, alpha)).unwrap();
+            let processed = process_image(&make_png(4, 4, alpha), DEFAULT_WEBP_QUALITY).unwrap();
             assert_eq!(processed.ext, "webp", "alpha={alpha}");
             // RIFF....WEBP 檔頭確認確實編成 WebP
             assert_eq!(&processed.bytes[0..4], b"RIFF", "alpha={alpha}");
@@ -175,14 +178,14 @@ mod tests {
         let mut gif = Vec::new();
         img.write_to(&mut Cursor::new(&mut gif), ImageFormat::Gif).unwrap();
 
-        let processed = process_image(&gif).unwrap();
+        let processed = process_image(&gif, DEFAULT_WEBP_QUALITY).unwrap();
         assert_eq!(processed.ext, "gif");
         assert_eq!(processed.bytes, gif); // 原檔 byte-for-byte 保留（動畫不被壓平）
     }
 
     #[test]
     fn non_image_bytes_are_rejected() {
-        let err = process_image(b"this is definitely not an image").unwrap_err();
+        let err = process_image(b"this is definitely not an image", DEFAULT_WEBP_QUALITY).unwrap_err();
         assert!(matches!(err, AppError::RequestError(RequestError::InvalidContent(_))));
     }
 
@@ -190,14 +193,14 @@ mod tests {
     fn truncated_image_is_rejected() {
         let mut png = make_png(8, 8, false);
         png.truncate(png.len() / 2); // 砍半 = 損毀
-        let err = process_image(&png).unwrap_err();
+        let err = process_image(&png, DEFAULT_WEBP_QUALITY).unwrap_err();
         assert!(matches!(err, AppError::RequestError(RequestError::InvalidContent(_))));
     }
 
     #[test]
     fn oversized_dimension_is_rejected() {
         // 寬 > 16383（libwebp 上限），decode 階段就該以 400 擋下,而不是編碼時 500
-        let err = process_image(&make_png(MAX_DIMENSION + 1, 1, false)).unwrap_err();
+        let err = process_image(&make_png(MAX_DIMENSION + 1, 1, false), DEFAULT_WEBP_QUALITY).unwrap_err();
         assert!(matches!(err, AppError::RequestError(RequestError::InvalidContent(_))));
     }
 }

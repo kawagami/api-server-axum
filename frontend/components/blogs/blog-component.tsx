@@ -16,6 +16,7 @@ import { useMarkdownTextarea } from '@/hooks/useMarkdownTextarea';
 import { useBlogDraft } from './useBlogDraft';
 import TagEditorModal from './tag-editor-modal';
 import type { Blog, Toc } from '@/types';
+import type { ImageCompressConfig } from '@/libs/image-config';
 
 function extractTocs(markdown: string): Toc[] {
     return markdown.match(/^#{1,6}\s+(.+)$/gm)?.map((h, index) => ({
@@ -29,9 +30,10 @@ interface Props {
     id: string;
     blog: Blog;
     allTags: string[];
+    compressConfig: ImageCompressConfig;
 }
 
-export default function BlogComponent({ id, blog, allTags }: Props) {
+export default function BlogComponent({ id, blog, allTags, compressConfig }: Props) {
     const router = useRouter();
     const { markdown, setMarkdown, tags, setTags, draftRestored, clearDraft } = useBlogDraft(id, blog);
     const [isSaving, setIsSaving] = useState(false);
@@ -80,6 +82,7 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
                 },
                 setUploadProgress,
                 (image) => insertAtCursor(`![image](${image.url})\n`),
+                compressConfig,
             );
         } catch (err) {
             setUploadError(uploadErrorMessage(err));

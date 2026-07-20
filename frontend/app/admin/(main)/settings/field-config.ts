@@ -2,7 +2,7 @@
 // 新增列舉/數字/秘密類設定時在這裡補一行即可
 export type FieldConfig =
     | { kind: "enum"; options: string[] }
-    | { kind: "number"; min?: number }
+    | { kind: "number"; min?: number; max?: number }
     | { kind: "secret" };
 
 export const FIELD_CONFIGS: Record<string, FieldConfig> = {
@@ -12,6 +12,10 @@ export const FIELD_CONFIGS: Record<string, FieldConfig> = {
     torrent_retention_days: { kind: "number", min: 1 },
     torrent_max_total_size_gb: { kind: "number", min: 1 },
     torrent_link_ttl_minutes: { kind: "number", min: 1 },
+    image_webp_quality: { kind: "number", min: 1, max: 100 },
+    image_client_compress: { kind: "enum", options: ["true", "false"] },
+    image_client_quality: { kind: "number", min: 1, max: 100 },
+    image_client_max_edge: { kind: "number", min: 64, max: 16383 },
 };
 
 // category slug → 中文標題(未登記的 fallback 顯示原字串)

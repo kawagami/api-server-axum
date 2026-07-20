@@ -3,6 +3,7 @@ import { uploadImage } from '@/api/images';
 import { deleteImage } from '@/api/images';
 import { uploadErrorMessage, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressAndUploadEach } from '@/libs/client-image';
+import { DEFAULT_IMAGE_COMPRESS, type ImageCompressConfig } from '@/libs/image-config';
 
 export interface ManagedImage {
     name: string;
@@ -10,7 +11,10 @@ export interface ManagedImage {
     status?: string;
 }
 
-export const useImageManager = (initialImages: ManagedImage[]) => {
+export const useImageManager = (
+    initialImages: ManagedImage[],
+    compressConfig: ImageCompressConfig = DEFAULT_IMAGE_COMPRESS,
+) => {
     const [images, setImages] = useState<ManagedImage[]>(initialImages);
     const [deletingImage, setDeletingImage] = useState<string | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -54,6 +58,7 @@ export const useImageManager = (initialImages: ManagedImage[]) => {
                     const original = selectedFiles[i];
                     setSelectedFiles((prev) => prev.filter(f => f !== original));
                 },
+                compressConfig,
             );
             removeSelectedImage();
         } catch (err) {

@@ -32,6 +32,10 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
                 setErrors(prev => ({ ...prev, [key]: `最小值為 ${config.min}` }));
                 return;
             }
+            if (config.max !== undefined && Number(draft) > config.max) {
+                setErrors(prev => ({ ...prev, [key]: `最大值為 ${config.max}` }));
+                return;
+            }
         }
         setSaving(prev => ({ ...prev, [key]: true }));
         setErrors(prev => ({ ...prev, [key]: "" }));
@@ -77,6 +81,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
                 <input
                     type="number"
                     min={config.min}
+                    max={config.max}
                     value={draft}
                     onChange={e => onChange(e.target.value)}
                     className={`${inputClass} flex-1 min-w-0`}

@@ -46,10 +46,15 @@ async fn upload_image(
     multipart: Multipart,
 ) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
     auth_user.require_permission(Perm::ImageCreate)?;
-    let base_url = state
-        .get_settings()
+    let settings = state.get_settings();
+    let base_url = settings
         .get("upload_base_url")
         .unwrap_or_else(|| "https://axum.kawa.homes/uploads".to_string());
-    let record = images_service::upload_image(state.get_pool(), state.get_storage(), &base_url, Some(auth_user.id), multipart).await?;
+    // PATCH 端已驗證 1–100；此處仍給 fallback，避免舊資料/缺 key 時炸掉
+    let quality = settings
+        .get("image_webp_quality")
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(images_service::DEFAULT_WEBP_QUALITY);
+    let record = images_service::upload_image(state.get_pool(), state.get_storage(), &base_url, Some(auth_user.id), quality, multipart).await?;
     Ok((StatusCode::CREATED, Json(serde_json::json!({ "id": record.id, "url": record.url }))))
 }

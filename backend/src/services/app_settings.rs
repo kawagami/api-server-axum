@@ -14,6 +14,10 @@ const PUBLIC_KEYS: &[&str] = &[
     "theme_rotation",
     "home_features",
     "enabled_features",
+    // 前端上傳前壓縮參數（image_webp_quality 只後端讀，不公開）
+    "image_client_compress",
+    "image_client_quality",
+    "image_client_max_edge",
 ];
 
 /// 平台保留設定 — 只有 platform:read 能在 GET /admin/settings 看到、platform:update 能改。
@@ -134,9 +138,30 @@ fn validate_webauthn_rp_origin(value: &str) -> Result<(), AppError> {
 }
 
 /// 設定值驗證 — key 不在表內就不驗證
+/// 整數且落在 [min, max]（含）內，否則 422。
+fn validate_int_range(key: &str, value: &str, min: u32, max: u32) -> Result<(), AppError> {
+    match value.parse::<u32>() {
+        Ok(n) if n >= min && n <= max => Ok(()),
+        _ => Err(unprocessable(format!("{key} 必須是 {min}–{max} 的整數"))),
+    }
+}
+
 fn validate(key: &str, value: &str) -> Result<(), AppError> {
     if key == "theme_rotation" {
         return validate_theme_rotation(value);
+    }
+    if key == "image_webp_quality" || key == "image_client_quality" {
+        return validate_int_range(key, value, 1, 100);
+    }
+    if key == "image_client_max_edge" {
+        // 上限對齊 libwebp 單邊上限 16383
+        return validate_int_range(key, value, 64, 16383);
+    }
+    if key == "image_client_compress" {
+        return match value {
+            "true" | "false" => Ok(()),
+            _ => Err(unprocessable(format!("{key} 只接受 true / false"))),
+        };
     }
     if key == "home_features" {
         return validate_home_features(value);
@@ -250,6 +275,31 @@ mod tests {
 
         // 不驗配對——整組換新網域時單 key PATCH 不會被另一半現值卡死
         assert!(validate("webauthn_rp_id", "totally-unrelated.example").is_ok());
+    }
+
+    #[test]
+    fn image_compression_settings_validate() {
+        // 品質：1–100 整數
+        for key in ["image_webp_quality", "image_client_quality"] {
+            assert!(validate(key, "80").is_ok());
+            assert!(validate(key, "1").is_ok());
+            assert!(validate(key, "100").is_ok());
+            assert!(validate(key, "0").is_err());
+            assert!(validate(key, "101").is_err());
+            assert!(validate(key, "80.5").is_err());
+            assert!(validate(key, "high").is_err());
+        }
+        // 長邊：64–16383 整數
+        assert!(validate("image_client_max_edge", "2560").is_ok());
+        assert!(validate("image_client_max_edge", "64").is_ok());
+        assert!(validate("image_client_max_edge", "16383").is_ok());
+        assert!(validate("image_client_max_edge", "63").is_err());
+        assert!(validate("image_client_max_edge", "16384").is_err());
+        // 開關：true / false
+        assert!(validate("image_client_compress", "true").is_ok());
+        assert!(validate("image_client_compress", "false").is_ok());
+        assert!(validate("image_client_compress", "1").is_err());
+        assert!(validate("image_client_compress", "yes").is_err());
     }
 
     #[test]
