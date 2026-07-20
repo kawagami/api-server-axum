@@ -9,12 +9,13 @@ function barColor(pct: number) {
 
 function UsageBar({ label, used, total }: { label: string; used: number; total: number }) {
     const pct = total > 0 ? Math.min((used / total) * 100, 100) : 0;
+    const free = Math.max(total - used, 0);
     return (
         <div className="flex-1 min-w-56">
             <div className="flex justify-between text-xs text-neutral-500 dark:text-neutral-400 mb-1">
                 <span>{label}</span>
                 <span>
-                    {formatBytes(used)} / {formatBytes(total)}（{pct.toFixed(1)}%）
+                    剩餘 {formatBytes(free)} / {formatBytes(total)}（{(100 - pct).toFixed(1)}%）
                 </span>
             </div>
             <div className="h-2 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
