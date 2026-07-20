@@ -98,6 +98,91 @@ docker exec -it database psql -U kawa -d kawa -c "
 不是空站而是搬家：跳過步驟 4–5，舊機停機後把整個 `/srv/kawa`
 （env + uploads + torrents + dbdata）rsync 到新機同路徑；
 憑證在新機重發（DNS-01 不依賴舊機）比搬 volume 簡單。
+完整的搬家操作順序見下方「換 VPS 搬家 runbook」。
+
+## 換 VPS 搬家 runbook（既有站台整機遷移）
+
+把活著的站台從舊 VPS 搬到新 VPS。核心是 `/srv/kawa` 與 `deploy/` 的邊界已經切乾淨，
+**產出值（JWT/密碼/OAuth）不重產，整個 `/srv/kawa` 原樣搬過去**。
+
+### 前提：搞清楚哪些東西不用碰
+
+- **Registrar（網域註冊商，Google Domains → Squarespace）不參與。** DNS 權威在 Cloudflare
+  （`dig NS kawa.homes` → `*.ns.cloudflare.com`），只需確認 Squarespace 那邊 NS 委派沒被改回預設。
+- **對外沒有 DNS 傳播延遲。** 網域是 proxied（橘雲）狀態，對外 A record 永遠是 Cloudflare 邊緣 IP
+  （`104.21.x` / `172.67.x`），不是 VPS 真實 IP。換機只改 Cloudflare 後台那筆「回源 IP」，
+  對外紀錄不變 → 近乎即時生效、不用等 TTL。
+- **PG 同版本（18）不需 dump/restore。** 直接搬 `dbdata/` 目錄即可（跨大版本才要走 PG 升級 runbook）。
+
+### 0. 新機前置（站台不中斷）
+
+- 建使用者 + SSH 金鑰、裝 `docker`（含 compose plugin）+ `rsync`、使用者加入 `docker` 群組
+- **開 swap**（1 核 1G 尤其必要——曾整機無 swap 被 OOM 殺 backend）：
+  ```bash
+  sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+  sudo mkswap /swapfile && sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # 開機自動掛
+  ```
+- 建持久層根目錄（kawa 無 sudo 密碼也行，用容器以 root 建）：
+  ```bash
+  docker run --rm -v /srv:/srv alpine sh -c "mkdir -p /srv/kawa && chown -R $(id -u):$(id -g) /srv/kawa"
+  ```
+
+### 1. 資料搬遷（停機開始，抓最小窗口）
+
+`dbdata` 必須停機後搬才一致；uploads / torrents / env 可先做一次預熱 rsync，停機後再補增量。
+rsync 兩端不能同時遠端，以下指令**在新機上跑、從舊機拉**（新機需能 SSH 到舊機；
+或反過來在舊機 push，擇一）。
+
+```bash
+# 新VPS：（選配）停機前先預熱體積大的靜態檔，縮短停機窗口
+rsync -av 舊VPS:/srv/kawa/uploads/   /srv/kawa/uploads/
+rsync -av 舊VPS:/srv/kawa/torrents/  /srv/kawa/torrents/
+
+# 舊機停站
+ssh 舊VPS 'cd ~/kawa-deploy && docker compose down'
+
+# 新VPS：停機後拉完整 /srv/kawa（含 dbdata 與 env；--delete 對齊，增量只補差異）
+rsync -av --delete 舊VPS:/srv/kawa/  /srv/kawa/
+```
+
+### 2. 部署設定、起服務
+
+```bash
+# 本機
+rsync -av deploy/ 新VPS:~/kawa-deploy/
+# 新VPS
+cd ~/kawa-deploy && docker compose config --quiet && docker compose up -d
+```
+
+nginx 此時起不來是正常的（新機還沒憑證）。
+
+### 3. 新機重發憑證（DNS-01，不依賴舊機）
+
+```bash
+# 新VPS
+cd ~/kawa-deploy && bash shells/issue-cert.sh && docker compose restart nginx
+```
+
+### 4. 切流量到新機（Cloudflare，非 registrar）
+
+- Cloudflare dashboard → DNS → 把 `kawa.homes` / `*.kawa.homes`（或 `axum`）那筆的**回源 IP**
+  從舊機改成新機 IP。橘雲維持開啟，SSL/TLS 維持 **Full (Strict)**。
+- **GitHub secrets** 更新成新機，否則下次 push 會 deploy 到舊機：
+  `VULTR_HOST` / `VULTR_USERNAME` / `SSH_PRIVATE_KEY`（deploy.yml / backend.yml / frontend.yml 三條 CI 共用）。
+
+### 5. 驗證與善後
+
+```bash
+# 新VPS
+docker compose ps                     # 六個服務 Up、database healthy
+curl -sI https://kawa.homes | head -1
+curl -sI https://axum.kawa.homes | head -1
+# 瀏覽器：前台登入（驗 JWT_SECRET 搬對）、後台登入、WS 頁面、圖片/torrent 讀取
+```
+
+- 站台穩定幾天後才關舊機、退租。
+- **回滾**：Cloudflare 回源 IP 指回舊機 + GitHub secrets 還原 + 舊機 `compose up -d`（舊機資料還在）。
 
 ## 一次性升級 runbook：PG 17 → 18 + migration squash（2026-07-02 準備）
 
