@@ -169,7 +169,7 @@ export default function MetricsView({
                             icon={MemoryStick}
                             label="記憶體"
                             value={`${gb(latest.mem_used_mb, 2)} / ${gb(latest.mem_total_mb, 2)} GB`}
-                            hint={`${pct((latest.mem_used_mb / Math.max(1, latest.mem_total_mb)) * 100)} 已用`}
+                            hint={`${pct((latest.mem_used_mb / Math.max(1, latest.mem_total_mb)) * 100)} 已用・backend ${latest.backend_rss_mb} MB`}
                         />
                         <SnapshotCard
                             icon={HardDrive}
@@ -200,6 +200,14 @@ export default function MetricsView({
                             yMax={latest.mem_total_mb / 1024}
                             points={metrics.map(m => ({ t: m.created_at, v: m.mem_used_mb / 1024 }))}
                             format={v => `${v.toFixed(2)}`}
+                        />
+                    </ChartSection>
+
+                    <ChartSection title="Backend 常駐記憶體（MB）" loading={loading}>
+                        <MetricsTrendChart
+                            title="Backend RSS 趨勢"
+                            points={metrics.map(m => ({ t: m.created_at, v: m.backend_rss_mb }))}
+                            format={v => `${Math.round(v)}`}
                         />
                     </ChartSection>
 

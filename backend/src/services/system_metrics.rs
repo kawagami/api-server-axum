@@ -12,6 +12,8 @@ pub async fn collect() -> io::Result<MetricSample> {
     let (mem_used_mb, mem_total_mb) = read_mem()?;
     let (disk_used_mb, disk_total_mb) = read_disk(DISK_PATH)?;
     let (load1, load5, load15) = read_loadavg()?;
+    // backend 行程自身 RSS:與整機 mem 分開,才能辨別「是我 Rust 在漲」還是 PG/Redis/前端。
+    let backend_rss_mb = read_self_rss().unwrap_or(0);
 
     Ok(MetricSample {
         cpu_pct,
@@ -22,6 +24,7 @@ pub async fn collect() -> io::Result<MetricSample> {
         load1,
         load5,
         load15,
+        backend_rss_mb,
     })
 }
 
@@ -85,6 +88,17 @@ fn read_mem() -> io::Result<(i32, i32)> {
 
 fn parse_kb(s: &str) -> u64 {
     s.split_whitespace().next().and_then(|v| v.parse().ok()).unwrap_or(0)
+}
+
+/// 讀 /proc/self/status 的 VmRSS,回傳本行程常駐記憶體(MB)。
+/// 容器內 /proc/self 恆為此 backend 行程,不含 PG/Redis/前端。
+fn read_self_rss() -> io::Result<i32> {
+    let status = std::fs::read_to_string("/proc/self/status")?;
+    let rss_kb = status
+        .lines()
+        .find_map(|l| l.strip_prefix("VmRSS:").map(parse_kb))
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "no VmRSS in /proc/self/status"))?;
+    Ok((rss_kb / 1024) as i32)
 }
 
 /// 讀 /proc/loadavg,回傳 (1m, 5m, 15m)。

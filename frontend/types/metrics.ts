@@ -9,5 +9,6 @@ export interface SystemMetric {
   load1: number;
   load5: number;
   load15: number;
+  backend_rss_mb: number; // backend 行程自身常駐記憶體（MB），與整機 mem 分開
   created_at: string; // ISO 時間字串（UTC）
 }

@@ -14,6 +14,8 @@ pub struct SystemMetric {
     pub load1: f32,
     pub load5: f32,
     pub load15: f32,
+    /// backend 行程自身 RSS(MB),與整機 mem_used_mb 分開追蹤。
+    pub backend_rss_mb: i32,
     pub created_at: DateTime<Utc>,
 }
 
@@ -27,13 +29,14 @@ pub struct MetricSample {
     pub load1: f32,
     pub load5: f32,
     pub load15: f32,
+    pub backend_rss_mb: i32,
 }
 
 pub async fn insert(pool: &Pool<Postgres>, s: &MetricSample) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"INSERT INTO system_metrics
-           (cpu_pct, mem_used_mb, mem_total_mb, disk_used_mb, disk_total_mb, load1, load5, load15)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+           (cpu_pct, mem_used_mb, mem_total_mb, disk_used_mb, disk_total_mb, load1, load5, load15, backend_rss_mb)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
     )
     .bind(s.cpu_pct)
     .bind(s.mem_used_mb)
@@ -43,6 +46,7 @@ pub async fn insert(pool: &Pool<Postgres>, s: &MetricSample) -> Result<(), sqlx:
     .bind(s.load1)
     .bind(s.load5)
     .bind(s.load15)
+    .bind(s.backend_rss_mb)
     .execute(pool)
     .await?;
     Ok(())
@@ -52,7 +56,7 @@ pub async fn insert(pool: &Pool<Postgres>, s: &MetricSample) -> Result<(), sqlx:
 pub async fn get_recent(pool: &Pool<Postgres>, hours: i64) -> Result<Vec<SystemMetric>, sqlx::Error> {
     sqlx::query_as::<_, SystemMetric>(
         r#"SELECT id, cpu_pct, mem_used_mb, mem_total_mb, disk_used_mb, disk_total_mb,
-                  load1, load5, load15, created_at
+                  load1, load5, load15, backend_rss_mb, created_at
            FROM system_metrics
            WHERE created_at >= now() - make_interval(hours => $1::int)
            ORDER BY created_at ASC"#,
