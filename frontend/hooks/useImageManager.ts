@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { uploadImages } from '@/api/images';
+import { uploadImage } from '@/api/images';
 import { deleteImage } from '@/api/images';
 import { uploadErrorMessage, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressAndUploadEach } from '@/libs/client-image';
@@ -45,12 +45,11 @@ export const useImageManager = (initialImages: ManagedImage[]) => {
                 (file) => {
                     const formData = new FormData();
                     formData.append('file', file);
-                    return withUploadTimeout(uploadImages(formData));
+                    return withUploadTimeout(uploadImage(formData));
                 },
                 setUploadProgress,
-                (responses, i) => {
-                    const newImages = responses.map(r => ({ name: r.id, url: r.url, status: r.status }));
-                    setImages((prev) => [...prev, ...newImages]);
+                (image, i) => {
+                    setImages((prev) => [...prev, { name: image.id, url: image.url, status: image.status }]);
                     // 已成功的移出選取，中途失敗時重按上傳只會送剩下的
                     const original = selectedFiles[i];
                     setSelectedFiles((prev) => prev.filter(f => f !== original));

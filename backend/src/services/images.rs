@@ -96,21 +96,24 @@ pub async fn delete_image(pool: &Pool<Postgres>, storage: &Storage, id: i32) -> 
     Ok(())
 }
 
-pub async fn upload_images(
+/// 單檔上傳：取 multipart 第一個檔案欄位，驗證+轉檔+落地+寫 DB，回傳該筆記錄。
+///
+/// 前端一律「一張一請求」（client 端壓縮 pipeline），故不再迴圈收多檔：
+/// 較小的 request body 避開 Cloudflare HTTP/3 大 POST 卡死，且每檔獨立成功/失敗，
+/// 不會有「批次中一檔壞掉、其餘已落地變孤兒」的髒狀態。
+pub async fn upload_image(
     pool: &Pool<Postgres>,
     storage: &Storage,
     base_url: &str,
     owner_id: Option<i64>,
     mut multipart: Multipart,
-) -> Result<Vec<ImageRecord>, AppError> {
-    let mut records = vec![];
-
+) -> Result<ImageRecord, AppError> {
     while let Some(field) = multipart
         .next_field()
         .await
         .map_err(|e| RequestError::MultipartError(e.into()))?
     {
-        // 只處理檔案欄位，跳過表單文字欄位（避免一個文字欄位讓整批上傳 400）
+        // 只處理檔案欄位，跳過表單文字欄位
         if field.file_name().is_none() {
             continue;
         }
@@ -131,15 +134,10 @@ pub async fn upload_images(
             .upload(&processed.bytes, processed.ext, base_url)
             .await
             .map_err(|e| SystemError::Internal(format!("儲存圖片失敗: {e}")))?;
-        let record = images_repo::insert_image(pool, &storage_key, &url, owner_id).await?;
-        records.push(record);
+        return images_repo::insert_image(pool, &storage_key, &url, owner_id).await;
     }
 
-    if records.is_empty() {
-        return Err(RequestError::InvalidContent("no file provided".into()).into());
-    }
-
-    Ok(records)
+    Err(RequestError::InvalidContent("no file provided".into()).into())
 }
 
 #[cfg(test)]

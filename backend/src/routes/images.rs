@@ -8,7 +8,7 @@ use crate::{
 use axum::{
     extract::{Extension, Multipart, Path, State},
     http::StatusCode,
-    routing::{delete, get, post},
+    routing::{delete, get},
     Json, Router,
 };
 
@@ -16,8 +16,7 @@ pub fn new(state: AppState) -> Router<AppState> {
     super::with_auth(
         state,
         Router::new()
-            .route("/", get(get_images))
-            .route("/upload_multiple", post(upload_multiple))
+            .route("/", get(get_images).post(upload_image))
             .route("/{id}", delete(delete_image)),
     )
 }
@@ -41,7 +40,7 @@ async fn delete_image(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn upload_multiple(
+async fn upload_image(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     multipart: Multipart,
@@ -51,10 +50,6 @@ async fn upload_multiple(
         .get_settings()
         .get("upload_base_url")
         .unwrap_or_else(|| "https://axum.kawa.homes/uploads".to_string());
-    let records = images_service::upload_images(state.get_pool(), state.get_storage(), &base_url, Some(auth_user.id), multipart).await?;
-    let body: Vec<_> = records
-        .iter()
-        .map(|r| serde_json::json!({ "id": r.id, "url": r.url }))
-        .collect();
-    Ok((StatusCode::CREATED, Json(serde_json::json!(body))))
+    let record = images_service::upload_image(state.get_pool(), state.get_storage(), &base_url, Some(auth_user.id), multipart).await?;
+    Ok((StatusCode::CREATED, Json(serde_json::json!({ "id": record.id, "url": record.url }))))
 }

@@ -9,7 +9,7 @@ import rehypeHighlight from 'rehype-highlight';
 import { Loader2, Bold, Italic, Code, Link2, Heading2, Quote, List, Plus, X } from 'lucide-react';
 import 'highlight.js/styles/github-dark.css';
 import { putBlog } from '@/api/blogs';
-import { uploadImages } from '@/api/images';
+import { uploadImage } from '@/api/images';
 import { uploadErrorMessage, uploadProgressLabel, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressAndUploadEach } from '@/libs/client-image';
 import { useMarkdownTextarea } from '@/hooks/useMarkdownTextarea';
@@ -76,10 +76,10 @@ export default function BlogComponent({ id, blog, allTags }: Props) {
                 (file) => {
                     const formData = new FormData();
                     formData.append('file', file);
-                    return withUploadTimeout(uploadImages(formData));
+                    return withUploadTimeout(uploadImage(formData));
                 },
                 setUploadProgress,
-                (data) => insertAtCursor(data.map(d => `![image](${d.url})`).join('\n') + '\n'),
+                (image) => insertAtCursor(`![image](${image.url})\n`),
             );
         } catch (err) {
             setUploadError(uploadErrorMessage(err));

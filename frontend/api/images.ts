@@ -9,9 +9,9 @@ export async function getImages(): Promise<Image[]> {
     });
 }
 
-export async function uploadImages(formData: FormData): Promise<Image[]> {
-    return adminRequest<Image[]>({
-        url: `${process.env.API_URL}/admin/images/upload_multiple`,
+export async function uploadImage(formData: FormData): Promise<Image> {
+    return adminRequest<Image>({
+        url: `${process.env.API_URL}/admin/images`,
         method: 'POST',
         body: formData,
     });
