@@ -92,7 +92,7 @@ function SidebarContent({ groups, pathname, onNavigate }: { groups: AdminNavGrou
                     );
                 })}
             </div>
-            <div className="border-t border-neutral-200 dark:border-neutral-700 p-4">
+            <div className="border-t border-neutral-200 dark:border-neutral-700 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
                 <button
                     onClick={() => {
                         stopTokenRefresh();
@@ -147,7 +147,7 @@ export default function AdminSidebar({ permissions, enabledFeatures }: { permiss
 
             {/* Mobile: drawer */}
             <aside
-                className={`sm:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white dark:bg-neutral-900 shadow-xl transition-transform duration-300
+                className={`sm:hidden fixed top-0 left-0 z-50 h-[100dvh] w-64 bg-white dark:bg-neutral-900 shadow-xl transition-transform duration-300
                     ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`}
             >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
