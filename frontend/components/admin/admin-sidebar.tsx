@@ -92,7 +92,7 @@ function SidebarContent({ groups, pathname, onNavigate }: { groups: AdminNavGrou
                     );
                 })}
             </div>
-            <div className="border-t border-neutral-200 dark:border-neutral-700 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="border-t border-neutral-200 dark:border-neutral-700 p-4">
                 <button
                     onClick={() => {
                         stopTokenRefresh();
