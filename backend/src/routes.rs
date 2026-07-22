@@ -2,6 +2,7 @@ mod admin;
 mod admin_games;
 mod admin_gov_tenders;
 mod admin_invoice_lottery;
+mod admin_messages;
 mod admin_stats;
 mod admin_vocab;
 mod app_settings;
@@ -15,6 +16,7 @@ mod invoices;
 mod ledger;
 mod lotto;
 mod members;
+mod messages;
 mod metrics;
 mod oauth;
 mod permissions;
@@ -123,6 +125,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/ws", ws::new(state.clone()))
         .nest("/roster", with_feature(state.clone(), Feature::Roster, roster::new()))
         .nest("/members", members::new(state.clone()))
+        .nest("/messages", with_feature(state.clone(), Feature::Message, messages::new(state.clone())))
         .nest("/member/portfolio", with_feature(state.clone(), Feature::Portfolio, portfolio::new(state.clone())))
         .nest("/member/ledger", with_feature(state.clone(), Feature::Ledger, ledger::new(state.clone())))
         .nest("/member/invoices", with_feature(state.clone(), Feature::Invoices, invoices::new(state.clone())))

@@ -1,4 +1,27 @@
 {
+  "Footer": {
+    "contact": "留言給我"
+  },
+  "Contact": {
+    "title": "留言給我",
+    "subtitle": "有任何想法、問題或合作提案,都歡迎在這裡留言。",
+    "nameLabel": "名字",
+    "namePlaceholder": "怎麼稱呼你?(可留空)",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com(可留空)",
+    "emailHint": "留下 Email 我才回得了信;不填也可以匿名留言。",
+    "contentLabel": "留言內容",
+    "contentPlaceholder": "想說的話…",
+    "submit": "送出留言",
+    "submitting": "送出中…",
+    "result": {
+      "success": "留言已送出,謝謝你!",
+      "empty": "請輸入留言內容",
+      "rateLimit": "送出太頻繁,請稍後再試",
+      "invalid": "內容格式不正確,請檢查後再送出",
+      "failed": "送出失敗,請稍後再試"
+    }
+  },
   "Header": {
     "tools": "工具",
     "games": "遊戲",

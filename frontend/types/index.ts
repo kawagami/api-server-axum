@@ -9,6 +9,7 @@ export * from './auth';
 export * from './ws';
 export * from './torrent';
 export * from './gov-tender';
+export * from './contact';
 export * from './misc';
 export * from './vocab';
 export * from './metrics';

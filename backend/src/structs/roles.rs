@@ -36,6 +36,8 @@ pub enum Perm {
     GovTenderRead,
     VocabRead,
     VocabUpdate,
+    MessageRead,
+    MessageDelete,
 }
 
 impl Perm {
@@ -75,6 +77,8 @@ impl Perm {
             Self::GovTenderRead  => "gov_tender:read",
             Self::VocabRead      => "vocab:read",
             Self::VocabUpdate    => "vocab:update",
+            Self::MessageRead    => "message:read",
+            Self::MessageDelete  => "message:delete",
         }
     }
 }

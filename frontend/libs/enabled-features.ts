@@ -16,6 +16,7 @@ export const BACKEND_FEATURES = [
     { key: "vocab", label: "單字闖關" },
     { key: "torrents", label: "Torrent 下載" },
     { key: "gov_tenders", label: "政府標案" },
+    { key: "message", label: "訪客留言" },
 ] as const;
 
 export type BackendFeatureKey = (typeof BACKEND_FEATURES)[number]["key"];

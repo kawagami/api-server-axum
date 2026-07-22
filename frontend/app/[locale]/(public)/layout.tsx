@@ -40,7 +40,7 @@ export default async function PublicLayout({ children }: { children: React.React
             <main className="min-h-[calc(100svh-50px-50px)] overflow-hidden flex flex-col items-center justify-start pt-4">
                 {children}
             </main>
-            <Footer />
+            <Footer enabledFeatures={enabledFeatures} />
             <WsToast />
         </>
     );

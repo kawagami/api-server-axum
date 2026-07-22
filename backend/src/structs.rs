@@ -9,6 +9,7 @@ pub mod jobs;
 pub mod ledger;
 pub mod lotto;
 pub mod members;
+pub mod messages;
 pub mod pagination;
 pub mod portfolio;
 pub mod roles;

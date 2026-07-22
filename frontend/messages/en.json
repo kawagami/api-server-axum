@@ -1,4 +1,27 @@
 {
+  "Footer": {
+    "contact": "Leave a message"
+  },
+  "Contact": {
+    "title": "Leave me a message",
+    "subtitle": "Thoughts, questions, or collaboration ideas — drop me a note here.",
+    "nameLabel": "Name",
+    "namePlaceholder": "What should I call you? (optional)",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com (optional)",
+    "emailHint": "Leave an email so I can reply; you can also stay anonymous.",
+    "contentLabel": "Message",
+    "contentPlaceholder": "What's on your mind…",
+    "submit": "Send message",
+    "submitting": "Sending…",
+    "result": {
+      "success": "Message sent — thank you!",
+      "empty": "Please enter a message",
+      "rateLimit": "Too many submissions, please try again later",
+      "invalid": "Invalid content, please check and try again",
+      "failed": "Failed to send, please try again later"
+    }
+  },
   "Header": {
     "tools": "Tools",
     "games": "Games",
