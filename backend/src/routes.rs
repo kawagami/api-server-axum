@@ -1,4 +1,5 @@
 mod admin;
+mod admin_blog_comments;
 mod admin_games;
 mod admin_gov_tenders;
 mod admin_invoice_lottery;
@@ -120,7 +121,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
 
     Router::new()
         .nest("/admin", admin::new(state.clone()))
-        .nest("/blogs", with_feature(state.clone(), Feature::Blog, blogs::new()))
+        .nest("/blogs", with_feature(state.clone(), Feature::Blog, blogs::new(state.clone())))
         .nest("/tools", with_feature(state.clone(), Feature::Tools, tools::new(state.clone())))
         .nest("/ws", ws::new(state.clone()))
         .nest("/roster", with_feature(state.clone(), Feature::Roster, roster::new()))

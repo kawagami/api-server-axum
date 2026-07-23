@@ -38,6 +38,8 @@ pub enum Perm {
     VocabUpdate,
     MessageRead,
     MessageDelete,
+    CommentRead,
+    CommentDelete,
 }
 
 impl Perm {
@@ -79,6 +81,8 @@ impl Perm {
             Self::VocabUpdate    => "vocab:update",
             Self::MessageRead    => "message:read",
             Self::MessageDelete  => "message:delete",
+            Self::CommentRead    => "comment:read",
+            Self::CommentDelete  => "comment:delete",
         }
     }
 }

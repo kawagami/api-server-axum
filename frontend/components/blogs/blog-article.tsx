@@ -7,7 +7,7 @@ import { getTranslations } from 'next-intl/server';
 import { extractHeadings } from '@/libs/blog-markdown';
 import 'highlight.js/styles/github-dark.css';   // 深色高亮主題，配 prose 的深色 pre 底（亮/暗模式皆一致）
 
-export default async function BlogArticle({ markdown }: { markdown: string }) {
+export default async function BlogArticle({ markdown, comments }: { markdown: string; comments?: React.ReactNode }) {
     const headings = extractHeadings(markdown);
     const t = await getTranslations('BlogArticle');
 
@@ -54,6 +54,12 @@ export default async function BlogArticle({ markdown }: { markdown: string }) {
                     </aside>
                 )}
             </div>
+
+            {comments && (
+                <div className="max-w-5xl mx-auto">
+                    <div className="max-w-prose">{comments}</div>
+                </div>
+            )}
         </div>
     );
 }

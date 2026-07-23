@@ -4,6 +4,7 @@ export * from './ledger';
 export * from './invoice';
 export * from './lotto';
 export * from './blog';
+export * from './blog-comment';
 export * from './stock';
 export * from './auth';
 export * from './ws';

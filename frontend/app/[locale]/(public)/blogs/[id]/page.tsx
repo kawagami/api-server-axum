@@ -1,7 +1,9 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import { getBlog } from "@/api/blogs";
 import BlogArticle from "@/components/blogs/blog-article";
+import CommentSection from "@/components/blogs/comments/comment-section";
 import { extractExcerpt, firstImageUrl } from "@/libs/blog-markdown";
 
 const fetchBlog = cache(getBlog);
@@ -41,6 +43,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function BlogPage({ params }: { params: Params }) {
     const { id } = await params;
     const blog = await fetchBlog(id);
+    // 訪客(無 access_token)也能留言,登入會員留言則綁身分;此處僅判斷是否顯示訪客名欄
+    const isMember = !!(await cookies()).get("access_token")?.value;
 
     const jsonLd = {
         "@context": "https://schema.org",
@@ -59,7 +63,10 @@ export default async function BlogPage({ params }: { params: Params }) {
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
-            <BlogArticle markdown={blog.markdown} />
+            <BlogArticle
+                markdown={blog.markdown}
+                comments={<CommentSection blogId={id} isMember={isMember} />}
+            />
         </>
     );
 }

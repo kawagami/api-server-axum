@@ -207,6 +207,23 @@
   "BlogArticle": {
     "toc": "目錄"
   },
+  "BlogComments": {
+    "title": "留言",
+    "empty": "還沒有留言,搶頭香吧!",
+    "guest": "訪客",
+    "memberBadge": "會員",
+    "asMember": "將以你的會員身分留言。",
+    "namePlaceholder": "怎麼稱呼你?(可留空)",
+    "contentPlaceholder": "留下你的想法…",
+    "submit": "送出留言",
+    "error": {
+      "empty": "請輸入留言內容",
+      "rateLimit": "送出太頻繁,請稍後再試",
+      "invalid": "內容格式不正確,請檢查後再送出",
+      "failed": "送出失敗,請稍後再試"
+    },
+    "loadMore": "載入更多"
+  },
   "About": {
     "intro": "簡介",
     "cards": [

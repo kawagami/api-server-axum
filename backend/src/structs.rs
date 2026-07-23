@@ -1,6 +1,7 @@
 pub mod app_settings;
 pub mod auth;
 pub mod config;
+pub mod blog_comments;
 pub mod blogs;
 pub mod features;
 pub mod gov_tenders;

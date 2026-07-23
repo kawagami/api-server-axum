@@ -30,6 +30,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         icon: FileText,
         items: [
             { label: "文章", href: "/admin/blogs", permission: "blog:read", feature: "blog" },
+            { label: "文章留言", href: "/admin/blog-comments", permission: "comment:read", feature: "blog" },
             { label: "圖片", href: "/admin/images", permission: "image:read", feature: "blog" },
             { label: "單字題庫", href: "/admin/vocab", permission: "vocab:read", feature: "vocab" },
         ],

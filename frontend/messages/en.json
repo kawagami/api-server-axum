@@ -207,6 +207,23 @@
   "BlogArticle": {
     "toc": "Contents"
   },
+  "BlogComments": {
+    "title": "Comments",
+    "empty": "No comments yet. Be the first!",
+    "guest": "Guest",
+    "memberBadge": "Member",
+    "asMember": "You'll comment as your member account.",
+    "namePlaceholder": "Your name (optional)",
+    "contentPlaceholder": "Share your thoughts…",
+    "submit": "Post comment",
+    "error": {
+      "empty": "Please enter a comment",
+      "rateLimit": "Too many requests, please try again later",
+      "invalid": "Invalid content, please check and try again",
+      "failed": "Failed to submit, please try again later"
+    },
+    "loadMore": "Load more"
+  },
   "About": {
     "intro": "Intro",
     "cards": [

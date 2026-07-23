@@ -17,6 +17,8 @@ const AUTH_MAX_REQUESTS: i64 = 5;
 const WEBAUTHN_MAX_REQUESTS: i64 = 10;
 // 訪客留言:公開未認證的寫入端點,收緊防灌水(正常人一次就送完)
 const MESSAGES_MAX_REQUESTS: i64 = 5;
+// blog 留言:同為公開寫入,獨立 bucket 不與訪客留言互搶(討論串可能連續發幾則)
+const COMMENTS_MAX_REQUESTS: i64 = 10;
 const WINDOW_SECS: i64 = 60;
 
 pub async fn tools_rate_limit(
@@ -49,6 +51,14 @@ pub async fn messages_rate_limit(
     next: Next,
 ) -> Result<Response<Body>, AppError> {
     rate_limit(state, req, next, "messages", MESSAGES_MAX_REQUESTS).await
+}
+
+pub async fn comments_rate_limit(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Result<Response<Body>, AppError> {
+    rate_limit(state, req, next, "comments", COMMENTS_MAX_REQUESTS).await
 }
 
 async fn rate_limit(
