@@ -53,7 +53,7 @@ deploy/ ──CI rsync──▶ VPS ~/kawa-deploy(compose + nginx + certbot)
 
 1. **Docker 映像**:前後端各自 build image 推到 Docker Hub;image 名稱是契約,改名要同步 `deploy/docker-compose.yml`。
 2. **HTTP / WebSocket**:前端用 `API_URL` / `WS_URL` 環境變數連後端,URL 不寫死。
-3. **編排**:`deploy/` 的 compose + nginx vhost(`kawa.homes` → frontend、`axum.kawa.homes` → backend)。秘密值只存在 VPS `/srv/kawa/env/kawa.env`(全站唯一 env 檔,三容器共用,`JWT_SECRET` 只出現一次)。
+3. **編排**:`deploy/` 的 compose + nginx vhost(`kawa.homes` → frontend、`axum.kawa.homes` → backend、`media.kawa.homes` → 上傳圖片靜態檔,nginx 直出 `/srv/kawa/uploads`)。秘密值只存在 VPS `/srv/kawa/env/kawa.env`(全站唯一 env 檔,三容器共用,`JWT_SECRET` 只出現一次)。
 
 ## 本地開發
 
