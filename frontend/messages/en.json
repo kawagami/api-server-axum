@@ -225,26 +225,41 @@
     "loadMore": "Load more"
   },
   "About": {
-    "intro": "Intro",
-    "cards": [
+    "title": "About",
+    "tagline": "kawa's personal site — a blog plus a bunch of tools I actually use, built end to end from the Rust backend to deployment.",
+    "intro": "Rather than scattering tools everywhere, I keep them in one place and grow it over time. This is my playground and testbed: where I try the tech I want to learn and build the features I want to have.",
+    "techHeading": "Tech Stack",
+    "tech": [
+      "Rust",
+      "Axum",
+      "Next.js",
+      "React",
+      "TypeScript",
+      "PostgreSQL",
+      "Redis",
+      "Tailwind CSS",
+      "Docker",
+      "nginx"
+    ],
+    "principlesHeading": "About this site",
+    "principles": [
       {
-        "title": "About this site",
-        "contents": [
-          "Backend API built with Rust's axum framework",
-          "Frontend built with React + Next.js",
-          "Blog pages rendered with react-markdown",
-          "UI/UX continuously improving",
-          "More features added as ideas come up"
-        ]
+        "title": "Built end to end",
+        "desc": "Backend API, frontend pages and deployment orchestration all done myself — the whole site is an ongoing practice and experiment."
       },
       {
-        "title": "Countdown page",
-        "contents": [
-          "Handy utilities of all kinds",
-          "Added to tools as they get built"
-        ]
+        "title": "Always growing",
+        "desc": "Useful ideas get added as they come; tools and games gain new features over time, and the UI/UX keeps getting polished."
+      },
+      {
+        "title": "Fully open source",
+        "desc": "Frontend, backend and deployment all live in one repo — feel free to browse the source on GitHub."
       }
-    ]
+    ],
+    "linksHeading": "Links",
+    "github": "Source on GitHub",
+    "contact": "Leave a message",
+    "home": "Back home to explore"
   },
   "Ws": {
     "title": "WS Notifications",

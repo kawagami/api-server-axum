@@ -225,26 +225,41 @@
     "loadMore": "加载更多"
   },
   "About": {
-    "intro": "简介",
-    "cards": [
+    "title": "关于本站",
+    "tagline": "kawa 的个人小站 —— 一个博客,加上一堆自己会用到的小工具,从 Rust 后端到部署全都自己来。",
+    "intro": "与其把工具散在各处,不如收进同一个站慢慢养。这里是我的练功场,也是实验场:想学的技术在这里试、想要的功能在这里长。",
+    "techHeading": "技术栈",
+    "tech": [
+      "Rust",
+      "Axum",
+      "Next.js",
+      "React",
+      "TypeScript",
+      "PostgreSQL",
+      "Redis",
+      "Tailwind CSS",
+      "Docker",
+      "nginx"
+    ],
+    "principlesHeading": "关于这个站",
+    "principles": [
       {
-        "title": "关于本站",
-        "contents": [
-          "后端 API 使用 rust 的 axum 框架",
-          "前端页面使用 react + next.js 框架",
-          "blogs 页面使用 react-markdown render",
-          "UI/UX 持续完善中",
-          "其余的想到什么就会加进来"
-        ]
+        "title": "一手包办",
+        "desc": "后端 API、前端页面到部署编排全部自己来,整站是长期练功与实验的成果。"
       },
       {
-        "title": "倒数页面",
-        "contents": [
-          "各种会用到的功能",
-          "实现后就会加进 tools 来"
-        ]
+        "title": "持续成长",
+        "desc": "想到有用的东西就加进来,工具与游戏会不定期冒出新功能,UI/UX 也持续打磨。"
+      },
+      {
+        "title": "全部开源",
+        "desc": "前端、后端与部署编排都放在同一个 repo,欢迎到 GitHub 逛逛源码。"
       }
-    ]
+    ],
+    "linksHeading": "链接",
+    "github": "GitHub 源码",
+    "contact": "留言给我",
+    "home": "回首页看看有什么"
   },
   "Ws": {
     "title": "WS 通知",
