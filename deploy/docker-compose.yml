@@ -20,6 +20,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - letsencrypt:/etc/letsencrypt
+      - /srv/kawa/uploads:/srv/kawa/uploads:ro   # media.kawa.homes 直接靜態服務上傳圖(唯讀)
     ports:
       - "80:80"
       - "443:443"

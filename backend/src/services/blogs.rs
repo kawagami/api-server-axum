@@ -29,15 +29,17 @@ pub fn normalize_tags(tags: Vec<String>) -> Vec<String> {
     out
 }
 
-fn extract_upload_urls(markdown: &str) -> Vec<String> {
+/// 抓出 markdown 內文所有圖片 URL（`![](url)`），不篩來源。
+/// 是否為站內上傳圖交給下游 `images` table 的 `url = ANY($1)` 精確比對決定：
+/// 外部圖（如 https://example.com/x.png）比不中任何 row、無害。
+/// 刻意不以 host/path 字串（如 `/uploads/`）判斷，公開 URL 網域才能與儲存後端解耦
+/// （media.kawa.homes / 未來 R2 / 商家 instance 皆適用）。
+fn extract_image_urls(markdown: &str) -> Vec<String> {
     let re = MD_IMAGE_RE
         .get_or_init(|| Regex::new(r"!\[[^\]]*\]\(([^)]+)\)").expect("static regex is always valid"));
 
     re.captures_iter(markdown)
-        .filter_map(|cap| {
-            let url = cap[1].to_string();
-            if url.contains("/uploads/") { Some(url) } else { None }
-        })
+        .map(|cap| cap[1].to_string())
         .collect()
 }
 
@@ -122,12 +124,12 @@ pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_
     let title = tocs.first().cloned().unwrap_or_default();
 
     let old_urls = match blogs_repo::get_blog_by_id(pool, id).await {
-        Ok(old_blog) => extract_upload_urls(&old_blog.markdown),
+        Ok(old_blog) => extract_image_urls(&old_blog.markdown),
         Err(AppError::RequestError(RequestError::NotFound)) => vec![],
         Err(e) => return Err(e),
     };
 
-    let new_urls = extract_upload_urls(&blog.markdown);
+    let new_urls = extract_image_urls(&blog.markdown);
     let new_url_set: HashSet<&String> = new_urls.iter().collect();
     let orphaned_urls: Vec<String> = old_urls.into_iter().filter(|u| !new_url_set.contains(u)).collect();
 
@@ -158,7 +160,7 @@ pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_
 
 pub async fn delete_blog_with_images(pool: &Pool<Postgres>, id: Uuid) -> Result<(), AppError> {
     let blog = blogs_repo::get_blog_by_id(pool, id).await?;
-    let upload_urls = extract_upload_urls(&blog.markdown);
+    let upload_urls = extract_image_urls(&blog.markdown);
 
     let image_ids: Vec<i32> = if upload_urls.is_empty() {
         vec![]

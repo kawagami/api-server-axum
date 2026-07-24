@@ -49,7 +49,7 @@ async fn upload_image(
     let settings = state.get_settings();
     let base_url = settings
         .get("upload_base_url")
-        .unwrap_or_else(|| "https://axum.kawa.homes/uploads".to_string());
+        .unwrap_or_else(|| "https://media.kawa.homes".to_string());
     // PATCH 端已驗證 1–100；此處仍給 fallback，避免舊資料/缺 key 時炸掉
     let quality = settings
         .get("image_webp_quality")
