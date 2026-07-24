@@ -25,11 +25,27 @@ export const useImageManager = (
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // 追加選取(拖放與點選共用),只收圖片、以 name+size+lastModified 去重
+    const addFiles = (files: File[]) => {
+        const imgs = files.filter(f => f.type.startsWith('image/'));
+        if (!imgs.length) return;
+        const key = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
+        setSelectedFiles(prev => {
+            const seen = new Set(prev.map(key));
+            return [...prev, ...imgs.filter(f => !seen.has(key(f)))];
+        });
+        setUploadError(null);
+    };
+
     const imageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.length) {
-            setSelectedFiles(Array.from(e.target.files));
-            setUploadError(null);
-        }
+        if (e.target.files?.length) addFiles(Array.from(e.target.files));
+        // 清空 input value,讓再次選到同一檔也能觸發 change
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const removeSelectedAt = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+        setUploadError(null);
     };
 
     const removeSelectedImage = () => {
@@ -102,7 +118,9 @@ export const useImageManager = (
         canUpload: selectedFiles.length > 0,
         copiedImage,
         fileInputRef,
+        addFiles,
         imageChange,
+        removeSelectedAt,
         removeSelectedImage,
         handleUpload,
         handleDelete,
