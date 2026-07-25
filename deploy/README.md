@@ -180,7 +180,7 @@ cd ~/kawa-deploy && bash shells/issue-cert.sh && docker compose restart nginx
 # 新VPS
 docker compose ps                     # 六個服務 Up、database healthy
 curl -sI https://kawa.homes | head -1
-curl -s -o /dev/null -w '%{http_code}\n' https://api.kawa.homes/settings/public   # 200（根路徑無路由，會 404 是正常的）
+curl -s https://api.kawa.homes/health   # {"status":"ok"}（根路徑無路由、回 404 是正常的，別拿 / 當探針）
 # 瀏覽器：前台登入（驗 JWT_SECRET 搬對）、後台登入、WS 頁面、圖片/torrent 讀取
 ```
 
@@ -263,7 +263,7 @@ docker compose up -d
 
 ```bash
 docker compose ps            # database healthy、backend Up
-curl -s -o /dev/null -w '%{http_code}\n' https://api.kawa.homes/settings/public   # 200（根路徑無路由，會 404 是正常的）
+curl -s https://api.kawa.homes/health   # {"status":"ok"}（根路徑無路由、回 404 是正常的，別拿 / 當探針）
 docker exec database psql -U kawa -d kawa -tAc "SELECT version FROM _sqlx_migrations"   # 只有 20260702000000
 ```
 
@@ -330,7 +330,7 @@ docker compose config --quiet && docker compose up -d
 ```bash
 docker compose ps                     # 六個服務都 Up、database healthy
 curl -sI https://kawa.homes | head -1
-curl -s -o /dev/null -w '%{http_code}\n' https://api.kawa.homes/settings/public   # 200（根路徑無路由，會 404 是正常的）
+curl -s https://api.kawa.homes/health   # {"status":"ok"}（根路徑無路由、回 404 是正常的，別拿 / 當探針）
 # 瀏覽器：前台登入（驗 JWT_SECRET 共用正確）、後台登入、WS 頁面
 ```
 

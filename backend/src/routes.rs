@@ -32,15 +32,19 @@ mod vocab;
 mod ws;
 
 use crate::{
-    logging::LogEntry, scheduler::initialize_scheduler, state::AppState,
+    errors::{AppError, RequestError},
+    logging::LogEntry,
+    scheduler::initialize_scheduler,
+    state::AppState,
     structs::features::Feature,
 };
 use axum::{
     extract::{DefaultBodyLimit, Request, State},
-    http::{header, HeaderValue, Method, StatusCode},
+    http::{header, HeaderValue, Method},
     middleware::{self, Next},
     response::IntoResponse,
-    Router,
+    routing::get,
+    Json, Router,
 };
 use tokio::sync::mpsc;
 use tower_http::cors::AllowOrigin;
@@ -61,7 +65,7 @@ pub(super) fn with_feature(
             if state.get_settings().feature_enabled(feature) {
                 next.run(req).await
             } else {
-                (StatusCode::NOT_FOUND, "empty page").into_response()
+                AppError::from(RequestError::NotFound).into_response()
             }
         },
     ))
@@ -137,8 +141,11 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/metrics", metrics::new(state.clone()))
         .nest("/settings", app_settings::public())
         .nest_service("/uploads", ServeDir::new(&upload_path))
+        // 存活探針：不查 DB / Redis，純粹回報「行程活著且在收請求」，給外部 uptime 監控打
+        .route("/health", get(|| async { Json(serde_json::json!({ "status": "ok" })) }))
         // fallback 需在 layer 之前註冊，否則不會被下面的 request_id / TraceLayer 包住（404 也要有追蹤 id）
-        .fallback(|| async { (StatusCode::NOT_FOUND, "empty page") })
+        // 形狀刻意與 AppError 一致（含 request_id），全站錯誤只有一種格式；with_feature 的 404 同源
+        .fallback(|| async { AppError::from(RequestError::NotFound) })
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
         .layer(

@@ -54,8 +54,13 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/logs` | 操作紀錄 |
 | `/uploads/*` | 本機靜態檔案 |
 | `/tools` | 工具 |
+| `/health` | 存活探針，回 `200 {"status":"ok"}`（無認證、不查 DB / Redis，給外部 uptime 監控用） |
 
 分頁端點統一 `?page=1&per_page=N`（per_page 上限 200）；POST 建立資源回 `201`，更新／刪除無內容回 `204`。
+
+根路徑 `/` 沒有路由，打了回 `404` —— 這是正常的，要探測服務是否活著請打 `/health`。
+所有 404（含未知路徑、功能開關關閉）與其他錯誤共用同一個 JSON 形狀
+`{ code, message, details?, request_id }`，`request_id` 同時在 `x-request-id` header,回報問題時可據此撈 log。
 
 ## 排程 Job
 
