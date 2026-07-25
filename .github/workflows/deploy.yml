@@ -10,9 +10,45 @@ on:
     paths:
       - 'deploy/**'
       - '.github/workflows/deploy.yml'
+  pull_request:
+    paths:
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
 
 jobs:
+  # PR 專用：在 runner 上把 nginx 設定完整跑一次 `nginx -t`。
+  # 這裡不碰 VPS、不需要任何 secret，純語法/語意驗證。
+  validate-nginx:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      -
+        # nginx -t 會檢查 ssl_certificate 指到的檔案存在，故先造一組拋棄式自簽憑證
+        name: 產生自簽憑證供 nginx -t 使用
+        run: |
+          mkdir -p certs/live/kawa.homes
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout certs/live/kawa.homes/privkey.pem \
+            -out   certs/live/kawa.homes/fullchain.pem \
+            -subj "/CN=kawa.homes"
+      -
+        # --add-host 不可省：proxy_pass http://backend:3000 是靜態主機名，
+        # nginx 在載入設定階段就會解析，runner 上沒有 compose 網路會 host not found。
+        name: nginx -t
+        run: |
+          docker run --rm \
+            --add-host backend:127.0.0.1 \
+            --add-host frontend:127.0.0.1 \
+            -v "$PWD/deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            -v "$PWD/deploy/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            -v "$PWD/certs:/etc/letsencrypt:ro" \
+            nginx:alpine nginx -t
+
   deploy:
+    if: github.event_name == 'push'   # PR 不部署
     runs-on: ubuntu-latest
     # 與 backend.yml / frontend.yml 的 deploy job 共用 group，部署序列化
     concurrency:

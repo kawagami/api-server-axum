@@ -1,9 +1,16 @@
 name: backend-ci
 
+# PR 只跑 test（讓 Dependabot PR 有驗證）；build 與 deploy 只在 push master 跑。
+# 兩者的區隔靠下方 job 的 `if: github.event_name == 'push'`，不可拿掉 ——
+# 否則每個 PR 都會推 image 到 Docker Hub 並 SSH 部署到 VPS。
 on:
   push:
     branches:
       - 'master'
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
     paths:
       - 'backend/**'
       - '.github/workflows/backend.yml'
@@ -37,6 +44,7 @@ jobs:
 
   build:
     needs: test
+    if: github.event_name == 'push'   # PR 不推 image
     runs-on: ubuntu-latest
     steps:
       -
@@ -66,6 +74,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.event_name == 'push'   # PR 不部署
     runs-on: ubuntu-latest
     # 與 frontend.yml 的 deploy job 共用 group：build 各自並行，只有部署階段序列化（排隊、不取消）
     concurrency:
