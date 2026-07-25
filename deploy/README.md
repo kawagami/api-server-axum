@@ -33,6 +33,26 @@
 - 改 `backend/**` / `frontend/**` → 各自 workflow build image 後 SSH：`cd ~/kawa-deploy && docker pull … && docker compose up -d`。
 - 三條 deploy 共用 `concurrency: vps-deploy`，序列化不撞車。
 
+## 效能量測
+
+`deploy/scripts/perf-check.sh` —— 換 CF 方案 / 搬機房 / 改快取策略時的前後對照基準。會隨部署 rsync 到 VPS，所以兩種模式都能就地跑。
+
+```bash
+./perf-check.sh           # 使用者視角（CF 節點、TCP/TLS/TTFB、快取狀態、圖片最佳化健檢）
+./perf-check.sh origin    # 在 VPS 上跑，量 origin 本身（繞過 CF）
+```
+
+2026-07-25 的基準（HiNet 固網）：
+
+| 量測點 | 數值 |
+|---|---|
+| origin 處理（`/zh-TW` SSR，直打容器） | ~10ms |
+| origin 經 nginx+TLS | ~30ms |
+| 到 CF 邊緣（`cloudflare.com`，KHH 高雄） | **11ms** |
+| 到 CF 邊緣（本站，**SIN 新加坡**） | **193ms** |
+
+**結論：瓶頸不在 origin（只佔 3%），而是 CF 免費方案把本站的網域丟到新加坡而非台灣節點。** 腳本會自動比對本站與 `cloudflare.com` 的 `cf-ray` 節點代碼並標出差異 —— 那個 baseline 代表「這條線路本來碰得到的最近節點」。
+
 ### ⚠ nginx.conf 是單檔 bind mount —— 改它必須 recreate 容器
 
 `docker-compose.yml` 把 `./nginx/nginx.conf` 以**單一檔案**掛進容器，而單檔 bind mount 綁的是 **inode**。rsync 的預設行為是「寫暫存檔再 rename」，會換掉 inode，**執行中的容器因此看不到新的 `nginx.conf`**。相對地 `./nginx/conf.d` 是**目錄**掛載，目錄內的檔案變動會正常反映。
