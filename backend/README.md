@@ -1,6 +1,6 @@
 # Rust Axum API Server
 
-Rust + Axum 網頁 API 伺服器，部署於 `https://axum.kawa.homes`。
+Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `axum.kawa.homes` 仍為有效 alias）。
 
 ## 功能
 

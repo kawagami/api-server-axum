@@ -7,7 +7,7 @@
 
 | 服務 | Image | 說明 |
 |------|-------|------|
-| nginx | nginx:alpine | 反向代理（`kawa.homes` → frontend、`axum.kawa.homes` → backend）＋ `media.kawa.homes` 直出上傳圖片（`root /srv/kawa/uploads`，掛唯讀 volume） |
+| nginx | nginx:alpine | 反向代理（`kawa.homes` → frontend、`api.kawa.homes` → backend，舊名 `axum.kawa.homes` 同 vhost 保留為 alias）＋ `media.kawa.homes` 直出上傳圖片（`root /srv/kawa/uploads`，掛唯讀 volume） |
 | certbot | certbot/dns-cloudflare | Let's Encrypt 自動 renew（DNS-01） |
 | database | postgres:18-alpine | 資料庫 |
 | valkey | valkey/valkey:alpine | Cache（Redis 相容） |
@@ -40,7 +40,9 @@
 ### 0. 前提
 
 - 新 VPS：建使用者 + SSH 金鑰、裝 docker（含 compose plugin）與 rsync、使用者加入 `docker` 群組
-- Cloudflare DNS：`kawa.homes`、`*.kawa.homes` 指向新機 IP；SSL/TLS 模式 **Full (Strict)**
+- Cloudflare DNS：`kawa.homes`、`*.kawa.homes`、以及各子網域單獨那幾筆（`api` / `axum` / `media`）
+  指向新機 IP；SSL/TLS 模式 **Full (Strict)**（憑證是 `kawa.homes` + `*.kawa.homes` wildcard，
+  新增子網域不用重簽，但橘雲要單獨開一筆 record）
 - 若新機**取代**舊機：GitHub secrets 更新 `VULTR_HOST` / `VULTR_USERNAME` / `SSH_PRIVATE_KEY`
 
 ### 1. 建持久層
@@ -166,7 +168,8 @@ cd ~/kawa-deploy && bash shells/issue-cert.sh && docker compose restart nginx
 
 ### 4. 切流量到新機（Cloudflare，非 registrar）
 
-- Cloudflare dashboard → DNS → 把 `kawa.homes` / `*.kawa.homes`（或 `axum`）那筆的**回源 IP**
+- Cloudflare dashboard → DNS → 把 `kawa.homes` / `*.kawa.homes`（以及 `api` / `axum` / `media`
+  等單獨列出的那幾筆）的**回源 IP**
   從舊機改成新機 IP。橘雲維持開啟，SSL/TLS 維持 **Full (Strict)**。
 - **GitHub secrets** 更新成新機，否則下次 push 會 deploy 到舊機：
   `VULTR_HOST` / `VULTR_USERNAME` / `SSH_PRIVATE_KEY`（deploy.yml / backend.yml / frontend.yml 三條 CI 共用）。
@@ -177,7 +180,7 @@ cd ~/kawa-deploy && bash shells/issue-cert.sh && docker compose restart nginx
 # 新VPS
 docker compose ps                     # 六個服務 Up、database healthy
 curl -sI https://kawa.homes | head -1
-curl -sI https://axum.kawa.homes | head -1
+curl -sI https://api.kawa.homes | head -1
 # 瀏覽器：前台登入（驗 JWT_SECRET 搬對）、後台登入、WS 頁面、圖片/torrent 讀取
 ```
 
@@ -260,7 +263,7 @@ docker compose up -d
 
 ```bash
 docker compose ps            # database healthy、backend Up
-curl -sI https://axum.kawa.homes | head -1
+curl -sI https://api.kawa.homes | head -1
 docker exec database psql -U kawa -d kawa -tAc "SELECT version FROM _sqlx_migrations"   # 只有 20260702000000
 ```
 
@@ -327,7 +330,7 @@ docker compose config --quiet && docker compose up -d
 ```bash
 docker compose ps                     # 六個服務都 Up、database healthy
 curl -sI https://kawa.homes | head -1
-curl -sI https://axum.kawa.homes | head -1
+curl -sI https://api.kawa.homes | head -1
 # 瀏覽器：前台登入（驗 JWT_SECRET 共用正確）、後台登入、WS 頁面
 ```
 

@@ -1,6 +1,6 @@
 # blog-next
 
-個人部落格與工具整合平台，Next.js 16 + React 19，後端對接 Rust Axum API (`axum.kawa.homes`)。
+個人部落格與工具整合平台，Next.js 16 + React 19，後端對接 Rust Axum API (`api.kawa.homes`)。
 
 ---
 
@@ -50,8 +50,8 @@
 - **圖片**：next/image（自動 WebP 轉換、lazy loading、縮圖），本地儲存（`/uploads/*`）
 - **認證**：JWT（`jose`），middleware 保護 `/admin/*` 與 `/{locale}/dashboard|profile|settings|portfolio|ledger|invoices|lotto`
 - **OCR**：`tesseract.js`（動態載入、數字白名單），彩券選號拍照／即時相機辨識輔助
-- **後端 API**：`https://axum.kawa.homes`（Rust Axum）
-- **WebSocket**：`wss://axum.kawa.homes`
+- **後端 API**：`https://api.kawa.homes`（Rust Axum；舊名 `axum.kawa.homes` 仍為有效 alias）
+- **WebSocket**：`wss://api.kawa.homes`
 - **部署**：Docker multi-stage build，standalone output
 
 ---
@@ -89,8 +89,8 @@ pnpm lint         # ESLint（flat config）
 需設定 `.env.local`：
 
 ```env
-API_URL=https://axum.kawa.homes
-WS_URL=wss://axum.kawa.homes
+API_URL=https://api.kawa.homes
+WS_URL=wss://api.kawa.homes
 JWT_SECRET=...
 ```
 
