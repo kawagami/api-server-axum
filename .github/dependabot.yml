@@ -1,0 +1,55 @@
+# Dependabot — 依賴自動跟版
+#
+# 為什麼需要：workflow 的 action 已改為釘 commit SHA（防 tag 被上游改寫的供應鏈攻擊），
+# 但釘死就不會自動拿到修補。Dependabot 認得 `@<sha> # v7` 這種寫法，
+# 會同時更新 SHA 與後面的版本註解，等於「釘死」與「跟得上」兼得。
+#
+# Dependabot 只開 PR，不會直接動 master。三個 CI workflow 都只在 push master 觸發，
+# 所以 PR 本身不會部署 —— 你 review、merge 之後才會走正常的部署流程。
+
+version: 2
+updates:
+  # ── GitHub Actions（供應鏈風險最高：這些 job 手上有 SSH_PRIVATE_KEY 與 DOCKERHUB_TOKEN）
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # ── 前端 npm/pnpm
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # 開發期依賴（eslint / 型別 / tailwind 等）合併成一個 PR，減少噪音
+      dev-dependencies:
+        dependency-type: development
+        patterns: ["*"]
+      # 生產依賴分開，方便逐一評估（next / react / sharp 這類要看 release note）
+      prod-minor-patch:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+
+  # ── 後端 Rust
+  - package-ecosystem: cargo
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Docker base image（builder 與 runtime 基底）
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

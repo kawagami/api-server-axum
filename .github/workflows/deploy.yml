@@ -21,10 +21,10 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       -
         name: Clean staging dir
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.VULTR_HOST }}
           username: ${{ secrets.VULTR_USERNAME }}
@@ -32,7 +32,7 @@ jobs:
           script: rm -rf ~/kawa-deploy-staging
       -
         name: Copy deploy config to staging
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1
         with:
           host: ${{ secrets.VULTR_HOST }}
           username: ${{ secrets.VULTR_USERNAME }}
@@ -42,7 +42,7 @@ jobs:
           strip_components: 1
       -
         name: Validate and apply
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.VULTR_HOST }}
           username: ${{ secrets.VULTR_USERNAME }}
