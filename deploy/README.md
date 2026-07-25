@@ -29,9 +29,22 @@
 
 ## CI 部署（日常）
 
-- 改 `deploy/**` → `deploy.yml`：scp 到 staging → `compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `compose up -d` → `nginx -t` → reload。
+- 改 `deploy/**` → `deploy.yml`：scp 到 staging → `compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `compose up -d` → 一次性容器 `nginx -t` → `--force-recreate` nginx。
 - 改 `backend/**` / `frontend/**` → 各自 workflow build image 後 SSH：`cd ~/kawa-deploy && docker pull … && docker compose up -d`。
 - 三條 deploy 共用 `concurrency: vps-deploy`，序列化不撞車。
+
+### ⚠ nginx.conf 是單檔 bind mount —— 改它必須 recreate 容器
+
+`docker-compose.yml` 把 `./nginx/nginx.conf` 以**單一檔案**掛進容器，而單檔 bind mount 綁的是 **inode**。rsync 的預設行為是「寫暫存檔再 rename」，會換掉 inode，**執行中的容器因此看不到新的 `nginx.conf`**。相對地 `./nginx/conf.d` 是**目錄**掛載，目錄內的檔案變動會正常反映。
+
+後果是新舊混用，而且錯誤訊息會指向錯的地方 —— 例如在 `conf.d` 新增 `limit_req zone=auth`、同時在 `nginx.conf` 新增對應的 `limit_req_zone`，容器只吃到前者，報的卻是 `zero size shared memory zone "auth"`，看起來像語法錯，實際是設定檔沒更新（2026-07-25 實際踩過）。
+
+因此 `deploy.yml` 的做法是：
+
+1. **用一次性容器驗證**，掛載當下磁碟上的檔案（不是執行中容器裡那份舊的）。借 `--network container:nginx` 取得 compose 網路，否則 `proxy_pass http://backend:3000` 在載入階段就 host not found。
+2. 通過後 **`docker compose up -d --force-recreate --no-deps nginx`** —— 只有 recreate 會重新解析 bind mount，`restart` 與 `nginx -s reload` 都不會。
+
+手動改 VPS 上的 nginx 設定時同理：動到 `nginx.conf` 就得 recreate，只動 `conf.d` 才能 reload 了事。
 
 ## 全新機器 bootstrap
 
