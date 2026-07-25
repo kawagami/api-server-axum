@@ -147,7 +147,7 @@ fn full_deck() -> Vec<Piece> {
 /// 隨機洗牌的初始局面（全部面朝下，First 先行）。
 pub fn initial_state() -> BanqiState {
     let mut deck = full_deck();
-    deck.shuffle(&mut rand::thread_rng());
+    deck.shuffle(&mut rand::rng());
     from_deck(deck)
 }
 

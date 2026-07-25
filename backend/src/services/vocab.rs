@@ -75,7 +75,7 @@ fn clamped_window(answered: i32, diff_min: i16, diff_max: i16) -> (i16, i16) {
 fn pick_kind(answered: i32) -> QuestionKind {
     if answered < 5 {
         QuestionKind::Choice
-    } else if rand::thread_rng().gen_bool(0.3) {
+    } else if rand::rng().random_bool(0.3) {
         QuestionKind::Spelling
     } else {
         QuestionKind::Choice
@@ -117,7 +117,7 @@ async fn build_question(
             if distractors.len() < 3 {
                 return Box::pin(build_question(state, run, word, QuestionKind::Spelling)).await;
             }
-            let answer_index = rand::thread_rng().gen_range(0..=distractors.len());
+            let answer_index = rand::rng().random_range(0..=distractors.len());
             let mut options = distractors;
             options.insert(answer_index, word.meaning_zh.clone());
 

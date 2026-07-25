@@ -6,7 +6,7 @@ use crate::structs::tools::{
 use crate::{state::AppState, structs::tools::Params};
 use axum::{extract::Query, middleware, routing::get, routing::post, Json, Router};
 use chrono::{Duration, Local};
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{distr::Alphanumeric, Rng};
 use zhconv::{zhconv, Variant};
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -21,7 +21,7 @@ pub fn new(state: AppState) -> Router<AppState> {
 }
 
 pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<String>>, AppError> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // 生成指定數量的隨機字串
     let result = (0..params.count)

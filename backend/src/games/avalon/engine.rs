@@ -72,7 +72,7 @@ pub fn setup_with_roles(roles: Vec<Role>, leader: usize) -> AvalonState {
 pub fn setup(n: usize, opt: Options) -> Result<AvalonState, &'static str> {
     use rand::seq::SliceRandom;
     let mut roles = roles::build_roles(n, opt)?;
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     roles.shuffle(&mut rng);
     let leader = (rand::random::<u64>() % n as u64) as usize;
     Ok(setup_with_roles(roles, leader))
