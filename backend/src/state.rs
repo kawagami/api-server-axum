@@ -194,7 +194,7 @@ impl AppState {
             match e {
                 bb8::RunError::User(redis_err) => redis_err,
                 bb8::RunError::TimedOut => redis::RedisError::from((
-                    redis::ErrorKind::IoError,
+                    redis::ErrorKind::Io,
                     "Redis connection pool timed out",
                 )),
             }

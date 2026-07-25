@@ -21,6 +21,23 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # repositories/redis.rs 的整合測試需要真實 Redis（權限快取 / OAuth state /
+    # refresh token / WS ticket 都靠它，升 redis crate 時光看編譯過不夠）。
+    # 版本與 production 的 deploy/docker-compose.yml 對齊。
+    services:
+      valkey:
+        image: valkey/valkey:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      REDIS_HOST: 127.0.0.1
+      # 設了這個，連不上 Redis 會讓測試 panic 而非靜默跳過（避免 service 掛掉卻假綠）
+      REDIS_TEST_REQUIRED: "1"
     steps:
       -
         name: Checkout
