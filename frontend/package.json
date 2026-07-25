@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "overrides": {
+      "sharp": "^0.35.0"
+    }
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
@@ -25,7 +30,7 @@
     "rehype-highlight": "^7.0.2",
     "rehype-slug": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "sharp": "^0.34.3",
+    "sharp": "^0.35.0",
     "tesseract.js": "^7.0.0",
     "uuid": "^14.0.0",
     "wanakana": "^5.3.1"
