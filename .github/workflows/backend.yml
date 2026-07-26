@@ -106,7 +106,12 @@ jobs:
           username: ${{ secrets.VULTR_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e   # 少了它，任何一步失敗都會被後面的指令蓋掉，job 照樣綠燈
             cd ~/kawa-deploy
             docker pull kawagami77/api-server:latest
             docker compose up -d --remove-orphans
+            # nginx 的 proxy_pass 是靜態 hostname，只在載入設定時解析一次並永久快取 IP。
+            # backend 容器 recreate 後 Docker 可能配到新 IP，不 reload 就會一直打舊 IP → 502
+            # （最久要等 compose 裡那個 6h reload 循環才自癒）。reload 會重新解析 upstream 名稱。
+            docker compose exec -T nginx nginx -s reload
             docker image prune --force

@@ -10,7 +10,7 @@
 | nginx | nginx:alpine | 反向代理（`kawa.homes` → frontend、`api.kawa.homes` → backend，舊名 `axum.kawa.homes` 同 vhost 保留為 alias）＋ `media.kawa.homes` 直出上傳圖片（`root /srv/kawa/uploads`，掛唯讀 volume） |
 | certbot | certbot/dns-cloudflare | Let's Encrypt 自動 renew（DNS-01） |
 | database | postgres:18-alpine | 資料庫 |
-| valkey | valkey/valkey:alpine | Cache（Redis 相容） |
+| valkey | valkey/valkey:alpine | Cache（Redis 相容）。**無持久化，重啟即清空** —— 見下方說明 |
 | backend | kawagami77/api-server:latest | Rust/Axum 後端 |
 | frontend | kawagami77/my-next-blog:latest | Next.js 前端 |
 
@@ -27,11 +27,60 @@
 └── dbdata/        ← postgres 資料（PG 18 佈局：實際 cluster 在 dbdata/18/docker/）
 ```
 
+**valkey 不在這個清單裡 —— 它刻意沒有持久化**，資料全在記憶體，容器重啟就清空。
+這是有意識的取捨，代價要知道：
+
+- **member refresh token（TTL 30 天）也會沒了 → valkey 重啟等於把所有會員登出**，下次操作需重新登入。
+  後台 / 前台使用者都一樣。
+- 其餘 key 掉了無感：權限快取（1h）、oauth state（5m）、ws ticket（30s）都會自動重算。
+
+所以 `docker compose restart valkey`、整機重開、image 更新都會踢人。哪天覺得代價太大，
+就掛 `/srv/kawa/valkey:/data` + `--appendonly yes`（同時建議補 `--maxmemory` / `volatile-lru`，
+目前 valkey 沒有記憶體上限）。
+
+## 日誌 rotation
+
+Docker 預設的 json-file **沒有上限**，只會單向長大到把磁碟塞滿（nginx 的 access_log 走
+`/dev/stdout`，每個請求一行，是最大的產出者）。compose 用三個 YAML anchor 依產量分級：
+
+| 額度 | 服務 | 上限 |
+|---|---|---|
+| `x-logging-heavy` | nginx | 20m × 5 |
+| `x-logging-normal` | backend / frontend | 10m × 3 |
+| `x-logging-quiet` | database / valkey / certbot | 10m × 2 |
+
+**與 `/admin` 觀測頁無關。** 觀測頁的日誌是後端 tracing 的 `DbLogLayer` 直接寫 postgres
+`logs` 表（只收 WARN/ERROR，保留 14 天由 `cleanup_observability` job 管），從頭到尾沒碰 Docker。
+這裡限制的是 `docker logs` 能往回看多久 —— backend 是 distroless、`exec` 進不去，
+**INFO 級訊息只存在 `docker logs`**，所以額度刻意不開太小。rotation 後 `docker logs`
+行為不變（會跨輪替檔讀，`--since` / `-f` 照常），只是歷史被 `max-size × max-file` 封頂。
+
+⚠ `logging:` 只在**容器建立時**生效：改額度後下次 `docker compose up -d` 會因 config hash
+變動而 recreate 那些 service（等於全站滾動重啟一次，**valkey 重啟＝會員被登出**，見上一節）。
+既有的 json log 檔不會被回溯截斷，舊檔隨舊容器一起消失。查目前佔用：
+
+```bash
+sudo du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail
+```
+
 ## CI 部署（日常）
 
 - 改 `deploy/**` → `deploy.yml`：scp 到 staging → `compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `compose up -d` → 一次性容器 `nginx -t` → `--force-recreate` nginx。
-- 改 `backend/**` / `frontend/**` → 各自 workflow build image 後 SSH：`cd ~/kawa-deploy && docker pull … && docker compose up -d`。
+- 改 `backend/**` / `frontend/**` → 各自 workflow build image 後 SSH：`cd ~/kawa-deploy && docker pull … && docker compose up -d` → **`nginx -s reload`**（原因見下）。
 - 三條 deploy 共用 `concurrency: vps-deploy`，序列化不撞車。
+
+### ⚠ 換 image 後必須 reload nginx —— upstream IP 會過期
+
+`proxy_pass http://backend:3000` 是**靜態 hostname**，nginx 只在載入設定時解析一次、之後永久
+快取那個 IP。`docker compose up -d` recreate 掉 backend / frontend 容器後 Docker 可能配到新 IP，
+nginx 卻還在打舊 IP → **502**，而且只會等到 compose 裡那個 6h reload 循環才自癒（最久 6 小時）。
+Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部署都炸。
+
+`backend.yml` / `frontend.yml` 的 deploy 因此在 `up -d` 後多跑一行
+`docker compose exec -T nginx nginx -s reload` —— reload 會重新解析所有 upstream 名稱。
+（`deploy.yml` 不需要，它本來就會 `--force-recreate` nginx。）
+
+手動在 VPS 上換 image 時同理：`up -d` 完記得 reload。
 
 ## 效能量測
 

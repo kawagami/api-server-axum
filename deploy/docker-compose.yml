@@ -8,8 +8,34 @@
 #   範例見 env.example/
 name: kawa
 
+# ── 日誌 rotation ──────────────────────────────────────────────────────────
+# Docker 預設的 json-file 沒有上限，只會單向長大到把小磁碟塞滿。額度依產量分級。
+#
+# ⚠ 這裡限制的**不是** /admin 觀測頁的日誌 —— 那是 tracing 的 DbLogLayer 直接寫
+#   postgres `logs` 表（只收 WARN/ERROR，保留 14 天由 cleanup_observability job 管），
+#   與 Docker 無關。這裡管的是 `docker logs` 能往回看多久；backend 是 distroless、
+#   exec 不進去，INFO 級訊息只存在這裡，所以額度不要開太小。
+x-logging-heavy: &logging-heavy
+  # nginx：access_log 走 /dev/stdout（官方 image symlink），每個請求一行，產量最大
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+x-logging-normal: &logging-normal
+  # 應用層：只在啟動、job、錯誤時寫，稀疏
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-logging-quiet: &logging-quiet
+  # 幾乎不寫
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "2" }
+
 services:
   nginx:
+    <<: *logging-heavy
     image: nginx:alpine
     container_name: nginx
     restart: unless-stopped
@@ -31,6 +57,7 @@ services:
         condition: service_started
 
   certbot:
+    <<: *logging-quiet
     image: certbot/dns-cloudflare
     container_name: certbot
     volumes:
@@ -40,6 +67,7 @@ services:
     restart: unless-stopped
 
   database:
+    <<: *logging-quiet
     # PG 18 起官方 image 的 volume 掛載點改為 /var/lib/postgresql（不再是 …/data），
     # 資料目錄由 image 決定為 <mount>/18/docker，未來大版本升級可用 image 的 pg_upgrade 流程
     image: postgres:18-alpine
@@ -54,13 +82,19 @@ services:
       - "POSTGRES_USER=kawa"
       - "PGUSER=kawa"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready", "-d", "kawa", "-U", "kawa"]
+      # CMD-SHELL 只吃一個字串；寫成多元素陣列的話後面那些會變成 sh -c 的位置參數
+      # （$0/$1…），不會傳給 pg_isready
+      test: ["CMD-SHELL", "pg_isready -d kawa -U kawa"]
       interval: 10s
       timeout: 10s
       retries: 5
       start_period: 30s
 
   valkey:
+    <<: *logging-quiet
+    # 刻意不掛 volume：資料全在記憶體，重啟即清空。
+    # ⚠ 代價是 member refresh token（TTL 30 天）也會沒了 → valkey 重啟等於把所有會員登出，
+    #   需重新登入。其餘 key（權限快取 / oauth state / ws ticket）TTL 短，掉了會自動重算。
     image: "valkey/valkey:alpine"
     container_name: valkey
     restart: unless-stopped
@@ -68,6 +102,7 @@ services:
       memlock: -1
 
   backend:
+    <<: *logging-normal
     image: kawagami77/api-server:latest
     container_name: backend
     restart: unless-stopped
@@ -80,8 +115,12 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      # AppState 建 redis pool 連不上會直接 panic，所以不能賭 valkey 先起來
+      valkey:
+        condition: service_started
 
   frontend:
+    <<: *logging-normal
     image: kawagami77/my-next-blog:latest
     container_name: frontend
     restart: unless-stopped

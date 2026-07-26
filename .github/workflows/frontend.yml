@@ -94,7 +94,11 @@ jobs:
           username: ${{ secrets.VULTR_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e   # 少了它，任何一步失敗都會被後面的指令蓋掉，job 照樣綠燈
             cd ~/kawa-deploy
             docker pull kawagami77/my-next-blog:latest
             docker compose up -d --remove-orphans
+            # 同 backend.yml：frontend recreate 後 IP 可能變，nginx 需 reload 才會重新解析
+            # upstream 名稱，否則會一直打舊 IP → 502。
+            docker compose exec -T nginx nginx -s reload
             docker image prune --force
