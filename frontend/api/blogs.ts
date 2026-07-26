@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidateTag } from "next/cache";
+import { updateTag } from "next/cache";
 import { fetchApi } from "@/libs/fetchApi";
 import adminRequest from "@/libs/adminRequest";
 import type { Blog, BlogInput, BlogPaginatedResponse, TagCount } from "@/types";
@@ -18,7 +18,11 @@ interface GetBlogsParams {
 
 // blog 內容近乎靜態：用 Next Data Cache + tag 失效取代 no-store
 // （layout 讀 cookies() 強制動態渲染，故只能靠 fetch data cache，無法 SSG）
-// 寫入時 putBlog / deleteBlog 會 revalidateTag('blogs')，故快取期間不會看到舊資料
+// 寫入時 putBlog / deleteBlog 會 updateTag('blogs')，故快取期間不會看到舊資料
+// ⚠️ 寫入路徑一律用 updateTag，不用 revalidateTag(tag, 'max')：
+//    revalidateTag 帶了非 expire:0 的 profile 時，Next 刻意不設 pathWasRevalidated
+//    （避免 server action 讀到自己的寫入），連帶**不會失效瀏覽器的 Router Cache**，
+//    結果存檔後再點編輯會拿到 client 端快取的舊 RSC payload，非 hard reload 不會更新。
 export async function getBlogs({ page = 1, per_page = 10, tag, author, q, sort }: GetBlogsParams = {}): Promise<BlogPaginatedResponse> {
     const params = new URLSearchParams({ page: String(page), per_page: String(per_page) });
     if (tag) params.set('tag', tag);
@@ -54,8 +58,8 @@ export async function putBlog(id: string, blog: BlogInput): Promise<void> {
         method: 'PUT',
         body: JSON.stringify(blog),
     });
-    revalidateTag('blogs', 'max');
-    revalidateTag(`blog:${id}`, 'max');
+    updateTag('blogs');
+    updateTag(`blog:${id}`);
 }
 
 export async function deleteBlog(id: string): Promise<void> {
@@ -63,8 +67,8 @@ export async function deleteBlog(id: string): Promise<void> {
         url: `${process.env.API_URL}/admin/blogs/${id}`,
         method: 'DELETE',
     });
-    revalidateTag('blogs', 'max');
-    revalidateTag(`blog:${id}`, 'max');
+    updateTag('blogs');
+    updateTag(`blog:${id}`);
 }
 
 // 全站改名/合併 tag（一般 admin 只影響自己的文章，super_admin 全站）。回受影響文章數。
@@ -75,7 +79,7 @@ export async function renameBlogTag(from: string, to: string): Promise<number> {
         method: 'PATCH',
         body: JSON.stringify({ from, to }),
     });
-    revalidateTag('blogs', 'max');
+    updateTag('blogs');
     return res?.affected ?? 0;
 }
 
@@ -85,6 +89,6 @@ export async function deleteBlogTag(tag: string): Promise<number> {
         url: `${process.env.API_URL}/admin/blogs/tags?tag=${encodeURIComponent(tag)}`,
         method: 'DELETE',
     });
-    revalidateTag('blogs', 'max');
+    updateTag('blogs');
     return res?.affected ?? 0;
 }
