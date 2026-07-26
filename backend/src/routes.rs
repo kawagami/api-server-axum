@@ -147,7 +147,10 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         // 形狀刻意與 AppError 一致（含 request_id），全站錯誤只有一種格式；with_feature 的 404 同源
         .fallback(|| async { AppError::from(RequestError::NotFound) })
         .layer(DefaultBodyLimit::disable())
-        .layer(RequestBodyLimitLayer::new(10 * 1000 * 1000))
+        // 必須與 deploy/nginx/nginx.conf 的 client_max_body_size 10m 相等。
+        // 不相等的話，落在兩者之間的檔案會由 nginx 放行、後端才 413，而 api vhost
+        // 開了 proxy_request_buffering off，client 端看到的是上傳到一半斷掉。
+        .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024))
         .layer(
             CorsLayer::new()
                 .allow_methods([
