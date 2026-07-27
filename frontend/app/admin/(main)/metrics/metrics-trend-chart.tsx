@@ -212,29 +212,34 @@ export default function MetricsTrendChart({
                     strokeLinecap="round"
                 />
 
-                {/* 資料點 + X 軸時間標籤 */}
-                {rows.map((r, i) => (
-                    <g key={`${r.t}-${i}`}>
+                {/* 資料點：點多到擠成一片就不畫（r=0 的圓連 title 都點不到，純粹是 DOM 負擔） */}
+                {rows.length <= 45 &&
+                    rows.map((r, i) => (
                         <circle
+                            key={`${r.t}-${i}`}
                             cx={x(i)}
                             cy={y(r.v)}
-                            r={rows.length > 45 ? 0 : 2.5}
+                            r={2.5}
                             fill="rgb(var(--primary-600))"
                         >
                             <title>{`${fmtTooltipTime(r.t)}：${format(r.v)}`}</title>
                         </circle>
-                        {i % labelStep === 0 && (
-                            <text
-                                x={x(i)}
-                                y={H - 8}
-                                textAnchor="middle"
-                                className="fill-neutral-400 dark:fill-neutral-500 text-[10px] tabular-nums"
-                            >
-                                {fmtAxisTime(r.t)}
-                            </text>
-                        )}
-                    </g>
-                ))}
+                    ))}
+
+                {/* X 軸時間標籤（固定約 6 個） */}
+                {rows.map((r, i) =>
+                    i % labelStep === 0 ? (
+                        <text
+                            key={`${r.t}-${i}`}
+                            x={x(i)}
+                            y={H - 8}
+                            textAnchor="middle"
+                            className="fill-neutral-400 dark:fill-neutral-500 text-[10px] tabular-nums"
+                        >
+                            {fmtAxisTime(r.t)}
+                        </text>
+                    ) : null,
+                )}
 
                 {/* 選取點：垂直參考線 + 數值標籤（觸控可用） */}
                 {selected !== null && rows[selected] && (() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cpu, MemoryStick, HardDrive, Activity, Loader2 } from "lucide-react";
 import { getSystemMetrics } from "@/api/metrics";
 import type { SystemMetric } from "@/types";
@@ -137,6 +137,21 @@ export default function MetricsView({
     // 四張圖共用同一組選區狀態：在任一張圖拖曳，其他張同步顯示灰帶
     const rangeProps = { range, onRangeChange: canReadAudit ? setRange : undefined };
 
+    // 後端依查詢範圍把資料聚成時間桶（見 repositories/system_metrics.rs 的 bucket_seconds），
+    // 每點的 created_at 是桶的起點。桶寬取相鄰採樣點的最小間隔推回來，
+    // 用來把選區的結束時間補滿最後一個桶，否則會漏掉桶內的紀錄。
+    const bucketMs = useMemo(() => {
+        let min = Infinity;
+        for (let i = 1; i < metrics.length; i++) {
+            const d =
+                new Date(metrics[i].created_at).getTime() -
+                new Date(metrics[i - 1].created_at).getTime();
+            if (d > 0 && d < min) min = d;
+        }
+        return Number.isFinite(min) ? min : 60_000;
+    }, [metrics]);
+    const bucketMinutes = Math.round(bucketMs / 60_000);
+
     return (
         <div className="max-w-5xl mx-auto flex flex-col gap-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -172,7 +187,12 @@ export default function MetricsView({
                             icon={Cpu}
                             label="CPU 使用率"
                             value={pct(latest.cpu_pct)}
-                            hint={`最新採樣：${fmtSnapshotTime(latest.created_at)}`}
+                            // 有聚合時卡片值是該桶的峰值而非單一採樣，標示清楚免得被當成即時值
+                            hint={
+                                bucketMinutes > 1
+                                    ? `最近 ${bucketMinutes} 分鐘峰值：${fmtSnapshotTime(latest.created_at)}`
+                                    : `最新採樣：${fmtSnapshotTime(latest.created_at)}`
+                            }
                         />
                         <SnapshotCard
                             icon={MemoryStick}
@@ -233,11 +253,16 @@ export default function MetricsView({
                     </ChartSection>
 
                     {canReadAudit && range && (
-                        <MetricsAuditPanel from={range.from} to={range.to} onClear={() => setRange(null)} />
+                        <MetricsAuditPanel
+                            from={range.from}
+                            to={new Date(new Date(range.to).getTime() + bucketMs).toISOString()}
+                            onClear={() => setRange(null)}
+                        />
                     )}
 
                     <p className="text-xs text-neutral-400 dark:text-neutral-500">
                         資料由後端定時採樣，時間以台北時區顯示；此頁每分鐘自動拉取最新採樣。
+                        {bucketMinutes > 1 && `範圍較長時會聚合顯示，圖上每點為 ${bucketMinutes} 分鐘內的峰值。`}
                         {canReadAudit && "在任一張圖上橫向拖曳可選取時間區間，下方會列出該區間的後台操作紀錄。"}
                     </p>
                 </>
