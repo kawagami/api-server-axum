@@ -27,7 +27,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
     const locale = useLocale();
     const dateFmt = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Taipei' });
 
-    const { items: entries, setItems: setEntries, hasMore, isPending, load, loadMore } = usePagedList<LottoTicket>(PER_PAGE, {
+    const { items: entries, setItems: setEntries, hasMore, isPending, failed, load, loadMore } = usePagedList<LottoTicket>(PER_PAGE, {
         items: initialEntries,
         fetcher: page => getLottoTickets({ status: lockWon ? 'won' : undefined, page, per_page: PER_PAGE }),
     });
@@ -145,7 +145,9 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
 
             <p className="text-xs text-neutral-400 dark:text-neutral-500">{t('disclaimer')}</p>
 
-            {loading ? (
+            {failed ? (
+                <p className="text-center text-red-600 dark:text-red-400 py-12">{t('loadFailed')}</p>
+            ) : loading ? (
                 <div className="flex justify-center py-12 text-neutral-400">
                     <Loader2 className="animate-spin" size={24} />
                 </div>

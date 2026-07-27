@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil } from "lucide-react";
 import { getAdminVocabWords, updateAdminVocabWord } from "@/api/admin-vocab";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import usePagedList from "@/hooks/usePagedList";
 import type { AdminVocabWord, UpdateVocabWordInput } from "@/types";
 
@@ -30,7 +31,7 @@ function toParams(f: Filters) {
 }
 
 export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) {
-    const { items: words, setItems, hasMore, isPending, load, loadMore } = usePagedList<AdminVocabWord>(LIMIT);
+    const { items: words, setItems, hasMore, isPending, failed, load, loadMore } = usePagedList<AdminVocabWord>(LIMIT);
     const [filters, setFilters] = useState<Filters>(defaultFilters);
     const [total, setTotal] = useState(0);
     const [editing, setEditing] = useState<AdminVocabWord | null>(null);
@@ -73,6 +74,8 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                     單字題庫
                     <span className="ml-2 text-sm font-normal text-neutral-400">共 {total} 字</span>
                 </h1>
+
+                <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
                 {/* Filter bar */}
                 <div className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">

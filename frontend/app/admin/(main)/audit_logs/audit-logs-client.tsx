@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { getAuditLogs } from "@/api/logs";
-import ErrorBanner from "@/components/admin/error-banner";
+import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import usePagedList from "@/hooks/usePagedList";
 import type { AuditLog, HttpMethod } from "@/types";
 import { METHOD_BADGE, httpStatusBadgeClass } from "@/libs/badge-styles";
@@ -32,10 +32,9 @@ function toQuery(f: Filters) {
 }
 
 export default function AuditLogsClient() {
-    const { items: logs, setItems: setLogs, hasMore, isPending, load, loadMore } = usePagedList<AuditLog>(LIMIT);
+    const { items: logs, setItems: setLogs, hasMore, isPending, failed, load, loadMore } = usePagedList<AuditLog>(LIMIT);
     const [filters, setFilters] = useState<Filters>(defaultFilters);
     const [appliedFilters, setAppliedFilters] = useState<Filters>(defaultFilters);
-    const [error, setError] = useState<string | null>(null);
 
     const logsRef = useRef<AuditLog[]>([]);
     const appliedFiltersRef = useRef<Filters>(defaultFilters);
@@ -63,19 +62,14 @@ export default function AuditLogsClient() {
 
     function handleSearch() {
         if (isPending) return;
-        setError(null);
         setAppliedFilters(filters);
         const query = toQuery(filters);
-        load(page => getAuditLogs({ ...query, page, per_page: LIMIT }).catch(e => {
-            setError(e instanceof Error ? e.message : '查詢失敗');
-            throw e;
-        }));
+        load(page => getAuditLogs({ ...query, page, per_page: LIMIT }));
     }
 
     function handleReset() {
         setFilters(defaultFilters);
         setAppliedFilters(defaultFilters);
-        setError(null);
         load(page => getAuditLogs({ page, per_page: LIMIT }));
     }
 
@@ -164,7 +158,7 @@ export default function AuditLogsClient() {
                     </div>
                 </div>
 
-                <ErrorBanner message={error} />
+                <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                     <div className="overflow-x-auto">

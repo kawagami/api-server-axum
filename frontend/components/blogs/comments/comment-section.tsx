@@ -15,7 +15,7 @@ type ErrorKey = "empty" | "rateLimit" | "invalid" | "failed";
 
 export default function CommentSection({ blogId, isMember }: { blogId: string; isMember: boolean }) {
     const t = useTranslations("BlogComments");
-    const { items: comments, hasMore, isPending, load, loadMore, setItems } =
+    const { items: comments, hasMore, isPending, failed, load, loadMore, setItems } =
         usePagedList<BlogComment>(LIMIT);
     const [content, setContent] = useState("");
     const [name, setName] = useState("");
@@ -71,7 +71,9 @@ export default function CommentSection({ blogId, isMember }: { blogId: string; i
             </h2>
 
             {/* 留言清單(舊到新) */}
-            {!loaded ? (
+            {failed ? (
+                <p className="text-sm text-red-600 dark:text-red-400 py-2">{t("loadFailed")}</p>
+            ) : !loaded ? (
                 <div className="flex justify-center py-6 text-neutral-400">
                     <Loader2 className="w-5 h-5 animate-spin" />
                 </div>

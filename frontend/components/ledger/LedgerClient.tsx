@@ -51,7 +51,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
 
 export default function LedgerClient({ categories, initialEntries, initialSummary }: Props) {
     const t = useTranslations('Ledger');
-    const { items: entries, hasMore, isPending, load, loadMore } = usePagedList<LedgerEntry>(PER_PAGE, {
+    const { items: entries, hasMore, isPending, failed, load, loadMore } = usePagedList<LedgerEntry>(PER_PAGE, {
         items: initialEntries,
         fetcher: page => getLedger({ kind: '', category: '', from: '', to: '', page, per_page: PER_PAGE }),
     });
@@ -233,7 +233,9 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
             )}
 
             {/* 清單 */}
-            {loading ? (
+            {failed ? (
+                <p className="text-center text-red-600 dark:text-red-400 py-12">{t('loadFailed')}</p>
+            ) : loading ? (
                 <div className="flex justify-center py-12 text-neutral-400">
                     <Loader2 className="animate-spin" size={24} />
                 </div>

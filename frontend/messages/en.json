@@ -103,6 +103,7 @@
     "noPriceData": "No quote"
   },
   "Ledger": {
+    "loadFailed": "Failed to load. Please try again later.",
     "title": "Ledger",
     "addEntry": "Add Entry",
     "editEntry": "Edit Entry",
@@ -208,6 +209,7 @@
     "toc": "Contents"
   },
   "BlogComments": {
+    "loadFailed": "Failed to load. Please try again later.",
     "title": "Comments",
     "empty": "No comments yet. Be the first!",
     "guest": "Guest",
@@ -633,6 +635,7 @@
     "closed_aborted": "Someone disconnected — game aborted"
   },
   "Invoices": {
+    "loadFailed": "Failed to load. Please try again later.",
     "myInvoicesTitle": "My Invoices",
     "registerTitle": "Register Invoice",
     "winningsTitle": "My Winnings",
@@ -704,6 +707,7 @@
     "disclaimer": "Lottery results are for reference only; the official MOF announcement and redemption deadlines prevail"
   },
   "Lotto": {
+    "loadFailed": "Failed to load. Please try again later.",
     "myTicketsTitle": "My Tickets",
     "registerTitle": "Register Picks",
     "winningsTitle": "My Winnings",

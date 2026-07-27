@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Trash2, ExternalLink } from "lucide-react";
 import { getAllBlogComments, deleteBlogComment } from "@/api/blog-comments";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import usePagedList from "@/hooks/usePagedList";
 import type { BlogComment } from "@/types";
 
@@ -16,7 +17,7 @@ const fmt = new Intl.DateTimeFormat("zh-TW", {
 });
 
 export default function BlogCommentsClient({ canDelete }: { canDelete: boolean }) {
-    const { items: comments, hasMore, isPending, load, loadMore, setItems } =
+    const { items: comments, hasMore, isPending, failed, load, loadMore, setItems } =
         usePagedList<BlogComment>(LIMIT);
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -43,6 +44,8 @@ export default function BlogCommentsClient({ canDelete }: { canDelete: boolean }
     return (
         <div className="w-full flex flex-col gap-4">
             <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">部落格留言</h1>
+
+            <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
             <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                 <div className="overflow-x-auto">

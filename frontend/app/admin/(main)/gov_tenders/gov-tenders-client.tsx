@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { getGovTenders, getGovTenderTypes } from "@/api/gov-tenders";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import usePagedList from "@/hooks/usePagedList";
 import type { GovTender } from "@/types";
 
@@ -18,7 +19,7 @@ interface Filters {
 const defaultFilters: Filters = { q: '', keyword: '', tender_type: '' };
 
 export default function GovTendersClient() {
-    const { items: tenders, hasMore, isPending, load, loadMore } = usePagedList<GovTender>(LIMIT);
+    const { items: tenders, hasMore, isPending, failed, load, loadMore } = usePagedList<GovTender>(LIMIT);
     const [filters, setFilters] = useState<Filters>(defaultFilters);
     const [types, setTypes] = useState<string[]>([]);
 
@@ -98,6 +99,8 @@ export default function GovTendersClient() {
                         </button>
                     </div>
                 </div>
+
+                <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                     <div className="overflow-x-auto">

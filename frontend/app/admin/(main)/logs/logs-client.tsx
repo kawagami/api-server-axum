@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getLogs } from "@/api/logs";
-import ErrorBanner from "@/components/admin/error-banner";
+import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import usePagedList from "@/hooks/usePagedList";
 import type { Log, LogLevel } from "@/types";
 import { LEVEL_BADGE, LEVEL_ROW_BG } from "@/libs/badge-styles";
@@ -12,9 +12,8 @@ const LIMIT = 100;
 type LevelFilter = '' | LogLevel;
 
 export default function LogsClient() {
-    const { items: logs, hasMore, isPending, load, loadMore } = usePagedList<Log>(LIMIT);
+    const { items: logs, hasMore, isPending, failed, load, loadMore } = usePagedList<Log>(LIMIT);
     const [level, setLevel] = useState<LevelFilter>('');
-    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         load(page => getLogs({ page, per_page: LIMIT }));
@@ -22,14 +21,12 @@ export default function LogsClient() {
 
     function handleFilterChange(newLevel: LevelFilter) {
         if (newLevel === level || isPending) return;
-        setError(null);
         setLevel(newLevel);
         load(page => getLogs({ level: newLevel || undefined, page, per_page: LIMIT }));
     }
 
     function handleLoadMore() {
         if (isPending) return;
-        setError(null);
         loadMore();
     }
 
@@ -58,7 +55,7 @@ export default function LogsClient() {
                     </div>
                 </div>
 
-                <ErrorBanner message={error} />
+                <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                     <div className="overflow-x-auto">

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Trash2, Mail } from "lucide-react";
 import { getContactMessages, deleteContactMessage } from "@/api/contact";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import usePagedList from "@/hooks/usePagedList";
 import type { ContactMessage } from "@/types";
 
@@ -15,7 +16,7 @@ const fmt = new Intl.DateTimeFormat("zh-TW", {
 });
 
 export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
-    const { items: messages, hasMore, isPending, load, loadMore, setItems } =
+    const { items: messages, hasMore, isPending, failed, load, loadMore, setItems } =
         usePagedList<ContactMessage>(LIMIT);
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -42,6 +43,8 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
     return (
         <div className="w-full flex flex-col gap-4">
             <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">訪客留言</h1>
+
+            <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
             <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                 <div className="overflow-x-auto">

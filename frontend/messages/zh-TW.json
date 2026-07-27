@@ -103,6 +103,7 @@
     "noPriceData": "無報價"
   },
   "Ledger": {
+    "loadFailed": "載入失敗,請稍後再試",
     "title": "記帳",
     "addEntry": "新增記錄",
     "editEntry": "編輯記錄",
@@ -208,6 +209,7 @@
     "toc": "目錄"
   },
   "BlogComments": {
+    "loadFailed": "載入失敗,請稍後再試",
     "title": "留言",
     "empty": "還沒有留言,搶頭香吧!",
     "guest": "訪客",
@@ -633,6 +635,7 @@
     "closed_aborted": "有人離線，對局中止"
   },
   "Invoices": {
+    "loadFailed": "載入失敗,請稍後再試",
     "myInvoicesTitle": "我的發票",
     "registerTitle": "登錄發票",
     "winningsTitle": "我的中獎",
@@ -704,6 +707,7 @@
     "disclaimer": "對獎結果僅供參考，實際以財政部公告與兌獎期限為準"
   },
   "Lotto": {
+    "loadFailed": "載入失敗,請稍後再試",
     "myTicketsTitle": "我的彩券",
     "registerTitle": "登錄選號",
     "winningsTitle": "我的中獎",

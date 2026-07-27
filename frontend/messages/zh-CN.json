@@ -103,6 +103,7 @@
     "noPriceData": "无报价"
   },
   "Ledger": {
+    "loadFailed": "加载失败,请稍后再试",
     "title": "记账",
     "addEntry": "新增记录",
     "editEntry": "编辑记录",
@@ -208,6 +209,7 @@
     "toc": "目录"
   },
   "BlogComments": {
+    "loadFailed": "加载失败,请稍后再试",
     "title": "留言",
     "empty": "还没有留言,抢沙发吧!",
     "guest": "访客",
@@ -633,6 +635,7 @@
     "closed_aborted": "有人离线，对局中止"
   },
   "Invoices": {
+    "loadFailed": "加载失败,请稍后再试",
     "myInvoicesTitle": "我的发票",
     "registerTitle": "登录发票",
     "winningsTitle": "我的中奖",
@@ -704,6 +707,7 @@
     "disclaimer": "对奖结果仅供参考，实际以财政部公告与兑奖期限为准"
   },
   "Lotto": {
+    "loadFailed": "加载失败,请稍后再试",
     "myTicketsTitle": "我的彩券",
     "registerTitle": "登录选号",
     "winningsTitle": "我的中奖",
