@@ -1,67 +1,21 @@
 import { getWsConnections } from "@/api/ws";
-import SaySomethingForm from "./say-something-form";
+import WsConnections from "./ws-connections";
 import type { Metadata } from "next";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
 import { requirePermission } from "@/libs/admin-permissions";
 
 export const metadata: Metadata = {
-    title: "WS Management",
-    description: "WebSocket connections management",
+    title: "WS 連線管理",
+    description: "即時線上 WebSocket 連線與訊息發送",
 };
 
 export default async function WsAdminPage() {
     await requirePermission("ws:read");
-    const connections = await getWsConnections();
+    const initial = await getWsConnections();
 
     return (
         <div className="w-full">
-            <div className="max-w-4xl mx-auto flex flex-col gap-8">
-                <section>
-                    <h2 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100 mb-4">
-                        Online Connections ({connections.length})
-                    </h2>
-                    <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                        <AdminTable>
-                            <thead>
-                                <AdminHeadRow>
-                                    <AdminTh>Addr</AdminTh>
-                                    <AdminTh>User Email</AdminTh>
-                                </AdminHeadRow>
-                            </thead>
-                            <tbody>
-                                {connections.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={2} className="border border-neutral-300 dark:border-neutral-700 px-4 py-4 text-center text-neutral-500 dark:text-neutral-400">
-                                            No active connections
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    connections.map((conn) => (
-                                        <AdminRow key={conn.addr}>
-                                            <AdminTd className="font-mono text-sm">
-                                                {conn.addr}
-                                            </AdminTd>
-                                            <AdminTd className="text-sm">
-                                                {conn.user_email ?? <span className="text-neutral-400">anonymous</span>}
-                                            </AdminTd>
-                                        </AdminRow>
-                                    ))
-                                )}
-                            </tbody>
-                        </AdminTable>
-                        </div>
-                    </div>
-                </section>
-
-                <section>
-                    <h2 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100 mb-4">
-                        Say Something to Someone
-                    </h2>
-                    <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg p-6">
-                        <SaySomethingForm />
-                    </div>
-                </section>
+            <div className="max-w-5xl mx-auto">
+                <WsConnections initial={initial} />
             </div>
         </div>
     );

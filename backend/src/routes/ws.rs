@@ -1,5 +1,5 @@
 use crate::{
-    errors::AppError,
+    errors::{AppError, RequestError, SystemError},
     middleware::auth,
     repositories::redis as redis_repo,
     state::{AppState, DisplayTrackedConnection, TrackedConnection},
@@ -29,6 +29,11 @@ const PING_INTERVAL_SECONDS: u64 = 30;
 #[derive(serde::Deserialize)]
 struct WsQuery {
     ticket: Option<String>,
+}
+
+/// 連線時間對外一律用固定寬度的 ISO-8601 毫秒 UTC 字串
+fn to_iso(t: SystemTime) -> String {
+    chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -86,18 +91,20 @@ async fn ws_handler(
         });
     }
 
-    ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email, real_ip))
+    ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email, real_ip, user_agent))
 }
 
-async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_email: Option<String>, real_ip: String) {
+async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_email: Option<String>, real_ip: String, user_agent: String) {
     let (sender, receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
 
+    let connected_at = SystemTime::now();
     let connection_info = TrackedConnection {
-        connected_at: SystemTime::now(),
+        connected_at,
         sender: sender_arc.clone(),
         user_email: user_email.clone(),
         real_ip: real_ip.clone(),
+        user_agent: user_agent.clone(),
     };
 
     {
@@ -105,10 +112,17 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
         connections.insert(who, connection_info);
     }
 
-    // 含 IP / email 個資，只推給 admin 連線，不對匿名訪客廣播
+    // 含 IP / email 個資，只推給 admin 連線，不對匿名訪客廣播。
+    // 欄位與 get_online_connections 的列一致，admin 頁可直接用這則事件插入新列，不必重抓。
     state.broadcast_to_admins(
         crate::structs::ws::WsEvent::UserJoined,
-        serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_email": user_email }),
+        serde_json::json!({
+            "addr": who.to_string(),
+            "real_ip": real_ip,
+            "user_email": user_email,
+            "connected_at": to_iso(connected_at),
+            "user_agent": user_agent,
+        }),
     );
 
     // --- recv_task: 接收客戶端訊息 ---
@@ -236,17 +250,28 @@ async fn get_online_connections(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DisplayTrackedConnection>>, AppError> {
     auth_user.require_permission(Perm::WsRead)?;
-    let connections = state.get_connections().lock().await;
 
-    let result = connections
-        .iter()
-        .map(|(addr, info)| DisplayTrackedConnection {
-            addr: addr.to_string(),
-            connected_at: info.connected_at,
-            user_email: info.user_email.clone(),
-            real_ip: info.real_ip.clone(),
-        })
-        .collect();
+    let mut result: Vec<DisplayTrackedConnection> = {
+        let connections = state.get_connections().lock().await;
+        connections
+            .iter()
+            .map(|(addr, info)| DisplayTrackedConnection {
+                addr: addr.to_string(),
+                connected_at: to_iso(info.connected_at),
+                user_email: info.user_email.clone(),
+                real_ip: info.real_ip.clone(),
+                user_agent: info.user_agent.clone(),
+            })
+            .collect()
+    };
+
+    // 新連線在前。HashMap 迭代順序不保證穩定，不排序的話前端每次輪詢列順序都會跳。
+    // 同毫秒連上的用 addr 破平手，確保順序完全確定
+    result.sort_by(|a, b| {
+        b.connected_at
+            .cmp(&a.connected_at)
+            .then_with(|| a.addr.cmp(&b.addr))
+    });
 
     Ok(Json(result))
 }
@@ -257,42 +282,42 @@ pub struct SendMessageParams {
     pub message: String,
 }
 
+/// 失敗一律回非 2xx。舊版對「位址格式錯 / 連線不存在 / 送出失敗」都回 200 加一段錯誤字串，
+/// 呼叫端只看 status 的話會把失敗顯示成成功。
 async fn say_something_to_someone(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Json(params): Json<SendMessageParams>,
-) -> Result<Json<String>, AppError> {
+) -> Result<Json<serde_json::Value>, AppError> {
     auth_user.require_permission(Perm::WsRead)?;
+
+    let socket_addr = params.addr.parse::<SocketAddr>().map_err(|_| {
+        tracing::info!("Invalid socket address format: {}", params.addr);
+        RequestError::InvalidContent(format!("無效的連線位址格式：{}", params.addr))
+    })?;
+
     let connections = state.get_connections().lock().await;
+    let tracked_conn = connections.get(&socket_addr).ok_or_else(|| {
+        tracing::info!("No connection found for address: {}", params.addr);
+        RequestError::NotFound
+    })?;
 
-    match params.addr.parse::<SocketAddr>() {
-        Ok(socket_addr) => {
-            if let Some(tracked_conn) = connections.get(&socket_addr) {
-                let mut sender_guard = tracked_conn.sender.lock().await;
-                let payload = crate::structs::ws::envelope(
-                    "admin_message",
-                    serde_json::json!({ "content": params.message, "from": auth_user.name }),
-                );
-                let message = Message::Text(payload.into());
+    let payload = crate::structs::ws::envelope(
+        "admin_message",
+        serde_json::json!({ "content": params.message, "from": auth_user.name }),
+    );
 
-                match sender_guard.send(message).await {
-                    Ok(_) => Ok(Json("Message sent successfully".to_string())),
-                    Err(e) => {
-                        tracing::error!("Failed to send message to {}: {}", socket_addr, e);
-                        // 這裡不立即清理連接，讓 handle_socket 中的任務處理
-                        Ok(Json(format!("Failed to send message: {}", e)))
-                    }
-                }
-            } else {
-                tracing::info!("No connection found for address: {}", params.addr);
-                Ok(Json("Connection not found".to_string()))
-            }
-        }
-        Err(_) => {
-            tracing::info!("Invalid socket address format: {}", params.addr);
-            Ok(Json("Invalid address format".to_string()))
-        }
-    }
+    let mut sender_guard = tracked_conn.sender.lock().await;
+    sender_guard
+        .send(Message::Text(payload.into()))
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to send message to {}: {}", socket_addr, e);
+            // 這裡不立即清理連接，讓 handle_socket 中的任務處理
+            SystemError::Internal(format!("訊息送出失敗：{e}"))
+        })?;
+
+    Ok(Json(serde_json::json!({ "sent": true })))
 }
 
 /// 換發 WS 一次性連線票（30 秒 TTL）。登入中的 admin 用它連 WS 取得管理員身分，

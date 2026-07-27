@@ -86,14 +86,18 @@ pub struct TrackedConnection {
     pub sender: WsSender,
     pub user_email: Option<String>,
     pub real_ip: String,
+    pub user_agent: String,
 }
 
 #[derive(Serialize)]
 pub struct DisplayTrackedConnection {
     pub addr: String,
-    pub connected_at: std::time::SystemTime,
+    /// ISO-8601 毫秒 UTC 字串（`SystemTime` 預設序列化成 `{secs,nanos}` 物件，前端不好用）。
+    /// 固定寬度，字典序 == 時間序，可直接拿來排序。
+    pub connected_at: String,
     pub user_email: Option<String>,
     pub real_ip: String,
+    pub user_agent: String,
 }
 
 #[derive(Clone)]
