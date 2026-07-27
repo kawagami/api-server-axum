@@ -19,6 +19,18 @@ interface Filters {
 
 const defaultFilters: Filters = { user_email: '', method: '', path: '', from: '', to: '' };
 
+// datetime-local 是無時區的本地時間字串（2026-07-27T10:30），後端要 RFC3339；
+// 必須在瀏覽器轉才吃得到使用者當地時區，不能丟給 server action 換算
+function toIso(local: string): string | undefined {
+    if (!local) return undefined;
+    const t = new Date(local).getTime();
+    return Number.isNaN(t) ? undefined : new Date(t).toISOString();
+}
+
+function toQuery(f: Filters) {
+    return { ...f, from: toIso(f.from), to: toIso(f.to) };
+}
+
 export default function AuditLogsClient() {
     const { items: logs, setItems: setLogs, hasMore, isPending, load, loadMore } = usePagedList<AuditLog>(LIMIT);
     const [filters, setFilters] = useState<Filters>(defaultFilters);
@@ -38,7 +50,7 @@ export default function AuditLogsClient() {
     useEffect(() => {
         const id = setInterval(async () => {
             try {
-                const fresh = await getAuditLogs({ ...appliedFiltersRef.current, page: 1, per_page: LIMIT });
+                const fresh = await getAuditLogs({ ...toQuery(appliedFiltersRef.current), page: 1, per_page: LIMIT });
                 const existingIds = new Set(logsRef.current.map(l => l.id));
                 const newEntries = fresh.filter(l => !existingIds.has(l.id));
                 if (newEntries.length > 0) {
@@ -53,7 +65,11 @@ export default function AuditLogsClient() {
         if (isPending) return;
         setError(null);
         setAppliedFilters(filters);
-        load(page => getAuditLogs({ ...filters, page, per_page: LIMIT }));
+        const query = toQuery(filters);
+        load(page => getAuditLogs({ ...query, page, per_page: LIMIT }).catch(e => {
+            setError(e instanceof Error ? e.message : '查詢失敗');
+            throw e;
+        }));
     }
 
     function handleReset() {
