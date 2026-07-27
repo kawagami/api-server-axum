@@ -7,7 +7,7 @@
 
 | 服務 | Image | 說明 |
 |------|-------|------|
-| nginx | nginx:alpine | 反向代理（`kawa.homes` → frontend、`api.kawa.homes` → backend，舊名 `axum.kawa.homes` 同 vhost 保留為 alias）＋ `media.kawa.homes` 直出上傳圖片（`root /srv/kawa/uploads`，掛唯讀 volume） |
+| nginx | nginx:alpine | 反向代理（`kawa.homes` → frontend、`api.kawa.homes` → backend，舊名 `axum.kawa.homes` 同 vhost 保留為 alias，其 `/uploads/` 301 到 media）＋ `media.kawa.homes` 直出上傳圖片（`root /srv/kawa/uploads`，掛唯讀 volume） |
 | certbot | certbot/dns-cloudflare | Let's Encrypt 自動 renew（DNS-01） |
 | database | postgres:18-alpine | 資料庫 |
 | valkey | valkey/valkey:alpine | Cache（Redis 相容）。**無持久化，重啟即清空** —— 見下方說明 |

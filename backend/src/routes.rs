@@ -140,6 +140,9 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/logs", logs::new(state.clone()))
         .nest("/metrics", metrics::new(state.clone()))
         .nest("/settings", app_settings::public())
+        // 生產不會被打到（nginx 的 media vhost 直出磁碟，api vhost 的 /uploads/ 已 301 過去），
+        // 但本地開發沒有 nginx，這是唯一能瀏覽自己剛上傳的圖的路徑 —— 本地把
+        // app_settings.upload_base_url 設成 http://127.0.0.1:3000/uploads 就靠這行。
         .nest_service("/uploads", ServeDir::new(&upload_path))
         // 存活探針：不查 DB / Redis，純粹回報「行程活著且在收請求」，給外部 uptime 監控打
         .route("/health", get(|| async { Json(serde_json::json!({ "status": "ok" })) }))

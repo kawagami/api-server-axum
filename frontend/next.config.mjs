@@ -31,13 +31,6 @@ const nextConfig = {
                 port: '',
                 pathname: '/**'
             },
-            // 舊圖沿用 axum 網域(換 media 網域後仍需服務存量圖片)
-            {
-                protocol: 'https',
-                hostname: 'axum.kawa.homes',
-                port: '',
-                pathname: '/uploads/**'
-            },
         ]
     },
     reactStrictMode: true,
