@@ -8,6 +8,12 @@ export interface MetricPoint {
     v: number;
 }
 
+/** 選取的時間區間，端點取自資料點的 `t`（四張圖共用同一組時間戳，故可用字串比對定位） */
+export interface TimeRange {
+    from: string;
+    to: string;
+}
+
 function fmtAxisTime(iso: string) {
     // 台北時區 HH:MM
     const d = new Date(iso);
@@ -41,16 +47,24 @@ export default function MetricsTrendChart({
     yMax,
     // 數值格式化（軸刻度 + tooltip），預設整數千分位
     format = v => Math.round(v).toLocaleString(),
+    // 目前選取區間（由呼叫端集中管理，四張圖同步顯示同一段灰帶）
+    range = null,
+    // 給了才啟用拖曳選區；單擊（沒拖）視為清除，回傳 null
+    onRangeChange,
 }: {
     title: string;
     points: MetricPoint[];
     yMax?: number;
     format?: (v: number) => string;
+    range?: TimeRange | null;
+    onRangeChange?: (range: TimeRange | null) => void;
 }) {
     const gradId = useId();
     const svgRef = useRef<SVGSVGElement>(null);
     // 觸控裝置沒有 hover，改點擊/拖曳選取資料點顯示數值
     const [selected, setSelected] = useState<number | null>(null);
+    // 拖曳中的暫時區間（放開才提交給呼叫端）
+    const [drag, setDrag] = useState<{ start: number; end: number } | null>(null);
     const rows = [...points].sort((a, b) => a.t.localeCompare(b.t));
 
     if (rows.length === 0) {
@@ -83,14 +97,50 @@ export default function MetricsTrendChart({
     const labelStep = Math.max(1, Math.ceil(rows.length / 6));
 
     // 依 pointer X 座標換算最近的資料點 index
-    function pick(e: React.PointerEvent<SVGSVGElement>) {
+    function idxAt(e: React.PointerEvent<SVGSVGElement>): number | null {
         const svg = svgRef.current;
-        if (!svg) return;
+        if (!svg) return null;
         const rect = svg.getBoundingClientRect();
         const px = ((e.clientX - rect.left) / rect.width) * W;
         const i = rows.length === 1 ? 0 : Math.round(((px - padL) / innerW) * (rows.length - 1));
-        setSelected(Math.max(0, Math.min(rows.length - 1, i)));
+        return Math.max(0, Math.min(rows.length - 1, i));
     }
+
+    function handleDown(e: React.PointerEvent<SVGSVGElement>) {
+        const i = idxAt(e);
+        if (i === null) return;
+        setSelected(i);
+        if (!onRangeChange) return;
+        // 抓住 pointer，拖出 svg 外放開也收得到 pointerup
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDrag({ start: i, end: i });
+    }
+
+    function handleMove(e: React.PointerEvent<SVGSVGElement>) {
+        if (!e.buttons) return;
+        const i = idxAt(e);
+        if (i === null) return;
+        setSelected(i);
+        setDrag(d => (d ? { ...d, end: i } : d));
+    }
+
+    function handleUp() {
+        if (!drag) return;
+        const [a, b] = [Math.min(drag.start, drag.end), Math.max(drag.start, drag.end)];
+        setDrag(null);
+        // 單擊（起訖同一點）只是看數值，不動選區——觸控裝置讀數值只能靠點擊，
+        // 若順手清掉選區太容易誤觸；要清改按面板上的「清除選取」
+        if (a !== b) onRangeChange?.({ from: rows[a].t, to: rows[b].t });
+    }
+
+    // 灰帶範圍：拖曳中用暫時值，否則用呼叫端傳入的區間（時間戳對不到就不畫）
+    const band = (() => {
+        if (drag) return [Math.min(drag.start, drag.end), Math.max(drag.start, drag.end)] as const;
+        if (!range) return null;
+        const a = rows.findIndex(r => r.t === range.from);
+        const b = rows.findIndex(r => r.t === range.to);
+        return a >= 0 && b >= 0 ? ([a, b] as const) : null;
+    })();
 
     return (
         <div className="overflow-x-auto">
@@ -98,10 +148,14 @@ export default function MetricsTrendChart({
                 ref={svgRef}
                 viewBox={`0 0 ${W} ${H}`}
                 className="w-full min-w-[480px] h-auto select-none cursor-crosshair"
+                // 橫向手勢留給選區拖曳，直向仍可捲頁
+                style={onRangeChange ? { touchAction: 'pan-y' } : undefined}
                 role="img"
                 aria-label={title}
-                onPointerDown={pick}
-                onPointerMove={e => { if (e.buttons) pick(e); }}
+                onPointerDown={handleDown}
+                onPointerMove={handleMove}
+                onPointerUp={handleUp}
+                onPointerCancel={() => setDrag(null)}
             >
                 <defs>
                     <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -131,6 +185,21 @@ export default function MetricsTrendChart({
                         </text>
                     </g>
                 ))}
+
+                {/* 選取區間灰帶（四張圖同步） */}
+                {band && (
+                    <rect
+                        x={x(band[0])}
+                        y={padT}
+                        width={Math.max(2, x(band[1]) - x(band[0]))}
+                        height={innerH}
+                        fill="rgb(var(--primary-500))"
+                        fillOpacity={0.12}
+                        stroke="rgb(var(--primary-400))"
+                        strokeWidth={1}
+                        pointerEvents="none"
+                    />
+                )}
 
                 {/* 面積 + 折線 */}
                 <path d={areaPath} fill={`url(#${gradId})`} />

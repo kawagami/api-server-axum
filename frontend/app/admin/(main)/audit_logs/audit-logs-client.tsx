@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { getAuditLogs } from "@/api/logs";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import usePagedList from "@/hooks/usePagedList";
@@ -31,19 +32,35 @@ function toQuery(f: Filters) {
     return { ...f, from: toIso(f.from), to: toIso(f.to) };
 }
 
+// 反向：ISO → datetime-local 輸入框吃的本地時間字串（給 ?from=&to= 帶入用，如 /admin/metrics 選區跳來）
+function toLocalInput(iso: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export default function AuditLogsClient() {
     const { items: logs, setItems: setLogs, hasMore, isPending, failed, load, loadMore } = usePagedList<AuditLog>(LIMIT);
-    const [filters, setFilters] = useState<Filters>(defaultFilters);
-    const [appliedFilters, setAppliedFilters] = useState<Filters>(defaultFilters);
+    const searchParams = useSearchParams();
+    // ?from=&to=（ISO）可帶入初始時間條件，供 /admin/metrics 選區跳轉；只在首次渲染讀一次
+    const [filters, setFilters] = useState<Filters>(() => ({
+        ...defaultFilters,
+        from: toLocalInput(searchParams.get('from')),
+        to: toLocalInput(searchParams.get('to')),
+    }));
+    const [appliedFilters, setAppliedFilters] = useState<Filters>(filters);
 
     const logsRef = useRef<AuditLog[]>([]);
-    const appliedFiltersRef = useRef<Filters>(defaultFilters);
+    const appliedFiltersRef = useRef<Filters>(filters);
 
     useEffect(() => { logsRef.current = logs; }, [logs]);
     useEffect(() => { appliedFiltersRef.current = appliedFilters; }, [appliedFilters]);
 
     useEffect(() => {
-        load(page => getAuditLogs({ page, per_page: LIMIT }));
+        const initial = toQuery(appliedFiltersRef.current);
+        load(page => getAuditLogs({ ...initial, page, per_page: LIMIT }));
     }, [load]);
 
     useEffect(() => {

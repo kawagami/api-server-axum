@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Cpu, MemoryStick, HardDrive, Activity, Loader2 } from "lucide-react";
 import { getSystemMetrics } from "@/api/metrics";
 import type { SystemMetric } from "@/types";
-import MetricsTrendChart from "./metrics-trend-chart";
+import MetricsTrendChart, { type TimeRange } from "./metrics-trend-chart";
+import MetricsAuditPanel from "./metrics-audit-panel";
 
 const HOUR_OPTIONS = [24, 72, 168];
 const POLL_MS = 60_000; // 後端定時採樣，每分鐘輪詢拉最新
@@ -81,14 +82,18 @@ function ChartSection({
 export default function MetricsView({
     initial,
     initialHours,
+    canReadAudit,
 }: {
     initial: SystemMetric[];
     initialHours: number;
+    /** 有 audit:read 才啟用「拖曳選區間 → 看操作紀錄」 */
+    canReadAudit: boolean;
 }) {
     const [hours, setHours] = useState(initialHours);
     const [metrics, setMetrics] = useState(initial);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [range, setRange] = useState<TimeRange | null>(null);
     // 避免輪詢回應覆蓋掉使用者剛切換的時間範圍
     const hoursRef = useRef(hours);
     useEffect(() => {
@@ -113,6 +118,8 @@ export default function MetricsView({
         async (h: number) => {
             if (h === hoursRef.current) return;
             setHours(h);
+            // 換範圍等於換資料集，舊選區的時間戳可能已不在圖上
+            setRange(null);
             setLoading(true);
             await refresh(h);
             setLoading(false);
@@ -127,6 +134,8 @@ export default function MetricsView({
     }, [refresh]);
 
     const latest = metrics.length > 0 ? metrics[metrics.length - 1] : null;
+    // 四張圖共用同一組選區狀態：在任一張圖拖曳，其他張同步顯示灰帶
+    const rangeProps = { range, onRangeChange: canReadAudit ? setRange : undefined };
 
     return (
         <div className="max-w-5xl mx-auto flex flex-col gap-6">
@@ -188,6 +197,7 @@ export default function MetricsView({
                     <ChartSection title="CPU 使用率（%）" loading={loading}>
                         <MetricsTrendChart
                             title="CPU 使用率趨勢"
+                            {...rangeProps}
                             yMax={100}
                             points={metrics.map(m => ({ t: m.created_at, v: m.cpu_pct }))}
                             format={v => `${Math.round(v)}%`}
@@ -197,6 +207,7 @@ export default function MetricsView({
                     <ChartSection title="記憶體使用量（GB）" loading={loading}>
                         <MetricsTrendChart
                             title="記憶體使用量趨勢"
+                            {...rangeProps}
                             yMax={latest.mem_total_mb / 1024}
                             points={metrics.map(m => ({ t: m.created_at, v: m.mem_used_mb / 1024 }))}
                             format={v => `${v.toFixed(2)}`}
@@ -206,6 +217,7 @@ export default function MetricsView({
                     <ChartSection title="Backend 常駐記憶體（MB）" loading={loading}>
                         <MetricsTrendChart
                             title="Backend RSS 趨勢"
+                            {...rangeProps}
                             points={metrics.map(m => ({ t: m.created_at, v: m.backend_rss_mb }))}
                             format={v => `${Math.round(v)}`}
                         />
@@ -214,13 +226,19 @@ export default function MetricsView({
                     <ChartSection title="Load（1 分鐘平均）" loading={loading}>
                         <MetricsTrendChart
                             title="Load 趨勢"
+                            {...rangeProps}
                             points={metrics.map(m => ({ t: m.created_at, v: m.load1 }))}
                             format={v => v.toFixed(2)}
                         />
                     </ChartSection>
 
+                    {canReadAudit && range && (
+                        <MetricsAuditPanel from={range.from} to={range.to} onClear={() => setRange(null)} />
+                    )}
+
                     <p className="text-xs text-neutral-400 dark:text-neutral-500">
                         資料由後端定時採樣，時間以台北時區顯示；此頁每分鐘自動拉取最新採樣。
+                        {canReadAudit && "在任一張圖上橫向拖曳可選取時間區間，下方會列出該區間的後台操作紀錄。"}
                     </p>
                 </>
             )}
