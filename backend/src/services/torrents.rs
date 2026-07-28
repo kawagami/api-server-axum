@@ -24,11 +24,12 @@ use std::{
 };
 use tokio::{sync::Mutex, task::JoinHandle};
 
-/// metadata 解析逾時預設值（秒）— 可由 app_settings.torrent_metadata_timeout_seconds 熱更新。
-/// 活著的冷門種子通常一兩分鐘內就能從 DHT 撈到 peer，撐更久多半是死種，
-/// 與其乾等不如讓後面排隊的先試（逾時會排到隊尾，額度用完才判 failed）。
+/// metadata 解析的**讓位檢查間隔**預設值（秒）— 可由 app_settings.torrent_metadata_timeout_seconds
+/// 熱更新（key 名沿用歷史，語意已不是硬逾時）。到點只檢查有沒有任務排隊等名額：
+/// 沒有就繼續等（冷門種子需要時間），有才放棄本輪。
 const DEFAULT_METADATA_TIMEOUT_SECONDS: i64 = 180;
-/// metadata 逾時的重試額度：連續這麼多輪都找不到 peers 才判 failed
+/// 讓位次數上限：被排隊任務擠掉這麼多次仍沒拿到 metadata 才判 failed。
+/// 沒人排隊時不會累計，所以「一直等」不會用掉額度。
 const MAX_METADATA_ATTEMPTS: i32 = 3;
 /// 初始化逾時 — metadata 到手後驗證磁碟既有 piece（純本地 IO + SHA-1，大檔在小機器上會久）
 const INIT_TIMEOUT: Duration = Duration::from_secs(1800);
@@ -40,9 +41,9 @@ const DEFAULT_LINK_TTL_MINUTES: i64 = 180;
 const DEFAULT_MAX_ACTIVE: usize = 2;
 const DEFAULT_MAX_TOTAL_SIZE_GB: i64 = 20;
 
-/// 啟動失敗的分類 —— metadata 逾時還有重試機會，其他錯誤直接判 failed
+/// 啟動失敗的分類 —— 讓位還有重試機會，其他錯誤直接判 failed
 enum StartFailure {
-    /// 這一輪沒在時限內找到 peers（額度未用完就只是排到隊尾）
+    /// 檢查點到了還沒找到 peers，而且有任務排隊等名額 → 讓位（額度未用完只是排到隊尾）
     MetadataTimeout,
     Fatal(String),
 }
@@ -95,7 +96,8 @@ impl TorrentManager {
     }
 }
 
-fn settings_usize(state: &AppState, key: &str, default: usize) -> usize {
+/// 讀 app_settings 的數值設定，缺失/壞值一律回退預設（型別由 default 決定）
+fn setting<T: std::str::FromStr>(state: &AppState, key: &str, default: T) -> T {
     state
         .get_settings()
         .get(key)
@@ -103,12 +105,9 @@ fn settings_usize(state: &AppState, key: &str, default: usize) -> usize {
         .unwrap_or(default)
 }
 
-fn settings_i64(state: &AppState, key: &str, default: i64) -> i64 {
-    state
-        .get_settings()
-        .get(key)
-        .and_then(|v| v.trim().parse().ok())
-        .unwrap_or(default)
+/// 併發上限（正在解析 metadata 的佔位也算一格）
+fn max_active(state: &AppState) -> usize {
+    setting(state, "torrent_max_active", DEFAULT_MAX_ACTIVE)
 }
 
 /// 解析 magnet URI，回傳小寫 hex info_hash
@@ -125,7 +124,7 @@ pub fn parse_info_hash(magnet_uri: &str) -> Result<String, AppError> {
 pub async fn create(state: &AppState, magnet_uri: &str, created_by: &str, owner_id: Option<i64>) -> Result<Torrent, AppError> {
     let info_hash = parse_info_hash(magnet_uri)?;
 
-    let max_bytes = settings_i64(state, "torrent_max_total_size_gb", DEFAULT_MAX_TOTAL_SIZE_GB)
+    let max_bytes = setting(state, "torrent_max_total_size_gb", DEFAULT_MAX_TOTAL_SIZE_GB)
         .saturating_mul(1024 * 1024 * 1024);
     let used = torrents_repo::total_size_sum(state.get_pool()).await?;
     if used >= max_bytes {
@@ -142,15 +141,16 @@ pub async fn create(state: &AppState, magnet_uri: &str, created_by: &str, owner_
 }
 
 /// 把排隊中（pending）與重啟後中斷（downloading）的任務補進 session，直到達併發上限。
-/// 啟動時、新增後、完成/失敗/刪除後都會呼叫；重複呼叫安全。
-/// 回傳 BoxFuture：與 watch_torrent 互相遞迴，opaque future 會造成 Send 自我參照
+/// 啟動時、新增後、完成/失敗/讓位/刪除後都會呼叫；重複呼叫安全。
+/// 回傳 BoxFuture：本函式 spawn `run_torrent`，而它收尾時又回頭 spawn 本函式，
+/// opaque future 會變成型別自我參照（不 Send）
 pub fn sync_active(state: AppState) -> futures::future::BoxFuture<'static, ()> {
     Box::pin(sync_active_inner(state))
 }
 
 async fn sync_active_inner(state: AppState) {
     let manager = state.get_torrents();
-    let max_active = settings_usize(&state, "torrent_max_active", DEFAULT_MAX_ACTIVE);
+    let max_active = max_active(&state);
 
     let mut slots = manager.active.lock().await;
     if slots.len() >= max_active {
@@ -190,9 +190,8 @@ async fn sync_active_inner(state: AppState) {
 /// 這是「解析 metadata 該不該讓位」的唯一判準 —— 沒人在等就沒有理由中斷冷門種子的解析。
 /// 查詢失敗時保守回 true（維持讓位行為，寧可多輪替也別卡住整條隊伍）。
 async fn queue_pressure(state: &AppState) -> bool {
-    let max_active = settings_usize(state, "torrent_max_active", DEFAULT_MAX_ACTIVE) as i64;
     match torrents_repo::count_resumable(state.get_pool()).await {
-        Ok(total) => total > max_active,
+        Ok(total) => total > max_active(state) as i64,
         Err(e) => {
             tracing::warn!("count_resumable failed: {e}");
             true
@@ -200,11 +199,12 @@ async fn queue_pressure(state: &AppState) -> bool {
     }
 }
 
-/// 一個任務的完整生命週期：加進 session（含 metadata 逾時）→ 監看到完成/失敗。
+/// 一個任務的完整生命週期：加進 session（解析 metadata，中途可能讓位）→ 監看到完成/失敗。
 /// 由 `sync_active` spawn，對應 active map 裡的一格。
 async fn run_torrent(state: AppState, row: Torrent) {
     let id = row.id;
-    // 記一次嘗試：把自己推到候選排序的隊尾，這輪沒成功時後面的任務才輪得到
+    // 記一次嘗試：把自己推到候選排序的隊尾，這輪沒成功時後面的任務才輪得到。
+    // DB 掛掉時當第 1 次 —— 寧可多試幾輪，也不要因為記不到帳就把任務判失敗
     let attempt = torrents_repo::mark_attempt(state.get_pool(), id)
         .await
         .unwrap_or_else(|e| {
@@ -212,39 +212,40 @@ async fn run_torrent(state: AppState, row: Torrent) {
             1
         });
 
-    let handle = match start_torrent(&state, &row).await {
-        Ok(handle) => handle,
-        // 還有額度就留在 pending 等下一輪（此時候選排序已把它排到最後）
-        Err(StartFailure::MetadataTimeout) if attempt < MAX_METADATA_ATTEMPTS => {
-            let reason = format!(
-                "找不到 peers，先讓位給排隊的任務（第 {attempt}/{MAX_METADATA_ATTEMPTS} 次）"
-            );
-            tracing::warn!("torrent {id} {reason}");
-            state.get_torrents().active.lock().await.remove(&id);
-            let _ = torrents_repo::set_retry_pending(state.get_pool(), id, &reason).await;
-            state.broadcast(
-                WsEvent::TorrentRetrying,
-                serde_json::json!({ "id": id, "name": row.name, "reason": reason, "attempt": attempt }),
-            );
-            tokio::spawn(sync_active(state.clone()));
-            return;
-        }
-        Err(failure) => {
-            let reason = match failure {
-                StartFailure::MetadataTimeout => {
-                    format!("找不到 peers，連續 {MAX_METADATA_ATTEMPTS} 次讓位後仍無結果")
-                }
-                StartFailure::Fatal(reason) => reason,
-            };
-            tracing::error!("torrent {id} start failed: {reason}");
-            state.get_torrents().active.lock().await.remove(&id);
-            let _ = torrents_repo::set_failed(state.get_pool(), id, &reason).await;
-            broadcast_failed(&state, id, row.name.as_deref(), &reason);
-            tokio::spawn(sync_active(state.clone()));
-            return;
-        }
+    let failure = match start_torrent(&state, &row).await {
+        // 成功後 watcher 自己收尾（完成/失敗都會清 slot 並補位）
+        Ok(handle) => return watch_torrent(state, id, handle).await,
+        Err(failure) => failure,
     };
-    watch_torrent(state, id, handle).await;
+
+    // 讓位（還有額度）→ 留在 pending 等下一輪；其餘一律判 failed。
+    // 兩條路的收尾動作相同：清 slot → 更新 DB → 推播 → 補位
+    let retrying =
+        matches!(failure, StartFailure::MetadataTimeout) && attempt < MAX_METADATA_ATTEMPTS;
+    let reason = match failure {
+        StartFailure::MetadataTimeout if retrying => {
+            format!("找不到 peers，先讓位給排隊的任務（第 {attempt}/{MAX_METADATA_ATTEMPTS} 次）")
+        }
+        StartFailure::MetadataTimeout => {
+            format!("找不到 peers，連續 {MAX_METADATA_ATTEMPTS} 次讓位後仍無結果")
+        }
+        StartFailure::Fatal(reason) => reason,
+    };
+
+    state.get_torrents().active.lock().await.remove(&id);
+    if retrying {
+        tracing::warn!("torrent {id} {reason}");
+        let _ = torrents_repo::set_retry_pending(state.get_pool(), id, &reason).await;
+        state.broadcast(
+            WsEvent::TorrentRetrying,
+            serde_json::json!({ "id": id, "name": row.name, "reason": reason, "attempt": attempt }),
+        );
+    } else {
+        tracing::error!("torrent {id} start failed: {reason}");
+        let _ = torrents_repo::set_failed(state.get_pool(), id, &reason).await;
+        broadcast_failed(&state, id, row.name.as_deref(), &reason);
+    }
+    tokio::spawn(sync_active(state));
 }
 
 async fn start_torrent(
@@ -254,7 +255,7 @@ async fn start_torrent(
     let manager = state.get_torrents();
     let output_dir = manager.output_dir(&row.info_hash);
     let interval = Duration::from_secs(
-        settings_i64(
+        setting(
             state,
             "torrent_metadata_timeout_seconds",
             DEFAULT_METADATA_TIMEOUT_SECONDS,
@@ -331,7 +332,7 @@ async fn start_torrent(
     Ok(handle)
 }
 
-/// 單一任務的生命週期監看：metadata → 進度推播 → 完成/失敗收尾
+/// 拿到 metadata 之後的監看：等初始化 → metadata 落 DB → 進度推播 → 完成/失敗收尾
 async fn watch_torrent(state: AppState, id: i32, handle: Arc<ManagedTorrent>) {
     // 1. 等初始化完成（metadata 已在 start_torrent 拿到，這裡等的是既有檔案的 piece 驗證）
     match tokio::time::timeout(INIT_TIMEOUT, handle.wait_until_initialized()).await {
@@ -487,6 +488,13 @@ fn broadcast_failed(state: &AppState, id: i32, name: Option<&str>, reason: &str)
     );
 }
 
+/// 從 librqbit session 移除；失敗只 warn，收尾流程不因此中斷
+async fn session_delete(manager: &TorrentManager, target: TorrentIdOrHash, delete_files: bool) {
+    if let Err(e) = manager.session.delete(target, delete_files).await {
+        tracing::warn!("session delete {target:?} failed: {e}");
+    }
+}
+
 async fn remove_from_session(
     state: &AppState,
     id: i32,
@@ -496,21 +504,18 @@ async fn remove_from_session(
     let manager = state.get_torrents();
     // 移掉的 Slot 帶著本 task 自己的 JoinHandle，drop 只是 detach，不會中止自己
     manager.active.lock().await.remove(&id);
-    if let Err(e) = manager.session.delete(handle.id().into(), delete_files).await {
-        tracing::warn!("torrent {id} session delete failed: {e}");
-    }
+    session_delete(manager, handle.id().into(), delete_files).await;
 }
 
-/// 沒有 handle 時的兜底清理（啟動 task 被 abort / 逾時），用 info_hash 找 session 內的殘留
+/// 沒有 handle 時的兜底清理（啟動 task 被 abort、或讓位時剛好已掛進 session），
+/// 用 info_hash 找殘留。**先查存在再刪**：讓位路徑每次都會走這裡，絕大多數是 no-op，
+/// 少了這道檢查每次讓位都會噴一行 warn。
 async fn purge_by_info_hash(manager: &TorrentManager, info_hash: &str, delete_files: bool) {
     let Ok(target) = TorrentIdOrHash::parse(info_hash) else {
         return;
     };
-    if manager.session.get(target).is_none() {
-        return;
-    }
-    if let Err(e) = manager.session.delete(target, delete_files).await {
-        tracing::warn!("torrent {info_hash} session delete by hash failed: {e}");
+    if manager.session.get(target).is_some() {
+        session_delete(manager, target, delete_files).await;
     }
 }
 
@@ -535,12 +540,8 @@ pub async fn delete(state: &AppState, id: i32) -> Result<(), AppError> {
     }
     let info_hash = torrents_repo::delete(state.get_pool(), id).await?;
     match slot.and_then(|s| s.handle) {
-        Some(handle) => {
-            if let Err(e) = manager.session.delete(handle.id().into(), true).await {
-                tracing::warn!("torrent {id} session delete failed: {e}");
-            }
-        }
-        // abort 前可能剛好已掛進 session，用 info_hash 兜底
+        Some(handle) => session_delete(manager, handle.id().into(), true).await,
+        // 還在解析、沒有 handle：abort 前可能剛好已掛進 session，用 info_hash 兜底
         None => purge_by_info_hash(manager, &info_hash, true).await,
     }
     let dir = manager.output_dir(&info_hash);
@@ -598,7 +599,7 @@ pub async fn create_download_links(
         .transpose()?
         .unwrap_or_default();
 
-    let ttl_minutes = settings_i64(state, "torrent_link_ttl_minutes", DEFAULT_LINK_TTL_MINUTES).max(1);
+    let ttl_minutes = setting(state, "torrent_link_ttl_minutes", DEFAULT_LINK_TTL_MINUTES).max(1);
     let expires_at = Utc::now() + Duration::from_secs(ttl_minutes as u64 * 60);
     let secret = &state.get_config().jwt_secret;
 
@@ -731,7 +732,7 @@ pub async fn storage_stats(state: &AppState) -> Result<serde_json::Value, AppErr
         .map_err(|e| SystemError::Internal(format!("statvfs failed: {e}")))?;
 
     let used = torrents_repo::total_size_sum(state.get_pool()).await?;
-    let max_bytes = settings_i64(state, "torrent_max_total_size_gb", DEFAULT_MAX_TOTAL_SIZE_GB)
+    let max_bytes = setting(state, "torrent_max_total_size_gb", DEFAULT_MAX_TOTAL_SIZE_GB)
         .saturating_mul(1024 * 1024 * 1024);
 
     Ok(serde_json::json!({
@@ -762,7 +763,7 @@ fn disk_space(path: &std::path::Path) -> std::io::Result<(u64, u64)> {
 
 /// 排程：清除逾期任務（completed 超過保留天數 / failed 同），刪 DB + 磁碟
 pub async fn cleanup_expired(state: &AppState) -> Result<(), AppError> {
-    let retention_days = settings_i64(state, "torrent_retention_days", 7);
+    let retention_days = setting(state, "torrent_retention_days", 7i64);
     let expired = torrents_repo::list_expired(state.get_pool(), retention_days).await?;
     for torrent in expired {
         tracing::info!(
