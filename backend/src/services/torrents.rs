@@ -24,8 +24,12 @@ use std::{
 };
 use tokio::{sync::Mutex, task::JoinHandle};
 
-/// metadata 解析逾時（抓不到 peers/tracker 就放棄）
-const METADATA_TIMEOUT: Duration = Duration::from_secs(600);
+/// metadata 解析逾時預設值（秒）— 可由 app_settings.torrent_metadata_timeout_seconds 熱更新。
+/// 活著的冷門種子通常一兩分鐘內就能從 DHT 撈到 peer，撐更久多半是死種，
+/// 與其乾等不如讓後面排隊的先試（逾時會排到隊尾，額度用完才判 failed）。
+const DEFAULT_METADATA_TIMEOUT_SECONDS: i64 = 180;
+/// metadata 逾時的重試額度：連續這麼多輪都找不到 peers 才判 failed
+const MAX_METADATA_ATTEMPTS: i32 = 3;
 /// 初始化逾時 — metadata 到手後驗證磁碟既有 piece（純本地 IO + SHA-1，大檔在小機器上會久）
 const INIT_TIMEOUT: Duration = Duration::from_secs(1800);
 /// 進度輪詢間隔
@@ -35,6 +39,13 @@ const DEFAULT_LINK_TTL_MINUTES: i64 = 180;
 
 const DEFAULT_MAX_ACTIVE: usize = 2;
 const DEFAULT_MAX_TOTAL_SIZE_GB: i64 = 20;
+
+/// 啟動失敗的分類 —— metadata 逾時還有重試機會，其他錯誤直接判 failed
+enum StartFailure {
+    /// 這一輪沒在時限內找到 peers（額度未用完就只是排到隊尾）
+    MetadataTimeout,
+    Fatal(String),
+}
 
 /// 進行中任務的一格。
 /// **佔位早於 `add_torrent`**：magnet 的 metadata 解析在 librqbit 內部進行、可能耗上數分鐘，
@@ -179,10 +190,37 @@ async fn sync_active_inner(state: AppState) {
 /// 由 `sync_active` spawn，對應 active map 裡的一格。
 async fn run_torrent(state: AppState, row: Torrent) {
     let id = row.id;
+    // 記一次嘗試：把自己推到候選排序的隊尾，這輪沒成功時後面的任務才輪得到
+    let attempt = torrents_repo::mark_attempt(state.get_pool(), id)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!("torrent {id} mark_attempt failed: {e}");
+            1
+        });
+
     let handle = match start_torrent(&state, &row).await {
         Ok(handle) => handle,
-        Err(e) => {
-            let reason = e.to_string();
+        // 還有額度就留在 pending 等下一輪（此時候選排序已把它排到最後）
+        Err(StartFailure::MetadataTimeout) if attempt < MAX_METADATA_ATTEMPTS => {
+            let reason =
+                format!("找不到 peers，第 {attempt}/{MAX_METADATA_ATTEMPTS} 次嘗試逾時，排隊重試");
+            tracing::warn!("torrent {id} {reason}");
+            state.get_torrents().active.lock().await.remove(&id);
+            let _ = torrents_repo::set_retry_pending(state.get_pool(), id, &reason).await;
+            state.broadcast(
+                WsEvent::TorrentRetrying,
+                serde_json::json!({ "id": id, "name": row.name, "reason": reason, "attempt": attempt }),
+            );
+            tokio::spawn(sync_active(state.clone()));
+            return;
+        }
+        Err(failure) => {
+            let reason = match failure {
+                StartFailure::MetadataTimeout => format!(
+                    "找不到 peers，連續 {MAX_METADATA_ATTEMPTS} 次嘗試都逾時"
+                ),
+                StartFailure::Fatal(reason) => reason,
+            };
             tracing::error!("torrent {id} start failed: {reason}");
             state.get_torrents().active.lock().await.remove(&id);
             let _ = torrents_repo::set_failed(state.get_pool(), id, &reason).await;
@@ -194,15 +232,34 @@ async fn run_torrent(state: AppState, row: Torrent) {
     watch_torrent(state, id, handle).await;
 }
 
-async fn start_torrent(state: &AppState, row: &Torrent) -> Result<Arc<ManagedTorrent>, AppError> {
+async fn start_torrent(
+    state: &AppState,
+    row: &Torrent,
+) -> Result<Arc<ManagedTorrent>, StartFailure> {
     let manager = state.get_torrents();
     let output_dir = manager.output_dir(&row.info_hash);
+    let timeout = Duration::from_secs(
+        settings_i64(
+            state,
+            "torrent_metadata_timeout_seconds",
+            DEFAULT_METADATA_TIMEOUT_SECONDS,
+        )
+        .clamp(30, 3600) as u64,
+    );
+
+    // 解析可能耗上數分鐘，這行是那段期間唯一的痕跡（started 要等解析完才印）
+    tracing::info!(
+        "torrent {} ({}) resolving metadata, timeout {}s",
+        row.id,
+        row.info_hash,
+        timeout.as_secs()
+    );
 
     // ⚠ 對 magnet，librqbit 會在 add_torrent 內部解析 metadata（DHT/tracker 找 peers 要 info），
     //   而且它自己沒有逾時 —— 種子沒人做種就是無限期卡在這個 await，任務永遠停在 pending。
     //   逾時必須包在這裡，包在後面的 wait_until_initialized 已經來不及。
     let response = tokio::time::timeout(
-        METADATA_TIMEOUT,
+        timeout,
         manager.session.add_torrent(
             AddTorrent::from_url(&row.magnet_uri),
             Some(AddTorrentOptions {
@@ -216,14 +273,12 @@ async fn start_torrent(state: &AppState, row: &Torrent) -> Result<Arc<ManagedTor
     .await;
 
     let response = match response {
-        Ok(r) => r.map_err(|e| SystemError::Internal(format!("add_torrent failed: {e}")))?,
+        Ok(Ok(r)) => r,
+        Ok(Err(e)) => return Err(StartFailure::Fatal(format!("add_torrent failed: {e}"))),
         Err(_) => {
             // 逾時當下極小機率剛好已掛進 session，用 info_hash 補刪，別留孤兒
             purge_by_info_hash(manager, &row.info_hash, false).await;
-            return Err(SystemError::Internal(
-                "metadata 解析逾時（找不到 peers）".to_string(),
-            )
-            .into());
+            return Err(StartFailure::MetadataTimeout);
         }
     };
 
@@ -231,7 +286,9 @@ async fn start_torrent(state: &AppState, row: &Torrent) -> Result<Arc<ManagedTor
         AddTorrentResponse::Added(_, handle) => handle,
         AddTorrentResponse::AlreadyManaged(_, handle) => handle,
         AddTorrentResponse::ListOnly(_) => {
-            return Err(SystemError::Internal("unexpected list-only response".to_string()).into())
+            return Err(StartFailure::Fatal(
+                "unexpected list-only response".to_string(),
+            ))
         }
     };
 
@@ -240,7 +297,9 @@ async fn start_torrent(state: &AppState, row: &Torrent) -> Result<Arc<ManagedTor
         Some(slot) => slot.handle = Some(handle.clone()),
         None => {
             let _ = manager.session.delete(handle.id().into(), true).await;
-            return Err(SystemError::Internal("任務已於啟動期間被移除".to_string()).into());
+            return Err(StartFailure::Fatal(
+                "任務已於啟動期間被移除".to_string(),
+            ));
         }
     }
     tracing::info!("torrent {} ({}) started", row.id, row.info_hash);

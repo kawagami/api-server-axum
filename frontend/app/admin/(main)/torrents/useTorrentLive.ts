@@ -76,6 +76,11 @@ export function useTorrentLive({ initialTorrents, initialTotal, initialStorage, 
         refresh();
     });
 
+    // 這輪沒找到 peers、排到隊尾等下一輪：狀態還是 pending，但 error 換了新訊息 → 刷列表
+    useWsSubscribe("torrent_retrying", () => {
+        refresh();
+    });
+
     useWsSubscribe("torrent_failed", (data) => {
         const ev = data as { id: number };
         setLiveMap((prev) => {

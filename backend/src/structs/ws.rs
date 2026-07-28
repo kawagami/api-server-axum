@@ -19,6 +19,8 @@ pub enum WsEvent {
     TorrentProgress,
     TorrentCompleted,
     TorrentFailed,
+    /// metadata 這輪沒找到 peers，還有額度 → 留在 pending 排隊重試
+    TorrentRetrying,
 }
 
 impl WsEvent {
@@ -32,6 +34,7 @@ impl WsEvent {
             Self::TorrentProgress => "torrent_progress",
             Self::TorrentCompleted => "torrent_completed",
             Self::TorrentFailed => "torrent_failed",
+            Self::TorrentRetrying => "torrent_retrying",
         }
     }
 }

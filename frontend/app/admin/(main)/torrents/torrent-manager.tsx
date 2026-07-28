@@ -156,7 +156,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                     <AdminTd>
                                         <span
                                             className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TORRENT_STATUS_BADGE[t.status]}`}
-                                            title={t.status === "failed" ? t.error ?? undefined : undefined}
+                                            title={t.error ?? undefined}
                                         >
                                             {t.status}
                                         </span>
@@ -182,6 +182,14 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                         ) : t.status === "failed" ? (
                                             <span className="block text-xs text-red-500 truncate max-w-44" title={t.error ?? undefined}>
                                                 {t.error ?? "失敗"}
+                                            </span>
+                                        ) : t.error ? (
+                                            // pending 帶 error = 這輪找不到 peers、排隊等下一輪重試（不是失敗，不上紅色）
+                                            <span
+                                                className="block text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-44"
+                                                title={t.error}
+                                            >
+                                                {t.error}
                                             </span>
                                         ) : (
                                             <span className="text-sm text-neutral-400">—</span>

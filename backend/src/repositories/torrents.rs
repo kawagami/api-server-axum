@@ -83,16 +83,40 @@ pub async fn list(
     Ok(TorrentPaginatedResponse { data, total })
 }
 
-/// 取可啟動的任務：pending（排隊中）與 downloading（重啟後待 resume），舊的優先
+/// 取可啟動的任務：pending（排隊中）與 downloading（重啟後待 resume）。
+/// 排序：續傳的 downloading 最優先 → 沒試過的 → 最久沒試的（冷門種子逾時後會沉到隊尾，
+/// 不會每輪都搶在新任務前面）。
 pub async fn list_resumable(pool: &Pool<Postgres>, limit: i64) -> Result<Vec<Torrent>, AppError> {
     Ok(sqlx::query_as::<_, Torrent>(&format!(
-        "SELECT {COLUMNS} FROM torrents WHERE status IN ($1, $2) ORDER BY id LIMIT $3"
+        "SELECT {COLUMNS} FROM torrents WHERE status IN ($1, $2)
+         ORDER BY (status = 'downloading') DESC, last_attempt_at ASC NULLS FIRST, id LIMIT $3"
     ))
     .bind(STATUS_PENDING)
     .bind(STATUS_DOWNLOADING)
     .bind(limit)
     .fetch_all(pool)
     .await?)
+}
+
+/// 記一次啟動嘗試，回傳這是第幾次（排序用 + 判斷還有沒有重試額度）
+pub async fn mark_attempt(pool: &Pool<Postgres>, id: i32) -> Result<i32, AppError> {
+    Ok(sqlx::query_scalar(
+        "UPDATE torrents SET last_attempt_at = now(), attempt_count = attempt_count + 1
+         WHERE id = $1 RETURNING attempt_count",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?)
+}
+
+/// metadata 逾時但還有重試額度：留在 pending（已被 mark_attempt 排到隊尾），只記下原因
+pub async fn set_retry_pending(pool: &Pool<Postgres>, id: i32, error: &str) -> Result<(), AppError> {
+    sqlx::query("UPDATE torrents SET status = 'pending', error = $2 WHERE id = $1")
+        .bind(id)
+        .bind(error)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn set_downloading_metadata(
@@ -102,8 +126,10 @@ pub async fn set_downloading_metadata(
     total_size: i64,
     files: &serde_json::Value,
 ) -> Result<(), AppError> {
+    // attempt_count 歸零：metadata 已到手，之後若失敗重跑要重新給滿重試額度
     sqlx::query(
-        "UPDATE torrents SET status = 'downloading', name = $2, total_size = $3, files = $4, error = NULL WHERE id = $1",
+        "UPDATE torrents SET status = 'downloading', name = $2, total_size = $3, files = $4,
+                error = NULL, attempt_count = 0 WHERE id = $1",
     )
     .bind(id)
     .bind(name)
@@ -131,10 +157,12 @@ pub async fn set_failed(pool: &Pool<Postgres>, id: i32, error: &str) -> Result<(
     Ok(())
 }
 
-/// 重設為 pending（重試）。回傳是否有更新到（id 不存在或仍在下載中 → false）
+/// 重設為 pending（重試）。回傳是否有更新到（id 不存在或仍在下載中 → false）。
+/// 清掉嘗試紀錄 —— 手動重設是明確要求重跑，排到候選最前面。
 pub async fn reset_pending(pool: &Pool<Postgres>, id: i32) -> Result<bool, AppError> {
     let result = sqlx::query(
-        "UPDATE torrents SET status = 'pending', error = NULL, completed_at = NULL
+        "UPDATE torrents SET status = 'pending', error = NULL, completed_at = NULL,
+                attempt_count = 0, last_attempt_at = NULL
          WHERE id = $1 AND status IN ('failed', 'completed')",
     )
     .bind(id)

@@ -12,6 +12,7 @@ export const FIELD_CONFIGS: Record<string, FieldConfig> = {
     torrent_retention_days: { kind: "number", min: 1 },
     torrent_max_total_size_gb: { kind: "number", min: 1 },
     torrent_link_ttl_minutes: { kind: "number", min: 1 },
+    torrent_metadata_timeout_seconds: { kind: "number", min: 30, max: 3600 },
     image_webp_quality: { kind: "number", min: 1, max: 100 },
     image_client_compress: { kind: "enum", options: ["true", "false"] },
     image_client_quality: { kind: "number", min: 1, max: 100 },
