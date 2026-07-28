@@ -98,6 +98,17 @@ pub async fn list_resumable(pool: &Pool<Postgres>, limit: i64) -> Result<Vec<Tor
     .await?)
 }
 
+/// 待啟動任務總數（pending + downloading）— 與併發上限比較就知道有沒有任務排不進名額
+pub async fn count_resumable(pool: &Pool<Postgres>) -> Result<i64, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT count(*) FROM torrents WHERE status IN ($1, $2)")
+            .bind(STATUS_PENDING)
+            .bind(STATUS_DOWNLOADING)
+            .fetch_one(pool)
+            .await?,
+    )
+}
+
 /// 記一次啟動嘗試，回傳這是第幾次（排序用 + 判斷還有沒有重試額度）
 pub async fn mark_attempt(pool: &Pool<Postgres>, id: i32) -> Result<i32, AppError> {
     Ok(sqlx::query_scalar(

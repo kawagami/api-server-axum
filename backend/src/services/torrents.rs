@@ -186,6 +186,20 @@ async fn sync_active_inner(state: AppState) {
     }
 }
 
+/// 有沒有任務排不進併發名額。
+/// 這是「解析 metadata 該不該讓位」的唯一判準 —— 沒人在等就沒有理由中斷冷門種子的解析。
+/// 查詢失敗時保守回 true（維持讓位行為，寧可多輪替也別卡住整條隊伍）。
+async fn queue_pressure(state: &AppState) -> bool {
+    let max_active = settings_usize(state, "torrent_max_active", DEFAULT_MAX_ACTIVE) as i64;
+    match torrents_repo::count_resumable(state.get_pool()).await {
+        Ok(total) => total > max_active,
+        Err(e) => {
+            tracing::warn!("count_resumable failed: {e}");
+            true
+        }
+    }
+}
+
 /// 一個任務的完整生命週期：加進 session（含 metadata 逾時）→ 監看到完成/失敗。
 /// 由 `sync_active` spawn，對應 active map 裡的一格。
 async fn run_torrent(state: AppState, row: Torrent) {
@@ -202,8 +216,9 @@ async fn run_torrent(state: AppState, row: Torrent) {
         Ok(handle) => handle,
         // 還有額度就留在 pending 等下一輪（此時候選排序已把它排到最後）
         Err(StartFailure::MetadataTimeout) if attempt < MAX_METADATA_ATTEMPTS => {
-            let reason =
-                format!("找不到 peers，第 {attempt}/{MAX_METADATA_ATTEMPTS} 次嘗試逾時，排隊重試");
+            let reason = format!(
+                "找不到 peers，先讓位給排隊的任務（第 {attempt}/{MAX_METADATA_ATTEMPTS} 次）"
+            );
             tracing::warn!("torrent {id} {reason}");
             state.get_torrents().active.lock().await.remove(&id);
             let _ = torrents_repo::set_retry_pending(state.get_pool(), id, &reason).await;
@@ -216,9 +231,9 @@ async fn run_torrent(state: AppState, row: Torrent) {
         }
         Err(failure) => {
             let reason = match failure {
-                StartFailure::MetadataTimeout => format!(
-                    "找不到 peers，連續 {MAX_METADATA_ATTEMPTS} 次嘗試都逾時"
-                ),
+                StartFailure::MetadataTimeout => {
+                    format!("找不到 peers，連續 {MAX_METADATA_ATTEMPTS} 次讓位後仍無結果")
+                }
                 StartFailure::Fatal(reason) => reason,
             };
             tracing::error!("torrent {id} start failed: {reason}");
@@ -238,7 +253,7 @@ async fn start_torrent(
 ) -> Result<Arc<ManagedTorrent>, StartFailure> {
     let manager = state.get_torrents();
     let output_dir = manager.output_dir(&row.info_hash);
-    let timeout = Duration::from_secs(
+    let interval = Duration::from_secs(
         settings_i64(
             state,
             "torrent_metadata_timeout_seconds",
@@ -249,36 +264,46 @@ async fn start_torrent(
 
     // 解析可能耗上數分鐘，這行是那段期間唯一的痕跡（started 要等解析完才印）
     tracing::info!(
-        "torrent {} ({}) resolving metadata, timeout {}s",
+        "torrent {} ({}) resolving metadata, check every {}s",
         row.id,
         row.info_hash,
-        timeout.as_secs()
+        interval.as_secs()
     );
 
     // ⚠ 對 magnet，librqbit 會在 add_torrent 內部解析 metadata（DHT/tracker 找 peers 要 info），
     //   而且它自己沒有逾時 —— 種子沒人做種就是無限期卡在這個 await，任務永遠停在 pending。
     //   逾時必須包在這裡，包在後面的 wait_until_initialized 已經來不及。
-    let response = tokio::time::timeout(
-        timeout,
-        manager.session.add_torrent(
-            AddTorrent::from_url(&row.magnet_uri),
-            Some(AddTorrentOptions {
-                // 重啟 resume：檔案已存在時驗證既有 piece 續抓，不整包重來
-                overwrite: true,
-                output_folder: Some(output_dir.to_string_lossy().to_string()),
-                ..Default::default()
-            }),
-        ),
-    )
-    .await;
+    let add_fut = manager.session.add_torrent(
+        AddTorrent::from_url(&row.magnet_uri),
+        Some(AddTorrentOptions {
+            // 重啟 resume：檔案已存在時驗證既有 piece 續抓，不整包重來
+            overwrite: true,
+            output_folder: Some(output_dir.to_string_lossy().to_string()),
+            ..Default::default()
+        }),
+    );
+    tokio::pin!(add_fut);
 
-    let response = match response {
-        Ok(Ok(r)) => r,
-        Ok(Err(e)) => return Err(StartFailure::Fatal(format!("add_torrent failed: {e}"))),
-        Err(_) => {
-            // 逾時當下極小機率剛好已掛進 session，用 info_hash 補刪，別留孤兒
-            purge_by_info_hash(manager, &row.info_hash, false).await;
-            return Err(StartFailure::MetadataTimeout);
+    // 到點只是「檢查要不要讓位」，不是硬逾時：沒有任務排隊就繼續等下一輪。
+    // 對同一個 pinned future 反覆 timeout（而不是重新 add_torrent），已累積的
+    // DHT 查詢與半握手的 peer 都留著 —— 冷門種子要的就是不被打斷的時間。
+    let response = loop {
+        match tokio::time::timeout(interval, &mut add_fut).await {
+            Ok(Ok(r)) => break r,
+            Ok(Err(e)) => return Err(StartFailure::Fatal(format!("add_torrent failed: {e}"))),
+            Err(_) => {
+                if !queue_pressure(state).await {
+                    tracing::info!(
+                        "torrent {} 仍在解析 metadata，無任務排隊等名額，繼續等待",
+                        row.id
+                    );
+                    continue;
+                }
+                // 有任務排不進名額 → 讓位，本輪放棄（逾時當下極小機率剛好已掛進
+                // session，用 info_hash 補刪，別留孤兒）
+                purge_by_info_hash(manager, &row.info_hash, false).await;
+                return Err(StartFailure::MetadataTimeout);
+            }
         }
     };
 
