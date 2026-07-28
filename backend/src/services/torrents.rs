@@ -12,17 +12,22 @@ use crate::{
 };
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, Magnet, ManagedTorrent, Session};
+use librqbit::{
+    api::TorrentIdOrHash, AddTorrent, AddTorrentOptions, AddTorrentResponse, Magnet, ManagedTorrent,
+    Session,
+};
 use std::{
     collections::HashMap,
     path::PathBuf,
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::JoinHandle};
 
 /// metadata 解析逾時（抓不到 peers/tracker 就放棄）
 const METADATA_TIMEOUT: Duration = Duration::from_secs(600);
+/// 初始化逾時 — metadata 到手後驗證磁碟既有 piece（純本地 IO + SHA-1，大檔在小機器上會久）
+const INIT_TIMEOUT: Duration = Duration::from_secs(1800);
 /// 進度輪詢間隔
 const POLL_INTERVAL: Duration = Duration::from_secs(5);
 /// 下載連結效期預設值（分鐘）— 可由 app_settings.torrent_link_ttl_minutes 熱更新
@@ -31,11 +36,21 @@ const DEFAULT_LINK_TTL_MINUTES: i64 = 180;
 const DEFAULT_MAX_ACTIVE: usize = 2;
 const DEFAULT_MAX_TOTAL_SIZE_GB: i64 = 20;
 
+/// 進行中任務的一格。
+/// **佔位早於 `add_torrent`**：magnet 的 metadata 解析在 librqbit 內部進行、可能耗上數分鐘，
+/// 那段期間還沒有 handle，但名額已經被吃掉，不先佔位就會被重複啟動、併發數也算不準。
+struct Slot {
+    /// 整條生命週期的 task（啟動 + 監看），刪除時 abort
+    task: JoinHandle<()>,
+    /// metadata 解析完才有；None = 還在解析
+    handle: Option<Arc<ManagedTorrent>>,
+}
+
 /// torrent session 與進行中任務的 handle 對照表。
 /// 進度不落 DB — 即時資訊一律從 handle 讀。
 pub struct TorrentManager {
     session: Arc<Session>,
-    active: Mutex<HashMap<i32, Arc<ManagedTorrent>>>,
+    active: Mutex<HashMap<i32, Slot>>,
     base_path: PathBuf,
 }
 
@@ -65,7 +80,7 @@ impl TorrentManager {
     }
 
     pub async fn get_handle(&self, id: i32) -> Option<Arc<ManagedTorrent>> {
-        self.active.lock().await.get(&id).cloned()
+        self.active.lock().await.get(&id).and_then(|s| s.handle.clone())
     }
 }
 
@@ -126,40 +141,69 @@ async fn sync_active_inner(state: AppState) {
     let manager = state.get_torrents();
     let max_active = settings_usize(&state, "torrent_max_active", DEFAULT_MAX_ACTIVE);
 
-    let rows = {
-        let active = manager.active.lock().await;
-        if active.len() >= max_active {
+    let mut slots = manager.active.lock().await;
+    if slots.len() >= max_active {
+        return;
+    }
+    // limit 要把已佔位的算進去 —— 它們也在 resumable 清單裡而且排在前面，
+    // 只撈 max_active 筆會被自己佔滿、撈不到後面排隊的
+    let rows = match torrents_repo::list_resumable(
+        state.get_pool(),
+        (max_active + slots.len()) as i64,
+    )
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::error!("sync_active db error: {e}");
             return;
         }
-        match torrents_repo::list_resumable(state.get_pool(), max_active as i64).await {
-            Ok(rows) => rows
-                .into_iter()
-                .filter(|t| !active.contains_key(&t.id))
-                .take(max_active - active.len())
-                .collect::<Vec<_>>(),
-            Err(e) => {
-                tracing::error!("sync_active db error: {e}");
-                return;
-            }
-        }
     };
+    let free = max_active - slots.len();
+    let to_start: Vec<Torrent> = rows
+        .into_iter()
+        .filter(|t| !slots.contains_key(&t.id))
+        .take(free)
+        .collect();
 
-    for row in rows {
-        if let Err(e) = start_torrent(&state, &row).await {
-            tracing::error!("torrent {} start failed: {e}", row.id);
-            let _ = torrents_repo::set_failed(state.get_pool(), row.id, &e.to_string()).await;
-            broadcast_failed(&state, row.id, row.name.as_deref(), &e.to_string());
-        }
+    // 各自 spawn，不在這裡逐一 await：add_torrent 會等 magnet metadata，
+    // 序列跑的話第一筆沒 peers 就把後面全卡死
+    for row in to_start {
+        let id = row.id;
+        let task = tokio::spawn(run_torrent(state.clone(), row));
+        slots.insert(id, Slot { task, handle: None });
     }
 }
 
-async fn start_torrent(state: &AppState, row: &Torrent) -> Result<(), AppError> {
+/// 一個任務的完整生命週期：加進 session（含 metadata 逾時）→ 監看到完成/失敗。
+/// 由 `sync_active` spawn，對應 active map 裡的一格。
+async fn run_torrent(state: AppState, row: Torrent) {
+    let id = row.id;
+    let handle = match start_torrent(&state, &row).await {
+        Ok(handle) => handle,
+        Err(e) => {
+            let reason = e.to_string();
+            tracing::error!("torrent {id} start failed: {reason}");
+            state.get_torrents().active.lock().await.remove(&id);
+            let _ = torrents_repo::set_failed(state.get_pool(), id, &reason).await;
+            broadcast_failed(&state, id, row.name.as_deref(), &reason);
+            tokio::spawn(sync_active(state.clone()));
+            return;
+        }
+    };
+    watch_torrent(state, id, handle).await;
+}
+
+async fn start_torrent(state: &AppState, row: &Torrent) -> Result<Arc<ManagedTorrent>, AppError> {
     let manager = state.get_torrents();
     let output_dir = manager.output_dir(&row.info_hash);
 
-    let response = manager
-        .session
-        .add_torrent(
+    // ⚠ 對 magnet，librqbit 會在 add_torrent 內部解析 metadata（DHT/tracker 找 peers 要 info），
+    //   而且它自己沒有逾時 —— 種子沒人做種就是無限期卡在這個 await，任務永遠停在 pending。
+    //   逾時必須包在這裡，包在後面的 wait_until_initialized 已經來不及。
+    let response = tokio::time::timeout(
+        METADATA_TIMEOUT,
+        manager.session.add_torrent(
             AddTorrent::from_url(&row.magnet_uri),
             Some(AddTorrentOptions {
                 // 重啟 resume：檔案已存在時驗證既有 piece 續抓，不整包重來
@@ -167,9 +211,21 @@ async fn start_torrent(state: &AppState, row: &Torrent) -> Result<(), AppError> 
                 output_folder: Some(output_dir.to_string_lossy().to_string()),
                 ..Default::default()
             }),
-        )
-        .await
-        .map_err(|e| SystemError::Internal(format!("add_torrent failed: {e}")))?;
+        ),
+    )
+    .await;
+
+    let response = match response {
+        Ok(r) => r.map_err(|e| SystemError::Internal(format!("add_torrent failed: {e}")))?,
+        Err(_) => {
+            // 逾時當下極小機率剛好已掛進 session，用 info_hash 補刪，別留孤兒
+            purge_by_info_hash(manager, &row.info_hash, false).await;
+            return Err(SystemError::Internal(
+                "metadata 解析逾時（找不到 peers）".to_string(),
+            )
+            .into());
+        }
+    };
 
     let handle = match response {
         AddTorrentResponse::Added(_, handle) => handle,
@@ -179,30 +235,29 @@ async fn start_torrent(state: &AppState, row: &Torrent) -> Result<(), AppError> 
         }
     };
 
-    {
-        // 併發 sync_active 防護：已有 watcher 就不重複 spawn
-        let mut active = manager.active.lock().await;
-        if active.contains_key(&row.id) {
-            return Ok(());
+    // 佔位格補上 handle（即時進度要用）。格子不見 = 解析期間任務被刪掉了
+    match manager.active.lock().await.get_mut(&row.id) {
+        Some(slot) => slot.handle = Some(handle.clone()),
+        None => {
+            let _ = manager.session.delete(handle.id().into(), true).await;
+            return Err(SystemError::Internal("任務已於啟動期間被移除".to_string()).into());
         }
-        active.insert(row.id, handle.clone());
     }
-    tokio::spawn(watch_torrent(state.clone(), row.id, handle));
     tracing::info!("torrent {} ({}) started", row.id, row.info_hash);
-    Ok(())
+    Ok(handle)
 }
 
 /// 單一任務的生命週期監看：metadata → 進度推播 → 完成/失敗收尾
 async fn watch_torrent(state: AppState, id: i32, handle: Arc<ManagedTorrent>) {
-    // 1. 等 metadata（DHT/tracker 解析），逾時放棄
-    match tokio::time::timeout(METADATA_TIMEOUT, handle.wait_until_initialized()).await {
+    // 1. 等初始化完成（metadata 已在 start_torrent 拿到，這裡等的是既有檔案的 piece 驗證）
+    match tokio::time::timeout(INIT_TIMEOUT, handle.wait_until_initialized()).await {
         Ok(Ok(())) => {}
         Ok(Err(e)) => {
             finish_failed(&state, id, &handle, &format!("初始化失敗: {e}")).await;
             return;
         }
         Err(_) => {
-            finish_failed(&state, id, &handle, "metadata 解析逾時（找不到 peers）").await;
+            finish_failed(&state, id, &handle, "初始化逾時（既有檔案驗證未完成）").await;
             return;
         }
     }
@@ -355,9 +410,23 @@ async fn remove_from_session(
     delete_files: bool,
 ) {
     let manager = state.get_torrents();
+    // 移掉的 Slot 帶著本 task 自己的 JoinHandle，drop 只是 detach，不會中止自己
     manager.active.lock().await.remove(&id);
     if let Err(e) = manager.session.delete(handle.id().into(), delete_files).await {
         tracing::warn!("torrent {id} session delete failed: {e}");
+    }
+}
+
+/// 沒有 handle 時的兜底清理（啟動 task 被 abort / 逾時），用 info_hash 找 session 內的殘留
+async fn purge_by_info_hash(manager: &TorrentManager, info_hash: &str, delete_files: bool) {
+    let Ok(target) = TorrentIdOrHash::parse(info_hash) else {
+        return;
+    };
+    if manager.session.get(target).is_none() {
+        return;
+    }
+    if let Err(e) = manager.session.delete(target, delete_files).await {
+        tracing::warn!("torrent {info_hash} session delete by hash failed: {e}");
     }
 }
 
@@ -375,10 +444,21 @@ pub async fn reset_pending(state: &AppState, id: i32) -> Result<(), AppError> {
 /// 刪除任務：session 停掉 → DB 刪除 → 磁碟清理 → 補位
 pub async fn delete(state: &AppState, id: i32) -> Result<(), AppError> {
     let manager = state.get_torrents();
-    if let Some(handle) = manager.get_handle(id).await {
-        remove_from_session(state, id, &handle, true).await;
+    // 先抽走佔位格並中止 task —— 還卡在解析 metadata（尚無 handle）的任務也要刪得掉
+    let slot = manager.active.lock().await.remove(&id);
+    if let Some(slot) = &slot {
+        slot.task.abort();
     }
     let info_hash = torrents_repo::delete(state.get_pool(), id).await?;
+    match slot.and_then(|s| s.handle) {
+        Some(handle) => {
+            if let Err(e) = manager.session.delete(handle.id().into(), true).await {
+                tracing::warn!("torrent {id} session delete failed: {e}");
+            }
+        }
+        // abort 前可能剛好已掛進 session，用 info_hash 兜底
+        None => purge_by_info_hash(manager, &info_hash, true).await,
+    }
     let dir = manager.output_dir(&info_hash);
     if let Err(e) = tokio::fs::remove_dir_all(&dir).await {
         if e.kind() != std::io::ErrorKind::NotFound {
