@@ -51,7 +51,7 @@ export default function DeleteUserButton({ user, isSelf }: Props) {
             }`}
         >
             {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-            {isDeleting ? "刪除中..." : "刪除"}
+            {isDeleting ? "刪除中…" : "刪除"}
         </button>
     );
 }

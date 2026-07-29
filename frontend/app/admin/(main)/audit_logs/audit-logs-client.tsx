@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
 import { getAuditLogs } from "@/api/logs";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
+import PageHeader from "@/components/admin/page-header";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import usePagedList from "@/hooks/usePagedList";
+import useFilterUrl from "@/hooks/useFilterUrl";
 import type { AuditLog, HttpMethod } from "@/types";
 import { METHOD_BADGE, httpStatusBadgeClass } from "@/libs/badge-styles";
+import { formatDateTimeSeconds } from "@/libs/admin-datetime";
 
 const LIMIT = 100;
 
@@ -33,7 +36,7 @@ function toQuery(f: Filters) {
 }
 
 // 反向：ISO → datetime-local 輸入框吃的本地時間字串（給 ?from=&to= 帶入用，如 /admin/metrics 選區跳來）
-function toLocalInput(iso: string | null): string {
+function toLocalInput(iso: string | null | undefined): string {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
@@ -43,14 +46,19 @@ function toLocalInput(iso: string | null): string {
 
 export default function AuditLogsClient() {
     const { items: logs, setItems: setLogs, hasMore, isPending, failed, load, loadMore } = usePagedList<AuditLog>(LIMIT);
-    const searchParams = useSearchParams();
-    // ?from=&to=（ISO）可帶入初始時間條件，供 /admin/metrics 選區跳轉；只在首次渲染讀一次
+    const { initial, write } = useFilterUrl(defaultFilters);
+    // 條件全部可從 URL 帶入（供 /admin/metrics 選區跳轉、重新整理、貼連結）；只在首次渲染讀一次。
+    // from / to 在 URL 上是 ISO，輸入框吃的是 datetime-local，兩邊各自轉換
     const [filters, setFilters] = useState<Filters>(() => ({
-        ...defaultFilters,
-        from: toLocalInput(searchParams.get('from')),
-        to: toLocalInput(searchParams.get('to')),
+        ...initial,
+        from: toLocalInput(initial.from),
+        to: toLocalInput(initial.to),
     }));
     const [appliedFilters, setAppliedFilters] = useState<Filters>(filters);
+
+    /** 寫回 URL：from / to 一律存 ISO（與 metrics 面板產生的連結同一種格式） */
+    const writeUrl = (f: Filters) =>
+        write({ ...f, from: toIso(f.from) ?? '', to: toIso(f.to) ?? '' });
 
     const logsRef = useRef<AuditLog[]>([]);
     const appliedFiltersRef = useRef<Filters>(filters);
@@ -80,6 +88,7 @@ export default function AuditLogsClient() {
     function handleSearch() {
         if (isPending) return;
         setAppliedFilters(filters);
+        writeUrl(filters);
         const query = toQuery(filters);
         load(page => getAuditLogs({ ...query, page, per_page: LIMIT }));
     }
@@ -87,6 +96,7 @@ export default function AuditLogsClient() {
     function handleReset() {
         setFilters(defaultFilters);
         setAppliedFilters(defaultFilters);
+        writeUrl(defaultFilters);
         load(page => getAuditLogs({ page, per_page: LIMIT }));
     }
 
@@ -95,17 +105,17 @@ export default function AuditLogsClient() {
         loadMore();
     }
 
-    const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary-400";
+    const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="w-full">
             <div className="flex flex-col gap-4">
-                <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">Audit Logs</h1>
+                <PageHeader title="操作紀錄" description="後台 API 的寫入與讀取紀錄" />
 
                 {/* Filter bar */}
                 <div className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-neutral-500 dark:text-neutral-400">User email</label>
+                        <label className="text-xs text-neutral-500 dark:text-neutral-400">管理員 Email</label>
                         <input
                             type="text"
                             value={filters.user_email}
@@ -116,20 +126,20 @@ export default function AuditLogsClient() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-neutral-500 dark:text-neutral-400">Method</label>
+                        <label className="text-xs text-neutral-500 dark:text-neutral-400">方法</label>
                         <select
                             value={filters.method}
                             onChange={e => setFilters(f => ({ ...f, method: e.target.value as HttpMethod | '' }))}
                             className={inputClass}
                         >
-                            <option value="">ALL</option>
+                            <option value="">全部</option>
                             {(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as HttpMethod[]).map(m => (
                                 <option key={m} value={m}>{m}</option>
                             ))}
                         </select>
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-neutral-500 dark:text-neutral-400">Path</label>
+                        <label className="text-xs text-neutral-500 dark:text-neutral-400">路徑</label>
                         <input
                             type="text"
                             value={filters.path}
@@ -140,7 +150,7 @@ export default function AuditLogsClient() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-neutral-500 dark:text-neutral-400">From</label>
+                        <label className="text-xs text-neutral-500 dark:text-neutral-400">起始時間</label>
                         <input
                             type="datetime-local"
                             value={filters.from}
@@ -149,7 +159,7 @@ export default function AuditLogsClient() {
                         />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-neutral-500 dark:text-neutral-400">To</label>
+                        <label className="text-xs text-neutral-500 dark:text-neutral-400">結束時間</label>
                         <input
                             type="datetime-local"
                             value={filters.to}
@@ -163,14 +173,14 @@ export default function AuditLogsClient() {
                             disabled={isPending}
                             className="px-4 py-1.5 text-sm font-medium rounded bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors"
                         >
-                            Search
+                            搜尋
                         </button>
                         <button
                             onClick={handleReset}
                             disabled={isPending}
                             className="px-4 py-1.5 text-sm font-medium rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors"
                         >
-                            Reset
+                            重設
                         </button>
                     </div>
                 </div>
@@ -178,58 +188,53 @@ export default function AuditLogsClient() {
                 <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="overflow-x-auto">
-                        <table className="w-full border-collapse text-sm">
+                    <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+                        <AdminTable className="text-sm">
                             <thead>
-                                <tr className="bg-neutral-100 dark:bg-neutral-800">
-                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-32 md:w-44">Time</th>
-                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 hidden md:table-cell">User</th>
-                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-20">Method</th>
-                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700">Path</th>
-                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 hidden lg:table-cell">Query</th>
-                                    <th className="px-4 py-2 text-left text-neutral-700 dark:text-neutral-300 border-b border-neutral-200 dark:border-neutral-700 w-20">Status</th>
-                                </tr>
+                                <AdminHeadRow>
+                                    <AdminTh className="w-32 md:w-44">時間</AdminTh>
+                                    <AdminTh className="hidden md:table-cell">管理員</AdminTh>
+                                    <AdminTh className="w-20">方法</AdminTh>
+                                    <AdminTh>路徑</AdminTh>
+                                    <AdminTh className="hidden lg:table-cell">Query</AdminTh>
+                                    <AdminTh className="w-20">狀態</AdminTh>
+                                </AdminHeadRow>
                             </thead>
                             <tbody>
                                 {logs.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-neutral-500 dark:text-neutral-400">
-                                            {isPending ? 'Loading...' : 'No audit logs found'}
-                                        </td>
-                                    </tr>
+                                    <AdminEmptyRow colSpan={6}>
+                                        {isPending ? '載入中…' : '目前沒有符合條件的紀錄'}
+                                    </AdminEmptyRow>
                                 ) : (
                                     logs.map(log => (
-                                        <tr
-                                            key={log.id}
-                                            className="border-b border-neutral-100 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                                        >
-                                            <td className="px-4 py-2 text-neutral-500 dark:text-neutral-400 text-xs whitespace-nowrap">
-                                                {new Date(log.created_at).toLocaleString()}
-                                            </td>
-                                            <td className="px-4 py-2 text-neutral-900 dark:text-neutral-100 text-xs font-mono hidden md:table-cell">
+                                        <AdminRow key={log.id}>
+                                            <AdminTd className="text-neutral-500 dark:text-neutral-400 text-xs whitespace-nowrap">
+                                                {formatDateTimeSeconds(log.created_at)}
+                                            </AdminTd>
+                                            <AdminTd className="text-xs font-mono hidden md:table-cell">
                                                 {log.user_email}
-                                            </td>
-                                            <td className="px-4 py-2">
+                                            </AdminTd>
+                                            <AdminTd>
                                                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${METHOD_BADGE[log.method] ?? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}`}>
                                                     {log.method}
                                                 </span>
-                                            </td>
-                                            <td className="px-4 py-2 text-neutral-900 dark:text-neutral-100 font-mono text-xs break-all">
+                                            </AdminTd>
+                                            <AdminTd className="font-mono text-xs break-all">
                                                 {log.path}
-                                            </td>
-                                            <td className="px-4 py-2 text-neutral-500 dark:text-neutral-400 font-mono text-xs hidden lg:table-cell">
+                                            </AdminTd>
+                                            <AdminTd className="text-neutral-500 dark:text-neutral-400 font-mono text-xs hidden lg:table-cell">
                                                 {log.query ?? '—'}
-                                            </td>
-                                            <td className="px-4 py-2">
+                                            </AdminTd>
+                                            <AdminTd>
                                                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${httpStatusBadgeClass(log.status_code)}`}>
                                                     {log.status_code}
                                                 </span>
-                                            </td>
-                                        </tr>
+                                            </AdminTd>
+                                        </AdminRow>
                                     ))
                                 )}
                             </tbody>
-                        </table>
+                        </AdminTable>
                     </div>
                 </div>
 
@@ -240,7 +245,7 @@ export default function AuditLogsClient() {
                             disabled={isPending}
                             className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
                         >
-                            {isPending ? 'Loading...' : 'Load More'}
+                            {isPending ? '載入中…' : '載入更多'}
                         </button>
                     </div>
                 )}

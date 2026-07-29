@@ -62,7 +62,7 @@ export default function EnabledFeaturesPicker({ initialValue }: { initialValue: 
     }
 
     return (
-        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 mb-6">
+        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
             <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
                 功能開關
                 <span className="ml-2 text-xs text-neutral-400 dark:text-neutral-500 font-mono">enabled_features</span>
@@ -113,7 +113,7 @@ export default function EnabledFeaturesPicker({ initialValue }: { initialValue: 
                     disabled={saving || !dirty}
                     className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
-                    {saving ? "儲存中..." : "儲存"}
+                    {saving ? "儲存中…" : "儲存"}
                 </button>
                 {dirty && !saving && (
                     <span className="text-xs text-neutral-500 dark:text-neutral-400">有未儲存的變更</span>

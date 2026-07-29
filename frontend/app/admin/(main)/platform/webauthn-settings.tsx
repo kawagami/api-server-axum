@@ -70,10 +70,10 @@ export default function WebauthnSettings({ initialRpId, initialRpOrigin }: Props
         }
     }
 
-    const inputClass = "w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary-500";
+    const inputClass = "w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-sm";
 
     return (
-        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 mb-6">
+        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
             <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
                 Passkey（WebAuthn）
                 <span className="ml-2 text-xs text-neutral-400 dark:text-neutral-500 font-mono">webauthn_rp_id / webauthn_rp_origin</span>
@@ -112,7 +112,7 @@ export default function WebauthnSettings({ initialRpId, initialRpOrigin }: Props
                     disabled={saving || !dirty}
                     className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
-                    {saving ? "儲存中..." : "儲存"}
+                    {saving ? "儲存中…" : "儲存"}
                 </button>
                 {dirty && !saving && (
                     <span className="text-xs text-neutral-500 dark:text-neutral-400">有未儲存的變更</span>

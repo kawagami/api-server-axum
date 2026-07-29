@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, Loader2, RefreshCw, Send } from "lucide-react";
 import { getWsConnections } from "@/api/ws";
 import { useWsContext } from "@/libs/ws-context";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+import PageHeader from "@/components/admin/page-header";
+import { formatDateTime, formatTimeOfDay } from "@/libs/admin-datetime";
 import SaySomethingForm from "./say-something-form";
 import type { WsConnection, WsUserEventData } from "@/types";
 
@@ -171,46 +173,46 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
     return (
         <div className="flex flex-col gap-8">
             <section className="flex flex-col gap-3">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                    <h2 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">
-                        線上連線（{rows.length}）
-                    </h2>
-                    <div className="flex items-center gap-4 flex-wrap">
-                        <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={onlyLoggedIn}
-                                onChange={(e) => setOnlyLoggedIn(e.target.checked)}
-                                className="accent-primary-600"
-                            />
-                            只看已登入
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={autoRefresh}
-                                onChange={(e) => setAutoRefresh(e.target.checked)}
-                                className="accent-primary-600"
-                            />
-                            自動更新（每 {POLL_INTERVAL_MS / 1000} 秒）
-                        </label>
-                        <button
-                            onClick={refresh}
-                            disabled={refreshing}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
-                        >
-                            {refreshing
-                                ? <Loader2 className="w-4 h-4 animate-spin" />
-                                : <RefreshCw className="w-4 h-4" />}
-                            重新整理
-                        </button>
-                    </div>
-                </div>
+                <PageHeader
+                    title={`WebSocket 連線（${rows.length}）`}
+                    actions={
+                        <>
+                            <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={onlyLoggedIn}
+                                    onChange={(e) => setOnlyLoggedIn(e.target.checked)}
+                                    className="accent-primary-600"
+                                />
+                                只看已登入
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={autoRefresh}
+                                    onChange={(e) => setAutoRefresh(e.target.checked)}
+                                    className="accent-primary-600"
+                                />
+                                自動更新（每 {POLL_INTERVAL_MS / 1000} 秒）
+                            </label>
+                            <button
+                                onClick={refresh}
+                                disabled={refreshing}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
+                            >
+                                {refreshing
+                                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                                    : <RefreshCw className="w-4 h-4" />}
+                                重新整理
+                            </button>
+                        </>
+                    }
+                />
 
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">
                     其中 {loggedInCount} 個已登入
                     {" · "}
-                    最後更新 {lastUpdated === null ? "—" : new Date(lastUpdated).toLocaleTimeString()}
+                    最後更新 {lastUpdated === null ? "—" : formatTimeOfDay(lastUpdated)}
                     {error && <span className="text-red-600 dark:text-red-400">{" · "}{error}</span>}
                 </div>
 
@@ -229,16 +231,11 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
                             </thead>
                             <tbody>
                                 {visible.length === 0 ? (
-                                    <tr>
-                                        <td
-                                            colSpan={6}
-                                            className="border border-neutral-300 dark:border-neutral-700 px-4 py-6 text-center text-sm text-neutral-500 dark:text-neutral-400"
-                                        >
-                                            {onlyLoggedIn && rows.length > 0
-                                                ? "目前沒有已登入的連線，取消勾選「只看已登入」可看全部。"
-                                                : "目前沒有線上連線。前台訪客開啟頁面就會建立 WS 連線，登入的管理員也會出現在這裡。"}
-                                        </td>
-                                    </tr>
+                                    <AdminEmptyRow colSpan={6}>
+                                        {onlyLoggedIn && rows.length > 0
+                                            ? "目前沒有已登入的連線，取消勾選「只看已登入」可看全部。"
+                                            : "目前沒有線上連線。前台訪客開啟頁面就會建立 WebSocket 連線，登入的管理員也會出現在這裡。"}
+                                    </AdminEmptyRow>
                                 ) : (
                                     visible.map((conn) => (
                                         <AdminRow
@@ -266,7 +263,7 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
                                                 </span>
                                             </AdminTd>
                                             <AdminTd className="text-sm whitespace-nowrap">
-                                                <span title={new Date(conn.connected_at).toLocaleString()}>
+                                                <span title={formatDateTime(conn.connected_at)}>
                                                     {now === null
                                                         ? "—"
                                                         : formatDuration(now - new Date(conn.connected_at).getTime())}

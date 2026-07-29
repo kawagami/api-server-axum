@@ -1,28 +1,32 @@
 import StockTableRow from "@/components/stocks/stock-table-row";
-import { Th } from "@/components/stocks/table-cells";
+import { AdminTable, AdminHeadRow, AdminTh, AdminEmptyRow } from "@/components/admin/table";
 import type { StockChange } from "@/types";
 
 export default function StockTable({ data }: { data: StockChange[] }) {
     return (
-        <table className="w-full border-collapse border border-neutral-300 dark:border-neutral-600">
+        <AdminTable className="text-sm">
             <thead>
-                <tr className="bg-neutral-200 dark:bg-neutral-700">
-                    <Th>股票代號</Th>
-                    <Th>股票名稱</Th>
-                    <Th>狀態</Th>
-                    <Th>起始日期</Th>
-                    <Th>起始價格</Th>
-                    <Th>結束日期</Th>
-                    <Th>結束價格</Th>
-                    <Th>變動 (%)</Th>
-                    <Th>動作</Th>
-                </tr>
+                <AdminHeadRow>
+                    <AdminTh>股票代號</AdminTh>
+                    <AdminTh>股票名稱</AdminTh>
+                    <AdminTh>狀態</AdminTh>
+                    <AdminTh>起始日期</AdminTh>
+                    <AdminTh className="text-right">起始價格</AdminTh>
+                    <AdminTh>結束日期</AdminTh>
+                    <AdminTh className="text-right">結束價格</AdminTh>
+                    <AdminTh className="text-right">變動 (%)</AdminTh>
+                    <AdminTh>操作</AdminTh>
+                </AdminHeadRow>
             </thead>
             <tbody>
-                {data.map((stock) => (
-                    <StockTableRow key={`${stock.stock_no}${stock.start_date}${stock.end_date}`} stock={stock} />
-                ))}
+                {data.length === 0 ? (
+                    <AdminEmptyRow colSpan={9}>沒有符合條件的異動資料</AdminEmptyRow>
+                ) : (
+                    data.map((stock) => (
+                        <StockTableRow key={`${stock.stock_no}${stock.start_date}${stock.end_date}`} stock={stock} />
+                    ))
+                )}
             </tbody>
-        </table>
+        </AdminTable>
     );
 }

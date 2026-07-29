@@ -3,6 +3,8 @@ export interface AuthUser {
   id: number;
   name: string;
   permissions: string[];
+  /** 只用於後台側欄顯示身分；權限判斷一律看 permissions */
+  is_super_admin: boolean;
 }
 
 export interface Permission {

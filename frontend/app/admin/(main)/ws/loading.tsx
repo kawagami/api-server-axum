@@ -2,7 +2,7 @@
 export default function Loading() {
     return (
         <div className="w-full">
-            <div className="max-w-5xl mx-auto flex flex-col gap-8">
+            <div className="flex flex-col gap-8">
                 <section className="flex flex-col gap-3">
                     <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="h-7 w-40 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />

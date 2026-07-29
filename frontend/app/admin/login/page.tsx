@@ -183,7 +183,8 @@ export default function Login() {
     };
 
     return (
-        <div className="w-full h-[calc(100svh-120px)] overflow-auto flex justify-center items-start">
+        // 後台登入頁沒有 header / footer，不能沿用前台扣 120px 的公式（會多出一段空白）
+        <div className="w-full min-h-screen overflow-auto flex justify-center items-center p-4">
             <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-neutral-800 rounded-lg shadow-md">
                 {showUpgrade ? (
                     <div className="space-y-4">
@@ -199,18 +200,18 @@ export default function Login() {
                                 ref={labelRef}
                                 defaultValue="我的裝置"
                                 maxLength={64}
-                                className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                                className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm"
                             />
                         </div>
-                        {upgradeError && <p className="text-sm text-red-500">{upgradeError}</p>}
+                        {upgradeError && <p role="alert" className="text-sm text-red-500">{upgradeError}</p>}
                         <button
                             type="button"
                             onClick={handleUpgradeCreate}
                             disabled={upgradePending}
-                            className={`w-full px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:ring-4 focus:ring-primary-500 focus:ring-opacity-50 ${upgradePending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`w-full px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors ${upgradePending ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             {upgradePending ? (
-                                <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />建立中...</span>
+                                <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />建立中…</span>
                             ) : (
                                 <span className="flex items-center justify-center gap-2"><KeyRound className="w-4 h-4" />建立 Passkey</span>
                             )}
@@ -226,25 +227,25 @@ export default function Login() {
                     </div>
                 ) : (
                     <>
-                        <h2 className="text-2xl font-bold text-center text-neutral-800 dark:text-neutral-100">Login</h2>
+                        <h2 className="text-2xl font-bold text-center text-neutral-800 dark:text-neutral-100">後台登入</h2>
                         <form action={formAction} className="space-y-4">
                             <div>
                                 <label htmlFor="name" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">名稱</label>
-                                <input type="text" id="name" name="name" autoComplete="username webauthn" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="輸入管理員名稱" required />
+                                <input type="text" id="name" name="name" autoComplete="username webauthn" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm" placeholder="輸入管理員名稱" required />
                             </div>
                             <div>
-                                <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Password</label>
-                                <input type="password" id="password" name="password" autoComplete="current-password" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="Enter your password" required />
+                                <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">密碼</label>
+                                <input type="password" id="password" name="password" autoComplete="current-password" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm" placeholder="輸入密碼" required />
                             </div>
-                            {error && <p className="text-sm text-red-500">{error}</p>}
+                            {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
                             <button
                                 type="submit"
                                 disabled={pending}
-                                className={`w-full px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:ring-4 focus:ring-primary-500 focus:ring-opacity-50 ${pending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`w-full px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors ${pending ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 {pending ? (
-                                    <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Logging in...</span>
-                                ) : 'Login'}
+                                    <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />登入中…</span>
+                                ) : '登入'}
                             </button>
                         </form>
                         <div className="flex items-center gap-3">
@@ -252,15 +253,15 @@ export default function Login() {
                             <span className="text-xs text-neutral-400">或</span>
                             <div className="flex-1 border-t dark:border-neutral-600" />
                         </div>
-                        {passkeyError && <p className="text-sm text-red-500">{passkeyError}</p>}
+                        {passkeyError && <p role="alert" className="text-sm text-red-500">{passkeyError}</p>}
                         <button
                             type="button"
                             onClick={handlePasskeyButton}
                             disabled={passkeyPending}
-                            className={`w-full px-4 py-2 border border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400 rounded-md hover:bg-primary-50 dark:hover:bg-neutral-700 focus:ring-4 focus:ring-primary-500 focus:ring-opacity-50 transition-colors ${passkeyPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`w-full px-4 py-2 border border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400 rounded-md hover:bg-primary-50 dark:hover:bg-neutral-700 transition-colors ${passkeyPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             {passkeyPending ? (
-                                <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />驗證中...</span>
+                                <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />驗證中…</span>
                             ) : (
                                 <span className="flex items-center justify-center gap-2"><KeyRound className="w-4 h-4" />使用 Passkey 登入</span>
                             )}

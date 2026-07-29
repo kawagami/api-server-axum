@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { requirePermission, getMyPermissions } from "@/libs/admin-permissions";
 
 export const metadata: Metadata = {
-    title: "部落格留言",
+    title: "文章留言",
     description: "訪客與會員在文章下的留言",
 };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { ADMIN_LOCALE, ADMIN_TIME_ZONE, formatTimeOfDay } from "@/libs/admin-datetime";
 
 export interface MetricPoint {
     // ISO 時間字串（UTC），已由呼叫端排序成舊→新
@@ -18,25 +19,23 @@ function fmtAxisTime(iso: string) {
     // 台北時區 HH:MM
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "";
-    return new Intl.DateTimeFormat("zh-TW", {
-        timeZone: "Asia/Taipei",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    }).format(d);
+    return formatTimeOfDay(d);
 }
+
+// tooltip 要看得出日期但不需要年份；locale / 時區沿用 admin-datetime 的同一組常數
+const tooltipFmt = new Intl.DateTimeFormat(ADMIN_LOCALE, {
+    timeZone: ADMIN_TIME_ZONE,
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+});
 
 function fmtTooltipTime(iso: string) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return new Intl.DateTimeFormat("zh-TW", {
-        timeZone: "Asia/Taipei",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    }).format(d);
+    return tooltipFmt.format(d);
 }
 
 // 純 SVG 折線圖：仿 visitor-trend-chart，單一序列，X 軸時間、Y 軸值

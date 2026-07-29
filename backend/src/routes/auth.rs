@@ -58,6 +58,8 @@ struct MeResponse {
     id: i64,
     name: String,
     permissions: Vec<String>,
+    /// 後台側欄顯示身分用（超級管理員 / 管理員）；權限判斷仍一律看 permissions
+    is_super_admin: bool,
 }
 
 async fn sign_in(
@@ -82,6 +84,7 @@ async fn me(
         id: auth_user.id,
         name: auth_user.name,
         permissions: auth_user.permissions,
+        is_super_admin: auth_user.is_super_admin,
     })
 }
 

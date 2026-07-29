@@ -2,6 +2,7 @@
 
 import { Check, Copy, Download, Loader2, X } from "lucide-react";
 import { formatBytes } from "@/libs/format-bytes";
+import useDialog from "@/hooks/useDialog";
 import type { Torrent } from "@/types";
 
 export function displayName(t: Torrent) {
@@ -20,12 +21,19 @@ interface Props {
 }
 
 export default function FileDownloadModal({ torrent, downloadingKey, copiedKey, onClose, onDownload, onCopy }: Props) {
+    // Esc 關閉、背景不捲動、焦點鎖在對話框內
+    const dialogRef = useDialog<HTMLDivElement>(true, onClose);
+
     return (
         <div
             className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="選擇要下載的檔案"
                 className="w-full max-w-lg max-h-[80svh] overflow-auto bg-white dark:bg-neutral-900 rounded-lg shadow-xl"
                 onClick={(e) => e.stopPropagation()}
             >

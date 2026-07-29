@@ -6,7 +6,7 @@ import { updateSetting } from "./actions";
 import type { Setting, SettingsResponse } from "@/types";
 import { FIELD_CONFIGS, CATEGORY_LABELS } from "./field-config";
 
-const inputClass = "px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500";
+const inputClass = "px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100";
 
 export default function SettingsClient({ initialSettings }: { initialSettings: SettingsResponse }) {
     const initialValues = Object.fromEntries(
@@ -140,7 +140,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
                         disabled={saving[setting.key] || !dirty}
                         className="shrink-0 px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                     >
-                        {saving[setting.key] ? "儲存中..." : "儲存"}
+                        {saving[setting.key] ? "儲存中…" : "儲存"}
                     </button>
                 </div>
                 {errors[setting.key] && (

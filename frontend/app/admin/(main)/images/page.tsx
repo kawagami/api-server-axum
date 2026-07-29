@@ -6,8 +6,8 @@ import { resolveImageCompressConfig } from "@/libs/image-config";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Images page",
-    description: "Images page",
+    title: "圖片",
+    description: "上傳與管理文章用圖片",
 };
 
 export default async function Images() {

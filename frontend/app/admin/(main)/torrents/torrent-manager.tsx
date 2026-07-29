@@ -3,14 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, ChevronLeft, ChevronRight, Copy, Download, Loader2, RotateCcw, Trash2 } from "lucide-react";
-import { AdminHeadRow, AdminRow, AdminTable, AdminTd, AdminTh } from "@/components/admin/table";
+import { AdminEmptyRow, AdminHeadRow, AdminRow, AdminTable, AdminTd, AdminTh } from "@/components/admin/table";
 import { createTorrentDownloadLinks, deleteTorrent, retryTorrent } from "@/api/torrents";
 import StorageBars from "./storage-bars";
 import AddTorrentForm from "./add-torrent-form";
 import FileDownloadModal, { displayName } from "./file-download-modal";
 import { useTorrentLive } from "./useTorrentLive";
-import { TORRENT_STATUS_BADGE } from "@/libs/badge-styles";
+import { TORRENT_STATUS_BADGE, TORRENT_STATUS_LABEL } from "@/libs/badge-styles";
 import { formatBytes } from "@/libs/format-bytes";
+import { formatDateTime } from "@/libs/admin-datetime";
+import ErrorBanner from "@/components/admin/error-banner";
 import type { Torrent, TorrentStorage } from "@/types";
 
 interface Props {
@@ -47,12 +49,15 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
     const [modalTorrent, setModalTorrent] = useState<Torrent | null>(null);
     const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
+    // 操作失敗一律顯示在頁面上的 ErrorBanner，不用 window.alert
+    const [actionError, setActionError] = useState<string | null>(null);
 
     // 點擊當下才產生連結（效期以回應的 expires_at 為準，後端 torrent_link_ttl_minutes 可調）
     const fetchLink = async (torrentId: number, fileIndex: number): Promise<string | null> => {
+        setActionError(null);
         const result = await createTorrentDownloadLinks(torrentId);
         if (!result.ok) {
-            alert(`產生下載連結失敗：${result.message}`);
+            setActionError(`產生下載連結失敗：${result.message}`);
             return null;
         }
         const link = result.links?.find((l) => l.file_index === fileIndex) ?? result.links?.[0];
@@ -94,20 +99,22 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
 
     const handleRetry = async (t: Torrent) => {
         if (busyId) return;
+        setActionError(null);
         setBusyId(t.id);
         const result = await retryTorrent(t.id);
         setBusyId(null);
-        if (!result.ok) alert(`重試失敗：${result.message}`);
+        if (!result.ok) setActionError(`重試失敗：${result.message}`);
         refresh();
     };
 
     const handleDelete = async (t: Torrent) => {
         if (busyId) return;
         if (!confirm(`確定刪除「${displayName(t)}」？伺服器上的檔案會一併刪除。`)) return;
+        setActionError(null);
         setBusyId(t.id);
         const result = await deleteTorrent(t.id);
         setBusyId(null);
-        if (!result.ok) alert(`刪除失敗：${result.message}`);
+        if (!result.ok) setActionError(`刪除失敗：${result.message}`);
         refresh();
     };
 
@@ -119,8 +126,10 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
         <div className="flex flex-col gap-4">
             <StorageBars storage={storage} />
             <AddTorrentForm onAdded={refresh} />
+            <ErrorBanner message={actionError} />
 
-            <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-x-auto">
+            <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
+                <div className="admin-sticky-head overflow-auto max-h-[70svh]">
                 <AdminTable>
                     <thead>
                         <AdminHeadRow>
@@ -134,11 +143,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                     </thead>
                     <tbody>
                         {torrents.length === 0 && (
-                            <AdminRow>
-                                <AdminTd colSpan={6} className="text-center text-neutral-500 dark:text-neutral-400 py-8">
-                                    沒有任務
-                                </AdminTd>
-                            </AdminRow>
+                            <AdminEmptyRow colSpan={6}>目前沒有任務</AdminEmptyRow>
                         )}
                         {torrents.map((t) => {
                             const live = liveMap[t.id];
@@ -158,7 +163,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                             className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TORRENT_STATUS_BADGE[t.status]}`}
                                             title={t.error ?? undefined}
                                         >
-                                            {t.status}
+                                            {TORRENT_STATUS_LABEL[t.status] ?? t.status}
                                         </span>
                                     </AdminTd>
                                     <AdminTd className="whitespace-nowrap text-sm">
@@ -196,7 +201,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                         )}
                                     </AdminTd>
                                     <AdminTd className="whitespace-nowrap text-sm">
-                                        {new Date(t.created_at).toLocaleString()}
+                                        {formatDateTime(t.created_at)}
                                     </AdminTd>
                                     <AdminTd>
                                         <div className="flex items-center gap-2">
@@ -249,6 +254,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                         })}
                     </tbody>
                 </AdminTable>
+                </div>
             </div>
 
             <div className="flex items-center justify-between">

@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { getGovTenders, getGovTenderTypes } from "@/api/gov-tenders";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
+import PageHeader from "@/components/admin/page-header";
 import usePagedList from "@/hooks/usePagedList";
+import useFilterUrl from "@/hooks/useFilterUrl";
 import type { GovTender } from "@/types";
 
 const LIMIT = 50;
@@ -20,30 +22,35 @@ const defaultFilters: Filters = { q: '', keyword: '', tender_type: '' };
 
 export default function GovTendersClient() {
     const { items: tenders, hasMore, isPending, failed, load, loadMore } = usePagedList<GovTender>(LIMIT);
-    const [filters, setFilters] = useState<Filters>(defaultFilters);
+    const { initial, write } = useFilterUrl(defaultFilters);
+    const [filters, setFilters] = useState<Filters>(initial);
     const [types, setTypes] = useState<string[]>([]);
 
     useEffect(() => {
-        load(page => getGovTenders({ page, per_page: LIMIT }));
+        // 初次載入沿用 URL 帶進來的條件（重新整理 / 貼連結不掉查詢）
+        load(page => getGovTenders({ ...initial, page, per_page: LIMIT }));
         getGovTenderTypes().then(setTypes).catch(() => setTypes([]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [load]);
 
     function handleSearch() {
         if (isPending) return;
+        write(filters);
         load(page => getGovTenders({ ...filters, page, per_page: LIMIT }));
     }
 
     function handleReset() {
         setFilters(defaultFilters);
+        write(defaultFilters);
         load(page => getGovTenders({ page, per_page: LIMIT }));
     }
 
-    const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary-400";
+    const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="w-full">
             <div className="flex flex-col gap-4">
-                <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">政府標案</h1>
+                <PageHeader title="政府標案" description="由排程每日抓取政府電子採購網，前台唯讀" />
 
                 {/* Filter bar */}
                 <div className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
@@ -103,7 +110,7 @@ export default function GovTendersClient() {
                 <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="overflow-x-auto">
+                    <div className="admin-sticky-head overflow-auto max-h-[70svh]">
                         <AdminTable className="text-sm">
                             <thead>
                                 <AdminHeadRow>
@@ -117,11 +124,9 @@ export default function GovTendersClient() {
                             </thead>
                             <tbody>
                                 {tenders.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-neutral-500 dark:text-neutral-400">
-                                            {isPending ? '載入中…' : '目前沒有標案資料（排程每日抓取一次）'}
-                                        </td>
-                                    </tr>
+                                    <AdminEmptyRow colSpan={6}>
+                                        {isPending ? '載入中…' : '目前沒有標案資料（排程每日抓取一次）'}
+                                    </AdminEmptyRow>
                                 ) : (
                                     tenders.map(t => (
                                         <AdminRow key={t.id}>

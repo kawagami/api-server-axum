@@ -57,7 +57,7 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
     }
 
     return (
-        <div className="mb-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 space-y-3">
+        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 space-y-3">
             <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">新增管理員</h2>
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -66,14 +66,14 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="名稱（登入帳號）"
-                    className="px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
                 />
                 <input
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="Email（選填）"
-                    className="px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
                 />
                 <input
                     type="password"
@@ -81,7 +81,7 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
                     onChange={e => setPassword(e.target.value)}
                     placeholder="密碼"
                     autoComplete="new-password"
-                    className="px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
                 />
             </div>
 
@@ -116,7 +116,7 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
                     disabled={isPending || !name || !password}
                     className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
-                    {isPending ? "建立中..." : "建立"}
+                    {isPending ? "建立中…" : "建立"}
                 </button>
                 <button
                     onClick={() => {

@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import { requirePermission } from "@/libs/admin-permissions";
 
 export const metadata: Metadata = {
-    title: "WS 連線管理",
-    description: "即時線上 WebSocket 連線與訊息發送",
+    title: "WebSocket 連線",
+    description: "即時線上連線與訊息發送",
 };
 
 export default async function WsAdminPage() {
@@ -14,9 +14,7 @@ export default async function WsAdminPage() {
 
     return (
         <div className="w-full">
-            <div className="max-w-5xl mx-auto">
-                <WsConnections initial={initial} />
-            </div>
+            <WsConnections initial={initial} />
         </div>
     );
 }

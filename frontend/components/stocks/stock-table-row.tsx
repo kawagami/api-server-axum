@@ -1,28 +1,33 @@
 import { patchStockPendingAction } from "@/app/admin/(main)/stocks/actions";
-import { Td } from "@/components/stocks/table-cells";
+import { AdminRow, AdminTd } from "@/components/admin/table";
+import { STOCK_STATUS_LABEL } from "@/libs/badge-styles";
 import type { StockChange } from "@/types";
 
 export default function StockTableRow({ stock }: { stock: StockChange }) {
     return (
-        <tr className="text-center dark:text-neutral-200">
-            <Td>{stock.stock_no}</Td>
-            <Td>{stock.stock_name}</Td>
-            <Td>{stock.status}</Td>
-            <Td>{stock.start_date}</Td>
-            <Td>{stock.start_price}</Td>
-            <Td>{stock.end_date}</Td>
-            <Td>{stock.end_price}</Td>
-            <Td className={stock.change < 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+        <AdminRow>
+            <AdminTd>{stock.stock_no}</AdminTd>
+            <AdminTd>{stock.stock_name}</AdminTd>
+            <AdminTd>{STOCK_STATUS_LABEL[stock.status] ?? stock.status}</AdminTd>
+            <AdminTd>{stock.start_date}</AdminTd>
+            <AdminTd className="text-right">{stock.start_price}</AdminTd>
+            <AdminTd>{stock.end_date}</AdminTd>
+            <AdminTd className="text-right">{stock.end_price}</AdminTd>
+            {/* 台股慣例：紅漲綠跌 */}
+            <AdminTd className={`text-right ${stock.change < 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                 {stock.change ? `${stock.change}%` : ``}
-            </Td>
-            <Td>
+            </AdminTd>
+            <AdminTd>
                 <form action={patchStockPendingAction} className="inline">
                     <input type="hidden" name="id" value={String(stock.id)} />
-                    <button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded mr-2">
+                    <button
+                        type="submit"
+                        className="px-3 py-1.5 text-sm font-medium rounded bg-primary-600 hover:bg-primary-700 text-white transition-colors"
+                    >
                         再查詢
                     </button>
                 </form>
-            </Td>
-        </tr>
+            </AdminTd>
+        </AdminRow>
     );
 }

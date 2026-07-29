@@ -1,7 +1,7 @@
 export default function Loading() {
     return (
-        <div className="w-full h-[calc(100svh-180px)] overflow-auto p-6">
-            <div className="max-w-4xl mx-auto flex flex-col gap-4">
+        <div className="w-full">
+            <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                     <div className="h-7 w-32 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
                     <div className="h-9 w-28 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />

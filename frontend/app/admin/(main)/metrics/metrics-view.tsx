@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cpu, MemoryStick, HardDrive, Activity, Loader2 } from "lucide-react";
 import { getSystemMetrics } from "@/api/metrics";
 import type { SystemMetric } from "@/types";
+import PageHeader from "@/components/admin/page-header";
+import { ADMIN_LOCALE, ADMIN_TIME_ZONE } from "@/libs/admin-datetime";
 import MetricsTrendChart, { type TimeRange } from "./metrics-trend-chart";
 import MetricsAuditPanel from "./metrics-audit-panel";
 
@@ -19,17 +21,20 @@ function gb(mb: number, digits = 1) {
     return (mb / 1024).toFixed(digits);
 }
 
+// 卡片只需要「月/日 時:分」，比 admin-datetime 的完整格式短；locale / 時區沿用同一組常數
+const snapshotFmt = new Intl.DateTimeFormat(ADMIN_LOCALE, {
+    timeZone: ADMIN_TIME_ZONE,
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+});
+
 function fmtSnapshotTime(iso: string) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return new Intl.DateTimeFormat("zh-TW", {
-        timeZone: "Asia/Taipei",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    }).format(d);
+    return snapshotFmt.format(d);
 }
 
 function SnapshotCard({
@@ -153,26 +158,28 @@ export default function MetricsView({
     const bucketMinutes = Math.round(bucketMs / 60_000);
 
     return (
-        <div className="max-w-5xl mx-auto flex flex-col gap-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">系統指標</h1>
-                <div className="inline-flex rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-                    {HOUR_OPTIONS.map(h => (
-                        <button
-                            key={h}
-                            type="button"
-                            onClick={() => onPickHours(h)}
-                            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                                h === hours
-                                    ? "bg-primary-600 text-white"
-                                    : "bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                            }`}
-                        >
-                            {h} 小時
-                        </button>
-                    ))}
-                </div>
-            </div>
+        <div className="flex flex-col gap-6">
+            <PageHeader
+                title="系統指標"
+                actions={
+                    <div className="inline-flex rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+                        {HOUR_OPTIONS.map(h => (
+                            <button
+                                key={h}
+                                type="button"
+                                onClick={() => onPickHours(h)}
+                                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                                    h === hours
+                                        ? "bg-primary-600 text-white"
+                                        : "bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                }`}
+                            >
+                                {h} 小時
+                            </button>
+                        ))}
+                    </div>
+                }
+            />
 
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 

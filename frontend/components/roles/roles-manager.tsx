@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { Trash2, ChevronDown, ChevronRight, Plus, Loader2, CheckCheck, X } from 'lucide-react';
 import { createRole, deleteRole, setRolePermissions } from '@/app/admin/(main)/roles/actions';
+import PageHeader from '@/components/admin/page-header';
 import type { Role, Permission } from '@/types';
 
 interface Props {
@@ -82,8 +83,8 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
     }
 
     return (
-        <div className="max-w-3xl mx-auto space-y-6">
-            <h1 className="text-2xl font-bold text-neutral-800 dark:text-white">角色管理</h1>
+        <div className="w-full flex flex-col gap-4">
+            <PageHeader title="角色" description="角色決定管理員能看到與操作哪些後台功能" />
 
             {/* Create form */}
             <form action={handleCreate} className="flex flex-col sm:flex-row gap-2">

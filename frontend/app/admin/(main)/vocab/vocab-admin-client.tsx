@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil } from "lucide-react";
 import { getAdminVocabWords, updateAdminVocabWord } from "@/api/admin-vocab";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
+import PageHeader from "@/components/admin/page-header";
 import usePagedList from "@/hooks/usePagedList";
+import useFilterUrl from "@/hooks/useFilterUrl";
 import type { AdminVocabWord, UpdateVocabWordInput } from "@/types";
 
 const LIMIT = 50;
@@ -32,20 +34,25 @@ function toParams(f: Filters) {
 
 export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) {
     const { items: words, setItems, hasMore, isPending, failed, load, loadMore } = usePagedList<AdminVocabWord>(LIMIT);
-    const [filters, setFilters] = useState<Filters>(defaultFilters);
+    const { initial, write } = useFilterUrl(defaultFilters);
+    const [filters, setFilters] = useState<Filters>(initial);
     const [total, setTotal] = useState(0);
     const [editing, setEditing] = useState<AdminVocabWord | null>(null);
     const [savingId, setSavingId] = useState<number | null>(null);
 
+    /** 查詢並把條件寫回 URL（重新整理 / 貼連結不掉查詢） */
     const search = useCallback((f: Filters) => {
+        write(f);
         load(async page => {
             const res = await getAdminVocabWords({ ...toParams(f), page, per_page: LIMIT });
             setTotal(res.total);
             return res.data;
         });
-    }, [load]);
+    }, [load, write]);
 
-    useEffect(() => { search(defaultFilters); }, [search]);
+    // 初次載入沿用 URL 帶進來的條件
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => { search(initial); }, [search]);
 
     function applyLocal(updated: AdminVocabWord) {
         setItems(prev => prev.map(w => (w.id === updated.id ? updated : w)));
@@ -65,15 +72,12 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
         }
     }
 
-    const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary-400";
+    const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="w-full">
             <div className="flex flex-col gap-4">
-                <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">
-                    單字題庫
-                    <span className="ml-2 text-sm font-normal text-neutral-400">共 {total} 字</span>
-                </h1>
+                <PageHeader title="單字題庫" description={`共 ${total} 字`} />
 
                 <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
@@ -134,7 +138,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                 </div>
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="overflow-x-auto">
+                    <div className="admin-sticky-head overflow-auto max-h-[70svh]">
                         <AdminTable className="text-sm">
                             <thead>
                                 <AdminHeadRow>
@@ -151,11 +155,9 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                             </thead>
                             <tbody>
                                 {words.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={canUpdate ? 9 : 8} className="px-4 py-8 text-center text-neutral-500 dark:text-neutral-400">
-                                            {isPending ? '載入中…' : '沒有符合條件的單字'}
-                                        </td>
-                                    </tr>
+                                    <AdminEmptyRow colSpan={canUpdate ? 9 : 8}>
+                                        {isPending ? '載入中…' : '沒有符合條件的單字'}
+                                    </AdminEmptyRow>
                                 ) : (
                                     words.map(w => (
                                         <AdminRow key={w.id} className={w.enabled ? '' : 'opacity-50'}>
@@ -277,7 +279,7 @@ function EditModal({ word, onClose, onSaved }: {
         }
     }
 
-    const fieldClass = "w-full px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary-400";
+    const fieldClass = "w-full px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>

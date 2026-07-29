@@ -40,7 +40,7 @@ export default function TagManager({ tags }: { tags: TagCount[] }) {
     if (tags.length === 0) return null;
 
     return (
-        <div className="bg-white dark:bg-neutral-800 shadow rounded-lg p-6 mt-6">
+        <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg p-4 sm:p-6">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100 mb-1">
                 <Tags size={18} /> 管理 Tag
             </h2>

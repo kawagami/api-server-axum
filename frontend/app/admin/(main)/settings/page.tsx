@@ -5,12 +5,13 @@ import HomeFeaturesPicker from "./home-features-picker";
 import { resolveSiteThemeSetting, normalizeRotation } from "@/libs/site-theme";
 import { resolveHomeFeatures } from "@/libs/home-features";
 import { requirePermission } from "@/libs/admin-permissions";
+import PageHeader from "@/components/admin/page-header";
 import type { SettingsResponse } from "@/types";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Settings",
-    description: "Admin settings",
+    title: "一般設定",
+    description: "站台主題、首頁卡片與其他營運設定",
 };
 
 export default async function SettingsPage() {
@@ -31,8 +32,8 @@ export default async function SettingsPage() {
     );
 
     return (
-        <div className="w-full max-w-2xl">
-            <h1 className="text-xl font-semibold text-neutral-900 dark:text-white mb-6">設定</h1>
+        <div className="w-full max-w-2xl flex flex-col gap-6">
+            <PageHeader title="一般設定" description="站台主題、首頁卡片與其他營運設定" />
             <ThemePicker initialSetting={siteTheme} initialRotation={rotation} />
             <HomeFeaturesPicker initialEnabled={homeFeatureKeys} />
             <SettingsClient initialSettings={restSettings} />

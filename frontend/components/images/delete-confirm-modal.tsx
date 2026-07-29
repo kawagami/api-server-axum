@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback } from "react";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
+import useDialog from "@/hooks/useDialog";
 import type { ManagedImage } from "@/hooks/useImageManager";
 
 interface Props {
@@ -13,25 +14,24 @@ interface Props {
 }
 
 export default function DeleteConfirmModal({ image, deleting, onConfirm, onClose }: Props) {
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !deleting) onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose, deleting]);
+    // 刪除進行中不讓 Esc / 點背景關掉（避免以為取消了但請求已送出）
+    const requestClose = useCallback(() => { if (!deleting) onClose(); }, [deleting, onClose]);
+    const dialogRef = useDialog<HTMLDivElement>(true, requestClose);
 
     return (
         <div
             className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => { if (!deleting) onClose(); }}
+            onClick={requestClose}
         >
             <div
+                ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label="刪除圖片"
                 className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-lg w-full max-w-sm"
                 onClick={(e) => e.stopPropagation()}
             >
-                <h2 className="text-lg font-semibold mb-4">確定刪除此圖片?</h2>
+                <h2 className="text-lg font-semibold mb-4">確定刪除此圖片？</h2>
                 <div className="flex justify-center mb-4">
                     <Image
                         width={160}
@@ -42,7 +42,7 @@ export default function DeleteConfirmModal({ image, deleting, onConfirm, onClose
                     />
                 </div>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 text-center">
-                    此操作無法復原,已引用此圖片的內容將失效。
+                    此操作無法復原，已引用此圖片的內容將失效。
                 </p>
                 <div className="flex gap-2">
                     <button

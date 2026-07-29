@@ -39,7 +39,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         label: "股票",
         icon: TrendingUp,
         items: [
-            { label: "列表", href: "/admin/stocks/list", permission: "stock:read", feature: "stocks" },
+            { label: "異動列表", href: "/admin/stocks/list", permission: "stock:read", feature: "stocks" },
             { label: "回購計畫", href: "/admin/stocks/get-buyback-plans", permission: "stock:read", feature: "stocks" },
             { label: "未完成回購", href: "/admin/stocks/get-unfinished-buyback-price-gap", permission: "stock:read", feature: "stocks" },
             { label: "收盤價查詢", href: "/admin/stocks/fetch-stock-closing-price-pair", permission: "stock:read", feature: "stocks" },
@@ -59,9 +59,9 @@ export const adminNavGroups: AdminNavGroup[] = [
         label: "工具",
         icon: Wrench,
         items: [
-            { label: "WS", href: "/admin/ws", permission: "ws:read" },
+            { label: "WebSocket 連線", href: "/admin/ws", permission: "ws:read" },
             { label: "對局總覽", href: "/admin/games", permission: "game:read", feature: "games" },
-            { label: "Torrents", href: "/admin/torrents", permission: "torrent:read", feature: "torrents" },
+            { label: "Torrent 下載", href: "/admin/torrents", permission: "torrent:read", feature: "torrents" },
         ],
     },
     {
@@ -72,15 +72,15 @@ export const adminNavGroups: AdminNavGroup[] = [
             { label: "政府標案", href: "/admin/gov_tenders", permission: "gov_tender:read", feature: "gov_tenders" },
             { label: "到訪統計", href: "/admin/stats", permission: "stat:read" },
             { label: "系統指標", href: "/admin/metrics", permission: "metric:read" },
-            { label: "Logs", href: "/admin/logs", permission: "log:read" },
-            { label: "Audit Logs", href: "/admin/audit_logs", permission: "audit:read" },
+            { label: "系統日誌", href: "/admin/logs", permission: "log:read" },
+            { label: "操作紀錄", href: "/admin/audit_logs", permission: "audit:read" },
         ],
     },
     {
         label: "設定",
         icon: Settings,
         items: [
-            { label: "Settings", href: "/admin/settings", permission: "setting:read" },
+            { label: "一般設定", href: "/admin/settings", permission: "setting:read" },
             { label: "平台設定", href: "/admin/platform", permission: "platform:read" },
             { label: "修改密碼", href: "/admin/change-password" },
             { label: "Passkey 管理", href: "/admin/passkeys" },

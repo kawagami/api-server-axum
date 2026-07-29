@@ -1,5 +1,7 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { FileText, Users, Image as ImageIcon, Radio, Gamepad2, type LucideIcon } from "lucide-react";
+import PageHeader from "@/components/admin/page-header";
 import { getBlogs } from "@/api/blogs";
 import { getMembers } from "@/api/members";
 import { getImages } from "@/api/images";
@@ -9,6 +11,11 @@ import { adminNavGroups, filterNavByPermissions } from "@/components/admin/nav";
 import { getMyPermissions } from "@/libs/admin-permissions";
 import { getPublicSettings } from "@/api/settings";
 import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
+
+export const metadata: Metadata = {
+    title: "儀表板",
+    description: "後台總覽",
+};
 
 // 單一端點掛掉不應整頁白屏：取值失敗回 null（顯示 —）
 async function safe<T>(p: Promise<T>): Promise<T | null> {
@@ -33,7 +40,7 @@ function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
     return (
         <Link
             href={href}
-            className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 hover:border-primary-400 dark:hover:border-primary-500 hover:shadow-md transition-colors"
+            className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 hover:border-primary-400 dark:hover:border-primary-500 hover:shadow-md transition-[border-color,box-shadow]"
         >
             <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
                 <Icon size={16} />
@@ -83,10 +90,8 @@ export default async function AdminDashboardPage() {
     const navGroups = filterNavByPermissions(adminNavGroups, permissions, enabledFeatures);
 
     return (
-        <div className="max-w-5xl mx-auto flex flex-col gap-8">
-            <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">
-                Admin Dashboard
-            </h1>
+        <div className="flex flex-col gap-8">
+            <PageHeader title="儀表板" />
 
             {/* 即時統計快照 */}
             <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">

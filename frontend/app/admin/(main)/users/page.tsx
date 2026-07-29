@@ -7,11 +7,12 @@ import CreateUserForm from "./create-user-form";
 import DeleteUserButton from "./delete-user-button";
 import type { Metadata } from "next";
 import AdminTableContainer from "@/components/admin/admin-table-container";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import PageHeader from "@/components/admin/page-header";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 
 export const metadata: Metadata = {
     title: "管理員",
-    description: "管理員",
+    description: "後台管理員帳號與角色",
 };
 
 export default async function Users() {
@@ -33,44 +34,49 @@ export default async function Users() {
     const defaultRoleIds = allRoles.filter(r => defaultRoleNames.includes(r.name)).map(r => r.id);
 
     return (
-        <div>
-        <CreateUserForm allRoles={allRoles} defaultRoleIds={defaultRoleIds} />
-        <AdminTableContainer>
-            <AdminTable>
-                <thead>
-                    <AdminHeadRow>
-                        <AdminTh className="hidden sm:table-cell">ID</AdminTh>
-                        <AdminTh>Name</AdminTh>
-                        <AdminTh>Email</AdminTh>
-                        <AdminTh>Roles</AdminTh>
-                        <AdminTh>操作</AdminTh>
-                    </AdminHeadRow>
-                </thead>
-                <tbody>
-                    {usersWithRoles.map(user => (
-                        <AdminRow key={user.id}>
-                            <AdminTd className="text-xs hidden sm:table-cell">{user.id}</AdminTd>
-                            <AdminTd>{user.name}</AdminTd>
-                            <AdminTd className="break-all">{user.email || "—"}</AdminTd>
-                            <AdminTd>
-                                <UserRolesPanel
-                                    userId={user.id}
-                                    userName={user.name}
-                                    initialRoles={user.roles}
-                                    allRoles={allRoles}
-                                />
-                            </AdminTd>
-                            <AdminTd>
-                                <DeleteUserButton
-                                    user={{ id: user.id, name: user.name }}
-                                    isSelf={String(user.id) === String(me.id)}
-                                />
-                            </AdminTd>
-                        </AdminRow>
-                    ))}
-                </tbody>
-            </AdminTable>
-        </AdminTableContainer>
+        <div className="w-full flex flex-col gap-4">
+            <PageHeader title="管理員" description={`共 ${usersWithRoles.length} 位管理員`} />
+            <CreateUserForm allRoles={allRoles} defaultRoleIds={defaultRoleIds} />
+            <AdminTableContainer>
+                <AdminTable>
+                    <thead>
+                        <AdminHeadRow>
+                            <AdminTh className="hidden sm:table-cell">ID</AdminTh>
+                            <AdminTh>名稱</AdminTh>
+                            <AdminTh>Email</AdminTh>
+                            <AdminTh>角色</AdminTh>
+                            <AdminTh>操作</AdminTh>
+                        </AdminHeadRow>
+                    </thead>
+                    <tbody>
+                        {usersWithRoles.length === 0 ? (
+                            <AdminEmptyRow colSpan={5}>目前沒有管理員</AdminEmptyRow>
+                        ) : (
+                            usersWithRoles.map(user => (
+                                <AdminRow key={user.id}>
+                                    <AdminTd className="text-xs hidden sm:table-cell">{user.id}</AdminTd>
+                                    <AdminTd>{user.name}</AdminTd>
+                                    <AdminTd className="break-all">{user.email || "—"}</AdminTd>
+                                    <AdminTd>
+                                        <UserRolesPanel
+                                            userId={user.id}
+                                            userName={user.name}
+                                            initialRoles={user.roles}
+                                            allRoles={allRoles}
+                                        />
+                                    </AdminTd>
+                                    <AdminTd>
+                                        <DeleteUserButton
+                                            user={{ id: user.id, name: user.name }}
+                                            isSelf={String(user.id) === String(me.id)}
+                                        />
+                                    </AdminTd>
+                                </AdminRow>
+                            ))
+                        )}
+                    </tbody>
+                </AdminTable>
+            </AdminTableContainer>
         </div>
     );
 }

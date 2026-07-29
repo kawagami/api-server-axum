@@ -26,6 +26,21 @@ export const TORRENT_STATUS_BADGE: Record<string, string> = {
     failed: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
 };
 
+/** 股票異動查詢狀態的中文顯示；查不到就顯示原字串 */
+export const STOCK_STATUS_LABEL: Record<string, string> = {
+    pending: "等待中",
+    completed: "已完成",
+    failed: "失敗",
+};
+
+/** 後台顯示用的中文狀態；查不到就顯示原字串（後端新增狀態不會變成空白） */
+export const TORRENT_STATUS_LABEL: Record<string, string> = {
+    pending: "等待中",
+    downloading: "下載中",
+    completed: "已完成",
+    failed: "失敗",
+};
+
 export const LEVEL_ROW_BG: Record<string, string> = {
     ERROR: "bg-red-50 dark:bg-red-900/10 hover:bg-red-100/70 dark:hover:bg-red-900/20",
     WARN: "bg-yellow-50 dark:bg-yellow-900/10 hover:bg-yellow-100/70 dark:hover:bg-yellow-900/20",

@@ -39,6 +39,38 @@
     "Yu Gothic", Meiryo, sans-serif;
 }
 
+/* ===== 後台統一焦點樣式 =====
+   後台（.admin-shell，由 app/admin/layout.tsx 掛上）的互動元素不逐一寫 focus-visible:ring，
+   一律由這條規則提供可見焦點 —— 純鍵盤操作必須看得出游標在哪，而逐一補 class 一定會漏。
+   特異度（0,2,1）高於 Tailwind 的 .focus\:outline-none:focus（0,2,0），
+   所以元件自帶的 outline-none 不會把它蓋掉。outline 會自動跟隨元素的 border-radius。 */
+.admin-shell :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--primary-500));
+  outline-offset: 2px;
+}
+
+/* ===== 後台長清單的黏住表頭 =====
+   兩個前提，缺一不可：
+   1) sticky 要下在 <th> 上（不是 thead/tr —— 舊寫法下在 thead 上其實從未生效）
+   2) 捲動容器必須有高度上限。原本的 `overflow-x-auto` wrapper 高度等於內容，
+      而 overflow-x:auto 會讓 overflow-y 計算成 auto，sticky 於是無處可黏。
+   所以呼叫端要一起給 `admin-sticky-head overflow-auto max-h-[...]`（見 AdminTableContainer 的 stickyHead）。
+   background-color: inherit 是為了繼承 AdminHeadRow 掛在 <tr> 上的底色（亮/暗自動跟著走），
+   否則 sticky 的 th 是透明的、捲動時看得到底下的列；border-collapse 下框線不會跟著黏，
+   用 box-shadow 補一條底線。 */
+.admin-shell .admin-sticky-head thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: inherit;
+  box-shadow: 0 1px 0 rgb(var(--neutral-300));
+}
+
+/* darkMode: 'selector' → .dark 掛在 <html> 上 */
+.dark .admin-shell .admin-sticky-head thead th {
+  box-shadow: 0 1px 0 rgb(var(--neutral-700));
+}
+
 /* ===== 主題色階（RGB 三元組，供 tailwind.config.js 的 rgb(var(--x) / alpha) 使用） =====
    換主題：<html data-theme="ocean">（由 site-theme cookie 控制，admin settings 可切換）
    新增主題：複製一段 [data-theme="..."] 區塊，11 階 primary + 11 階 neutral */

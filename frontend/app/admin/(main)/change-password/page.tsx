@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { postChangePassword } from "@/api/auth";
+import PageHeader from "@/components/admin/page-header";
 
 type ChangeState = { error: string | null; success: boolean };
 
@@ -34,11 +35,12 @@ export default function ChangePasswordPage() {
         if (state.success) formRef.current?.reset();
     }, [state.success]);
 
-    const inputClass = "w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500";
+    // 焦點樣式由 globals.css 的 .admin-shell 規則統一提供，元件不再各自寫 focus:ring
+    const inputClass = "w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
-        <div className="max-w-md">
-            <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100 mb-6">修改密碼</h1>
+        <div className="w-full max-w-2xl flex flex-col gap-4">
+            <PageHeader title="修改密碼" />
             <form ref={formRef} action={formAction} className="space-y-4">
                 <div>
                     <label className="block text-sm text-neutral-600 dark:text-neutral-400 mb-1">目前密碼</label>
@@ -83,7 +85,7 @@ export default function ChangePasswordPage() {
                     disabled={pending}
                     className="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                    {pending ? "處理中..." : "變更密碼"}
+                    {pending ? "處理中…" : "變更密碼"}
                 </button>
             </form>
         </div>

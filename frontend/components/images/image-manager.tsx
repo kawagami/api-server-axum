@@ -5,6 +5,7 @@ import { useImageManager, type ManagedImage } from '@/hooks/useImageManager';
 import UploadSection from '@/components/images/upload-section';
 import ImageGrid from '@/components/images/image-grid';
 import DeleteConfirmModal from '@/components/images/delete-confirm-modal';
+import PageHeader from '@/components/admin/page-header';
 import type { ImageCompressConfig } from '@/libs/image-config';
 
 type Filter = 'all' | 'active' | 'unused';
@@ -42,7 +43,8 @@ export default function ImageManager({ initialImages, compressConfig }: { initia
     };
 
     return (
-        <div className="container mx-auto">
+        <div className="w-full flex flex-col gap-4">
+            <PageHeader title="圖片" description="上傳後複製網址貼進文章；未被引用的圖片會由排程清除" />
             <UploadSection
                 fileInputRef={fileInputRef}
                 selectedFiles={selectedFiles}
@@ -58,7 +60,7 @@ export default function ImageManager({ initialImages, compressConfig }: { initia
             />
 
             {/* 篩選列 */}
-            <div className="flex flex-wrap items-center gap-2 mt-8">
+            <div className="flex flex-wrap items-center gap-2">
                 {tabs.map(tab => (
                     <button
                         key={tab.key}
@@ -72,7 +74,7 @@ export default function ImageManager({ initialImages, compressConfig }: { initia
                         {tab.label} <span className="opacity-70">{counts[tab.key]}</span>
                     </button>
                 ))}
-                <span className="ml-auto text-xs text-neutral-400">「未使用」未被任何內容引用,會由排程自動清除</span>
+                <span className="ml-auto text-xs text-neutral-400">「未使用」未被任何內容引用，會由排程自動清除</span>
             </div>
 
             <ImageGrid

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Users, CalendarRange, Loader2 } from "lucide-react";
 import { getVisitorStats } from "@/api/stats";
 import type { VisitorStats } from "@/types";
+import PageHeader from "@/components/admin/page-header";
 import VisitorTrendChart from "./visitor-trend-chart";
 
 const DAY_OPTIONS = [7, 30, 90];
@@ -87,26 +88,28 @@ export default function VisitorStatsView({
     }, [refresh]);
 
     return (
-        <div className="max-w-5xl mx-auto flex flex-col gap-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">到訪統計</h1>
-                <div className="inline-flex rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-                    {DAY_OPTIONS.map(d => (
-                        <button
-                            key={d}
-                            type="button"
-                            onClick={() => onPickDays(d)}
-                            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                                d === days
-                                    ? "bg-primary-600 text-white"
-                                    : "bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                            }`}
-                        >
-                            {d} 天
-                        </button>
-                    ))}
-                </div>
-            </div>
+        <div className="flex flex-col gap-6">
+            <PageHeader
+                title="到訪統計"
+                actions={
+                    <div className="inline-flex rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+                        {DAY_OPTIONS.map(d => (
+                            <button
+                                key={d}
+                                type="button"
+                                onClick={() => onPickDays(d)}
+                                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                                    d === days
+                                        ? "bg-primary-600 text-white"
+                                        : "bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                }`}
+                            >
+                                {d} 天
+                            </button>
+                        ))}
+                    </div>
+                }
+            />
 
             {error && (
                 <p className="text-sm text-red-600 dark:text-red-400">{error}</p>

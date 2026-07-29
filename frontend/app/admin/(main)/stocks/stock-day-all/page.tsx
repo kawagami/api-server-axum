@@ -1,4 +1,15 @@
+import type { Metadata } from "next";
 import { getStockDayAll } from "@/app/admin/(main)/stocks/actions";
+import PageHeader from "@/components/admin/page-header";
+import AdminTableContainer from "@/components/admin/admin-table-container";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+
+export const metadata: Metadata = {
+    title: "當日全部",
+    description: "全市場每日行情查詢",
+};
+
+const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ trade_date?: string; stock_code?: string; page?: string; per_page?: string }> }) {
     const params = await searchParams;
@@ -10,70 +21,88 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
     const data = await getStockDayAll({ trade_date, stock_code, page, perPage });
 
     return (
-        <div className="w-full p-3 sm:p-6 bg-neutral-100 dark:bg-neutral-800">
-            <h1 className="text-xl font-bold mb-4 dark:text-white">全市場行情</h1>
-            <form method="get" className="flex gap-2 mb-4 items-end flex-wrap">
+        <div className="w-full flex flex-col gap-4">
+            <PageHeader title="全市場行情" description={`本頁 ${data.length} 筆`} />
+
+            <form method="get" className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
                 <div className="flex flex-col gap-1">
-                    <label className="text-sm text-neutral-600 dark:text-neutral-400">交易日期</label>
-                    <input type="text" name="trade_date" defaultValue={trade_date} placeholder="YYYYMMDD" className="border dark:border-neutral-600 px-2 py-1 text-sm rounded bg-white dark:bg-neutral-700 dark:text-neutral-200" />
+                    <label className="text-xs text-neutral-500 dark:text-neutral-400">交易日期</label>
+                    <input type="text" name="trade_date" defaultValue={trade_date} placeholder="YYYYMMDD" className={inputClass} />
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="text-sm text-neutral-600 dark:text-neutral-400">股票代號</label>
-                    <input type="text" name="stock_code" defaultValue={stock_code} placeholder="2330" className="border dark:border-neutral-600 px-2 py-1 text-sm rounded bg-white dark:bg-neutral-700 dark:text-neutral-200" />
+                    <label className="text-xs text-neutral-500 dark:text-neutral-400">股票代號</label>
+                    <input type="text" name="stock_code" defaultValue={stock_code} placeholder="2330" className={inputClass} />
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="text-sm text-neutral-600 dark:text-neutral-400">筆數</label>
-                    <input type="number" name="per_page" defaultValue={perPage} min={1} max={200} className="border dark:border-neutral-600 px-2 py-1 text-sm rounded w-20 bg-white dark:bg-neutral-700 dark:text-neutral-200" />
+                    <label className="text-xs text-neutral-500 dark:text-neutral-400">筆數</label>
+                    <input type="number" name="per_page" defaultValue={perPage} min={1} max={200} className={`${inputClass} w-20`} />
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="text-sm text-neutral-600 dark:text-neutral-400">頁碼</label>
-                    <input type="number" name="page" defaultValue={page} min={1} className="border dark:border-neutral-600 px-2 py-1 text-sm rounded w-20 bg-white dark:bg-neutral-700 dark:text-neutral-200" />
+                    <label className="text-xs text-neutral-500 dark:text-neutral-400">頁碼</label>
+                    <input type="number" name="page" defaultValue={page} min={1} className={`${inputClass} w-20`} />
                 </div>
-                <button type="submit" className="px-4 py-1.5 bg-primary-600 text-white text-sm rounded hover:bg-primary-700">查詢</button>
+                <button type="submit" className="px-4 py-1.5 text-sm font-medium rounded bg-primary-600 hover:bg-primary-700 text-white transition-colors">
+                    查詢
+                </button>
             </form>
-            <div className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">共 {data.length} 筆</div>
-            <div className="overflow-x-auto">
-                <table className="min-w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 text-sm">
-                    <thead className="bg-neutral-200 dark:bg-neutral-700 sticky top-0 z-10">
-                        <tr>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">交易日期</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">股票代號</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">股票名稱</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">開盤</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">最高</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">最低</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">收盤</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">漲跌</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">成交量</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200 hidden sm:table-cell">成交金額</th>
-                            <th className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200 hidden sm:table-cell">成交筆數</th>
-                        </tr>
+
+            <AdminTableContainer stickyHead>
+                <AdminTable className="text-sm">
+                    <thead>
+                        <AdminHeadRow>
+                            <AdminTh>交易日期</AdminTh>
+                            <AdminTh>股票代號</AdminTh>
+                            <AdminTh>股票名稱</AdminTh>
+                            <AdminTh className="text-right">開盤</AdminTh>
+                            <AdminTh className="text-right">最高</AdminTh>
+                            <AdminTh className="text-right">最低</AdminTh>
+                            <AdminTh className="text-right">收盤</AdminTh>
+                            <AdminTh className="text-right">漲跌</AdminTh>
+                            <AdminTh className="text-right">成交量</AdminTh>
+                            <AdminTh className="text-right hidden sm:table-cell">成交金額</AdminTh>
+                            <AdminTh className="text-right hidden sm:table-cell">成交筆數</AdminTh>
+                        </AdminHeadRow>
                     </thead>
                     <tbody>
-                        {data.map((item, i) => (
-                            <tr key={`${item.stock_code}-${i}`} className="hover:bg-neutral-50 dark:hover:bg-neutral-700 dark:text-neutral-200">
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-center">{item.trade_date}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-center">{item.stock_code}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600">{item.stock_name}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.open_price}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.high_price}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.low_price}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.close_price}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.price_change}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right">{item.trade_volume?.toLocaleString()}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right hidden sm:table-cell">{item.trade_amount?.toLocaleString()}</td>
-                                <td className="px-3 py-1 border border-neutral-300 dark:border-neutral-600 text-right hidden sm:table-cell">{item.transaction_count?.toLocaleString()}</td>
-                            </tr>
-                        ))}
+                        {data.length === 0 ? (
+                            <AdminEmptyRow colSpan={11}>沒有符合條件的行情資料</AdminEmptyRow>
+                        ) : (
+                            data.map((item, i) => (
+                                <AdminRow key={`${item.stock_code}-${i}`}>
+                                    <AdminTd>{item.trade_date}</AdminTd>
+                                    <AdminTd>{item.stock_code}</AdminTd>
+                                    <AdminTd>{item.stock_name}</AdminTd>
+                                    <AdminTd className="text-right">{item.open_price}</AdminTd>
+                                    <AdminTd className="text-right">{item.high_price}</AdminTd>
+                                    <AdminTd className="text-right">{item.low_price}</AdminTd>
+                                    <AdminTd className="text-right">{item.close_price}</AdminTd>
+                                    <AdminTd className="text-right">{item.price_change}</AdminTd>
+                                    <AdminTd className="text-right">{item.trade_volume?.toLocaleString()}</AdminTd>
+                                    <AdminTd className="text-right hidden sm:table-cell">{item.trade_amount?.toLocaleString()}</AdminTd>
+                                    <AdminTd className="text-right hidden sm:table-cell">{item.transaction_count?.toLocaleString()}</AdminTd>
+                                </AdminRow>
+                            ))
+                        )}
                     </tbody>
-                </table>
-            </div>
-            <div className="flex gap-2 mt-4">
+                </AdminTable>
+            </AdminTableContainer>
+
+            <div className="flex gap-2">
                 {page > 1 && (
-                    <a href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page - 1}`} className="px-4 py-2 bg-neutral-300 dark:bg-neutral-600 dark:text-neutral-200 rounded text-sm hover:bg-neutral-400 dark:hover:bg-neutral-500">上一頁</a>
+                    <a
+                        href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page - 1}`}
+                        className="px-4 py-2 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
+                    >
+                        上一頁
+                    </a>
                 )}
                 {data.length === perPage && (
-                    <a href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page + 1}`} className="px-4 py-2 bg-neutral-300 dark:bg-neutral-600 dark:text-neutral-200 rounded text-sm hover:bg-neutral-400 dark:hover:bg-neutral-500">下一頁</a>
+                    <a
+                        href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page + 1}`}
+                        className="px-4 py-2 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
+                    >
+                        下一頁
+                    </a>
                 )}
             </div>
         </div>

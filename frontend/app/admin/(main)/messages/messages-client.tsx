@@ -3,22 +3,20 @@
 import { useEffect, useState } from "react";
 import { Trash2, Mail } from "lucide-react";
 import { getContactMessages, deleteContactMessage } from "@/api/contact";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
-import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+import ErrorBanner, { LOAD_FAILED, DELETE_FAILED } from "@/components/admin/error-banner";
+import PageHeader from "@/components/admin/page-header";
 import usePagedList from "@/hooks/usePagedList";
+import { formatDateTime } from "@/libs/admin-datetime";
 import type { ContactMessage } from "@/types";
 
 const LIMIT = 50;
-
-const fmt = new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", timeZone: "Asia/Taipei",
-});
 
 export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
     const { items: messages, hasMore, isPending, failed, load, loadMore, setItems } =
         usePagedList<ContactMessage>(LIMIT);
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     useEffect(() => {
         load(page => getContactMessages(page, LIMIT));
@@ -26,13 +24,14 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
 
     async function handleDelete(id: number) {
         if (deletingId) return;
-        if (!window.confirm("確定要刪除這則留言嗎?")) return;
+        if (!window.confirm("確定要刪除這則留言嗎？")) return;
+        setDeleteError(null);
         setDeletingId(id);
         try {
             await deleteContactMessage(id);
             setItems(prev => prev.filter(m => m.id !== id));
         } catch {
-            window.alert("刪除失敗,請稍後再試");
+            setDeleteError(DELETE_FAILED);
         } finally {
             setDeletingId(null);
         }
@@ -42,12 +41,12 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
 
     return (
         <div className="w-full flex flex-col gap-4">
-            <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">訪客留言</h1>
+            <PageHeader title="訪客留言" description="訪客從前台聯絡表單送來的訊息" />
 
-            <ErrorBanner message={failed ? LOAD_FAILED : null} />
+            <ErrorBanner message={failed ? LOAD_FAILED : deleteError} />
 
             <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                <div className="overflow-x-auto">
+                <div className="admin-sticky-head overflow-auto max-h-[70svh]">
                     <AdminTable className="text-sm">
                         <thead>
                             <AdminHeadRow>
@@ -59,16 +58,14 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                         </thead>
                         <tbody>
                             {messages.length === 0 ? (
-                                <tr>
-                                    <td colSpan={colSpan} className="px-4 py-8 text-center text-neutral-500 dark:text-neutral-400">
-                                        {isPending ? '載入中…' : '目前沒有留言'}
-                                    </td>
-                                </tr>
+                                <AdminEmptyRow colSpan={colSpan}>
+                                    {isPending ? '載入中…' : '目前沒有留言'}
+                                </AdminEmptyRow>
                             ) : (
                                 messages.map(m => (
                                     <AdminRow key={m.id}>
                                         <AdminTd className="whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
-                                            {fmt.format(new Date(m.created_at))}
+                                            {formatDateTime(m.created_at)}
                                         </AdminTd>
                                         <AdminTd className="text-xs">
                                             <div className="text-neutral-800 dark:text-neutral-200">{m.name || '匿名'}</div>

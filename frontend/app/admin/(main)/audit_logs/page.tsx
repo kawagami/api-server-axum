@@ -5,15 +5,15 @@ import { requirePermission } from "@/libs/admin-permissions";
 import { ListTableSkeleton } from "@/components/loading/table-skeleton";
 
 export const metadata: Metadata = {
-    title: "Audit Logs",
-    description: "Admin audit log viewer",
+    title: "操作紀錄",
+    description: "後台 API 操作紀錄查詢",
 };
 
 export default async function AuditLogsPage() {
     await requirePermission("audit:read");
     // AuditLogsClient 讀 useSearchParams（?from=&to=），需要 Suspense 邊界
     return (
-        <Suspense fallback={<ListTableSkeleton headers={['Time', 'User', 'Method', 'Path', 'Query', 'Status']} rows={10} />}>
+        <Suspense fallback={<ListTableSkeleton headers={['時間', '管理員', '方法', '路徑', 'Query', '狀態']} rows={10} />}>
             <AuditLogsClient />
         </Suspense>
     );

@@ -4,22 +4,24 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { ExternalLink, X } from "lucide-react";
 import { getAuditLogs } from "@/api/logs";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import usePagedList from "@/hooks/usePagedList";
 import { METHOD_BADGE, httpStatusBadgeClass } from "@/libs/badge-styles";
+import { ADMIN_LOCALE, ADMIN_TIME_ZONE } from "@/libs/admin-datetime";
 import type { AuditLog } from "@/types";
 
 const LIMIT = 50;
 
-const fmtRange = new Intl.DateTimeFormat("zh-TW", {
-    timeZone: "Asia/Taipei",
-    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+// 面板空間窄，省略年份；locale / 時區沿用 admin-datetime 的同一組常數
+const fmtRange = new Intl.DateTimeFormat(ADMIN_LOCALE, {
+    timeZone: ADMIN_TIME_ZONE,
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
 });
 
-const fmtRow = new Intl.DateTimeFormat("zh-TW", {
-    timeZone: "Asia/Taipei",
-    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+const fmtRow = new Intl.DateTimeFormat(ADMIN_LOCALE, {
+    timeZone: ADMIN_TIME_ZONE,
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
 });
 
 /**
@@ -60,7 +62,7 @@ export default function MetricsAuditPanel({
                         className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
                     >
                         <ExternalLink size={14} />
-                        在 audit_logs 開啟
+                        在操作紀錄開啟
                     </Link>
                     <button
                         type="button"
@@ -81,18 +83,16 @@ export default function MetricsAuditPanel({
                         <AdminHeadRow>
                             <AdminTh className="whitespace-nowrap">時間</AdminTh>
                             <AdminTh className="whitespace-nowrap hidden md:table-cell">使用者</AdminTh>
-                            <AdminTh className="whitespace-nowrap">Method</AdminTh>
+                            <AdminTh className="whitespace-nowrap">方法</AdminTh>
                             <AdminTh className="min-w-[12rem]">路徑</AdminTh>
                             <AdminTh className="whitespace-nowrap">狀態</AdminTh>
                         </AdminHeadRow>
                     </thead>
                     <tbody>
                         {logs.length === 0 ? (
-                            <tr>
-                                <td colSpan={5} className="px-4 py-8 text-center text-neutral-500 dark:text-neutral-400">
-                                    {isPending ? "載入中…" : "這段時間沒有後台操作紀錄"}
-                                </td>
-                            </tr>
+                            <AdminEmptyRow colSpan={5}>
+                                {isPending ? "載入中…" : "這段時間沒有後台操作紀錄"}
+                            </AdminEmptyRow>
                         ) : (
                             logs.map(log => (
                                 <AdminRow key={log.id}>

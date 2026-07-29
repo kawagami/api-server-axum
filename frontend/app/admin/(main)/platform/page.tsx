@@ -2,6 +2,7 @@ import { getSettings } from "../settings/actions";
 import EnabledFeaturesPicker from "./enabled-features-picker";
 import WebauthnSettings from "./webauthn-settings";
 import { requirePermission } from "@/libs/admin-permissions";
+import PageHeader from "@/components/admin/page-header";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -20,11 +21,11 @@ export default async function PlatformSettingsPage() {
     const rpOrigin = flat.find(s => s.key === 'webauthn_rp_origin')?.value ?? '';
 
     return (
-        <div className="w-full max-w-2xl">
-            <h1 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">平台設定</h1>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6">
-                平台保留設定，修改需要 platform:update 權限，一般設定權限（setting:*）碰不到這裡的項目。
-            </p>
+        <div className="w-full max-w-2xl flex flex-col gap-6">
+            <PageHeader
+                title="平台設定"
+                description="平台保留設定，修改需要 platform:update 權限，一般設定權限（setting:*）碰不到這裡的項目。"
+            />
             <EnabledFeaturesPicker initialValue={enabledFeaturesValue} />
             <WebauthnSettings initialRpId={rpId} initialRpOrigin={rpOrigin} />
         </div>

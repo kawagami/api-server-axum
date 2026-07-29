@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
     title: "角色",
-    description: "角色與權限管理",
+    description: "角色與權限設定",
 };
 
 export default async function RolesPage() {

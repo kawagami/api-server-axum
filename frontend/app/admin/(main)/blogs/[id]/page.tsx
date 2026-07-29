@@ -4,6 +4,12 @@ import { getPublicSettings } from "@/api/settings";
 import BlogComponent from "@/components/blogs/blog-component";
 import { resolveImageCompressConfig } from "@/libs/image-config";
 import type { Blog } from "@/types";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+    title: "編輯文章",
+    description: "Markdown 編輯與預覽",
+};
 
 export default async function BlogPage({ params }: { params: Promise<{ id: string }> }) {
     const id = (await params).id;

@@ -1,12 +1,26 @@
 import { Suspense } from "react";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import StockTable from "@/components/stocks/stock-table";
+import PageHeader from "@/components/admin/page-header";
 import { StatusLink } from "./status-link";
 import { getStockChanges } from "@/app/admin/(main)/stocks/actions";
 import type { StockChange } from "@/types";
 
+export const metadata: Metadata = {
+    title: "異動列表",
+    description: "股票異動查詢結果",
+};
+
 const PER_PAGE = 50;
+
+const STATUS_TABS: { value: string; label: string }[] = [
+    { value: "", label: "全部" },
+    { value: "completed", label: "已完成" },
+    { value: "failed", label: "失敗" },
+    { value: "pending", label: "等待中" },
+];
 
 function buildHref(status: string | undefined, page: number) {
     const params = new URLSearchParams();
@@ -26,16 +40,35 @@ async function StockContent({ status, page }: { status: string | undefined; page
 
     return (
         <>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 mb-4">
-                <h1 className="text-xl font-bold dark:text-white">共 {total} 筆，本頁 {data.length} 筆</h1>
-                <h1 className="text-xl font-bold dark:text-white">總變動 {totalChange.toFixed(2)} %</h1>
-                <h1 className="text-xl font-bold dark:text-white">有資料 {totalCount} 筆</h1>
-                <h1 className="text-xl font-bold dark:text-white">平均 {totalCount > 0 ? (totalChange / totalCount).toFixed(2) : '—'} %</h1>
+            {/* 這些是統計值不是標題，用 dl 而不是一排 h1 */}
+            <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+                <div className="flex gap-1">
+                    <dt>共</dt>
+                    <dd className="font-semibold text-neutral-800 dark:text-neutral-100">{total} 筆</dd>
+                    <dt>，本頁</dt>
+                    <dd className="font-semibold text-neutral-800 dark:text-neutral-100">{data.length} 筆</dd>
+                </div>
+                <div className="flex gap-1">
+                    <dt>總變動</dt>
+                    <dd className="font-semibold text-neutral-800 dark:text-neutral-100">{totalChange.toFixed(2)} %</dd>
+                </div>
+                <div className="flex gap-1">
+                    <dt>有資料</dt>
+                    <dd className="font-semibold text-neutral-800 dark:text-neutral-100">{totalCount} 筆</dd>
+                </div>
+                <div className="flex gap-1">
+                    <dt>平均</dt>
+                    <dd className="font-semibold text-neutral-800 dark:text-neutral-100">
+                        {totalCount > 0 ? (totalChange / totalCount).toFixed(2) : '—'} %
+                    </dd>
+                </div>
+            </dl>
+            <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
+                <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+                    <StockTable data={data} />
+                </div>
             </div>
-            <div className="overflow-x-auto">
-                <StockTable data={data} />
-            </div>
-            <div className="flex items-center justify-between mt-4">
+            <div className="flex items-center justify-between">
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">
                     {offset + 1}–{Math.min(offset + PER_PAGE, total)} / {total}
                 </span>
@@ -43,7 +76,7 @@ async function StockContent({ status, page }: { status: string | undefined; page
                     {hasPrev ? (
                         <Link
                             href={buildHref(status, page - 1)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
                         >
                             <ChevronLeft className="w-4 h-4" /> 上一頁
                         </Link>
@@ -55,7 +88,7 @@ async function StockContent({ status, page }: { status: string | undefined; page
                     {hasNext ? (
                         <Link
                             href={buildHref(status, page + 1)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
                         >
                             下一頁 <ChevronRight className="w-4 h-4" />
                         </Link>
@@ -83,11 +116,12 @@ export default async function List({ searchParams }: { searchParams: Promise<{ s
     const page = Math.max(1, Number(pageStr ?? 1) || 1);
 
     return (
-        <div className="w-full p-3 sm:p-6 bg-neutral-100 dark:bg-neutral-800">
-            <div className="flex gap-2 mb-4 overflow-x-auto">
-                {["", "completed", "failed", "pending"].map((s) => (
-                    <StatusLink key={s || 'all'} status={s} currentStatus={status ?? ''}>
-                        {s || 'All'}
+        <div className="w-full flex flex-col gap-4">
+            <PageHeader title="股票異動列表" />
+            <div className="flex gap-2 overflow-x-auto">
+                {STATUS_TABS.map(({ value, label }) => (
+                    <StatusLink key={value || 'all'} status={value} currentStatus={status ?? ''}>
+                        {label}
                     </StatusLink>
                 ))}
             </div>

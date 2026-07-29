@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { getGamesOverview } from "@/api/games";
 import type { GameOverview } from "@/types";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd } from "@/components/admin/table";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+import PageHeader from "@/components/admin/page-header";
 
 const POLL_INTERVAL_MS = 7000;
 
@@ -52,32 +53,32 @@ export default function GamesOverview({ initial }: { initial: GameOverview[] }) 
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <h2 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">
-                    對局總覽
-                </h2>
-                <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 cursor-pointer select-none">
-                        <input
-                            type="checkbox"
-                            checked={autoRefresh}
-                            onChange={(e) => setAutoRefresh(e.target.checked)}
-                            className="accent-primary-600"
-                        />
-                        自動更新（每 {POLL_INTERVAL_MS / 1000} 秒）
-                    </label>
-                    <button
-                        onClick={refresh}
-                        disabled={refreshing}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
-                    >
-                        {refreshing
-                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                            : <RefreshCw className="w-4 h-4" />}
-                        重新整理
-                    </button>
-                </div>
-            </div>
+            <PageHeader
+                title="對局總覽"
+                actions={
+                    <>
+                        <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={autoRefresh}
+                                onChange={(e) => setAutoRefresh(e.target.checked)}
+                                className="accent-primary-600"
+                            />
+                            自動更新（每 {POLL_INTERVAL_MS / 1000} 秒）
+                        </label>
+                        <button
+                            onClick={refresh}
+                            disabled={refreshing}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
+                        >
+                            {refreshing
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <RefreshCw className="w-4 h-4" />}
+                            重新整理
+                        </button>
+                    </>
+                }
+            />
 
             <div className="text-sm text-neutral-600 dark:text-neutral-400">
                 目前在對局中的人數：
@@ -103,11 +104,7 @@ export default function GamesOverview({ initial }: { initial: GameOverview[] }) 
                     </thead>
                     <tbody>
                         {rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={7} className="border border-neutral-300 dark:border-neutral-700 px-4 py-4 text-center text-neutral-500 dark:text-neutral-400">
-                                    無資料
-                                </td>
-                            </tr>
+                            <AdminEmptyRow colSpan={7}>目前沒有對局資料</AdminEmptyRow>
                         ) : (
                             rows.map((g) => {
                                 const meta = GAME_LABELS[g.game];

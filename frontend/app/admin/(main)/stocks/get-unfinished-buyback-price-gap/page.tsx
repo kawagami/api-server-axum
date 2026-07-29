@@ -1,4 +1,13 @@
+import type { Metadata } from "next";
 import { getUnfinishedBuybackPriceGap } from "@/app/admin/(main)/stocks/actions";
+import PageHeader from "@/components/admin/page-header";
+import AdminTableContainer from "@/components/admin/admin-table-container";
+import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+
+export const metadata: Metadata = {
+    title: "未完成回購",
+    description: "執行中的庫藏股與價差",
+};
 
 interface BuybackPriceGapItem {
     stock_no: string;
@@ -11,6 +20,13 @@ interface BuybackPriceGapItem {
     diff_percent: string;
 }
 
+// 台股慣例：紅漲綠跌（語意色，不走 primary/neutral token）
+function changeClass(value: string) {
+    return parseFloat(value) >= 0
+        ? 'text-green-600 dark:text-green-400'
+        : 'text-red-600 dark:text-red-400';
+}
+
 export default async function Page() {
     const info = await getUnfinishedBuybackPriceGap() as BuybackPriceGapItem[];
 
@@ -21,43 +37,45 @@ export default async function Page() {
     const avgDiffPercent = info.length > 0 ? totalDiffPercent / info.length : 0;
 
     return (
-        <div className="w-full p-3 sm:p-6 bg-neutral-100 dark:bg-neutral-800">
-            <h1 className="text-xl font-bold mb-4 dark:text-white">執行中的庫藏股</h1>
-            <div className="mb-4 text-right text-sm text-neutral-600 dark:text-neutral-400 space-y-1">
-                <div>資料數量：{info.length}</div>
-                <div>價差 (%) 總和：{totalDiffPercent.toFixed(2)}%</div>
-                <div>平均價差 (%)：{avgDiffPercent.toFixed(2)}%</div>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="min-w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 text-sm">
-                    <thead className="bg-neutral-200 dark:bg-neutral-700 sticky top-0 z-10">
-                        <tr>
-                            <th className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">股票代號</th>
-                            <th className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">股票名稱</th>
-                            <th className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">開始日</th>
-                            <th className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">結束日</th>
-                            <th className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">開始日價格</th>
-                            <th className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">最新價格</th>
-                            <th className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">價差</th>
-                            <th className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 dark:text-neutral-200">價差 (%)</th>
-                        </tr>
+        <div className="w-full flex flex-col gap-4">
+            <PageHeader
+                title="執行中的庫藏股"
+                description={`共 ${info.length} 筆・價差總和 ${totalDiffPercent.toFixed(2)}%・平均 ${avgDiffPercent.toFixed(2)}%`}
+            />
+            <AdminTableContainer stickyHead>
+                <AdminTable className="text-sm">
+                    <thead>
+                        <AdminHeadRow>
+                            <AdminTh>股票代號</AdminTh>
+                            <AdminTh>股票名稱</AdminTh>
+                            <AdminTh>開始日</AdminTh>
+                            <AdminTh>結束日</AdminTh>
+                            <AdminTh className="text-right">開始日價格</AdminTh>
+                            <AdminTh className="text-right">最新價格</AdminTh>
+                            <AdminTh className="text-right">價差</AdminTh>
+                            <AdminTh className="text-right">價差 (%)</AdminTh>
+                        </AdminHeadRow>
                     </thead>
                     <tbody>
-                        {info.map((item) => (
-                            <tr key={item.stock_no} className="hover:bg-neutral-100 dark:hover:bg-neutral-700 dark:text-neutral-200">
-                                <td className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-center">{item.stock_no}</td>
-                                <td className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-center">{item.stock_name}</td>
-                                <td className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-center">{item.start_date}</td>
-                                <td className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-center">{item.end_date}</td>
-                                <td className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-right">{item.price_on_start_date}</td>
-                                <td className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-right">{item.latest_price}</td>
-                                <td className={`px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-right ${parseFloat(item.diff) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{item.diff}</td>
-                                <td className={`px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-right ${parseFloat(item.diff_percent) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{item.diff_percent}%</td>
-                            </tr>
-                        ))}
+                        {info.length === 0 ? (
+                            <AdminEmptyRow colSpan={8}>目前沒有執行中的庫藏股</AdminEmptyRow>
+                        ) : (
+                            info.map((item) => (
+                                <AdminRow key={item.stock_no}>
+                                    <AdminTd>{item.stock_no}</AdminTd>
+                                    <AdminTd>{item.stock_name}</AdminTd>
+                                    <AdminTd>{item.start_date}</AdminTd>
+                                    <AdminTd>{item.end_date}</AdminTd>
+                                    <AdminTd className="text-right">{item.price_on_start_date}</AdminTd>
+                                    <AdminTd className="text-right">{item.latest_price}</AdminTd>
+                                    <AdminTd className={`text-right ${changeClass(item.diff)}`}>{item.diff}</AdminTd>
+                                    <AdminTd className={`text-right ${changeClass(item.diff_percent)}`}>{item.diff_percent}%</AdminTd>
+                                </AdminRow>
+                            ))
+                        )}
                     </tbody>
-                </table>
-            </div>
+                </AdminTable>
+            </AdminTableContainer>
         </div>
     );
 }

@@ -1,9 +1,17 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getTorrents, getTorrentStorage } from "@/api/torrents";
 import { ListTableSkeleton } from "@/components/loading/table-skeleton";
+import PageHeader from "@/components/admin/page-header";
+import { TORRENT_STATUS_LABEL } from "@/libs/badge-styles";
 import TorrentManager from "./torrent-manager";
 import { requirePermission } from "@/libs/admin-permissions";
+
+export const metadata: Metadata = {
+    title: "Torrent 下載",
+    description: "magnet 任務與檔案下載",
+};
 
 const PER_PAGE = 50;
 const STATUS_TABS = ["", "pending", "downloading", "completed", "failed"];
@@ -41,9 +49,9 @@ export default async function TorrentsPage({ searchParams }: { searchParams: Pro
     const page = Math.max(1, Number(pageStr ?? 1) || 1);
 
     return (
-        <div className="w-full max-w-5xl mx-auto">
-            <h1 className="text-xl font-bold mb-4 text-neutral-800 dark:text-white">Torrent 管理</h1>
-            <div className="flex gap-2 mb-4 flex-wrap">
+        <div className="w-full flex flex-col gap-4">
+            <PageHeader title="Torrent 下載" />
+            <div className="flex gap-2 flex-wrap">
                 {STATUS_TABS.map((s) => {
                     const isActive = status === s;
                     return (
@@ -55,7 +63,7 @@ export default async function TorrentsPage({ searchParams }: { searchParams: Pro
                                 : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                                 }`}
                         >
-                            {s || "All"}
+                            {s ? TORRENT_STATUS_LABEL[s] ?? s : "全部"}
                         </Link>
                     );
                 })}
