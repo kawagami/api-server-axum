@@ -21,11 +21,11 @@ interface HeaderProps {
     enabledFeatures: string[] | null
 }
 
-const navLinkClass = "block px-4 rounded hover:text-primary-600 dark:hover:text-primary-300 hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-primary-400 whitespace-nowrap";
+const navLinkClass = "block px-4 rounded hover:text-primary-600 dark:hover:text-primary-300 hover:underline underline-offset-4 whitespace-nowrap";
 const navTriggerClass = navLinkClass.replace('block', 'inline-flex items-center gap-1');
 const activeNavClass = "text-primary-600 dark:text-primary-300 font-medium";
-const dropdownItemClass = "flex items-center gap-2 px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-400";
-const mobileItemClass = "px-4 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-400";
+const dropdownItemClass = "flex items-center gap-2 px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700";
+const mobileItemClass = "px-4 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800";
 
 function DesktopDropdown({ isOpen, align = 'left', children }: { isOpen: boolean; align?: 'left' | 'right'; children: React.ReactNode }) {
     return (
@@ -47,6 +47,8 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
     const t = useTranslations('Header');
     const pathname = usePathname();
     const navRef = useRef<HTMLElement>(null);
+    const mobileNavRef = useRef<HTMLElement>(null);
+    const hamburgerRef = useRef<HTMLButtonElement>(null);
 
     const showBlog = isFeatureEnabled(enabledFeatures, 'blog');
     const showVocab = isFeatureEnabled(enabledFeatures, 'vocab');
@@ -92,9 +94,41 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
         };
     }, [isOpen, isResourcesOpen, isGamesOpen, isMemberOpen]);
 
+    // 行動選單是覆蓋整頁的 overlay，焦點必須關在裡面，否則 Tab 會跑到被遮住的頁面上
+    useEffect(() => {
+        const node = mobileNavRef.current;
+        const hamburger = hamburgerRef.current;
+        if (!isOpen || !node) return;
+        const SELECTOR = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+        const focusables = () =>
+            Array.from(node.querySelectorAll<HTMLElement>(SELECTOR)).filter(el => el.offsetParent !== null);
+        focusables()[0]?.focus();
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Tab') return;
+            const items = focusables();
+            if (items.length === 0) return;
+            const first = items[0];
+            const last = items[items.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
+        node.addEventListener('keydown', onKey);
+        return () => {
+            node.removeEventListener('keydown', onKey);
+            // 關閉後把焦點還給漢堡鈕，鍵盤操作才不會掉回頁面最頂端
+            hamburger?.focus();
+        };
+    }, [isOpen]);
+
     return (
         <>
-            <header className="min-h-[50px] flex items-center justify-between px-4 relative z-50">
+            {/* sticky：全站捲動一律由 body 負責，導航必須一直在（頁面不要自己開內捲區） */}
+            <header className="sticky top-0 z-50 min-h-[50px] flex items-center justify-between px-4 bg-primary-50/85 dark:bg-primary-950/85 backdrop-blur-sm">
                 <div className="flex items-center flex-shrink-0">
                     <Link href="/" className="block px-2" aria-label={t('backToHome')} onClick={closeAll}>
                         <KawaLogo width={100} height={40} />
@@ -111,14 +145,14 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
                         onMouseLeave={() => setIsResourcesOpen(false)}
                     >
                         <span className={`${navTriggerClass} ${isToolsActive ? activeNavClass : ''}`}>
-                            <Link href="/tools" aria-label={t('tools')} className="focus:outline-none focus:ring-2 focus:ring-primary-400 rounded" onClick={closeDesktopDropdowns}>
+                            <Link href="/tools" aria-label={t('tools')} className="rounded" onClick={closeDesktopDropdowns}>
                                 {t('tools')}
                             </Link>
                             <button
                                 aria-label={t('openToolsMenu')}
                                 aria-expanded={isResourcesOpen}
                                 onClick={() => setIsResourcesOpen(o => !o)}
-                                className="focus:outline-none focus:ring-2 focus:ring-primary-400 rounded"
+                                className="rounded"
                             >
                                 <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isResourcesOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -137,14 +171,14 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
                         onMouseLeave={() => setIsGamesOpen(false)}
                     >
                         <span className={`${navTriggerClass} ${isGamesActive ? activeNavClass : ''}`}>
-                            <Link href="/games" aria-label={t('games')} className="focus:outline-none focus:ring-2 focus:ring-primary-400 rounded" onClick={closeDesktopDropdowns}>
+                            <Link href="/games" aria-label={t('games')} className="rounded" onClick={closeDesktopDropdowns}>
                                 {t('games')}
                             </Link>
                             <button
                                 aria-label={t('openGamesMenu')}
                                 aria-expanded={isGamesOpen}
                                 onClick={() => setIsGamesOpen(o => !o)}
-                                className="focus:outline-none focus:ring-2 focus:ring-primary-400 rounded"
+                                className="rounded"
                             >
                                 <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isGamesOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -167,7 +201,7 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
                             onMouseLeave={() => setIsMemberOpen(false)}
                         >
                             <button
-                                className="flex items-center gap-1 px-4 rounded hover:text-primary-600 dark:hover:text-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                                className="flex items-center gap-1 px-4 rounded hover:text-primary-600 dark:hover:text-primary-300"
                                 aria-label={t('openMemberMenu')}
                                 aria-expanded={isMemberOpen}
                                 onClick={() => setIsMemberOpen(o => !o)}
@@ -196,9 +230,12 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
 
                 {/* Mobile hamburger */}
                 <button
-                    className="md:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-primary-400"
+                    ref={hamburgerRef}
+                    className="md:hidden p-2 rounded"
                     onClick={() => setIsOpen(o => !o)}
                     aria-label={isOpen ? t('closeMenu') : t('openMenu')}
+                    aria-expanded={isOpen}
+                    aria-controls="mobile-nav"
                 >
                     {isOpen ? <X size={24} /> : <Menu size={24} />}
                 </button>
@@ -208,7 +245,11 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
             {isOpen && (
                 <>
                     <div className="md:hidden fixed inset-0 z-30 bg-black/40" onClick={closeAll} aria-hidden="true" />
-                    <nav className="md:hidden fixed top-[50px] left-0 right-0 z-40 bg-white dark:bg-neutral-900 shadow-lg border-t border-neutral-200 dark:border-neutral-700 flex flex-col p-4 gap-1">
+                    <nav
+                        id="mobile-nav"
+                        ref={mobileNavRef}
+                        className="md:hidden fixed top-[50px] left-0 right-0 z-40 max-h-[calc(100svh-50px)] overflow-y-auto bg-white dark:bg-neutral-900 shadow-lg border-t border-neutral-200 dark:border-neutral-700 flex flex-col p-4 gap-1"
+                    >
                         {showBlog && <Link href="/blogs" className={`${mobileItemClass} ${isBlogActive ? activeNavClass : ''}`} onClick={closeAll}>{t('blog')}</Link>}
                         {showVocab && <Link href="/vocab" className={`${mobileItemClass} ${isVocabActive ? activeNavClass : ''}`} onClick={closeAll}>{t('vocab')}</Link>}
 

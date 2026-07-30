@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import { getPublicSettings } from "@/api/settings";
 import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
 import ContactForm from "./contact-form";
+import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Contact");
@@ -19,12 +21,9 @@ export default async function ContactPage() {
     const t = await getTranslations("Contact");
 
     return (
-        <div className="w-full max-w-xl px-4 py-4 flex flex-col gap-6">
-            <div className="text-center flex flex-col gap-2">
-                <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">{t("title")}</h1>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("subtitle")}</p>
-            </div>
+        <PageShell width="form" className="flex flex-col gap-6">
+            <PageTitle title={t("title")} description={t("subtitle")} />
             <ContactForm />
-        </div>
+        </PageShell>
     );
 }

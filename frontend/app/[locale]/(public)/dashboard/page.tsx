@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { ScanLine, Ticket } from "lucide-react";
 import FeatureCard from "@/components/feature-card";
+import PageShell from "@/components/page-shell";
 import { MEMBER_LINKS, filterNavByFeatures } from "@/libs/site-nav";
 import { getPublicSettings } from "@/api/settings";
 import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
@@ -31,7 +32,7 @@ export default async function DashboardPage() {
     const memberLinks = filterNavByFeatures(MEMBER_LINKS, enabled);
 
     return (
-        <div className="w-full max-w-3xl px-4 py-8 flex flex-col gap-8">
+        <PageShell className="flex flex-col gap-8">
             <div className="flex items-center gap-4">
                 {member.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -47,7 +48,7 @@ export default async function DashboardPage() {
                 )}
                 <div>
                     <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("welcomeBack")}</p>
-                    <h1 className="text-2xl font-bold">{member.name}</h1>
+                    <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">{member.name}</h1>
                 </div>
             </div>
 
@@ -84,6 +85,6 @@ export default async function DashboardPage() {
                     ))}
                 </div>
             </section>
-        </div>
+        </PageShell>
     );
 }

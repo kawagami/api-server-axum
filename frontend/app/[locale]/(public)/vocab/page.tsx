@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import VocabClient from "./VocabClient";
+import PageShell from "@/components/page-shell";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Vocab");
@@ -18,8 +19,8 @@ export default async function VocabPage() {
     const leaderboard = await getVocabLeaderboard("en", "weekly").catch(() => null);
 
     return (
-        <div className="w-full max-w-2xl px-4 py-8">
+        <PageShell width="form">
             <VocabClient initialMe={me} initialMistakes={mistakes} initialLeaderboard={leaderboard} />
-        </div>
+        </PageShell>
     );
 }

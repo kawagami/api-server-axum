@@ -1,7 +1,10 @@
+import PageShell from "@/components/page-shell";
+
+// 容器規格對齊 blog-article.tsx（wide + 左欄 max-w-prose），否則載完會跳版
 export default function BlogLoading() {
     return (
-        <div className="w-full h-[calc(100svh-120px)] overflow-auto px-4 py-6">
-            <div className="max-w-prose mx-auto animate-pulse space-y-4">
+        <PageShell width="wide">
+            <div className="max-w-prose animate-pulse space-y-4">
                 <div className="h-8 bg-neutral-300 dark:bg-neutral-700 rounded w-3/4" />
                 <div className="h-4 bg-neutral-200 dark:bg-neutral-600 rounded w-1/4" />
                 <div className="space-y-2 pt-4">
@@ -22,6 +25,6 @@ export default function BlogLoading() {
                     <div className="h-4 bg-neutral-200 dark:bg-neutral-600 rounded w-full" />
                 </div>
             </div>
-        </div>
+        </PageShell>
     );
 }

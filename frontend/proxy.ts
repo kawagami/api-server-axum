@@ -6,7 +6,8 @@ import { routing } from './i18n/routing';
 const intlMiddleware = createMiddleware(routing);
 
 export const config = {
-    matcher: ['/((?!_next|api|auth|.*\\..*).*)'],
+    // opengraph-image 沒有副檔名，不排除的話會被 intl middleware 加上 locale prefix 而 404
+    matcher: ['/((?!_next|api|auth|opengraph-image|.*\\..*).*)'],
 };
 
 export default async function proxy(req: NextRequest) {

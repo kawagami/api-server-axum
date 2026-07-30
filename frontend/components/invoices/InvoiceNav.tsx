@@ -17,7 +17,7 @@ export default function InvoiceNav() {
     const pathname = usePathname();
 
     return (
-        <nav className="flex flex-wrap gap-2 mb-6">
+        <nav className="flex flex-wrap gap-2">
             {LINKS.map(({ href, labelKey, icon: Icon }) => {
                 // /invoices 需精確比對，避免被子路由點亮
                 const active = href === '/invoices' ? pathname === '/invoices' : pathname.startsWith(href);

@@ -3,6 +3,8 @@ import InvoiceDrawsClient from "@/components/invoices/InvoiceDrawsClient";
 import InvoiceNav from "@/components/invoices/InvoiceNav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
+import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Invoices');
@@ -16,10 +18,10 @@ export default async function InvoiceDrawsPage() {
     ]);
 
     return (
-        <div className="w-full max-w-4xl px-4 py-8">
-            <h1 className="text-2xl font-bold mb-6">{t('drawsTitle')}</h1>
+        <PageShell className="flex flex-col gap-6">
+            <PageTitle title={t('drawsTitle')} />
             <InvoiceNav />
             <InvoiceDrawsClient initialDraws={draws} />
-        </div>
+        </PageShell>
     );
 }

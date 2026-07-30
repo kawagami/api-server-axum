@@ -6,15 +6,18 @@ import { resolveActiveTheme, normalizeRotation } from "@/libs/site-theme";
 import { resolveDefaultColorMode } from "@/libs/color-mode";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { getLocale } from "next-intl/server";
+import { SITE_NAME } from "@/libs/seo";
 
 export const metadata: Metadata = {
     metadataBase: new URL("https://kawa.homes"),
-    title: "Kawa's Blog",
-    description: "kawa blog ongoing",
+    // template 讓各頁只填自己的短標題，站名統一由這裡接（後台 app/admin/layout.tsx 有自己的 template）
+    title: { template: `%s｜${SITE_NAME}`, default: SITE_NAME },
+    description: "個人部落格與工具整合平台：文章、線上小工具、對戰遊戲與會員功能。",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-    const [cookieStore, publicSettings] = await Promise.all([cookies(), getPublicSettings()]);
+    const [cookieStore, publicSettings, locale] = await Promise.all([cookies(), getPublicSettings(), getLocale()]);
     // 全站風格：site_theme 是具體主題 → 固定；是 'auto' → 依 theme_rotation + 當天星期（Asia/Taipei）輪播
     // layout 因 cookies() 為動態渲染、每 request 重算，跨午夜自動換主題不受 60s settings cache 影響
     const siteTheme = resolveActiveTheme(publicSettings.site_theme, normalizeRotation(publicSettings.theme_rotation));
@@ -28,8 +31,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     const isDark = themeCookie ? themeCookie === 'dark' : defaultMode === 'dark';
     const followSystem = !themeCookie && defaultMode === 'system';
 
+    // lang 跟著當前語系走：寫死 zh-TW 會讓英文頁被螢幕閱讀器用中文發音，搜尋引擎也判錯語言
     return (
-        <html lang="zh-TW" className={isDark ? 'dark' : ''} data-theme={siteTheme} suppressHydrationWarning>
+        <html lang={locale} className={isDark ? 'dark' : ''} data-theme={siteTheme} suppressHydrationWarning>
             <head>
                 {followSystem && (
                     <script dangerouslySetInnerHTML={{ __html: `(function(){try{if(window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark');}}catch(e){}})();` }} />

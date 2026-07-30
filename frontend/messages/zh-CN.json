@@ -56,7 +56,8 @@
     "gameAvalon": "在线阿瓦隆",
     "gameFarm": "农场经营",
     "gameMetalSlug": "越南大战",
-    "blog": "文章"
+    "blog": "文章",
+    "skipToContent": "跳至主要内容"
   },
   "Login": {
     "title": "登录",
@@ -66,11 +67,14 @@
     "comingSoon": "即将推出",
     "errorDefault": "登录失败，请重试",
     "errorOauthFailed": "登录失败，请重试",
-    "errorOauthDenied": "已取消授权"
+    "errorOauthDenied": "已取消授权",
+    "metaTitle": "登录",
+    "metaDescription": "使用 OAuth 账号登录会员功能。"
   },
   "NotFound": {
     "title": "404 - 页面不存在",
-    "backHome": "回首页"
+    "backHome": "回首页",
+    "description": "这个网址没有对应的页面，可能已经移除或打错了。"
   },
   "Portfolio": {
     "title": "投资组合",
@@ -185,9 +189,9 @@
     "authorHeading": "{author} 的文章",
     "empty": "目前没有符合的文章",
     "all": "全部",
-    "metaTitle": "Kawa's Blog",
-    "metaTaggedTitle": "Tag: {tag} | Kawa's Blog",
-    "metaAuthorTitle": "{author} 的文章 | Kawa's Blog",
+    "metaTitle": "博客",
+    "metaTaggedTitle": "标签：{tag}",
+    "metaAuthorTitle": "{author} 的文章",
     "metaDescription": "Kawa 的个人博客，分享程序开发、后端、前端与工具相关笔记。",
     "searchPlaceholder": "搜索文章…",
     "searchClear": "清除搜索",
@@ -261,7 +265,9 @@
     "linksHeading": "链接",
     "github": "GitHub 源码",
     "contact": "留言给我",
-    "home": "回首页看看有什么"
+    "home": "回首页看看有什么",
+    "metaTitle": "关于本站",
+    "metaDescription": "kawa 的个人小站介绍：技术栈、设计原则与联系方式。"
   },
   "Ws": {
     "title": "WS 通知",
@@ -841,7 +847,7 @@
     }
   },
   "ToolsHub": {
-    "metaTitle": "实用工具 — Kawa's Homes",
+    "metaTitle": "实用工具",
     "metaDescription": "倒数计时、闹钟、整点报时、排班计算、密码生成、简繁转换等在线小工具。",
     "title": "实用工具",
     "intro": "打开即用的在线小工具，无需登录。",
@@ -855,7 +861,7 @@
     }
   },
   "GamesHub": {
-    "metaTitle": "对战游戏 — Kawa's Homes",
+    "metaTitle": "对战游戏",
     "metaDescription": "象棋、国际象棋、五子棋、围棋、暗棋、阿瓦隆、农场经营等实时多人在线对战游戏。",
     "title": "对战游戏",
     "intro": "实时多人在线对战，开房邀朋友或大厅匹配。",
@@ -941,5 +947,89 @@
     "lbEmpty": "这个周期还没有纪录,抢下第一个名次吧!",
     "lbRuns": "{count} 局",
     "lbMyRank": "我的名次:第 {rank} 名 · {exp} EXP"
+  },
+  "Alarm": {
+    "title": "闹钟",
+    "timeLabel": "设定闹钟时间",
+    "setAt": "闹钟设定：{time}",
+    "start": "设定闹钟",
+    "cancel": "取消闹钟",
+    "stop": "关闭闹钟",
+    "ringing": "时间到！播放提醒中…",
+    "idle": "尚未设定"
+  },
+  "Countdown": {
+    "title": "倒数计时器",
+    "minutesLabel": "设定分钟数",
+    "start": "开始倒数",
+    "pause": "暂停",
+    "resume": "继续",
+    "reset": "重置",
+    "ringing": "时间到！播放提醒中…"
+  },
+  "HourlyChime": {
+    "title": "整点报时",
+    "on": "报时中",
+    "off": "已停用",
+    "nextChime": "距下一个整点",
+    "lastChime": "最近报时",
+    "hint": "开启后，每个整点自动播报语音",
+    "speech": "现在 {hour} 点整",
+    "speechLang": "zh-CN"
+  },
+  "ConvertText": {
+    "title": "中文转换",
+    "s2t": "简→繁",
+    "t2s": "繁→简",
+    "placeholderS2t": "请输入简体中文",
+    "placeholderT2s": "请输入繁体中文",
+    "convert": "转换",
+    "converting": "处理中…",
+    "resultLabel": "转换结果",
+    "copy": "复制结果",
+    "copyEmpty": "没有可以复制的文字",
+    "copySuccess": "已复制到剪贴板",
+    "copyFail": "复制失败，请手动选取",
+    "emptyInput": "请先输入文字",
+    "success": "转换完成",
+    "failed": "转换失败，请稍后再试"
+  },
+  "NewPassword": {
+    "title": "密码生成器",
+    "countLabel": "组数",
+    "lengthLabel": "长度",
+    "generate": "生成密码",
+    "generating": "生成中…",
+    "resultLabel": "生成结果",
+    "empty": "尚未生成密码",
+    "copy": "复制",
+    "copySuccess": "密码已复制",
+    "copyFail": "复制失败",
+    "error": "生成失败，请稍后再试"
+  },
+  "Roster": {
+    "title": "自动排班",
+    "paramsHeading": "排班参数设定",
+    "membersLabel": "参与人员（{count}）",
+    "namePlaceholder": "输入姓名…",
+    "addName": "新增人员",
+    "removeName": "移除",
+    "duplicateName": "这个姓名已经在名单里",
+    "emptyNames": "请至少加入一位人员",
+    "daysLabel": "排班天数（1-31 天）",
+    "ruleLabel": "排班规则",
+    "ruleFairness": "平均分配（公平）",
+    "ruleMorning": "早班优先",
+    "ruleNight": "晚班优先",
+    "generate": "开始自动排班",
+    "generating": "计算中…",
+    "failed": "排班失败，请稍后再试",
+    "staffColumn": "人员名单",
+    "dayColumn": "第 {n} 天"
+  },
+  "Error": {
+    "title": "发生错误",
+    "description": "服务器响应异常，请稍后再试。",
+    "retry": "重试"
   }
 }

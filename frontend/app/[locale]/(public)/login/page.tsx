@@ -3,6 +3,7 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import PageShell from '@/components/page-shell'
 
 async function handleLogin(provider: string, redirectTo: string | null) {
     const qs = redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''
@@ -23,8 +24,8 @@ function LoginContent() {
         : null
 
     return (
-        <div className="flex flex-col items-center justify-center gap-4 pt-16">
-            <h1 className="text-2xl font-bold">{t('title')}</h1>
+        <PageShell width="form" className="flex flex-col items-center gap-4 pt-8 sm:pt-16">
+            <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">{t('title')}</h1>
             {errorMsg && (
                 <p className="text-red-500 dark:text-red-400 text-sm">{errorMsg}</p>
             )}
@@ -48,7 +49,7 @@ function LoginContent() {
                     {t('lineLogin')} <span className="text-xs">（{t('comingSoon')}）</span>
                 </button>
             </div>
-        </div>
+        </PageShell>
     )
 }
 

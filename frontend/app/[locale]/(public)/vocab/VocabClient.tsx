@@ -7,6 +7,7 @@ import { BookOpenCheck, CheckCircle2, Clock, Flame, GraduationCap, Heart, Loader
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { vocabSound } from "./sound";
+import PageTitle from "@/components/page-title";
 
 type Phase = "idle" | "playing" | "finished";
 
@@ -264,7 +265,7 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
     if (phase === "finished" && result) {
         return (
             <div className="flex flex-col gap-6">
-                <PageTitle ja={ja} t={t} />
+                <VocabHeading ja={ja} t={t} />
                 {mode === "review"
                     ? <ReviewResultCard result={result} busy={busy} onAgain={() => start("survival")} t={t} />
                     : <ScoredResultCard mode={mode} result={result} busy={busy} isMember={isMember} loginHref={loginHref} onAgain={() => start(mode)} t={t} />}
@@ -281,7 +282,7 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-start justify-between gap-2">
-                <PageTitle ja={ja} t={t} />
+                <VocabHeading ja={ja} t={t} />
                 <Link href={ja ? "/vocab" : "/vocab-ja"}
                     className="shrink-0 text-sm text-primary-600 dark:text-primary-400 hover:underline mt-1">
                     {ja ? t("switchToEn") : t("switchToJa")}
@@ -373,15 +374,18 @@ function MuteButton({ muted, onToggle, t }: { muted: boolean; onToggle: () => vo
     );
 }
 
-function PageTitle({ ja, t }: { ja: boolean; t: T }) {
+// 標題規格走全站共用的 PageTitle，只是把圖示塞進 title 裡
+function VocabHeading({ ja, t }: { ja: boolean; t: T }) {
     return (
-        <div className="flex items-center gap-2">
-            <GraduationCap size={28} className="text-primary-500" />
-            <div>
-                <h1 className="text-2xl font-bold">{t(ja ? "titleJa" : "title")}</h1>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">{t(ja ? "subtitleJa" : "subtitle")}</p>
-            </div>
-        </div>
+        <PageTitle
+            title={
+                <span className="flex items-center gap-2">
+                    <GraduationCap size={26} className="text-primary-500" />
+                    {t(ja ? "titleJa" : "title")}
+                </span>
+            }
+            description={t(ja ? "subtitleJa" : "subtitle")}
+        />
     );
 }
 

@@ -1,102 +1,104 @@
 "use client";
 
-import { useState, useEffect, useActionState } from "react";
-import { convertTextAction } from "@/app/[locale]/(public)/tools/convert-text/actions";
-
-interface Notification {
-    type: string;
-    message: string;
-}
+import { useState, useActionState } from "react";
+import { useTranslations } from "next-intl";
+import { convertTextAction, type ConvertTextState } from "@/app/[locale]/(public)/tools/convert-text/actions";
+import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
+import Toast, { useToast } from "@/components/toast";
 
 const DIRECTIONS = [
-    { value: "s2t", label: "簡→繁" },
-    { value: "t2s", label: "繁→簡" },
+    { value: "s2t", labelKey: "s2t" },
+    { value: "t2s", labelKey: "t2s" },
 ] as const;
 
+const inputClass =
+    "w-full p-3 text-base border border-neutral-300 rounded-md bg-white dark:bg-neutral-800 dark:border-neutral-600";
+
 export default function ConvertText() {
-    const initialState = { status: null, message: null, converted_text: '' };
+    const t = useTranslations("ConvertText");
+    const initialState: ConvertTextState = { status: null, messageKey: null, converted_text: '' };
     const [state, formAction, isPending] = useActionState(convertTextAction, initialState);
-    const [notification, setNotification] = useState<Notification | null>(null);
     const [direction, setDirection] = useState<"s2t" | "t2s">("s2t");
+    const { toast, showToast } = useToast();
 
     const handleCopy = async () => {
         if (!state.converted_text.trim()) {
-            setNotification({ type: "error", message: "沒有可以複製的文本" });
+            showToast("error", t("copyEmpty"));
             return;
         }
         try {
             await navigator.clipboard.writeText(state.converted_text);
-            setNotification({ type: "success", message: "文本已成功複製到剪貼板" });
+            showToast("success", t("copySuccess"));
         } catch {
-            setNotification({ type: "error", message: "複製失敗，請手動嘗試" });
+            showToast("error", t("copyFail"));
         }
     };
 
-    // action state 變更時同步 notification（adjust-state-during-render 模式，取代 useEffect）
+    // action state 變更時同步提示（adjust-state-during-render 模式，取代 useEffect）
     const [prevState, setPrevState] = useState(state);
     if (prevState !== state) {
         setPrevState(state);
-        if (state.status && state.message) {
-            setNotification({ type: state.status, message: state.message });
+        if (state.status && state.messageKey) {
+            showToast(state.status, t(state.messageKey));
         }
     }
 
-    useEffect(() => {
-        if (notification) {
-            const timer = setTimeout(() => setNotification(null), 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [notification]);
-
     return (
-        <div className="w-full h-[calc(100svh-120px)] overflow-auto flex flex-col items-center">
-            <h1 className="text-2xl font-bold mb-4">中文轉換</h1>
-            <form action={formAction} className="w-4/6 flex flex-col items-center">
+        <PageShell width="form" className="flex flex-col gap-6">
+            <PageTitle title={t("title")} />
+
+            <form action={formAction} className="flex flex-col gap-3">
                 <input type="hidden" name="direction" value={direction} />
-                <div className="flex gap-2 mb-3">
-                    {DIRECTIONS.map(({ value, label }) => (
+                <div className="flex flex-wrap gap-2">
+                    {DIRECTIONS.map(({ value, labelKey }) => (
                         <button
                             key={value}
                             type="button"
                             onClick={() => setDirection(value)}
-                            className={`px-4 py-1.5 rounded-md border text-sm font-medium transition-colors ${direction === value ? "bg-primary-500 text-white border-primary-500" : "border-neutral-300 hover:border-primary-400 dark:border-neutral-600"}`}
+                            aria-pressed={direction === value}
+                            className={`px-4 py-1.5 rounded-md border text-sm font-medium transition-colors ${direction === value
+                                ? "bg-primary-500 text-white border-primary-500"
+                                : "border-neutral-300 hover:border-primary-400 dark:border-neutral-600"}`}
                         >
-                            {label}
+                            {t(labelKey)}
                         </button>
                     ))}
                 </div>
                 <textarea
                     name="inputText"
                     rows={5}
-                    placeholder={direction === "s2t" ? "請輸入簡體中文" : "請輸入繁體中文"}
-                    className="w-full mb-3 p-3 text-lg border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-600"
+                    aria-label={t("title")}
+                    placeholder={direction === "s2t" ? t("placeholderS2t") : t("placeholderT2s")}
+                    className={inputClass}
                 />
                 <button
                     type="submit"
-                    className="px-5 py-2 text-lg bg-primary-500 text-white rounded-md hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-400 mb-3"
+                    className="self-start px-5 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600 disabled:opacity-50 transition-colors"
                     disabled={isPending}
                 >
-                    {isPending ? "處理中..." : "轉換"}
+                    {isPending ? t("converting") : t("convert")}
                 </button>
             </form>
-            <h2 className="text-xl font-semibold mb-2">轉換結果：</h2>
-            <textarea
-                rows={5}
-                readOnly
-                value={state.converted_text}
-                className="w-4/6 p-3 text-lg border border-neutral-300 rounded-md bg-neutral-100 dark:bg-neutral-700 dark:border-neutral-600"
-            />
-            <button
-                onClick={handleCopy}
-                className="px-5 py-2 text-lg bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 mt-3"
-            >
-                複製結果
-            </button>
-            {notification && (
-                <div className={`fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 px-4 py-2 rounded-md shadow-lg text-white ${notification.type === "success" ? "bg-green-500" : "bg-red-500"}`}>
-                    {notification.message}
-                </div>
-            )}
-        </div>
+
+            <div className="flex flex-col gap-3">
+                <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">{t("resultLabel")}</h2>
+                <textarea
+                    rows={5}
+                    readOnly
+                    aria-label={t("resultLabel")}
+                    value={state.converted_text}
+                    className={`${inputClass} bg-neutral-100 dark:bg-neutral-700`}
+                />
+                <button
+                    onClick={handleCopy}
+                    className="self-start px-5 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                >
+                    {t("copy")}
+                </button>
+            </div>
+
+            <Toast toast={toast} />
+        </PageShell>
     );
 }

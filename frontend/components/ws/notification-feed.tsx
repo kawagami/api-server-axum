@@ -1,6 +1,8 @@
 "use client";
 
 import { useWsContext } from "@/libs/ws-context";
+import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
 import { useEffect, useState } from "react";
 import type { WsEventType } from "@/types";
 
@@ -43,25 +45,23 @@ export default function NotificationFeed() {
     }, [subscribe, unsubscribe]);
 
     return (
-        <div className="w-full h-[calc(100svh-120px)] overflow-auto p-6">
-            <div className="max-w-2xl mx-auto flex flex-col gap-3">
-                <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">WS Notifications</h1>
-                {entries.length === 0 ? (
-                    <p className="text-neutral-500 dark:text-neutral-400 text-sm">Waiting for events…</p>
-                ) : (
-                    entries.map(entry => (
-                        <div key={entry.key} className="bg-white dark:bg-neutral-800 rounded-lg p-4 shadow text-sm font-mono">
-                            <div className="flex items-center gap-3 mb-1">
-                                <span className="text-primary-600 dark:text-primary-400 font-semibold">{entry.type}</span>
-                                <span className="text-neutral-400 text-xs">{entry.ts}</span>
-                            </div>
-                            <pre className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap break-all text-xs">
-                                {JSON.stringify(entry.data, null, 2)}
-                            </pre>
+        <PageShell width="form" className="flex flex-col gap-3">
+            <PageTitle title="WS Notifications" />
+            {entries.length === 0 ? (
+                <p className="text-neutral-500 dark:text-neutral-400 text-sm">Waiting for events…</p>
+            ) : (
+                entries.map(entry => (
+                    <div key={entry.key} className="bg-white dark:bg-neutral-800 rounded-lg p-4 shadow text-sm font-mono">
+                        <div className="flex items-center gap-3 mb-1">
+                            <span className="text-primary-600 dark:text-primary-400 font-semibold">{entry.type}</span>
+                            <span className="text-neutral-400 text-xs">{entry.ts}</span>
                         </div>
-                    ))
-                )}
-            </div>
-        </div>
+                        <pre className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap break-all text-xs">
+                            {JSON.stringify(entry.data, null, 2)}
+                        </pre>
+                    </div>
+                ))
+            )}
+        </PageShell>
     );
 }

@@ -5,8 +5,12 @@ import TimerControls from './timer-controls';
 import TimerSettings from './timer-settings';
 import useTimer from '@/hooks/useTimer';
 import { useAudioBeeper } from '@/hooks/useAudioBeeper';
+import { useTranslations } from 'next-intl';
+import PageShell from '@/components/page-shell';
+import PageTitle from '@/components/page-title';
 
 export default function Timer() {
+    const t = useTranslations('Countdown');
     const {
         minutes,
         setMinutes,
@@ -28,9 +32,9 @@ export default function Timer() {
     };
 
     return (
-        <div className="h-[calc(100svh-120px)] overflow-auto flex flex-col items-center justify-center p-4">
-            <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-8 w-full max-w-md">
-                <h1 className="text-4xl font-extrabold text-center mb-6 text-primary-600 dark:text-primary-400">倒數計時器</h1>
+        <PageShell width="form" className="flex flex-col gap-6">
+            <PageTitle title={t('title')} />
+            <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-6 sm:p-8">
                 <TimerSettings
                     minutes={minutes}
                     setMinutes={setMinutes}
@@ -48,6 +52,6 @@ export default function Timer() {
                 />
             </div>
             <audio ref={audioRef} src="/beep.mp3" loop />
-        </div>
+        </PageShell>
     );
 }

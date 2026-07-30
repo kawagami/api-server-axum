@@ -3,6 +3,8 @@ import NotifySettingsClient from "@/components/invoices/NotifySettingsClient";
 import InvoiceNav from "@/components/invoices/InvoiceNav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
+import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Invoices');
@@ -16,10 +18,10 @@ export default async function InvoiceSettingsPage() {
     ]);
 
     return (
-        <div className="w-full max-w-2xl px-4 py-8">
-            <h1 className="text-2xl font-bold mb-6">{t('settingsTitle')}</h1>
+        <PageShell width="form" className="flex flex-col gap-6">
+            <PageTitle title={t('settingsTitle')} />
             <InvoiceNav />
             <NotifySettingsClient hasEmail={!!member.email} email={member.email} initialEnabled={member.lottery_notify_enabled} />
-        </div>
+        </PageShell>
     );
 }

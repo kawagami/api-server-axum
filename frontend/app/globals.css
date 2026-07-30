@@ -39,14 +39,39 @@
     "Yu Gothic", Meiryo, sans-serif;
 }
 
-/* ===== 後台統一焦點樣式 =====
-   後台（.admin-shell，由 app/admin/layout.tsx 掛上）的互動元素不逐一寫 focus-visible:ring，
-   一律由這條規則提供可見焦點 —— 純鍵盤操作必須看得出游標在哪，而逐一補 class 一定會漏。
-   特異度（0,2,1）高於 Tailwind 的 .focus\:outline-none:focus（0,2,0），
+/* ===== 全站統一焦點樣式 =====
+   互動元素不逐一寫 focus-visible:ring，一律由這條規則提供可見焦點 ——
+   純鍵盤操作必須看得出游標在哪，而逐一補 class 一定會漏（前台 163 個 button 只有 51 處有 ring）。
+   原本只套 .admin-shell，現在提到全域，前後台一致。
+   :focus-visible 只在鍵盤操作時出現，滑鼠點擊不會有框，所以不影響既有觀感。
+   特異度（0,1,1）高於 Tailwind 的 .focus\:outline-none:focus（0,1,0），
    所以元件自帶的 outline-none 不會把它蓋掉。outline 會自動跟隨元素的 border-radius。 */
-.admin-shell :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+:is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid rgb(var(--primary-500));
   outline-offset: 2px;
+}
+
+/* 跳至主要內容：平常隱藏，鍵盤 Tab 到才浮出（前台 layout 的第一個可聚焦元素） */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 60;
+  transform: translateY(-200%);
+  transition: transform 0.15s ease-out;
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* 錨點捲動要避開 sticky header（TOC、留言區連結都靠這個） */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 66px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .skip-link { transition: none; }
 }
 
 /* ===== 後台長清單的黏住表頭 =====

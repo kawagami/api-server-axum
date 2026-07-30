@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from 'react';
+import { useTranslations } from 'next-intl';
 
 interface Props {
     minutes: number;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function TimerSettings({ minutes, setMinutes, disabled, onEnterPress }: Props) {
+    const t = useTranslations('Countdown');
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -26,7 +28,7 @@ export default function TimerSettings({ minutes, setMinutes, disabled, onEnterPr
 
     return (
         <form onSubmit={handleSubmit} className="mb-6">
-            <label className="text-lg font-medium block mb-2 text-neutral-700 dark:text-neutral-300">設定分鐘數：</label>
+            <label className="text-lg font-medium block mb-2 text-neutral-700 dark:text-neutral-300">{t('minutesLabel')}</label>
             <div className="relative">
                 <input
                     ref={inputRef}

@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import VocabClient from "../vocab/VocabClient";
+import PageShell from "@/components/page-shell";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Vocab");
@@ -19,12 +20,12 @@ export default async function VocabJaPage() {
     const leaderboard = await getVocabLeaderboard("ja", "weekly").catch(() => null);
 
     return (
-        <div className="w-full max-w-2xl px-4 py-8 flex flex-col gap-6">
+        <PageShell width="form" className="flex flex-col gap-6">
             <VocabClient initialMe={me} initialMistakes={mistakes} language="ja" initialLeaderboard={leaderboard} />
             {/* JMdict 為 CC BY-SA 授權,出處標註是硬需求 */}
             <p className="text-xs text-neutral-400 dark:text-neutral-500 text-center">
                 {t("jmdictAttribution")}
             </p>
-        </div>
+        </PageShell>
     );
 }

@@ -3,6 +3,8 @@ import LottoListClient from "@/components/lotto/LottoListClient";
 import LottoNav from "@/components/lotto/LottoNav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
+import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Lotto');
@@ -16,10 +18,10 @@ export default async function LottoPage() {
     ]);
 
     return (
-        <div className="w-full max-w-4xl px-4 py-8">
-            <h1 className="text-2xl font-bold mb-6">{t('myTicketsTitle')}</h1>
+        <PageShell className="flex flex-col gap-6">
+            <PageTitle title={t('myTicketsTitle')} />
             <LottoNav />
             <LottoListClient initialEntries={entries} />
-        </div>
+        </PageShell>
     );
 }

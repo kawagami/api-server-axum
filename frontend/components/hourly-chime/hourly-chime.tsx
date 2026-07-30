@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, BellOff } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { startSecondTick } from '@/libs/second-tick';
+import PageShell from '@/components/page-shell';
+import PageTitle from '@/components/page-title';
 
 function msToNextHour(): number {
     const now = new Date();
@@ -19,6 +22,7 @@ function formatTimeLeft(ms: number): string {
 }
 
 export default function HourlyChime() {
+    const t = useTranslations('HourlyChime');
     const [enabled, setEnabled] = useState(false);
     const [currentTime, setCurrentTime] = useState('');
     const [timeLeft, setTimeLeft] = useState('');
@@ -47,14 +51,15 @@ export default function HourlyChime() {
             playBell(ctx, ctx.currentTime + i * gap);
         }
         setTimeout(() => {
-            const utterance = new SpeechSynthesisUtterance(`現在 ${hour} 點整`);
-            utterance.lang = 'zh-TW';
+            // 語音內容與發音語系都跟著當前 locale 走（speechLang 是各語系檔自己給的 BCP 47 值）
+            const utterance = new SpeechSynthesisUtterance(t('speech', { hour }));
+            utterance.lang = t('speechLang');
             utterance.rate = 0.75;
             utterance.volume = 1;
             speechSynthesis.speak(utterance);
         }, 3 * gap * 1000);
         setLastChime(`${hour.toString().padStart(2, '0')}:00`);
-    }, []);
+    }, [t]);
 
     useEffect(() => {
         if (!enabled) {
@@ -85,11 +90,10 @@ export default function HourlyChime() {
     }, []);
 
     return (
-        <div className="h-[calc(100svh-120px)] overflow-auto flex flex-col items-center justify-center p-4">
-            <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-8 w-full max-w-md flex flex-col items-center gap-6">
-                <h1 className="text-4xl font-extrabold text-center text-primary-600 dark:text-primary-400">整點報時</h1>
-
-                <div className="text-6xl font-mono font-bold text-neutral-800 dark:text-neutral-100 tabular-nums">
+        <PageShell width="form" className="flex flex-col gap-6">
+            <PageTitle title={t('title')} />
+            <div className="bg-white dark:bg-neutral-800 shadow-lg rounded-lg p-6 sm:p-8 flex flex-col items-center gap-6">
+                <div className="text-5xl sm:text-6xl font-mono font-bold text-neutral-800 dark:text-neutral-100 tabular-nums">
                     {currentTime || '--:--:--'}
                 </div>
 
@@ -102,17 +106,17 @@ export default function HourlyChime() {
                     }`}
                 >
                     {enabled ? <Bell size={20} /> : <BellOff size={20} />}
-                    {enabled ? '報時中' : '已停用'}
+                    {enabled ? t('on') : t('off')}
                 </button>
 
                 <div className="w-full bg-neutral-100 dark:bg-neutral-700 rounded-lg p-4 flex flex-col gap-2 text-sm text-neutral-600 dark:text-neutral-400">
                     <div className="flex justify-between">
-                        <span>距下一個整點</span>
+                        <span>{t('nextChime')}</span>
                         <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200">{timeLeft || '--:--'}</span>
                     </div>
                     {lastChime && (
                         <div className="flex justify-between">
-                            <span>最近報時</span>
+                            <span>{t('lastChime')}</span>
                             <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200">{lastChime}</span>
                         </div>
                     )}
@@ -120,10 +124,10 @@ export default function HourlyChime() {
 
                 {!enabled && (
                     <p className="text-xs text-neutral-400 dark:text-neutral-500 text-center">
-                        開啟後，每個整點自動播報語音
+                        {t('hint')}
                     </p>
                 )}
             </div>
-        </div>
+        </PageShell>
     );
 }

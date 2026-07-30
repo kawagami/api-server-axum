@@ -4,6 +4,8 @@ import { Link } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { GraduationCap, LayoutDashboard } from "lucide-react";
+import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Profile");
@@ -29,17 +31,19 @@ export default async function ProfilePage() {
         : 100;
 
     return (
-        <div className="w-full max-w-2xl px-4 py-8 flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">{t("title")}</h1>
-                <Link
-                    href="/dashboard"
-                    className="flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400 hover:text-primary-500 dark:hover:text-primary-400"
-                >
-                    <LayoutDashboard size={16} />
-                    {t("dashboard")}
-                </Link>
-            </div>
+        <PageShell width="form" className="flex flex-col gap-6">
+            <PageTitle
+                title={t("title")}
+                actions={
+                    <Link
+                        href="/dashboard"
+                        className="flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+                    >
+                        <LayoutDashboard size={16} />
+                        {t("dashboard")}
+                    </Link>
+                }
+            />
 
             <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
                 <div className="flex items-center gap-4">
@@ -105,6 +109,6 @@ export default async function ProfilePage() {
                     </div>
                 )}
             </div>
-        </div>
+        </PageShell>
     );
 }

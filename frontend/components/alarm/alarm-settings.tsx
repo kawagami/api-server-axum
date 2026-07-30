@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from 'react';
+import { useTranslations } from 'next-intl';
 
 interface Props {
     hour: number;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function AlarmSettings({ hour, setHour, minute, setMinute, disabled, onEnterPress }: Props) {
+    const t = useTranslations('Alarm');
     const hourRef = useRef<HTMLInputElement>(null);
     const minuteRef = useRef<HTMLInputElement>(null);
 
@@ -29,7 +31,7 @@ export default function AlarmSettings({ hour, setHour, minute, setMinute, disabl
 
     return (
         <form onSubmit={handleSubmit} className="mb-6">
-            <label className="text-lg font-medium block mb-2 text-neutral-700 dark:text-neutral-300">設定鬧鐘時間：</label>
+            <label className="text-lg font-medium block mb-2 text-neutral-700 dark:text-neutral-300">{t('timeLabel')}</label>
             <div className="flex items-center gap-2">
                 <input
                     ref={hourRef}
@@ -58,7 +60,7 @@ export default function AlarmSettings({ hour, setHour, minute, setMinute, disabl
                 />
             </div>
             <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400 text-center">
-                鬧鐘設定：{String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
+                {t('setAt', { time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}` })}
             </p>
             <button type="submit" className="hidden" />
         </form>

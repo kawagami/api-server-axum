@@ -56,7 +56,8 @@
     "gameAvalon": "Online Avalon",
     "gameFarm": "Farm Manager",
     "gameMetalSlug": "Metal Slug",
-    "blog": "Blog"
+    "blog": "Blog",
+    "skipToContent": "Skip to main content"
   },
   "Login": {
     "title": "Login",
@@ -66,11 +67,14 @@
     "comingSoon": "Coming soon",
     "errorDefault": "Login failed, please try again",
     "errorOauthFailed": "Login failed, please try again",
-    "errorOauthDenied": "Authorization cancelled"
+    "errorOauthDenied": "Authorization cancelled",
+    "metaTitle": "Login",
+    "metaDescription": "Sign in with an OAuth account to use member features."
   },
   "NotFound": {
     "title": "404 - Page Not Found",
-    "backHome": "Back to Home"
+    "backHome": "Back to Home",
+    "description": "There is no page at this address — it may have been removed or mistyped."
   },
   "Portfolio": {
     "title": "Portfolio",
@@ -185,9 +189,9 @@
     "authorHeading": "Posts by {author}",
     "empty": "No matching posts yet",
     "all": "All",
-    "metaTitle": "Kawa's Blog",
-    "metaTaggedTitle": "Tag: {tag} | Kawa's Blog",
-    "metaAuthorTitle": "Posts by {author} | Kawa's Blog",
+    "metaTitle": "Blog",
+    "metaTaggedTitle": "Tag: {tag}",
+    "metaAuthorTitle": "Posts by {author}",
     "metaDescription": "Kawa's personal blog — notes on programming, backend, frontend, and developer tools.",
     "searchPlaceholder": "Search posts…",
     "searchClear": "Clear search",
@@ -261,7 +265,9 @@
     "linksHeading": "Links",
     "github": "Source on GitHub",
     "contact": "Leave a message",
-    "home": "Back home to explore"
+    "home": "Back home to explore",
+    "metaTitle": "About",
+    "metaDescription": "About kawa's personal site: stack, principles and contact."
   },
   "Ws": {
     "title": "WS Notifications",
@@ -841,7 +847,7 @@
     }
   },
   "ToolsHub": {
-    "metaTitle": "Tools — Kawa's Homes",
+    "metaTitle": "Tools",
     "metaDescription": "Handy online tools: countdown timer, alarm, hourly chime, roster scheduling, password generator, and Chinese text conversion.",
     "title": "Tools",
     "intro": "Handy online tools, ready to use — no login required.",
@@ -855,7 +861,7 @@
     }
   },
   "GamesHub": {
-    "metaTitle": "Games — Kawa's Homes",
+    "metaTitle": "Games",
     "metaDescription": "Real-time multiplayer online games: Xiangqi, Chess, Gomoku, Go, Banqi, Avalon, farm management, and more.",
     "title": "Games",
     "intro": "Real-time multiplayer battles — create a room for friends or match in the lobby.",
@@ -941,5 +947,89 @@
     "lbEmpty": "No records this period yet — be the first!",
     "lbRuns": "{count} runs",
     "lbMyRank": "My rank: #{rank} · {exp} EXP"
+  },
+  "Alarm": {
+    "title": "Alarm",
+    "timeLabel": "Alarm time",
+    "setAt": "Set for {time}",
+    "start": "Set alarm",
+    "cancel": "Cancel alarm",
+    "stop": "Stop alarm",
+    "ringing": "Time's up — alarm ringing…",
+    "idle": "Not set"
+  },
+  "Countdown": {
+    "title": "Countdown timer",
+    "minutesLabel": "Minutes",
+    "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
+    "reset": "Reset",
+    "ringing": "Time's up — alarm ringing…"
+  },
+  "HourlyChime": {
+    "title": "Hourly chime",
+    "on": "Chiming",
+    "off": "Off",
+    "nextChime": "Next chime in",
+    "lastChime": "Last chime",
+    "hint": "Once on, the time is announced every hour",
+    "speech": "It is now {hour} o'clock",
+    "speechLang": "en-US"
+  },
+  "ConvertText": {
+    "title": "Chinese conversion",
+    "s2t": "Simplified → Traditional",
+    "t2s": "Traditional → Simplified",
+    "placeholderS2t": "Enter Simplified Chinese",
+    "placeholderT2s": "Enter Traditional Chinese",
+    "convert": "Convert",
+    "converting": "Converting…",
+    "resultLabel": "Result",
+    "copy": "Copy result",
+    "copyEmpty": "Nothing to copy",
+    "copySuccess": "Copied to clipboard",
+    "copyFail": "Copy failed — please select manually",
+    "emptyInput": "Enter some text first",
+    "success": "Converted",
+    "failed": "Conversion failed — please try again"
+  },
+  "NewPassword": {
+    "title": "Password generator",
+    "countLabel": "Count",
+    "lengthLabel": "Length",
+    "generate": "Generate",
+    "generating": "Generating…",
+    "resultLabel": "Generated passwords",
+    "empty": "No passwords yet",
+    "copy": "Copy",
+    "copySuccess": "Password copied",
+    "copyFail": "Copy failed",
+    "error": "Failed to generate — please try again"
+  },
+  "Roster": {
+    "title": "Shift scheduler",
+    "paramsHeading": "Schedule settings",
+    "membersLabel": "People ({count})",
+    "namePlaceholder": "Enter a name…",
+    "addName": "Add person",
+    "removeName": "Remove",
+    "duplicateName": "That name is already on the list",
+    "emptyNames": "Add at least one person",
+    "daysLabel": "Days (1–31)",
+    "ruleLabel": "Rule",
+    "ruleFairness": "Even split (fair)",
+    "ruleMorning": "Morning-heavy",
+    "ruleNight": "Night-heavy",
+    "generate": "Generate schedule",
+    "generating": "Calculating…",
+    "failed": "Scheduling failed — please try again",
+    "staffColumn": "Person",
+    "dayColumn": "Day {n}"
+  },
+  "Error": {
+    "title": "Something went wrong",
+    "description": "The server returned an error. Please try again shortly.",
+    "retry": "Try again"
   }
 }
