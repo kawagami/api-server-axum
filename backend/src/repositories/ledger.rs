@@ -4,7 +4,7 @@ use crate::{
 };
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
-use sqlx::{Pool, Postgres};
+use sqlx::{PgConnection, Pool, Postgres};
 use uuid::Uuid;
 
 const COLS: &str = "id, member_id, kind, amount, category, note, occurred_at, \
@@ -61,9 +61,10 @@ pub async fn create(
 }
 
 /// 從掃描的發票建立一筆 expense。發票號碼重複（unique 違反）回 409。
+/// 由 caller 持有 transaction（與 invoices 的寫入必須同生同死）。
 #[allow(clippy::too_many_arguments)]
-pub async fn create_from_invoice(
-    pool: &Pool<Postgres>,
+pub async fn create_from_invoice_in_tx(
+    conn: &mut PgConnection,
     member_id: i64,
     amount: Decimal,
     category: &str,
@@ -85,7 +86,7 @@ pub async fn create_from_invoice(
     .bind(occurred_at)
     .bind(invoice_number)
     .bind(seller_tax_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await;
 
     match result {

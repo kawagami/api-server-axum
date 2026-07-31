@@ -11,6 +11,7 @@ use crate::{
     },
 };
 use regex::Regex;
+use rust_decimal::Decimal;
 use sqlx::{Pool, Postgres};
 use std::sync::OnceLock;
 use uuid::Uuid;
@@ -26,6 +27,25 @@ fn unprocessable(msg: &str) -> AppError {
     RequestError::UnprocessableContent(msg.to_string()).into()
 }
 
+/// 取出並驗證「順便記一筆支出」需要的欄位；`record_as_expense=false` 時回 None。
+///
+/// 抽成純函式是為了讓這段**保證跑在任何寫入之前**——先前的版本在發票已 INSERT
+/// 之後才驗 amount/category，回 422 的同時發票已落地，使用者重試就撞 unique
+/// violation 變 409「已登錄過」，那張發票從此既登不進去也拿不到帳目。
+fn expense_fields(req: &InvoiceRequest) -> Result<Option<(Decimal, String)>, AppError> {
+    if !req.record_as_expense {
+        return Ok(None);
+    }
+    let amount = req
+        .amount
+        .ok_or_else(|| unprocessable("record_as_expense 為 true 時必須提供 amount"))?;
+    let category = req.category.clone().unwrap_or_else(|| "other".to_string());
+    if !EXPENSE_CATEGORIES.iter().any(|(v, _)| *v == category) {
+        return Err(unprocessable("category 不是合法的支出分類"));
+    }
+    Ok(Some((amount, category)))
+}
+
 /// 登錄發票（前門）；record_as_expense 時一併建 ledger 並連結
 pub async fn register(
     pool: &Pool<Postgres>,
@@ -39,35 +59,35 @@ pub async fn register(
         return Err(unprocessable("source 必須為 qr / barcode / manual"));
     }
 
+    let expense = expense_fields(req)?;
     let period = period_of_date(req.invoice_date);
-    let invoice = invoices_repo::create(pool, member_id, req, &period).await?;
 
-    if !req.record_as_expense {
-        return Ok(invoice);
-    }
+    // 三次寫入（invoices → ledger_entries → 回寫 ledger_entry_id）包同一 transaction：
+    // 中途失敗若各自 commit，會留下孤兒 ledger 支出 + ledger_entry_id 為 NULL 的發票，
+    // 而重試又被 unique violation 擋成 409，等於永久卡死。
+    let mut tx = pool.begin().await?;
+    let invoice = invoices_repo::create_in_tx(&mut tx, member_id, req, &period).await?;
 
-    // 同時記成一筆支出
-    let amount = req
-        .amount
-        .ok_or_else(|| unprocessable("record_as_expense 為 true 時必須提供 amount"))?;
-    let category = req.category.clone().unwrap_or_else(|| "other".to_string());
-    if !EXPENSE_CATEGORIES.iter().any(|(v, _)| *v == category) {
-        return Err(unprocessable("category 不是合法的支出分類"));
-    }
+    let result = match expense {
+        None => invoice,
+        Some((amount, category)) => {
+            let entry = ledger_repo::create_from_invoice_in_tx(
+                &mut tx,
+                member_id,
+                amount,
+                &category,
+                req.note.as_deref(),
+                req.invoice_date,
+                &req.invoice_number,
+                req.seller_tax_id.as_deref(),
+            )
+            .await?;
+            invoices_repo::link_ledger_in_tx(&mut tx, invoice.id, entry.id).await?
+        }
+    };
 
-    let entry = ledger_repo::create_from_invoice(
-        pool,
-        member_id,
-        amount,
-        &category,
-        req.note.as_deref(),
-        req.invoice_date,
-        &req.invoice_number,
-        req.seller_tax_id.as_deref(),
-    )
-    .await?;
-
-    invoices_repo::link_ledger(pool, invoice.id, entry.id).await
+    tx.commit().await?;
+    Ok(result)
 }
 
 pub async fn list(
@@ -128,4 +148,49 @@ pub async fn admin_set_numbers(
     invoices_repo::upsert_period_numbers(pool, &req.period, &nums).await?;
     invoices_repo::reset_period_check(pool, &req.period).await?;
     Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+
+    fn req(record_as_expense: bool, amount: Option<i64>, category: Option<&str>) -> InvoiceRequest {
+        InvoiceRequest {
+            invoice_number: "AB12345678".to_string(),
+            invoice_date: NaiveDate::from_ymd_opt(2026, 7, 1).unwrap(),
+            amount: amount.map(Decimal::from),
+            seller_tax_id: None,
+            source: "manual".to_string(),
+            record_as_expense,
+            category: category.map(str::to_string),
+            note: None,
+        }
+    }
+
+    #[test]
+    fn no_expense_requested_needs_no_amount() {
+        assert!(expense_fields(&req(false, None, None)).unwrap().is_none());
+    }
+
+    #[test]
+    fn expense_defaults_category_to_other() {
+        let (amount, category) = expense_fields(&req(true, Some(120), None))
+            .unwrap()
+            .expect("record_as_expense=true 應回 Some");
+        assert_eq!(amount, Decimal::from(120));
+        assert_eq!(category, "other");
+    }
+
+    /// 這兩條守的是「驗證必須早於任何寫入」：只要 expense_fields 先擋下來，
+    /// 發票就不會落地，使用者才有重試的機會（否則重試會撞 unique 變 409 永久卡死）。
+    #[test]
+    fn expense_without_amount_is_rejected() {
+        assert!(expense_fields(&req(true, None, Some("food"))).is_err());
+    }
+
+    #[test]
+    fn expense_with_unknown_category_is_rejected() {
+        assert!(expense_fields(&req(true, Some(50), Some("not_a_category"))).is_err());
+    }
 }

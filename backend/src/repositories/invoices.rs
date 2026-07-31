@@ -3,15 +3,16 @@ use crate::{
     services::invoice_lottery::PeriodNumbers,
     structs::invoices::{Invoice, InvoiceListQuery, InvoiceRequest, PeriodDraw, WinnerRow},
 };
-use sqlx::{Pool, Postgres};
+use sqlx::{PgConnection, Pool, Postgres};
 use uuid::Uuid;
 
 const COLS: &str = "id, member_id, invoice_number, invoice_date, period, amount, seller_tax_id, \
      source, ledger_entry_id, lottery_checked, prize_tier, notified_at, created_at, updated_at";
 
-/// 登錄一張發票；同 member 同號碼重複（unique 違反）回 409
-pub async fn create(
-    pool: &Pool<Postgres>,
+/// 登錄一張發票；同 member 同號碼重複（unique 違反）回 409。
+/// 由 caller 持有 transaction（登錄可能連帶寫 ledger，兩者必須同生同死）。
+pub async fn create_in_tx(
+    conn: &mut PgConnection,
     member_id: i64,
     req: &InvoiceRequest,
     period: &str,
@@ -29,7 +30,7 @@ pub async fn create(
     .bind(req.amount)
     .bind(&req.seller_tax_id)
     .bind(&req.source)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await;
 
     match result {
@@ -41,8 +42,8 @@ pub async fn create(
     }
 }
 
-pub async fn link_ledger(
-    pool: &Pool<Postgres>,
+pub async fn link_ledger_in_tx(
+    conn: &mut PgConnection,
     id: Uuid,
     ledger_entry_id: Uuid,
 ) -> Result<Invoice, AppError> {
@@ -51,7 +52,7 @@ pub async fn link_ledger(
     ))
     .bind(ledger_entry_id)
     .bind(id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(row)
 }
