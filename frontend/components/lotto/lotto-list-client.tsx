@@ -7,7 +7,7 @@ import { Trash2, Loader2, QrCode, Keyboard, Trophy, Plus, X } from "lucide-react
 import { getLottoTickets, deleteLottoTicket } from "@/api/lotto";
 import usePagedList from "@/hooks/usePagedList";
 import { GAME_KEY, PRIZE_KEY } from "@/libs/lotto";
-import Balls from "@/components/lotto/Balls";
+import Balls from "@/components/lotto/balls";
 import type { LottoTicket, LottoSource, LottoGame, LottoStatus } from "@/types";
 
 const PER_PAGE = 50;

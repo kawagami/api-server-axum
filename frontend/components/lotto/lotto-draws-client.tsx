@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { getLottoDraws } from "@/api/lotto";
 import { GAME_KEY, LOTTO_GAMES } from "@/libs/lotto";
-import Balls from "@/components/lotto/Balls";
+import Balls from "@/components/lotto/balls";
 import type { LottoDraw, LottoGame } from "@/types";
 
 const LIMIT = 20;

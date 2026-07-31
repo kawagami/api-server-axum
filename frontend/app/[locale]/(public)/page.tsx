@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { localeAlternates } from '@/libs/seo';
-import ProjectIntro from '@/components/home/project-intro';
+import ProjectIntro from './project-intro';
 
 interface Props {
     params: Promise<{ locale: string }>

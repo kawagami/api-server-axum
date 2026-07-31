@@ -7,9 +7,9 @@ import { Loader2, CheckCircle2, Shuffle, Plus, Trash2, Keyboard, Camera } from "
 import { postLotto } from "@/api/lotto";
 import { GAME_SPECS, LOTTO_GAMES, GAME_KEY, nextDrawDate, isNoteValid, quickPick } from "@/libs/lotto";
 import { parseLottoOcr } from "@/libs/lotto-ocr";
-import NumberGrid from "@/components/lotto/NumberGrid";
-import Balls from "@/components/lotto/Balls";
-import LottoOcrScanner from "@/components/lotto/LottoOcrScanner";
+import NumberGrid from "@/components/lotto/number-grid";
+import Balls from "@/components/lotto/balls";
+import LottoOcrScanner from "@/components/lotto/lotto-ocr-scanner";
 import type { LottoGame, LottoNote, LottoInput } from "@/types";
 
 type Mode = 'manual' | 'ocr';

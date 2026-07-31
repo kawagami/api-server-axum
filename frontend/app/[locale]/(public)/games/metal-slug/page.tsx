@@ -1,4 +1,4 @@
-import MetalSlugGame from "@/components/games/metal-slug-game";
+import MetalSlugGame from "./metal-slug-game";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 

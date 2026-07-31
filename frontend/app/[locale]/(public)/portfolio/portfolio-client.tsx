@@ -7,8 +7,8 @@ import { Plus, Pencil, Trash2, BarChart2 } from "lucide-react";
 import { postPortfolio } from "@/api/portfolio";
 import { putPortfolio } from "@/api/portfolio";
 import { deletePortfolio } from "@/api/portfolio";
-import PortfolioForm from "@/components/portfolio/PortfolioForm";
-import StockHistoryTable from "@/components/portfolio/StockHistoryTable";
+import PortfolioForm from "./portfolio-form";
+import StockHistoryTable from "./stock-history-table";
 import type { PortfolioSummaryEntry, PortfolioEntryInput } from "@/types";
 
 interface Props {

@@ -1,5 +1,5 @@
 import { getPortfolioSummary } from "@/api/portfolio";
-import PortfolioClient from "@/components/portfolio/PortfolioClient";
+import PortfolioClient from "./portfolio-client";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";

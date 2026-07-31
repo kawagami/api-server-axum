@@ -2,7 +2,7 @@ import { getVocabLeaderboard, getVocabMe, getVocabMistakes } from "@/api/vocab";
 import { getTranslations } from "next-intl/server";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
-import VocabClient from "./VocabClient";
+import VocabClient from "./vocab-client";
 import PageShell from "@/components/page-shell";
 
 export async function generateMetadata(): Promise<Metadata> {

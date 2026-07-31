@@ -1,6 +1,6 @@
 import { getLottoTickets } from "@/api/lotto";
-import LottoListClient from "@/components/lotto/LottoListClient";
-import LottoNav from "@/components/lotto/LottoNav";
+import LottoListClient from "@/components/lotto/lotto-list-client";
+import LottoNav from "@/components/lotto/lotto-nav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import PageShell from "@/components/page-shell";

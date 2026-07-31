@@ -5,9 +5,9 @@ import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2, Loader2, X, ScanLine, Receipt } from "lucide-react";
 import { getLedger, getLedgerSummary, postLedger, putLedger, deleteLedger } from "@/api/ledger";
 import usePagedList from "@/hooks/usePagedList";
-import LedgerForm from "@/components/ledger/LedgerForm";
-import InvoiceImportModal from "@/components/ledger/InvoiceImportModal";
-import { CategoryPie, MonthlyBars } from "@/components/ledger/ledger-charts";
+import LedgerForm from "./ledger-form";
+import InvoiceImportModal from "./invoice-import-modal";
+import { CategoryPie, MonthlyBars } from "./ledger-charts";
 import type { LedgerEntry, LedgerInput, LedgerSummary, LedgerCategories, LedgerKind } from "@/types";
 
 const PER_PAGE = 50;

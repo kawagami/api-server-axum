@@ -1,6 +1,6 @@
 import { getCurrentMember } from "@/api/members";
-import LottoNotifySettingsClient from "@/components/lotto/LottoNotifySettingsClient";
-import LottoNav from "@/components/lotto/LottoNav";
+import LottoNotifySettingsClient from "@/components/lotto/lotto-notify-settings-client";
+import LottoNav from "@/components/lotto/lotto-nav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import PageShell from "@/components/page-shell";

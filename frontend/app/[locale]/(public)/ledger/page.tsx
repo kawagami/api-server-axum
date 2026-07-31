@@ -1,5 +1,5 @@
 import { getLedgerCategories, getLedger, getLedgerSummary } from "@/api/ledger";
-import LedgerClient from "@/components/ledger/LedgerClient";
+import LedgerClient from "./ledger-client";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";

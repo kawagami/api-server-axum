@@ -1,6 +1,6 @@
 import { getLedgerCategories } from "@/api/ledger";
-import InvoiceRegisterClient from "@/components/invoices/InvoiceRegisterClient";
-import InvoiceNav from "@/components/invoices/InvoiceNav";
+import InvoiceRegisterClient from "@/components/invoices/invoice-register-client";
+import InvoiceNav from "@/components/invoices/invoice-nav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import PageShell from "@/components/page-shell";

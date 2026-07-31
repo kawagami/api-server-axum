@@ -1,6 +1,6 @@
 import "./globals.css";
 import { WsProvider } from "@/libs/ws-context";
-import ThemeBackground from "@/components/ThemeBackground";
+import ThemeBackground from "@/components/theme-background";
 import { getPublicSettings } from "@/api/settings";
 import { resolveActiveTheme, normalizeRotation } from "@/libs/site-theme";
 import { resolveDefaultColorMode } from "@/libs/color-mode";

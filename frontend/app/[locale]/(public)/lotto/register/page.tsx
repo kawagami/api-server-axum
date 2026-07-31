@@ -1,5 +1,5 @@
-import LottoRegisterClient from "@/components/lotto/LottoRegisterClient";
-import LottoNav from "@/components/lotto/LottoNav";
+import LottoRegisterClient from "@/components/lotto/lotto-register-client";
+import LottoNav from "@/components/lotto/lotto-nav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import PageShell from "@/components/page-shell";

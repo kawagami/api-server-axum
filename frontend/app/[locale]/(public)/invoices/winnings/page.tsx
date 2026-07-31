@@ -1,6 +1,6 @@
 import { getInvoices } from "@/api/invoices";
-import InvoiceListClient from "@/components/invoices/InvoiceListClient";
-import InvoiceNav from "@/components/invoices/InvoiceNav";
+import InvoiceListClient from "@/components/invoices/invoice-list-client";
+import InvoiceNav from "@/components/invoices/invoice-nav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import PageShell from "@/components/page-shell";

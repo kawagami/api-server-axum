@@ -1,6 +1,6 @@
 import { getCurrentMember } from "@/api/members";
-import NotifySettingsClient from "@/components/invoices/NotifySettingsClient";
-import InvoiceNav from "@/components/invoices/InvoiceNav";
+import NotifySettingsClient from "@/components/invoices/notify-settings-client";
+import InvoiceNav from "@/components/invoices/invoice-nav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import PageShell from "@/components/page-shell";

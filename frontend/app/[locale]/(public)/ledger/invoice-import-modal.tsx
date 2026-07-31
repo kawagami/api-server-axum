@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { X, Loader2 } from "lucide-react";
 import { postInvoice } from "@/api/invoices";
 import { parseInvoiceQr, type ParsedInvoice } from "@/libs/invoice-qr";
-import InvoiceScanner from "@/components/invoices/InvoiceScanner";
+import InvoiceScanner from "@/components/invoices/invoice-scanner";
 import type { LedgerCategories, InvoiceInput } from "@/types";
 
 interface Props {

@@ -7,7 +7,7 @@ import { QrCode, ScanBarcode, Keyboard, Loader2, CheckCircle2 } from "lucide-rea
 import { postInvoice } from "@/api/invoices";
 import { parseInvoiceQr } from "@/libs/invoice-qr";
 import { parseInvoiceBarcode } from "@/libs/invoice-barcode";
-import InvoiceScanner from "@/components/invoices/InvoiceScanner";
+import InvoiceScanner from "@/components/invoices/invoice-scanner";
 import type { LedgerCategories, InvoiceInput, InvoiceSource } from "@/types";
 
 interface Props {
