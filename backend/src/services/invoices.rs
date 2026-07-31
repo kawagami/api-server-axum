@@ -145,8 +145,11 @@ pub async fn admin_set_numbers(
         + nums.first.len()
         + nums.additional.len();
 
-    invoices_repo::upsert_period_numbers(pool, &req.period, &nums).await?;
-    invoices_repo::reset_period_check(pool, &req.period).await?;
+    // 改號碼 + 讓該期重新對獎必須同生同死（理由見 reset_period_check_in_tx 的註解）
+    let mut tx = pool.begin().await?;
+    invoices_repo::upsert_period_numbers_in_tx(&mut tx, &req.period, &nums).await?;
+    invoices_repo::reset_period_check_in_tx(&mut tx, &req.period).await?;
+    tx.commit().await?;
     Ok(count)
 }
 

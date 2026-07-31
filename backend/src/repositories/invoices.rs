@@ -131,9 +131,11 @@ pub async fn set_notify_pref(pool: &Pool<Postgres>, member_id: i64, enabled: boo
 
 // ── 對獎 job 用 ───────────────────────────────────────────
 
-/// upsert 一期的中獎號碼
-pub async fn upsert_period_numbers(
-    pool: &Pool<Postgres>,
+/// upsert 一期的中獎號碼。一期有 1 特別獎 + 1 特獎 + 3 頭獎 + 6 增開六獎 = 最多 11 筆，
+/// 由 caller 持有 transaction —— 逐筆各自 commit 的話中途失敗會留下半套號碼，而
+/// `periods_pending_check` 只檢查該期「有沒有任何一筆號碼」，會拿殘缺號碼去對整期的獎。
+pub async fn upsert_period_numbers_in_tx(
+    conn: &mut PgConnection,
     period: &str,
     nums: &PeriodNumbers,
 ) -> Result<(), AppError> {
@@ -158,7 +160,7 @@ pub async fn upsert_period_numbers(
         .bind(period)
         .bind(tier)
         .bind(number)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
     }
     Ok(())
@@ -269,12 +271,18 @@ pub async fn mark_checked(
 }
 
 /// admin 改號碼後讓某期重新對獎
-pub async fn reset_period_check(pool: &Pool<Postgres>, period: &str) -> Result<(), AppError> {
+/// 讓整期重新對獎。由 caller 持有 transaction：必須與改號碼同生同死，否則號碼改了
+/// 但沒歸零 `lottery_checked` 時，`periods_pending_check` 再也撈不到這期（只找 false），
+/// 使用者會永遠看到用舊號碼算出的錯誤結果，且沒有任何機制會自動重試。
+pub async fn reset_period_check_in_tx(
+    conn: &mut PgConnection,
+    period: &str,
+) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE invoices SET lottery_checked = false, prize_tier = NULL, updated_at = NOW() WHERE period = $1",
     )
     .bind(period)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }

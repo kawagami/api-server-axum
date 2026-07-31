@@ -30,7 +30,10 @@ pub async fn run(state: AppState) {
 
 async fn fetch_and_store(pool: &Pool<Postgres>, client: &reqwest::Client) -> Result<(), AppError> {
     for (period, nums) in invoice_lottery::fetch_winning_numbers(client).await? {
-        invoices_repo::upsert_period_numbers(pool, &period, &nums).await?;
+        // 一期一個 transaction：單期的號碼要嘛整套進去、要嘛完全不進去
+        let mut tx = pool.begin().await?;
+        invoices_repo::upsert_period_numbers_in_tx(&mut tx, &period, &nums).await?;
+        tx.commit().await?;
     }
     Ok(())
 }
