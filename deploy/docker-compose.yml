@@ -33,10 +33,27 @@ x-logging-quiet: &logging-quiet
     driver: json-file
     options: { max-size: "10m", max-file: "2" }
 
+# ── 資源上限 ────────────────────────────────────────────────────────────────
+# 這台是 1 核 1G（+2G swap）。在加上限之前**完全沒有**任何 mem_limit，2026-07-18
+# 就發生過整機 OOM、killer 挑中 backend 把它殺掉（見 docs 的事故記錄）。
+#
+# 加上限的意義是「爆的是單一容器、有明確 log、其他服務活著」，而不是整機被 killer
+# 隨機挑一個殺。代價：設太低會讓容器在正常尖峰被 OOM-kill，所以第一版刻意寬鬆。
+#
+# ⚠ 這些數字是**起步值，不是量測結果**。上線後看 /admin/metrics 的 RSS 曲線再收緊。
+#   各上限之和（約 1.2G）刻意略高於實體記憶體 —— mem_limit 是上限不是預留，
+#   真正的用途是攔住單一失控的容器。
+# ⚠ 刻意不設 memswap_limit：未設時 Docker 允許再用等量 swap，失控的容器會先變慢
+#   而不是立刻被殺，在這台機器上是想要的行為（有緩衝時間可以介入）。
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+
 services:
   nginx:
-    <<: *logging-heavy
+    <<: [*logging-heavy, *hardening]
     image: nginx:alpine
+    mem_limit: 64m
     container_name: nginx
     restart: unless-stopped
     stop_signal: SIGTERM
@@ -57,8 +74,9 @@ services:
         condition: service_started
 
   certbot:
-    <<: *logging-quiet
+    <<: [*logging-quiet, *hardening]
     image: certbot/dns-cloudflare
+    mem_limit: 64m
     container_name: certbot
     volumes:
       - letsencrypt:/etc/letsencrypt
@@ -67,7 +85,10 @@ services:
     restart: unless-stopped
 
   database:
-    <<: *logging-quiet
+    <<: [*logging-quiet, *hardening]
+    # 預設 shared_buffers 128MB + 每連線 work_mem（pool 上限 20 條）+ WAL buffers，
+    # 給足餘裕：這支被 OOM-kill 的代價最高
+    mem_limit: 384m
     # PG 18 起官方 image 的 volume 掛載點改為 /var/lib/postgresql（不再是 …/data），
     # 資料目錄由 image 決定為 <mount>/18/docker，未來大版本升級可用 image 的 pg_upgrade 流程
     image: postgres:18-alpine
@@ -91,19 +112,26 @@ services:
       start_period: 30s
 
   valkey:
-    <<: *logging-quiet
+    <<: [*logging-quiet, *hardening]
     # 刻意不掛 volume：資料全在記憶體，重啟即清空。
     # ⚠ 代價是 member refresh token（TTL 30 天）也會沒了 → valkey 重啟等於把所有會員登出，
     #   需重新登入。其餘 key（權限快取 / oauth state / ws ticket）TTL 短，掉了會自動重算。
     image: "valkey/valkey:alpine"
     container_name: valkey
     restart: unless-stopped
+    # maxmemory 是這裡真正的防線：資料全在記憶體，refresh token 的 TTL 是 30 天，
+    # 會員數成長就是單向長大。volatile-lru 只淘汰有 TTL 的 key（本站所有 key 都有），
+    # 額滿時淘汰最久未用的，而不是拒絕寫入。
+    command: valkey-server --maxmemory 128mb --maxmemory-policy volatile-lru
+    mem_limit: 160m
     ulimits:
       memlock: -1
 
   backend:
-    <<: *logging-normal
+    <<: [*logging-normal, *hardening]
     image: kawagami77/api-server:latest
+    # 圖片 decode 的 alloc 上限是 128MB（services/images.rs），尖峰要留得下
+    mem_limit: 320m
     container_name: backend
     restart: unless-stopped
     working_dir: /app   # distroless image 無預設 workdir；UPLOAD_PATH 等相對路徑以 /app 為基準
@@ -120,8 +148,10 @@ services:
         condition: service_started
 
   frontend:
-    <<: *logging-normal
+    <<: [*logging-normal, *hardening]
     image: kawagami77/my-next-blog:latest
+    # Next.js standalone + sharp 的圖片最佳化是這台機器上最會吃記憶體的一段
+    mem_limit: 320m
     container_name: frontend
     restart: unless-stopped
     stop_grace_period: 1s
