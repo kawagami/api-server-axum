@@ -40,7 +40,7 @@ export default function TimerSettings({ minutes, setMinutes, disabled, onEnterPr
                     min="1"
                     max="999"
                     disabled={disabled}
-                    className="w-full p-3 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
+                    className="w-full p-3 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-sm bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                     onMouseEnter={handleMouseEnter}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' && !disabled) {

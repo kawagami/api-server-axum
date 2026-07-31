@@ -110,7 +110,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                             <select
                                 value={game}
                                 onChange={e => setGame(e.target.value as '' | LottoGame)}
-                                className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                                className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                             >
                                 <option value="">{t('all')}</option>
                                 <option value="lotto649">{t('gameLotto649')}</option>
@@ -122,7 +122,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                             <select
                                 value={status}
                                 onChange={e => setStatus(e.target.value as '' | LottoStatus)}
-                                className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                                className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                             >
                                 <option value="">{t('all')}</option>
                                 <option value="pending">{t('filterPending')}</option>

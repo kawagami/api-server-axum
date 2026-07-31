@@ -14,7 +14,7 @@ import type { LottoGame, LottoNote, LottoInput } from "@/types";
 
 type Mode = 'manual' | 'ocr';
 
-const inputClass = "border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400";
+const inputClass = "border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 
 export default function LottoRegisterClient() {
     const t = useTranslations('Lotto');

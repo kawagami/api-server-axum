@@ -44,7 +44,7 @@ export function FarmLobby({
                 <input
                     value={nickname} onChange={e => setNickname(e.target.value)} maxLength={20}
                     placeholder={t('nicknamePlaceholder')}
-                    className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-800 focus:border-primary-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                 />
             </label>
 
@@ -52,7 +52,7 @@ export function FarmLobby({
                 <input
                     value={roomName} onChange={e => setRoomName(e.target.value)} maxLength={40}
                     placeholder={t('roomNamePlaceholder')}
-                    className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:border-primary-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                 />
                 <button onClick={() => onCreate(roomName.trim(), nickname.trim())}
                     className="flex flex-none items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white transition-colors hover:bg-primary-700">

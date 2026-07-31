@@ -92,7 +92,7 @@ export function Lobby({
                     onChange={e => setName(e.target.value)}
                     maxLength={40}
                     placeholder={t('tableNamePlaceholder')}
-                    className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 transition-colors focus:border-primary-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                 />
                 <button type="submit" className="flex flex-none items-center gap-2 rounded-lg border border-primary-400 px-3 py-2 text-sm text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-950">
                     <Plus className="h-4 w-4" />{t('createTable')}

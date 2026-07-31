@@ -142,7 +142,7 @@ export default function CommentSection({ blogId, isMember }: { blogId: string; i
                         onChange={e => setName(e.target.value)}
                         maxLength={100}
                         placeholder={t("namePlaceholder")}
-                        className="w-full sm:max-w-xs rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 transition-colors"
+                        className="w-full sm:max-w-xs rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 transition-colors"
                     />
                 )}
                 {isMember && (
@@ -154,7 +154,7 @@ export default function CommentSection({ blogId, isMember }: { blogId: string; i
                     maxLength={CONTENT_MAX}
                     rows={3}
                     placeholder={t("contentPlaceholder")}
-                    className="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 transition-colors resize-y"
+                    className="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 transition-colors resize-y"
                 />
                 {errorKey && (
                     <p className="text-sm text-red-600 dark:text-red-400">{t(`error.${errorKey}`)}</p>

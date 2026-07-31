@@ -48,7 +48,7 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         onChange={e => setStockCode(e.target.value)}
                         required
                         placeholder="e.g. 2330"
-                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -58,7 +58,7 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         value={buyDate}
                         onChange={e => setBuyDate(e.target.value)}
                         required
-                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -70,7 +70,7 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         required
                         min="0"
                         step="0.01"
-                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -82,7 +82,7 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         required
                         min="1"
                         step="1"
-                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
             </div>

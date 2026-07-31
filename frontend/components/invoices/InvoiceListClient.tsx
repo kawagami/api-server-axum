@@ -133,7 +133,7 @@ export default function InvoiceListClient({ initialEntries, lockWon = false }: P
                                 onChange={e => setPeriod(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                 placeholder="202606"
                                 inputMode="numeric"
-                                className="border rounded px-2 py-1.5 text-sm w-28 font-mono dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                                className="border rounded px-2 py-1.5 text-sm w-28 font-mono dark:bg-neutral-700 dark:border-neutral-600"
                             />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -141,7 +141,7 @@ export default function InvoiceListClient({ initialEntries, lockWon = false }: P
                             <select
                                 value={won}
                                 onChange={e => setWon(e.target.value as WonFilter)}
-                                className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                                className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                             >
                                 <option value="">{t('all')}</option>
                                 <option value="won">{t('filterWon')}</option>

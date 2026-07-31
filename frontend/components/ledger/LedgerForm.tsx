@@ -16,7 +16,7 @@ function todayTaipei() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 }
 
-const inputClass = "border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400";
+const inputClass = "border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 
 export default function LedgerForm({ categories, initial, onSave, onCancel }: Props) {
     const t = useTranslations('Ledger');

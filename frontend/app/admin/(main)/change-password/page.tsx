@@ -35,7 +35,7 @@ export default function ChangePasswordPage() {
         if (state.success) formRef.current?.reset();
     }, [state.success]);
 
-    // 焦點樣式由 globals.css 的 .admin-shell 規則統一提供，元件不再各自寫 focus:ring
+    // 焦點樣式由 globals.css 的全站 :focus-visible 規則統一提供，元件不再各自寫 focus 類別
     const inputClass = "w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (

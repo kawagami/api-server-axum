@@ -53,7 +53,7 @@ export default function MetalSlugGame() {
                 <canvas
                     id={CANVAS_ID}
                     ref={canvasRef}
-                    className="block w-full h-full focus:outline-none"
+                    className="block w-full h-full"
                     tabIndex={0}
                 />
 

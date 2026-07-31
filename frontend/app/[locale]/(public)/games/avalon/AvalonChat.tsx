@@ -39,7 +39,7 @@ export function AvalonChat({ chat, onSend }: { chat: ChatEntry[]; onSend: (text:
                     onChange={e => setText(e.target.value)}
                     maxLength={500}
                     placeholder={t('chatPlaceholder')}
-                    className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-800 focus:border-primary-400 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-800 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
                 />
                 <button type="submit" className="flex flex-none items-center rounded-md bg-primary-600 px-3 text-white transition-colors hover:bg-primary-700">
                     <Send className="h-4 w-4" />

@@ -46,7 +46,7 @@ export function AvalonLobby({
                 <input
                     value={nickname} onChange={e => setNickname(e.target.value)} maxLength={20}
                     placeholder={t('nicknamePlaceholder')}
-                    className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-800 focus:border-primary-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                 />
             </label>
 
@@ -55,7 +55,7 @@ export function AvalonLobby({
                 <input
                     value={roomName} onChange={e => setRoomName(e.target.value)} maxLength={40}
                     placeholder={t('roomNamePlaceholder')}
-                    className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:border-primary-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                 />
                 <div className="flex gap-4 text-sm text-neutral-600 dark:text-neutral-300">
                     <label className="flex items-center gap-1.5">

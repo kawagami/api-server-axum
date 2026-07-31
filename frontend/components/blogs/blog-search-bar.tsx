@@ -61,7 +61,7 @@ export default function BlogSearchBar({ q, sort }: Props) {
                     onChange={(e) => setValue(e.target.value)}
                     placeholder={t('searchPlaceholder')}
                     aria-label={t('searchPlaceholder')}
-                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 pl-9 pr-9 py-2 text-sm text-neutral-800 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 pl-9 pr-9 py-2 text-sm text-neutral-800 dark:text-neutral-100 placeholder:text-neutral-400"
                 />
                 {value && (
                     <button
@@ -78,7 +78,7 @@ export default function BlogSearchBar({ q, sort }: Props) {
                 value={sort === 'oldest' ? 'oldest' : 'newest'}
                 onChange={changeSort}
                 aria-label={t('sortLabel')}
-                className="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-200"
             >
                 <option value="newest">{t('sortNewest')}</option>
                 <option value="oldest">{t('sortOldest')}</option>

@@ -39,7 +39,7 @@ export default function ThemeButton({ initialMode, defaultIsDark }: Props) {
     return (
         <div className="flex items-center">
             <button
-                className="w-8 h-8 bg-neutral-400 dark:bg-white text-white dark:text-neutral-700 rounded-full grid place-content-center focus:outline-none focus:ring-2 focus:ring-primary-400 hover:scale-110 transition-transform"
+                className="w-8 h-8 bg-neutral-400 dark:bg-white text-white dark:text-neutral-700 rounded-full grid place-content-center hover:scale-110 transition-transform"
                 onClick={cycle}
                 aria-label={MODE_LABEL[mode]}
                 title={MODE_LABEL[mode]}

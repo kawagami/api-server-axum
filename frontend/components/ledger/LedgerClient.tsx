@@ -150,7 +150,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                     <select
                         value={filters.kind}
                         onChange={e => setFilters(f => ({ ...f, kind: e.target.value as Filters['kind'], category: '' }))}
-                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     >
                         <option value="">{t('all')}</option>
                         <option value="income">{t('income')}</option>
@@ -163,7 +163,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                         value={filters.category}
                         onChange={e => setFilters(f => ({ ...f, category: e.target.value }))}
                         disabled={!filters.kind}
-                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400 disabled:opacity-50"
+                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 disabled:opacity-50"
                     >
                         <option value="">{t('all')}</option>
                         {filterCategoryOptions.map(o => (
@@ -177,7 +177,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                         type="date"
                         value={filters.from}
                         onChange={e => setFilters(f => ({ ...f, from: e.target.value }))}
-                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -186,7 +186,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                         type="date"
                         value={filters.to}
                         onChange={e => setFilters(f => ({ ...f, to: e.target.value }))}
-                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 {filterActive && (

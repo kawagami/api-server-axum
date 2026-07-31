@@ -569,7 +569,7 @@ function SpellingCard({ question, feedback, busy, ja, value, onChange, onSubmit,
                     onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }}
                     onCompositionStart={() => { composingRef.current = true; }}
                     onCompositionEnd={(e) => { composingRef.current = false; onChange(e.currentTarget.value); }}
-                    className={`flex-1 px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-transparent focus:outline-none focus:border-primary-400 ${ja ? "font-ja" : "font-mono"}`} />
+                    className={`flex-1 px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-transparent ${ja ? "font-ja" : "font-mono"}`} />
                 <button type="submit" disabled={busy || !!feedback || !value.trim()}
                     className="px-5 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold transition-colors disabled:opacity-50">
                     {t("submit")}
