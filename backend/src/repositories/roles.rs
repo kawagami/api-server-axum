@@ -43,6 +43,25 @@ pub async fn get_role_with_permissions(
     })
 }
 
+/// 這組 role_ids 裡是否含 `super_admin`。
+///
+/// 用查名稱而不是寫死 id：baseline migration 的 super_admin 剛好是 4，但那是巧合，
+/// 不該讓權限邊界依賴它。
+pub async fn contains_super_admin(
+    pool: &Pool<Postgres>,
+    role_ids: &[i32],
+) -> Result<bool, AppError> {
+    if role_ids.is_empty() {
+        return Ok(false);
+    }
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM roles WHERE name = 'super_admin' AND id = ANY($1))",
+    )
+    .bind(role_ids)
+    .fetch_one(pool)
+    .await?)
+}
+
 /// 依角色名稱批次查 id，不存在的名稱直接略過（供建立管理員的預設角色 fallback 用）
 pub async fn get_role_ids_by_names(
     pool: &Pool<Postgres>,

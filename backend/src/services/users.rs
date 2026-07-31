@@ -23,6 +23,9 @@ pub async fn create_user(
     } else {
         std::mem::take(&mut user.role_ids)
     };
+    // 預設角色那條路徑也要過 guard：`new_user_default_roles` 是 app_settings，
+    // 只需 setting:update 就能改，不擋的話等於另開一條提權門。
+    super::roles::ensure_assignable(pool, &role_ids).await?;
     users_repo::create_user(pool, user, &role_ids).await
 }
 

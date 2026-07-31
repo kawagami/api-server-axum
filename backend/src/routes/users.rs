@@ -41,6 +41,11 @@ async fn create_user(
     Json(user): Json<NewUser>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::UserCreate)?;
+    // 帶 role_ids 就等於在指派角色，門檻必須與 PUT /admin/users/{id}/roles 一致。
+    // 少了這道，只有 user:create 的管理員可以繞過整個 role:assign 的把關。
+    if !user.role_ids.is_empty() {
+        auth_user.require_permission(Perm::RoleAssign)?;
+    }
     users_service::create_user(state.get_pool(), &state.get_settings(), user).await?;
     Ok(StatusCode::CREATED)
 }
