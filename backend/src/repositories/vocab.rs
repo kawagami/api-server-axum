@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use chrono::{DateTime, Utc};
-use sqlx::{Pool, Postgres};
+use sqlx::{PgConnection, Pool, Postgres};
 use uuid::Uuid;
 
 const WORD_COLS: &str =
@@ -170,8 +170,11 @@ pub async fn distractor_meanings(
 }
 
 /// 落地一局結果
-pub async fn insert_run(
-    pool: &Pool<Postgres>,
+/// 落地一局成績。由 caller 持有 transaction —— 必須與發經驗同生同死，否則
+/// vocab_runs 有紀錄（會被排行榜聚合）但 member_vocab_exp 沒加，排行榜總和
+/// 與玩家等級會長期不一致。
+pub async fn insert_run_in_tx(
+    conn: &mut PgConnection,
     run_id: Uuid,
     member_id: i64,
     state: &RunState,
@@ -190,7 +193,7 @@ pub async fn insert_run(
     .bind(state.started_at)
     .bind(state.mode.as_str())
     .bind(state.language.as_str())
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
@@ -234,8 +237,9 @@ pub async fn bests(
 }
 
 /// 加分語言經驗值,回傳加完後該語言總 exp(members.exp 已凍結,不再讀寫)
-pub async fn upsert_vocab_exp(
-    pool: &Pool<Postgres>,
+/// 發經驗並回新的累計值。由 caller 持有 transaction（理由同 insert_run_in_tx）。
+pub async fn upsert_vocab_exp_in_tx(
+    conn: &mut PgConnection,
     member_id: i64,
     language: &str,
     delta: i64,
@@ -249,7 +253,7 @@ pub async fn upsert_vocab_exp(
     .bind(member_id)
     .bind(language)
     .bind(delta)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(exp)
 }

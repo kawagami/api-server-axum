@@ -383,16 +383,20 @@ pub async fn start_run(
     })
 }
 
-/// 結算計分模式的對局:清 Redis、算新紀錄、落地、發經驗、回結算
+/// 結算計分模式的對局:算新紀錄、落地、發經驗、清 Redis、回結算
+///
+/// ⚠️ **Redis 的對局狀態必須最後才刪**。先刪再寫 DB 的話，落地失敗就再也重試不了
+/// (正解與進度只存在 Redis)，成績與經驗直接消失。落地兩張表也必須同一個 transaction:
+/// insert_run 成功但 upsert_vocab_exp 失敗會讓 vocab_runs 有紀錄(排行榜聚合看得到)
+/// 而 member_vocab_exp 沒加,排行榜總和與玩家等級從此長期不一致。
 async fn finalize(
     state: &AppState,
     run_id: Uuid,
     run: &RunState,
 ) -> Result<RunResult, AppError> {
-    redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
-
     // 訪客:不入 DB,結算只回本局成績(經驗值當登入誘餌)
     let Some(mid) = run.member_id else {
+        redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
         return Ok(RunResult {
             answered_count: run.answered,
             correct_count: run.correct,
@@ -414,10 +418,17 @@ async fn finalize(
             || (run.correct == b.correct_count && run.max_combo > b.max_combo)
     });
 
-    vocab_repo::insert_run(state.get_pool(), run_id, mid, run).await?;
+    let mut tx = state.get_pool().begin().await?;
+    vocab_repo::insert_run_in_tx(&mut tx, run_id, mid, run).await?;
     let total_exp =
-        vocab_repo::upsert_vocab_exp(state.get_pool(), mid, run.language.as_str(), run.exp)
-            .await?;
+        vocab_repo::upsert_vocab_exp_in_tx(&mut tx, mid, run.language.as_str(), run.exp).await?;
+    tx.commit().await?;
+
+    // 成績確定落地後才清掉 Redis 的對局狀態(在此之前失敗都還能重試 —— 每條進 finalize
+    // 的路徑都先 load_run,Redis 還在就重試得到)。殘留窗口:commit 成功但這行失敗時,
+    // 重試會撞 vocab_runs 的 PK 衝突而報錯,但成績已經存好了,且 key 有 TTL 會自清。
+    redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
+
     let level = level_for_exp(total_exp);
     let leveled_up = run.exp > 0 && level > level_for_exp(total_exp - run.exp);
 
