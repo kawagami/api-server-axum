@@ -322,10 +322,17 @@ async fn say_something_to_someone(
 
 /// 換發 WS 一次性連線票（30 秒 TTL）。登入中的 admin 用它連 WS 取得管理員身分，
 /// token 本體不再出現在 WS URL。
+///
+/// 權限門檻必須與 `get_online_connections` 一致（同為 `ws:read`）：ticket 換來的連線會被
+/// 標成 admin 身分，因而收得到 `broadcast_to_admins` 推的 `user_joined` / `user_left`，
+/// 那兩個事件的 payload 含 `real_ip` 與 `user_email`。少了這道檢查，沒有 ws:read 的管理員
+/// HTTP 端查不到連線清單，卻能改走 WS 拿到同樣的個資。
 async fn create_ws_ticket(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    auth_user.require_permission(Perm::WsRead)?;
+
     let ticket = uuid::Uuid::new_v4().to_string();
     redis_repo::set_ws_ticket(state.get_redis_pool(), &ticket, &auth_user.name).await?;
     Ok(Json(serde_json::json!({ "ticket": ticket })))
