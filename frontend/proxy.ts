@@ -24,7 +24,12 @@ export default async function proxy(req: NextRequest) {
 
             try {
                 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-                await jwtVerify(value, secret);
+                const { payload } = await jwtVerify(value, secret);
+                // 也要驗 role：admin 與 member 的 token 用同一把 secret 簽，
+                // 只驗簽章的話把 member 的 access_token 塞進 session cookie 就能進
+                // /admin/* 的頁面外殼。後端 authorize_and_load 會擋成 401（無資料外洩），
+                // 但前端不該比後端寬鬆。
+                if (payload.role !== 'admin') return NextResponse.redirect(loginUrl);
             } catch {
                 return NextResponse.redirect(loginUrl);
             }

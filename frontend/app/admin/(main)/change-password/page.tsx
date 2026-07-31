@@ -30,9 +30,18 @@ export default function ChangePasswordPage() {
         { error: null, success: false }
     );
 
-    // 成功後清空表單（uncontrolled inputs，靠 form.reset()）
+    // 成功後清空表單（uncontrolled inputs，靠 form.reset()）並導回登入頁。
+    //
+    // 後端改密碼成功會撤銷這個帳號的 session（清 Redis user:login:{id}），所以現在這張
+    // token 已經失效了。不主動導頁的話，使用者會看到「成功」然後在下一個動作才被彈回
+    // 登入頁，看起來像壞掉。延遲一下讓成功訊息看得到。
     useEffect(() => {
-        if (state.success) formRef.current?.reset();
+        if (!state.success) return;
+        formRef.current?.reset();
+        const timer = setTimeout(() => {
+            window.location.href = "/admin/login?redirect=/admin";
+        }, 1500);
+        return () => clearTimeout(timer);
     }, [state.success]);
 
     // 焦點樣式由 globals.css 的全站 :focus-visible 規則統一提供，元件不再各自寫 focus 類別
@@ -74,7 +83,9 @@ export default function ChangePasswordPage() {
                 </div>
 
                 {state.success && (
-                    <p className="text-sm text-green-600 dark:text-green-400">密碼已成功變更</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                        密碼已成功變更，即將導向登入頁，請以新密碼重新登入
+                    </p>
                 )}
                 {state.error && (
                     <p className="text-sm text-red-500">{state.error}</p>

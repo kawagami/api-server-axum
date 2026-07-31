@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
     cookieStore.set('session', token, {
         maxAge: 60 * 60,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: true, // 硬寫：綁 NODE_ENV 的話一旦 env 沒設對，admin JWT 就變成非 Secure cookie
+        path: '/',
         sameSite: 'lax',
     });
 

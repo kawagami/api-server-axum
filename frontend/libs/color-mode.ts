@@ -11,13 +11,14 @@ export function resolveDefaultColorMode(value: string | undefined | null): Color
 
 /** Client-only：寫 cookie 並套用 class */
 export function applyUserColorMode(mode: ColorMode) {
-    document.cookie = `theme=${mode}; path=/; max-age=31536000`;
+    // 不加 httpOnly 是刻意的（server 要讀、client 要寫）；Secure + SameSite 則該補上
+    document.cookie = `theme=${mode}; path=/; max-age=31536000; SameSite=Lax; Secure`;
     document.documentElement.classList.toggle('dark', mode === 'dark');
 }
 
 /** Client-only：清掉個人偏好，回到網站預設（defaultIsDark=null 表示跟隨系統） */
 export function clearUserColorMode(defaultIsDark: boolean | null) {
-    document.cookie = 'theme=; path=/; max-age=0';
+    document.cookie = 'theme=; path=/; max-age=0; SameSite=Lax; Secure';
     const dark = defaultIsDark ?? window.matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.classList.toggle('dark', dark);
 }

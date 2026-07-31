@@ -3,11 +3,17 @@ import { redirect } from 'next/navigation'
 import { NextRequest } from 'next/server'
 import { clientIpHeaders } from '@/libs/client-ip'
 
+// 同 /api/auth/[provider]：擋掉用 %2F 編碼把 provider 變成路徑片段的代理用法
+const PROVIDERS = ['google', 'github', 'line'] as const
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ provider: string }> }
 ) {
     const { provider } = await params
+    if (!PROVIDERS.includes(provider as (typeof PROVIDERS)[number])) {
+        redirect('/login?error=oauth_failed')
+    }
     const { searchParams } = request.nextUrl
 
     const code = searchParams.get('code')

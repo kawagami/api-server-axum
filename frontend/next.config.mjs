@@ -36,7 +36,8 @@ const nextConfig = {
     reactStrictMode: true,
     experimental: {
         serverActions: {
-            allowedOrigins: ["kawa.homes", "next-blog:3000"],
+            // next-blog:3000 是已改名的舊 compose service（現為 frontend），已移除
+            allowedOrigins: ["kawa.homes"],
             bodySizeLimit: '10mb'
         }
     }

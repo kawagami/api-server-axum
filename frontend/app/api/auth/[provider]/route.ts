@@ -2,11 +2,20 @@ import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { clientIpHeaders } from '@/libs/client-ip'
 
+// 後端 /oauth/{provider} 自己會驗 provider，但這支是用字串插值組 URL：
+// `/api/auth/..%2F..%2Fadmin%2Fsettings` 會被 Next 解碼成 provider="../../admin/settings"，
+// fetch 正規化後就變成打後端任意路徑的代理。此處不帶任何憑證，所以打 /admin/* 只會拿 401，
+// 但它仍是「繞過 nginx per-location 限流 + 把來源偽裝成 frontend 容器」的工具。
+const PROVIDERS = ['google', 'github', 'line'] as const
+
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ provider: string }> }
 ) {
     const { provider } = await params
+    if (!PROVIDERS.includes(provider as (typeof PROVIDERS)[number])) {
+        return NextResponse.json({ error: 'unknown provider' }, { status: 404 })
+    }
     const res = await fetch(`${process.env.API_URL}/oauth/${provider}`, {
         headers: await clientIpHeaders(),
     })
