@@ -100,7 +100,6 @@
     "noHistory": "無資料",
     "errorLoad": "載入失敗",
     "errorSave": "儲存失敗",
-    "errorDelete": "刪除失敗",
     "totalCost": "總成本",
     "currentValue": "目前市值",
     "currentPrice": "現價",
@@ -141,9 +140,7 @@
     "errorAmount": "金額必須大於 0",
     "scanInvoice": "掃發票",
     "scanTitle": "掃描電子發票",
-    "scanHint": "對準發票左方 QR Code",
     "cameraError": "無法開啟相機，請確認權限",
-    "parseError": "無法解析此 QR，請對準發票左方條碼再試一次",
     "importTitle": "確認匯入",
     "invoiceNumber": "發票號碼",
     "sellerTaxId": "賣方統編",
@@ -270,8 +267,11 @@
     "metaDescription": "kawa 的個人小站介紹：技術棧、設計原則與聯絡方式。"
   },
   "Ws": {
-    "title": "WS 通知",
-    "description": "即時 WebSocket 通知"
+    "blogCreated": "新文章發布",
+    "stockCompleted": "股票完成 ✓",
+    "stockFailed": "股票失敗 ✗",
+    "stockNo": "股票代號：{no}",
+    "adminMessage": "管理員訊息"
   },
   "Games": {
     "metalSlugTitle": "越南大戰（試作）",
@@ -660,8 +660,6 @@
     "scanQrHint": "對準發票左方 QR Code",
     "scanBarcodeHint": "對準發票上的一維條碼",
     "cameraError": "無法開啟相機，請確認權限",
-    "parseErrorQr": "無法解析此 QR，請對準發票左方條碼再試一次",
-    "parseErrorBarcode": "無法解析此條碼，請對準發票條碼再試一次",
     "invoiceNumber": "發票號碼",
     "invoiceDate": "發票日期",
     "amount": "金額",
@@ -890,9 +888,6 @@
     "maxComboLabel": "最高連對",
     "expGained": "獲得經驗值",
     "levelUp": "升級！Lv.{level}",
-    "totalRuns": "挑戰次數",
-    "wordsLearned": "學過單字",
-    "bestCorrect": "最佳答對數",
     "questionNumber": "第 {number} 題",
     "comboLabel": "{count} 連對",
     "chooseMeaning": "選出正確的意思",

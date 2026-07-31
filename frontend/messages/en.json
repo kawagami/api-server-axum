@@ -100,7 +100,6 @@
     "noHistory": "No data",
     "errorLoad": "Failed to load",
     "errorSave": "Failed to save",
-    "errorDelete": "Failed to delete",
     "totalCost": "Total Cost",
     "currentValue": "Current Value",
     "currentPrice": "Price",
@@ -141,9 +140,7 @@
     "errorAmount": "Amount must be greater than 0",
     "scanInvoice": "Scan Invoice",
     "scanTitle": "Scan e-Invoice",
-    "scanHint": "Aim at the left QR code on the invoice",
     "cameraError": "Cannot open camera, please check permissions",
-    "parseError": "Could not read this QR. Aim at the left barcode and try again.",
     "importTitle": "Confirm Import",
     "invoiceNumber": "Invoice No.",
     "sellerTaxId": "Seller Tax ID",
@@ -270,8 +267,11 @@
     "metaDescription": "About kawa's personal site: stack, principles and contact."
   },
   "Ws": {
-    "title": "WS Notifications",
-    "description": "Real-time WebSocket notifications"
+    "blogCreated": "New post published",
+    "stockCompleted": "Stock completed ✓",
+    "stockFailed": "Stock failed ✗",
+    "stockNo": "Stock code: {no}",
+    "adminMessage": "Admin message"
   },
   "Games": {
     "metalSlugTitle": "Metal Slug (WIP)",
@@ -660,8 +660,6 @@
     "scanQrHint": "Aim at the QR code on the left of the receipt",
     "scanBarcodeHint": "Aim at the 1D barcode on the receipt",
     "cameraError": "Unable to open the camera, please check permissions",
-    "parseErrorQr": "Could not read this QR — aim at the left barcode and try again",
-    "parseErrorBarcode": "Could not read this barcode — aim at the receipt barcode and try again",
     "invoiceNumber": "Invoice number",
     "invoiceDate": "Invoice date",
     "amount": "Amount",
@@ -890,9 +888,6 @@
     "maxComboLabel": "Best streak",
     "expGained": "EXP earned",
     "levelUp": "Level up! Lv.{level}",
-    "totalRuns": "Runs",
-    "wordsLearned": "Words learned",
-    "bestCorrect": "Best correct",
     "questionNumber": "Question {number}",
     "comboLabel": "{count} streak",
     "chooseMeaning": "Pick the correct meaning",
