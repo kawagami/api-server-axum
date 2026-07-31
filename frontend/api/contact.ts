@@ -1,6 +1,7 @@
 "use server";
 
 import { fetchApi } from "@/libs/fetchApi";
+import { clientIpHeaders } from "@/libs/client-ip";
 import adminRequest from "@/libs/adminRequest";
 import type { ContactMessage, NewContactMessage } from "@/types";
 
@@ -8,7 +9,7 @@ import type { ContactMessage, NewContactMessage } from "@/types";
 export async function postContactMessage(input: NewContactMessage): Promise<ContactMessage> {
     return fetchApi(`${process.env.API_URL}/messages`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await clientIpHeaders()) },
         body: JSON.stringify(input),
         cache: "no-store",
     });

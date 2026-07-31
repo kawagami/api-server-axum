@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { clientIpHeaders } from '@/libs/client-ip';
 
 // 後端回傳與密碼登入同形的 JWT，cookie 寫法比照 /api/auth/login
 export async function POST(req: NextRequest) {
@@ -7,7 +8,7 @@ export async function POST(req: NextRequest) {
 
     const response = await fetch(`${process.env.API_URL}/admin/auth/passkeys/login/finish`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await clientIpHeaders()) },
         body: JSON.stringify(body),
     });
 

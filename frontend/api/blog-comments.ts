@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { fetchApi } from "@/libs/fetchApi";
+import { clientIpHeaders } from "@/libs/client-ip";
 import adminRequest from "@/libs/adminRequest";
 import type { BlogComment, NewBlogComment, BlogCommentListResponse } from "@/types";
 
@@ -25,6 +26,7 @@ export async function postBlogComment(blogId: string, input: NewBlogComment): Pr
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            ...(await clientIpHeaders()),
             ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify(input),

@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { clientIpHeaders } from "@/libs/client-ip";
 
 interface RequestOptions {
     url: string;
@@ -11,6 +12,8 @@ export function createAuthRequest(cookieKey: string, onUnauthorized: () => Promi
     return async function request<T = unknown>({ url, method = 'GET', headers = {}, body = null }: RequestOptions): Promise<T> {
         const cookieStore = await cookies();
         const token = cookieStore.get(cookieKey)?.value;
+        // 轉發訪客真實 IP，否則後端限流會把所有人算成 frontend 容器同一個 key
+        const ipHeaders = await clientIpHeaders();
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 30000);
@@ -21,6 +24,7 @@ export function createAuthRequest(cookieKey: string, onUnauthorized: () => Promi
                 method,
                 headers: {
                     ...(token && { 'Authorization': `Bearer ${token}` }),
+                    ...ipHeaders,
                     ...headers,
                 },
                 body,

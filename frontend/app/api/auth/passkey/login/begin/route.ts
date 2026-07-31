@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
+import { clientIpHeaders } from '@/libs/client-ip';
 
 // 登入前無 session，同源代理後端 passkey 挑戰（瀏覽器不直打後端）
 export async function POST() {
     const response = await fetch(`${process.env.API_URL}/admin/auth/passkeys/login/begin`, {
         method: 'POST',
+        headers: await clientIpHeaders(),
     });
 
     if (!response.ok) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { clientIpHeaders } from '@/libs/client-ip';
 
 // token 只存 httpOnly session cookie，這裡直接讀 cookie 續期，client 端不經手 token
 export async function POST() {
@@ -9,7 +10,7 @@ export async function POST() {
 
     const response = await fetch(`${process.env.API_URL}/admin/auth/refresh`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, ...(await clientIpHeaders()) },
     });
 
     if (!response.ok) {

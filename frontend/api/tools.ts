@@ -1,18 +1,19 @@
 "use server";
 
 import { fetchApi } from "@/libs/fetchApi";
+import { clientIpHeaders } from "@/libs/client-ip";
 
 export async function getNewPassword(count = 1, length = 8): Promise<string[]> {
     return fetchApi(
         `${process.env.API_URL}/tools/new_password?count=${count}&length=${length}`,
-        { cache: 'no-store' }
+        { cache: 'no-store', headers: await clientIpHeaders() }
     );
 }
 
 export async function postConvertText(text: string, direction: "t2s" | "s2t"): Promise<{ original_text: string; converted_text: string }> {
     return fetchApi(`${process.env.API_URL}/tools/convert_text`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await clientIpHeaders()) },
         body: JSON.stringify({ text, direction }),
     });
 }
@@ -31,7 +32,7 @@ interface RosterResponse {
 export async function postRoster(params: RosterParams): Promise<RosterResponse> {
     return fetchApi(`${process.env.API_URL}/roster`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await clientIpHeaders()) },
         body: JSON.stringify({
             names: params.names,
             days: parseInt(String(params.days)),
