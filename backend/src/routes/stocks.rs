@@ -26,10 +26,10 @@ pub fn new(state: AppState) -> Router<AppState> {
         Router::new()
             .route("/changes", get(list_stock_changes))
             .route("/changes/{id}/pending", patch(reset_stock_change_pending))
-            .route("/closing_price_stats", get(get_closing_price_stats))
-            .route("/day_all", get(get_stock_day_all))
-            .route("/buyback_price_gaps", get(get_buyback_price_gaps))
-            .route("/buyback_periods", get(get_buyback_periods)),
+            .route("/closing_price_stats", get(closing_price_stats))
+            .route("/day_all", get(stock_day_all))
+            .route("/buyback_price_gaps", get(buyback_price_gaps))
+            .route("/buyback_periods", get(buyback_periods)),
     )
 }
 
@@ -60,7 +60,7 @@ async fn reset_stock_change_pending(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn get_closing_price_stats(
+async fn closing_price_stats(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(payload): Query<StockRequest>,
@@ -69,7 +69,7 @@ async fn get_closing_price_stats(
     Ok(Json(stocks_service::get_closing_price_pair_stats(state.get_pool(), state.get_http_client(), &payload).await?))
 }
 
-async fn get_stock_day_all(
+async fn stock_day_all(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(payload): Query<GetStockDayAll>,
@@ -80,7 +80,7 @@ async fn get_stock_day_all(
     Ok(Json(stocks_service::get_stock_day_all_list(state.get_pool(), payload, limit, offset).await?))
 }
 
-async fn get_buyback_price_gaps(
+async fn buyback_price_gaps(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackMoreInfo>>, AppError> {
@@ -88,7 +88,7 @@ async fn get_buyback_price_gaps(
     Ok(Json(stocks_service::get_active_buyback_prices(state.get_pool()).await?))
 }
 
-async fn get_buyback_periods(
+async fn buyback_periods(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<StockBuybackPeriod>>, AppError> {

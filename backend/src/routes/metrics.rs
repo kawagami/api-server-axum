@@ -18,10 +18,10 @@ struct MetricsQuery {
 }
 
 pub fn new(state: AppState) -> Router<AppState> {
-    super::with_auth(state, Router::new().route("/", get(get_metrics_handler)))
+    super::with_auth(state, Router::new().route("/", get(list_metrics)))
 }
 
-async fn get_metrics_handler(
+async fn list_metrics(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(query): Query<MetricsQuery>,

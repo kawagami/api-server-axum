@@ -13,7 +13,7 @@ use serde::Serialize;
 
 pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/{provider}", get(get_oauth_url))
+        .route("/{provider}", get(oauth_url))
         .route("/{provider}/exchange", post(exchange_code))
         .route("/refresh", post(refresh_token))
         .with_state(state)
@@ -24,7 +24,7 @@ struct OAuthUrlResponse {
     url: String,
 }
 
-async fn get_oauth_url(
+async fn oauth_url(
     State(state): State<AppState>,
     Path(provider_str): Path<String>,
 ) -> Result<Json<OAuthUrlResponse>, AppError> {

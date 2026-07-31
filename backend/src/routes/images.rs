@@ -16,12 +16,12 @@ pub fn new(state: AppState) -> Router<AppState> {
     super::with_auth(
         state,
         Router::new()
-            .route("/", get(get_images).post(upload_image))
+            .route("/", get(list_images).post(upload_image))
             .route("/{id}", delete(delete_image)),
     )
 }
 
-async fn get_images(
+async fn list_images(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ImageRecord>>, AppError> {

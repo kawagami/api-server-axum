@@ -19,7 +19,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         state,
         Router::new()
             .route("/", get(list_roles).post(create_role))
-            .route("/{id}", get(get_role).delete(delete_role))
+            .route("/{id}", get(role_detail).delete(delete_role))
             .route("/{id}/permissions", put(set_permissions)),
     )
 }
@@ -32,7 +32,7 @@ async fn list_roles(
     Ok(Json(roles_service::get_roles(state.get_pool()).await?))
 }
 
-async fn get_role(
+async fn role_detail(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Path(id): Path<i32>,

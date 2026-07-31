@@ -18,10 +18,10 @@ struct LogQuery {
 }
 
 pub fn new(state: AppState) -> Router<AppState> {
-    super::with_auth(state, Router::new().route("/", get(get_logs_handler)))
+    super::with_auth(state, Router::new().route("/", get(list_logs)))
 }
 
-async fn get_logs_handler(
+async fn list_logs(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(query): Query<LogQuery>,

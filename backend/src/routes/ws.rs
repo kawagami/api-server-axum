@@ -41,7 +41,7 @@ pub fn new(state: AppState) -> Router<AppState> {
     // 每次 WS 重連都會打的高頻端點，寫進 admin_audit_logs 只會把稽核表灌滿噪音。
     // 其餘 admin 模組一律用 with_auth。
     let admin_routes = Router::new()
-        .route("/get_online_connections", get(get_online_connections))
+        .route("/get_online_connections", get(list_connections))
         .route("/say_something_to_someone", post(say_something_to_someone))
         .route("/ticket", post(create_ws_ticket))
         .layer(middleware::from_fn_with_state(
@@ -248,7 +248,7 @@ async fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> Con
 }
 
 // 原有的獲取所有連接的端點
-async fn get_online_connections(
+async fn list_connections(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DisplayTrackedConnection>>, AppError> {

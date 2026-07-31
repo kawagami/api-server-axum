@@ -19,21 +19,21 @@ pub fn new(state: AppState) -> Router<AppState> {
     super::with_auth(
         state,
         Router::new()
-            .route("/", get(get_all))
+            .route("/", get(list_settings))
             .route("/{key}", patch(update)),
     )
 }
 
 /// GET /settings/public — 無認證，訪客 SSR 用；只回白名單設定
 pub fn public() -> Router<AppState> {
-    Router::new().route("/public", get(get_public))
+    Router::new().route("/public", get(public_settings))
 }
 
-async fn get_public(State(state): State<AppState>) -> Json<BTreeMap<String, String>> {
+async fn public_settings(State(state): State<AppState>) -> Json<BTreeMap<String, String>> {
     Json(settings_service::get_public(&state.get_settings()))
 }
 
-async fn get_all(
+async fn list_settings(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<BTreeMap<String, Vec<AppSetting>>>, AppError> {

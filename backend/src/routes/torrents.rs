@@ -25,8 +25,8 @@ pub fn new(state: AppState) -> Router<AppState> {
         state,
         Router::new()
             .route("/", post(create_torrent).get(list_torrents))
-            .route("/storage", get(get_storage_stats))
-            .route("/{id}", get(get_torrent).delete(delete_torrent))
+            .route("/storage", get(storage_stats))
+            .route("/{id}", get(torrent_detail).delete(delete_torrent))
             .route("/{id}/pending", patch(reset_torrent_pending))
             .route("/{id}/download_links", post(create_download_links)),
     );
@@ -73,7 +73,7 @@ async fn list_torrents(
     ))
 }
 
-async fn get_storage_stats(
+async fn storage_stats(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, AppError> {
@@ -81,7 +81,7 @@ async fn get_storage_stats(
     Ok(Json(torrents_service::storage_stats(&state).await?))
 }
 
-async fn get_torrent(
+async fn torrent_detail(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Path(id): Path<i32>,

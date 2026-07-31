@@ -33,15 +33,15 @@ pub fn new(state: AppState) -> Router<AppState> {
         ));
 
     Router::new()
-        .route("/", get(get_blogs))
-        .route("/tags", get(get_tags))
-        .route("/tags/counts", get(get_tag_counts))
-        .route("/{id}", get(get_blog))
+        .route("/", get(list_blogs))
+        .route("/tags", get(tags))
+        .route("/tags/counts", get(tag_counts))
+        .route("/{id}", get(blog_detail))
         .route("/{id}/comments", get(list_comments))
         .merge(comment_post)
 }
 
-async fn get_blogs(
+async fn list_blogs(
     Query(page): Query<PageQuery>,
     Query(filter): Query<BlogFilter>,
     State(state): State<AppState>,
@@ -58,21 +58,21 @@ async fn get_blogs(
     Ok(Json(blogs))
 }
 
-async fn get_tags(
+async fn tags(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<String>>, AppError> {
     let tags = blogs_service::get_tags(state.get_pool()).await?;
     Ok(Json(tags))
 }
 
-async fn get_tag_counts(
+async fn tag_counts(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<TagCount>>, AppError> {
     let tags = blogs_service::get_tag_counts(state.get_pool()).await?;
     Ok(Json(tags))
 }
 
-async fn get_blog(
+async fn blog_detail(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<DbBlog>, AppError> {

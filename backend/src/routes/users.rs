@@ -21,13 +21,13 @@ pub fn new(state: AppState) -> Router<AppState> {
         Router::new()
             .route(
                 "/",
-                get(get_users).post(create_user).delete(delete_user),
+                get(list_users).post(create_user).delete(delete_user),
             )
-            .route("/{id}/roles", get(get_user_roles).put(set_user_roles)),
+            .route("/{id}/roles", get(user_roles).put(set_user_roles)),
     )
 }
 
-async fn get_users(
+async fn list_users(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<User>>, AppError> {
@@ -55,7 +55,7 @@ async fn delete_user(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn get_user_roles(
+async fn user_roles(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Path(user_id): Path<i64>,
