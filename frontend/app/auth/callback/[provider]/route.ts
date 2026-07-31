@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { NextRequest } from 'next/server'
+import { clientIpHeaders } from '@/libs/client-ip'
 
 export async function GET(
     request: NextRequest,
@@ -17,9 +18,19 @@ export async function GET(
         redirect('/login?error=oauth_denied')
     }
 
+    // state 必須與發起本次登入時寫下的 cookie 相符，否則這是別人的授權流程被塞進來
+    // （login CSRF）。cookie 由 /api/auth/[provider] 寫入，httpOnly 故攻擊者無法設定。
+    // 用後即刪，避免殘留讓下一次 callback 意外通過。
+    const cookieStore = await cookies()
+    const expectedState = cookieStore.get('oauth_state')?.value
+    cookieStore.delete('oauth_state')
+    if (!expectedState || expectedState !== state) {
+        redirect('/login?error=oauth_denied')
+    }
+
     const res = await fetch(`${process.env.API_URL}/oauth/${provider}/exchange`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await clientIpHeaders()) },
         body: JSON.stringify({ code, state }),
     })
 
@@ -28,7 +39,6 @@ export async function GET(
     }
 
     const { access_token, refresh_token } = await res.json()
-    const cookieStore = await cookies()
 
     cookieStore.set('access_token', access_token, {
         httpOnly: true,

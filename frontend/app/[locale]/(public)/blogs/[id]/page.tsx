@@ -60,9 +60,16 @@ export default async function BlogPage({ params }: { params: Params }) {
 
     return (
         <>
+            {/*
+                `<` 必須 escape：JSON.stringify 不會處理它，而 headline / description /
+                keywords 三者都來自 PUT /admin/blogs/:id 的 body（tocs 是原封存下來的，
+                markdown 經 markdownToPlainText 也不去角括號）。作者塞一個 `</script>`
+                就能跳出這個元素、在公開文章頁執行任意 script。
+                JSON 字串裡 `<` 與 `<` 等價，schema.org 解析不受影響。
+            */}
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
             />
             <BlogArticle
                 markdown={blog.markdown}
