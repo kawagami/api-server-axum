@@ -90,7 +90,8 @@ export default async function ProfilePage() {
                 </div>
 
                 <div className="flex flex-col gap-2 text-sm text-neutral-500 dark:text-neutral-400 border-t border-neutral-100 dark:border-neutral-700 pt-4">
-                    <span>{t("joinedAt")}{new Date(member.created_at).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" })}</span>
+                    {/* timeZone 必填：server component 跑在容器裡（UTC），少了會與 client 差一天 */}
+                    <span>{t("joinedAt")}{new Date(member.created_at).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Taipei" })}</span>
                 </div>
 
                 {member.providers.length > 0 && (

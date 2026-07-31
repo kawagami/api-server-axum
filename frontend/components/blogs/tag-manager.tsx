@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Trash2, Tags } from "lucide-react";
+import Toast, { useToast } from "@/components/toast";
 import { renameBlogTag, deleteBlogTag } from "@/api/blogs";
 import type { TagCount } from "@/types";
 
@@ -11,16 +12,18 @@ export default function TagManager({ tags }: { tags: TagCount[] }) {
     const router = useRouter();
     const [busy, setBusy] = useState<string | null>(null);
     const [, startTransition] = useTransition();
+    // 成功/失敗都是一次性提示（成功訊息 ErrorBanner 做不到），統一走 useToast，不用 window.alert
+    const { toast, showToast } = useToast();
 
     async function run(tag: string, fn: () => Promise<number>, done: (n: number) => string) {
         setBusy(tag);
         try {
             const affected = await fn();
             startTransition(() => router.refresh());
-            alert(done(affected));
+            showToast("success", done(affected));
         } catch (err) {
             if ((err as { digest?: string }).digest?.startsWith("NEXT_REDIRECT")) throw err;
-            alert("操作失敗，請稍後再試。");
+            showToast("error", "操作失敗，請稍後再試");
         } finally {
             setBusy(null);
         }
@@ -78,6 +81,7 @@ export default function TagManager({ tags }: { tags: TagCount[] }) {
                     </li>
                 ))}
             </ul>
+            <Toast toast={toast} />
         </div>
     );
 }

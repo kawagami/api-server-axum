@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Check, X } from 'lucide-react';
+import useDialog from '@/hooks/useDialog';
 
 interface Props {
     tags: string[];
@@ -17,15 +18,11 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
     const [input, setInput] = useState('');
     const [hint, setHint] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const dialogRef = useRef<HTMLDivElement>(null);
+    // Esc 關閉、鎖背景捲動、焦點鎖在對話框內、關閉後還原焦點，全走共用 hook
+    const dialogRef = useDialog<HTMLDivElement>(true, onClose);
 
-    // Close the tag modal on Escape.
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
-
+    // useDialog 會聚焦第一個可聚焦元素（＝第一顆 tag 移除鈕），但這個對話框是拿來打字的，
+    // 所以宣告在它之後覆寫成輸入框（effect 依宣告順序執行，這個跑在後面）。
     useEffect(() => { inputRef.current?.focus(); }, []);
 
     // 候選 = 全站 tags ∪ 本文 tags(含本次新建、尚未存檔的)
@@ -60,17 +57,6 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
 
     const removeTag = (tag: string) => onTagsChange(tags.filter(t => tagKey(t) !== tagKey(tag)));
 
-    // Tab 循環鎖在 dialog 內
-    const trapFocus = (e: React.KeyboardEvent) => {
-        if (e.key !== 'Tab') return;
-        const focusables = dialogRef.current?.querySelectorAll<HTMLElement>('button, input');
-        if (!focusables?.length) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    };
-
     return (
         <div
             className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4"
@@ -81,7 +67,6 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
                 role="dialog"
                 aria-modal="true"
                 aria-label="編輯 Tag"
-                onKeyDown={trapFocus}
                 className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-lg w-full max-w-md max-h-[80vh] overflow-auto"
                 onClick={(e) => e.stopPropagation()}
             >

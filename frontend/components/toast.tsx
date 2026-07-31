@@ -9,9 +9,12 @@ export interface ToastState {
 }
 
 /**
- * 前台一次性提示的單一來源。取代散在各頁的 `alert()` 與自己刻的置中覆蓋層
- * ——alert 會擋住整個視窗、無法翻譯樣式，覆蓋層則各頁位置不一。
+ * 一次性提示的單一來源（前後台通用 —— 本檔只吃 message 字串、不碰 i18n，
+ * 所以沒有 NextIntlClientProvider 的 admin 也能直接用）。
+ * 取代散在各頁的 `alert()` 與自己刻的置中覆蓋層
+ * ——alert 會擋住整個視窗、無法套樣式，覆蓋層則各頁位置不一。
  * 固定浮在畫面底部中央，role="status" 讓螢幕閱讀器也讀得到。
+ * 頁面層級的「載入/操作失敗」請用 components/admin/error-banner.tsx（常駐、role="alert"）。
  */
 export function useToast(timeoutMs = 2400) {
     const [toast, setToast] = useState<ToastState | null>(null);

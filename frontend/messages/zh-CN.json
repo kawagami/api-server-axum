@@ -271,6 +271,8 @@
     "metaDescription": "kawa 的个人小站介绍：技术栈、设计原则与联系方式。"
   },
   "Ws": {
+    "feedTitle": "实时通知",
+    "waiting": "等待事件…",
     "blogCreated": "新文章发布",
     "stockCompleted": "股票完成 ✓",
     "stockFailed": "股票失败 ✗",

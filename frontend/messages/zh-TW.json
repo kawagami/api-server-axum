@@ -271,6 +271,8 @@
     "metaDescription": "kawa 的個人小站介紹：技術棧、設計原則與聯絡方式。"
   },
   "Ws": {
+    "feedTitle": "即時通知",
+    "waiting": "等待事件…",
     "blogCreated": "新文章發布",
     "stockCompleted": "股票完成 ✓",
     "stockFailed": "股票失敗 ✗",

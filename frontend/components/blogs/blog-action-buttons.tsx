@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type ButtonHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
 import { v4 as uuidv4 } from 'uuid';
+import Toast, { useToast } from "@/components/toast";
 import { deleteBlog } from "@/api/blogs";
 
 interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -52,6 +53,9 @@ export function EditButton({ uuid }: { uuid: string }) {
 export function DeleteButton({ uuid }: { uuid: string }) {
     const router = useRouter();
     const [isDeleting, setIsDeleting] = useState(false);
+    // 這顆按鈕在清單列的行內動作列裡（flex space-x-2），塞不進 ErrorBanner 這種塊狀元素，
+    // 故一次性失敗提示走 Toast（不用 window.alert）。頁面層級的失敗仍用 ErrorBanner。
+    const { toast, showToast } = useToast();
 
     const handleDelete = async () => {
         if (isDeleting) return;
@@ -64,22 +68,25 @@ export function DeleteButton({ uuid }: { uuid: string }) {
             router.refresh();
         } catch (err) {
             if ((err as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw err;
-            alert("刪除失敗，請稍後再試。");
+            showToast("error", "刪除失敗，請稍後再試");
         } finally {
             setIsDeleting(false);
         }
     };
 
     return (
-        <LoadingButton
-            loading={isDeleting}
-            onClick={handleDelete}
-            className={`ml-2 px-4 py-2 font-medium rounded-lg text-white flex items-center gap-1 transition duration-200 ${isDeleting
-                ? "bg-neutral-400 cursor-not-allowed"
-                : "bg-red-500 hover:bg-red-600"
-                }`}
-        >
-            {isDeleting ? "刪除中..." : "刪除"}
-        </LoadingButton>
+        <>
+            <LoadingButton
+                loading={isDeleting}
+                onClick={handleDelete}
+                className={`ml-2 px-4 py-2 font-medium rounded-lg text-white flex items-center gap-1 transition duration-200 ${isDeleting
+                    ? "bg-neutral-400 cursor-not-allowed"
+                    : "bg-red-500 hover:bg-red-600"
+                    }`}
+            >
+                {isDeleting ? "刪除中..." : "刪除"}
+            </LoadingButton>
+            <Toast toast={toast} />
+        </>
     );
 }

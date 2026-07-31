@@ -271,6 +271,8 @@
     "metaDescription": "About kawa's personal site: stack, principles and contact."
   },
   "Ws": {
+    "feedTitle": "Live notifications",
+    "waiting": "Waiting for events…",
     "blogCreated": "New post published",
     "stockCompleted": "Stock completed ✓",
     "stockFailed": "Stock failed ✗",
