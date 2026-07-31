@@ -5,36 +5,21 @@ use tokio_cron_scheduler::{Job as CronJob, JobScheduler};
 pub async fn initialize_scheduler(state: AppState) {
     let scheduler = JobScheduler::new().await.expect("failed to create scheduler");
 
-    for job in [
-        AppJob::CleanupExpiredTorrents,
-        AppJob::CleanupUnusedImages,
-        AppJob::FetchStockDayAll,
-        AppJob::FetchBuybackPeriods,
-        AppJob::FetchGovTenders,
-        AppJob::FetchHistoricalClosingPrices,
-        AppJob::ConsumePendingStockChange,
-        AppJob::SyncBuybackToPending,
-        AppJob::CheckInvoiceLottery,
-        AppJob::CheckLottoWins,
-        AppJob::AggregateVisitors,
-        AppJob::CollectSystemMetrics,
-        AppJob::CleanupObservability,
-    ] {
+    // 清單的單一來源在 AppJob::ALL，這裡不另抄一份（漏抄會靜默不執行）
+    for job in AppJob::ALL {
         add_job(&scheduler, state.clone(), job).await;
     }
 
     scheduler.start().await.expect("failed to start scheduler");
 }
 
-async fn add_job(scheduler: &JobScheduler, state: AppState, job: AppJob) {
+async fn add_job(scheduler: &JobScheduler, state: AppState, job: &'static AppJob) {
     let expr = job.cron_expression().to_string();
-    let job = Arc::new(job);
     // 防重疊：上一輪還沒跑完就跳過本輪
     let running = Arc::new(tokio::sync::Mutex::new(()));
 
     let cron_job = match CronJob::new_async(expr.as_str(), move |_uuid, _l| {
         let state = state.clone();
-        let job = job.clone();
         let running = running.clone();
         Box::pin(async move {
             // instance 級功能開關：每次觸發時檢查，設定熱更新即時生效

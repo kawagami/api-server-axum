@@ -58,6 +58,11 @@ pub enum RequestError {
 
     #[error("找不到資源")]
     NotFound,
+
+    /// 限流。有這個 variant，rate_limit middleware 才不必自己組 JSON —— 否則被限流的
+    /// 使用者拿到的是唯一一種沒有 request_id 的錯誤 body，回報問題時對不到 log。
+    #[error("{0}")]
+    TooManyRequests(String),
 }
 
 #[derive(Error, Debug)]
@@ -135,6 +140,7 @@ impl AppError {
                 RequestError::Conflict(_) => StatusCode::CONFLICT,
                 RequestError::InsufficientStorage(_) => StatusCode::INSUFFICIENT_STORAGE,
                 RequestError::NotFound => StatusCode::NOT_FOUND,
+                RequestError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             },
             Self::AuthError(err) => match err {
                 AuthError::MissingToken => StatusCode::UNAUTHORIZED,

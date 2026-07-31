@@ -1,11 +1,12 @@
-use crate::{errors::AppError, state::AppState};
+use crate::{
+    errors::{AppError, RequestError},
+    state::AppState,
+};
 use axum::{
     body::Body,
     extract::{connect_info::ConnectInfo, Request, State},
-    http::StatusCode,
     middleware::Next,
-    response::{IntoResponse, Response},
-    Json,
+    response::Response,
 };
 use std::net::SocketAddr;
 
@@ -100,14 +101,9 @@ async fn rate_limit(
     .await?;
 
     if count > max_requests {
-        return Ok((
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(serde_json::json!({
-                "code": 429,
-                "message": "請求過於頻繁，請稍後再試"
-            })),
-        )
-            .into_response());
+        // 走 AppError 而不是自組 JSON：全站錯誤形狀只有 errors.rs 那一種
+        // （帶 code / message / details? / request_id），這裡曾是唯一的破口。
+        return Err(RequestError::TooManyRequests("請求過於頻繁，請稍後再試".to_string()).into());
     }
 
     Ok(next.run(req).await)

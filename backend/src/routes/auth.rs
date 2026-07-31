@@ -105,14 +105,16 @@ async fn change_password(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthenticatedUser>,
     Json(body): Json<ChangePasswordData>,
-) -> Result<(), AppError> {
+) -> Result<StatusCode, AppError> {
     auth_service::change_password(
         state.get_pool(),
         auth_user.id,
         &body.current_password,
         &body.new_password,
     )
-    .await
+    .await?;
+    // 回 `()` 的話 axum 會給 200 + 空 body；無內容的更新一律 204（同檔 delete_passkey）
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn passkey_register_begin(

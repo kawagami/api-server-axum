@@ -17,6 +17,26 @@ pub enum AppJob {
 }
 
 impl AppJob {
+    /// 所有 job 的單一來源（對應 `Feature::ALL`）。scheduler 從這裡迭代，不要在
+    /// scheduler.rs 另抄一份陣列 —— 其餘四個 method 都是窮盡 match（漏了會編譯錯），
+    /// 只有「有沒有註冊進 scheduler」沒有編譯器保護：漏了會編得過、跑起來、
+    /// 該 job 永遠不觸發，而且零 log 零警告。
+    pub const ALL: &'static [AppJob] = &[
+        AppJob::CleanupExpiredTorrents,
+        AppJob::CleanupUnusedImages,
+        AppJob::FetchStockDayAll,
+        AppJob::FetchBuybackPeriods,
+        AppJob::FetchGovTenders,
+        AppJob::FetchHistoricalClosingPrices,
+        AppJob::ConsumePendingStockChange,
+        AppJob::SyncBuybackToPending,
+        AppJob::CheckInvoiceLottery,
+        AppJob::CheckLottoWins,
+        AppJob::AggregateVisitors,
+        AppJob::CollectSystemMetrics,
+        AppJob::CleanupObservability,
+    ];
+
     pub fn name(&self) -> &'static str {
         match self {
             AppJob::CleanupExpiredTorrents => "CleanupExpiredTorrents",
