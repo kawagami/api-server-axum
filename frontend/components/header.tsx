@@ -45,6 +45,12 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
     const [isGamesOpen, setIsGamesOpen] = useState(false);
     const [isMemberOpen, setIsMemberOpen] = useState(false);
     const t = useTranslations('Header');
+    // ThemeButton 前後台共用、拿不到 intl context，文案由這裡餵進去
+    const themeLabels = {
+        light: t('colorModeLight'),
+        dark: t('colorModeDark'),
+        auto: t('colorModeAuto'),
+    };
     const pathname = usePathname();
     const navRef = useRef<HTMLElement>(null);
     const mobileNavRef = useRef<HTMLElement>(null);
@@ -193,7 +199,7 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
                     </div>}
                     <Link href="/about" aria-label={t('about')} className={`${navLinkClass} ${isAboutActive ? activeNavClass : ''}`}>{t('about')}</Link>
                     <LocaleSwitcher />
-                    <ThemeButton initialMode={colorMode} defaultIsDark={defaultIsDark} />
+                    <ThemeButton initialMode={colorMode} defaultIsDark={defaultIsDark} labels={themeLabels} />
                     {member ? (
                         <div
                             className="relative"
@@ -305,7 +311,7 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
 
                         <Link href="/about" className={`${mobileItemClass} ${isAboutActive ? activeNavClass : ''}`} onClick={closeAll}>{t('about')}</Link>
                         <div className="px-4 py-2">
-                            <ThemeButton initialMode={colorMode} defaultIsDark={defaultIsDark} />
+                            <ThemeButton initialMode={colorMode} defaultIsDark={defaultIsDark} labels={themeLabels} />
                         </div>
                         <div className="px-4 py-2">
                             <LocaleSwitcher />

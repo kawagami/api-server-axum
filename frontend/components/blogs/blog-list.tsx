@@ -59,7 +59,7 @@ export default async function BlogList({ selectedTag = null, page = 1, q = null,
                             <BlogListCard
                                 key={blog.id}
                                 id={blog.id}
-                                toc={blog.tocs[0] || '未命名 blog'}
+                                toc={blog.tocs[0] || t('untitled')}
                                 excerpt={makeExcerpt(blog.markdown ?? '', blog.tocs[0] ?? '')}
                                 tags={blog.tags || []}
                                 created_at={blog.created_at ?? ''}

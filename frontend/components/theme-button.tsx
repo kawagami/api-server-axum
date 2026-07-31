@@ -9,6 +9,13 @@ interface Props {
     initialMode: UserColorMode;
     /** 網站預設是否深色；null = 跟隨系統 */
     defaultIsDark: boolean | null;
+    /**
+     * 三態的 aria-label／title。
+     * 本元件前後台共用，而 admin 不在 [locale] 之下、沒有 NextIntlClientProvider，
+     * 所以**不能**在這裡呼叫 useTranslations —— 文案由呼叫端給：
+     * 前台 Header 傳翻譯後的字串，admin 省略此 prop 吃預設繁中（後台文案一律繁中）。
+     */
+    labels?: Record<UserColorMode, string>;
 }
 
 const NEXT_MODE: Record<UserColorMode, UserColorMode> = {
@@ -17,14 +24,15 @@ const NEXT_MODE: Record<UserColorMode, UserColorMode> = {
     auto: 'light',
 };
 
-const MODE_LABEL: Record<UserColorMode, string> = {
+const DEFAULT_MODE_LABEL: Record<UserColorMode, string> = {
     light: '淺色模式（點擊切深色）',
     dark: '深色模式（點擊改跟隨網站預設）',
     auto: '跟隨網站預設（點擊切淺色）',
 };
 
-export default function ThemeButton({ initialMode, defaultIsDark }: Props) {
+export default function ThemeButton({ initialMode, defaultIsDark, labels }: Props) {
     const [mode, setMode] = useState<UserColorMode>(initialMode);
+    const MODE_LABEL = labels ?? DEFAULT_MODE_LABEL;
 
     function cycle() {
         const next = NEXT_MODE[mode];

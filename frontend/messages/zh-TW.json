@@ -57,6 +57,9 @@
     "gameFarm": "農場經營",
     "gameMetalSlug": "越南大戰",
     "blog": "文章",
+    "colorModeLight": "淺色模式（點擊切深色）",
+    "colorModeDark": "深色模式（點擊改跟隨網站預設）",
+    "colorModeAuto": "跟隨網站預設（點擊切淺色）",
     "skipToContent": "跳至主要內容"
   },
   "Login": {
@@ -190,6 +193,7 @@
     "metaTaggedTitle": "標籤：{tag}",
     "metaAuthorTitle": "{author} 的文章",
     "metaDescription": "Kawa 的個人部落格，分享程式開發、後端、前端與工具相關筆記。",
+    "untitled": "未命名文章",
     "searchPlaceholder": "搜尋文章…",
     "searchClear": "清除搜尋",
     "sortLabel": "排序",
@@ -1019,6 +1023,9 @@
     "generate": "開始自動排班",
     "generating": "計算中…",
     "failed": "排班失敗，請稍後再試",
+    "shiftMorning": "早班",
+    "shiftNight": "晚班",
+    "shiftOff": "休",
     "staffColumn": "人員名單",
     "dayColumn": "第 {n} 天"
   },

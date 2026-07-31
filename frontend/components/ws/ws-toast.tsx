@@ -2,6 +2,7 @@
 
 import { useWsNotification } from '@/hooks/useWsNotification';
 import type { WsEventType } from '@/types';
+import { useTranslations } from 'next-intl';
 import { X } from 'lucide-react';
 
 interface ToastItemProps {
@@ -40,40 +41,44 @@ function UserJoinedToast(_: ToastItemProps) { return null; }
 function UserLeftToast(_: ToastItemProps) { return null; }
 
 function BlogCreatedToast({ data, onDismiss }: ToastItemProps) {
+    const t = useTranslations('Ws');
     const blog = data as BlogData;
     return (
         <ToastShell bg="bg-primary-600 dark:bg-primary-700" onDismiss={onDismiss}>
-            <p className="font-semibold">新文章發布</p>
+            <p className="font-semibold">{t('blogCreated')}</p>
             <p>{blog.title}</p>
         </ToastShell>
     );
 }
 
 function StockCompletedToast({ data, onDismiss }: ToastItemProps) {
+    const t = useTranslations('Ws');
     const s = data as StockData;
     return (
         <ToastShell bg="bg-green-600 dark:bg-green-700" onDismiss={onDismiss}>
-            <p className="font-semibold">股票完成 ✓</p>
+            <p className="font-semibold">{t('stockCompleted')}</p>
             <p>{s.stock_name}（{s.stock_no}）</p>
         </ToastShell>
     );
 }
 
 function StockFailedToast({ data, onDismiss }: ToastItemProps) {
+    const t = useTranslations('Ws');
     const s = data as StockData;
     return (
         <ToastShell bg="bg-red-600 dark:bg-red-700" onDismiss={onDismiss}>
-            <p className="font-semibold">股票失敗 ✗</p>
-            <p>股票代號：{s.stock_no}</p>
+            <p className="font-semibold">{t('stockFailed')}</p>
+            <p>{t('stockNo', { no: s.stock_no ?? '' })}</p>
         </ToastShell>
     );
 }
 
 function AdminMessageToast({ data, onDismiss }: ToastItemProps) {
+    const t = useTranslations('Ws');
     const m = data as AdminMessageData;
     return (
         <ToastShell bg="bg-neutral-800 dark:bg-neutral-700" onDismiss={onDismiss}>
-            <p className="font-semibold">管理員訊息</p>
+            <p className="font-semibold">{t('adminMessage')}</p>
             <p>{m.content}</p>
             {m.from && <p className="text-xs opacity-75">— {m.from}</p>}
         </ToastShell>

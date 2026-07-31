@@ -57,6 +57,9 @@
     "gameFarm": "Farm Manager",
     "gameMetalSlug": "Metal Slug",
     "blog": "Blog",
+    "colorModeLight": "Light mode (click for dark)",
+    "colorModeDark": "Dark mode (click to follow site default)",
+    "colorModeAuto": "Following site default (click for light)",
     "skipToContent": "Skip to main content"
   },
   "Login": {
@@ -190,6 +193,7 @@
     "metaTaggedTitle": "Tag: {tag}",
     "metaAuthorTitle": "Posts by {author}",
     "metaDescription": "Kawa's personal blog — notes on programming, backend, frontend, and developer tools.",
+    "untitled": "Untitled post",
     "searchPlaceholder": "Search posts…",
     "searchClear": "Clear search",
     "sortLabel": "Sort",
@@ -1019,6 +1023,9 @@
     "generate": "Generate schedule",
     "generating": "Calculating…",
     "failed": "Scheduling failed — please try again",
+    "shiftMorning": "Morning",
+    "shiftNight": "Night",
+    "shiftOff": "Off",
     "staffColumn": "Person",
     "dayColumn": "Day {n}"
   },
