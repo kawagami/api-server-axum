@@ -1,18 +1,14 @@
 use crate::errors::{AppError, RequestError, SystemError};
 use crate::middleware::rate_limit;
-use crate::structs::tools::{
-    CompleteTimeResponse, ConvertTextRequest, ConvertTextResponse, ConversionDirection, Troops,
-};
+use crate::structs::tools::{ConvertTextRequest, ConvertTextResponse, ConversionDirection};
 use crate::{state::AppState, structs::tools::Params};
 use axum::{extract::Query, middleware, routing::get, routing::post, Json, Router};
-use chrono::{Duration, Local};
 use rand::{distr::Alphanumeric, Rng};
 use zhconv::{zhconv, Variant};
 
 pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/new_password", get(new_password))
-        .route("/caculate_complete_time", get(caculate_complete_time))
         .route("/convert_text", post(convert_text))
         .layer(middleware::from_fn_with_state(
             state,
@@ -72,18 +68,5 @@ pub async fn convert_text(
     Ok(Json(ConvertTextResponse {
         original_text,
         converted_text,
-    }))
-}
-
-pub async fn caculate_complete_time(
-    Query(troops): Query<Troops>,
-) -> Result<Json<CompleteTimeResponse>, AppError> {
-    let remaining_time = (troops.full - troops.now - troops.remaining_troops).max(0); // 跟 0 比取大者
-    let minutes = remaining_time / 127;
-    let complete_time = Local::now() + Duration::minutes(minutes);
-
-    Ok(Json(CompleteTimeResponse {
-        complete_time: complete_time.format("%Y-%m-%d %H:%M:%S").to_string(),
-        minutes,
     }))
 }
