@@ -20,6 +20,9 @@ fn epoch_end() -> NaiveDate {
 }
 
 /// 驗證 kind / category / amount，非法回 422
+/// 備註長度上限，與 services/messages.rs 的 CONTENT_MAX 同級
+const NOTE_MAX: usize = 5000;
+
 fn validate(req: &LedgerRequest) -> Result<(), AppError> {
     let categories = match req.kind.as_str() {
         "income" => INCOME_CATEGORIES,
@@ -45,6 +48,17 @@ fn validate(req: &LedgerRequest) -> Result<(), AppError> {
 
     if req.amount <= Decimal::ZERO {
         return Err(RequestError::UnprocessableContent("amount 必須大於 0".to_string()).into());
+    }
+
+    // note 是 DB 的 text 欄位、無天然上限。會員（OAuth 免費取得）可重複 POST 大量
+    // 內容灌磁碟；同 codebase 的 messages / blog_comments 早就有上限，這裡補齊。
+    if let Some(note) = &req.note {
+        if note.chars().count() > NOTE_MAX {
+            return Err(RequestError::UnprocessableContent(format!(
+                "note 長度上限 {NOTE_MAX} 字"
+            ))
+            .into());
+        }
     }
 
     Ok(())

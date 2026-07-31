@@ -494,6 +494,10 @@ pub async fn answer(
     caller: Option<i64>,
     req: &AnswerRequest,
 ) -> Result<AnswerResponse, AppError> {
+    // 先擋長度再做任何事：日文讀音正規化會對整個輸入多趟掃描，而這支端點訪客可用
+    req.validate()
+        .map_err(crate::errors::RequestError::UnprocessableContent)?;
+
     let mut run = load_run(state, run_id, caller).await?;
 
     // 限時已到:棄置此題直接結算(正常由前端倒數歸零呼叫 finish,此為伺服器端安全網)

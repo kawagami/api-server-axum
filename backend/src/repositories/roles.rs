@@ -164,21 +164,27 @@ pub async fn set_role_permissions(
     Ok(())
 }
 
-pub async fn delete_role(pool: &Pool<Postgres>, role_id: i32) -> Result<(), AppError> {
-    let built_in = ["guest", "member", "admin", "super_admin"];
-    let (name,): (String,) =
-        sqlx::query_as("SELECT name FROM roles WHERE id = $1")
-            .bind(role_id)
-            .fetch_one(pool)
-            .await?;
+/// 內建角色：不可刪除、也不可改權限組。
+/// 允許改的話，任何有 `role:update` 的人都能把自己所屬的角色補滿權限來自我提權。
+const BUILT_IN_ROLES: [&str; 4] = ["guest", "member", "admin", "super_admin"];
 
-    if built_in.contains(&name.as_str()) {
+/// 這個 role 是不是內建角色；是的話回 400。供 delete_role 與 set_role_permissions 共用。
+pub async fn ensure_not_built_in(pool: &Pool<Postgres>, role_id: i32) -> Result<(), AppError> {
+    let (name,): (String,) = sqlx::query_as("SELECT name FROM roles WHERE id = $1")
+        .bind(role_id)
+        .fetch_one(pool)
+        .await?;
+
+    if BUILT_IN_ROLES.contains(&name.as_str()) {
         return Err(AppError::RequestError(
-            crate::errors::RequestError::InvalidContent(
-                "無法刪除內建角色".to_string(),
-            ),
+            crate::errors::RequestError::InvalidContent(format!("內建角色 {name} 不可修改")),
         ));
     }
+    Ok(())
+}
+
+pub async fn delete_role(pool: &Pool<Postgres>, role_id: i32) -> Result<(), AppError> {
+    ensure_not_built_in(pool, role_id).await?;
 
     sqlx::query("DELETE FROM roles WHERE id = $1")
         .bind(role_id)

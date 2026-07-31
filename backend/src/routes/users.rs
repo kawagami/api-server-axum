@@ -1,5 +1,5 @@
 use crate::{
-    errors::AppError,
+    errors::{AppError, RequestError},
     services::users as users_service,
     state::AppState,
     structs::{
@@ -76,6 +76,13 @@ async fn set_user_roles(
     Json(body): Json<SetUserRoles>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::RoleAssign)?;
+    // 不可改自己的角色：否則有 role:assign 的人可以自行加掛任何角色（自我提權）。
+    // 要調整自己的權限得請另一位管理員操作。
+    if user_id == auth_user.id {
+        return Err(AppError::RequestError(RequestError::InvalidContent(
+            "不可變更自己的角色，請由其他管理員操作".to_string(),
+        )));
+    }
     users_service::set_user_roles(state.get_pool(), state.get_redis_pool(), user_id, body.role_ids).await?;
     Ok(StatusCode::NO_CONTENT)
 }

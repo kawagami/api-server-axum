@@ -68,6 +68,7 @@ pub async fn set_user_roles(
     user_id: i64,
     role_ids: Vec<i32>,
 ) -> Result<(), AppError> {
+    super::roles::ensure_assignable(pool, &role_ids).await?;
     users_repo::set_user_roles(pool, user_id, &role_ids).await?;
     redis::invalidate_user_permissions(redis_pool, user_id).await;
     Ok(())

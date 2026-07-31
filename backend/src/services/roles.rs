@@ -41,6 +41,9 @@ pub async fn set_role_permissions(
     role_id: i32,
     body: SetRolePermissions,
 ) -> Result<(), AppError> {
+    // 內建角色的權限組不可改。delete_role 早就有這道保護，這支漏了 ——
+    // 少了它，有 role:update 的人可以把自己所屬角色補滿權限（自我提權）。
+    roles_repo::ensure_not_built_in(pool, role_id).await?;
     let ids = roles_repo::get_ids_by_role_id(pool, role_id).await?;
     roles_repo::set_role_permissions(pool, role_id, &body.permission_ids).await?;
     redis::invalidate_permissions_for_ids(redis_pool, &ids).await;

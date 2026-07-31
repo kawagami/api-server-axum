@@ -158,12 +158,32 @@ pub struct QuestionDto {
     pub hint_length: Option<usize>,
 }
 
+/// 拼字題答案的長度上限（bytes）。一個單字／讀音遠遠用不到這麼多。
+///
+/// 需要上限的理由：日文分支會對輸入跑 `vocab_ja::normalize_reading`
+/// （NFKC → filter → to_lowercase → to_hiragana，多趟掃描 + 多份配置），
+/// 而 vocab 對訪客開放，不擋的話 10MB 輸入會佔住 tokio worker。
+/// 有了上限，成本可忽略，就不必為它包 spawn_blocking。
+pub const MAX_ANSWER_TEXT_BYTES: usize = 256;
+
 #[derive(Deserialize)]
 pub struct AnswerRequest {
     /// 選擇題:選項 index
     pub choice_index: Option<usize>,
     /// 拼字題:輸入的單字
     pub text: Option<String>,
+}
+
+impl AnswerRequest {
+    /// 純函式驗證，可測。
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(t) = &self.text {
+            if t.len() > MAX_ANSWER_TEXT_BYTES {
+                return Err(format!("text 長度上限 {MAX_ANSWER_TEXT_BYTES} bytes"));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Default)]
@@ -351,4 +371,43 @@ pub struct VocabMe {
     pub bests: Vec<BestRun>,
     pub total_runs: i64,
     pub words_learned: i64,
+}
+
+#[cfg(test)]
+mod answer_request_tests {
+    use super::*;
+
+    fn with_text(t: Option<&str>) -> AnswerRequest {
+        AnswerRequest {
+            choice_index: None,
+            text: t.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn accepts_normal_answer() {
+        assert!(with_text(Some("apple")).validate().is_ok());
+        assert!(with_text(Some("とうきょう")).validate().is_ok());
+    }
+
+    /// 選擇題不帶 text，不該被誤擋
+    #[test]
+    fn accepts_missing_text() {
+        assert!(with_text(None).validate().is_ok());
+    }
+
+    #[test]
+    fn accepts_exactly_at_limit() {
+        let s = "a".repeat(MAX_ANSWER_TEXT_BYTES);
+        assert!(with_text(Some(s.as_str())).validate().is_ok());
+    }
+
+    /// 這條守的是「訪客可觸發的 CPU 阻塞」：日文讀音正規化會對整個輸入多趟掃描
+    #[test]
+    fn rejects_oversized_answer() {
+        let s = "a".repeat(MAX_ANSWER_TEXT_BYTES + 1);
+        assert!(with_text(Some(s.as_str())).validate().is_err());
+        let huge = "a".repeat(10 * 1024 * 1024);
+        assert!(with_text(Some(huge.as_str())).validate().is_err());
+    }
 }

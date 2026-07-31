@@ -17,6 +17,10 @@ use std::sync::OnceLock;
 use uuid::Uuid;
 
 const SOURCES: &[&str] = &["qr", "barcode", "manual"];
+/// 與 services/messages.rs 的 CONTENT_MAX、services/ledger.rs 的 NOTE_MAX 同級
+const NOTE_MAX: usize = 5000;
+/// 統編是 8 位數字，留點餘裕給空白／連字號
+const SELLER_TAX_ID_MAX: usize = 16;
 
 fn invoice_number_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
@@ -57,6 +61,17 @@ pub async fn register(
     }
     if !SOURCES.contains(&req.source.as_str()) {
         return Err(unprocessable("source 必須為 qr / barcode / manual"));
+    }
+    // note / seller_tax_id 是 DB 的 text 欄位、無天然上限；會員可重複 POST 大量內容灌磁碟
+    if req.note.as_ref().is_some_and(|n| n.chars().count() > NOTE_MAX) {
+        return Err(unprocessable("note 長度上限 5000 字"));
+    }
+    if req
+        .seller_tax_id
+        .as_ref()
+        .is_some_and(|s| s.chars().count() > SELLER_TAX_ID_MAX)
+    {
+        return Err(unprocessable("seller_tax_id 長度不正確"));
     }
 
     let expense = expense_fields(req)?;
