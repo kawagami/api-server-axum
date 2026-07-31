@@ -118,13 +118,28 @@ pub enum SystemError {
     TimeParse(#[source] chrono::ParseError),
 }
 
+/// SystemError 對外的統一訊息。
+///
+/// `SystemError::Internal(String)` 的 Display 會把內部字串原樣帶出去，而那些字串常含
+/// 檔案系統路徑、errno、上游回應片段（`serve file failed: {e}`、`儲存圖片失敗: {e}`，
+/// 以及 anyhow / reqwest 的 blanket 轉換）。在 `error_response` 這一層統一換成通用
+/// 訊息，比逐一修每個 `format!` 徹底 —— 新增的 Internal 也自動被涵蓋。
+///
+/// 細節不會消失：`IntoResponse` 已經用 `tracing::error!(?self, …)` 記下完整內容，
+/// 對外回應帶著 `request_id`，要查就用它對 log。
+const SYSTEM_ERROR_PUBLIC_MESSAGE: &str = "伺服器內部錯誤，請稍後再試";
+
 impl AppError {
     fn error_response(&self) -> ErrorResponse {
         let status = self.status_code();
 
         ErrorResponse {
             code: status.as_u16(),
-            message: self.to_string(),
+            // SystemError 的內部細節只進 log，不出站
+            message: match self {
+                Self::SystemError(_) => SYSTEM_ERROR_PUBLIC_MESSAGE.to_string(),
+                _ => self.to_string(),
+            },
             details: self.error_details(),
             request_id: crate::middleware::request_id::current_request_id(),
         }
@@ -248,6 +263,21 @@ mod tests {
 
         assert_eq!(response.code, 401);
         assert_eq!(response.message, "認證失敗: 缺少認證 Token");
+    }
+
+    /// SystemError 的內部字串常含檔案路徑 / errno / 上游回應片段，不可出站。
+    /// 細節只進 log，客戶端拿 request_id 去對。
+    #[test]
+    fn system_error_detail_never_reaches_client() {
+        let leaky = AppError::SystemError(SystemError::Internal(
+            "serve file failed: /srv/kawa/torrents/abc/secret.mkv (os error 13)".to_string(),
+        ));
+        let response = leaky.error_response();
+
+        assert_eq!(response.code, 500);
+        assert_eq!(response.message, SYSTEM_ERROR_PUBLIC_MESSAGE);
+        assert!(!response.message.contains("/srv/kawa"));
+        assert!(!response.message.contains("os error"));
     }
 
     #[test]

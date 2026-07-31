@@ -100,6 +100,22 @@ pub async fn count_all(pool: &Pool<Postgres>) -> Result<i64, AppError> {
 }
 
 /// 刪除一則留言;不存在回 RowNotFound(→ 404)
+/// 這則留言所屬文章的作者。外層 Option = 留言不存在；內層 Option = 文章沒有作者
+/// （舊資料，只有 super_admin 動得了）。形狀與 blogs::get_author 一致，
+/// 好讓呼叫端沿用同一套 require_owner 判斷。
+pub async fn get_blog_author(
+    pool: &Pool<Postgres>,
+    comment_id: i64,
+) -> Result<Option<Option<i64>>, AppError> {
+    let row: Option<(Option<i64>,)> = sqlx::query_as(
+        "SELECT b.author_id FROM blog_comments c JOIN blogs b ON b.id = c.blog_id WHERE c.id = $1",
+    )
+    .bind(comment_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|(author,)| author))
+}
+
 pub async fn delete(pool: &Pool<Postgres>, id: i64) -> Result<(), AppError> {
     let res = sqlx::query("DELETE FROM blog_comments WHERE id = $1")
         .bind(id)

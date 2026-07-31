@@ -76,11 +76,19 @@ async fn ws_handler(
             .flatten(),
         None => None,
     };
-    let real_ip = req_headers
-        .get("CF-Connecting-IP")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| addr.ip().to_string());
+    // 與 middleware/rate_limit.rs 同一條規則：只有確定流量都經 Cloudflare
+    // （TRUST_CF_HEADER=true）才信任這個 header。生產靠 nginx 在 server 層無條件
+    // 覆寫成 $remote_addr 擋著，但不能只有一層 —— 直連 origin 或本地開發時，
+    // 偽造值會進到訪客去重統計、後台連線列表、與 user_joined 廣播。
+    let real_ip = if state.get_config().trust_cf_header {
+        req_headers
+            .get("CF-Connecting-IP")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| addr.ip().to_string())
+    } else {
+        addr.ip().to_string()
+    };
     tracing::info!("{real_ip} connected ({}) email={:?}", user_agent, user_email);
 
     // 每日不重複到訪統計：以 WS 握手為採集點（天然濾掉不跑 JS 的 bot），

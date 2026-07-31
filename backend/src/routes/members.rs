@@ -6,11 +6,12 @@ use crate::{
     structs::{
         auth::AuthenticatedUser,
         members::{AuthenticatedMember, Member, MemberDetail},
+        pagination::PageQuery,
         roles::Perm,
     },
 };
 use axum::{
-    extract::{Extension, Path, State},
+    extract::{Extension, Path, Query, State},
     middleware,
     routing::get,
     Json, Router,
@@ -36,9 +37,15 @@ pub fn new(state: AppState) -> Router<AppState> {
 async fn list_members(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
+    Query(page): Query<PageQuery>,
 ) -> Result<Json<Vec<Member>>, AppError> {
     auth_user.require_permission(Perm::MemberRead)?;
-    Ok(Json(members_service::get_members(state.get_pool()).await?))
+    // 預設取 PageQuery 的上限（200）：前端目前沒有分頁 UI、預期拿完整清單，
+    // 所以先只把查詢加界、不改行為。會員數逼近 200 時前端要補分頁。
+    let (limit, offset) = page.to_limit_offset(crate::structs::pagination::MAX_PER_PAGE);
+    Ok(Json(
+        members_service::get_members(state.get_pool(), limit, offset).await?,
+    ))
 }
 
 async fn member_detail(

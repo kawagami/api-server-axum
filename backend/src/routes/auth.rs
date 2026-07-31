@@ -108,6 +108,7 @@ async fn change_password(
 ) -> Result<StatusCode, AppError> {
     auth_service::change_password(
         state.get_pool(),
+        state.get_redis_pool(),
         auth_user.id,
         &body.current_password,
         &body.new_password,

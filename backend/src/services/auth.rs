@@ -66,8 +66,12 @@ pub async fn refresh_admin_token(
     encode_jwt(id, jwt_secret)
 }
 
+/// 改密碼。成功後撤銷該帳號的登入 session（清 Redis `user:login:{id}`）——
+/// 改密碼的動機常常是「懷疑帳號被盜」，若不撤銷，被竊的 token 還能再用最多 1 小時。
+/// 代價：操作者自己也會被登出，需以新密碼重新登入（前端會導回登入頁）。
 pub async fn change_password(
     pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
     id: i64,
     current_password: &str,
     new_password: &str,
@@ -81,8 +85,14 @@ pub async fn change_password(
     }
 
     let new_hash = hash_password(new_password.to_string()).await?;
+    users::update_password(pool, id, &new_hash).await?;
 
-    users::update_password(pool, id, &new_hash).await
+    // 密碼已經換了，這一步失敗只代表舊 session 多活最多 1 小時（access token 效期），
+    // 不該把整個改密碼判定成失敗 —— 但要留下可查的 error log。
+    if let Err(e) = crate::repositories::redis::del_user_login(redis_pool, id).await {
+        tracing::error!("change_password: 撤銷 user:login:{id} 失敗: {e}");
+    }
+    Ok(())
 }
 
 fn encode_jwt(id: i64, jwt_secret: &str) -> Result<String, AppError> {

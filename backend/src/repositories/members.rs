@@ -4,10 +4,19 @@ use crate::{
 };
 use sqlx::{Pool, Postgres};
 
-pub async fn get_members(pool: &Pool<Postgres>) -> Result<Vec<Member>, AppError> {
+/// 會員列表。全站每個列表端點都吃 PageQuery，這支原本是唯一沒有 LIMIT 的
+/// （而且回傳含 email），members 表只會單向成長。
+pub async fn get_members(
+    pool: &Pool<Postgres>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<Member>, AppError> {
     let members = sqlx::query_as(
-        "SELECT id, name, email, avatar_url, created_at FROM members ORDER BY id DESC",
+        "SELECT id, name, email, avatar_url, created_at FROM members
+         ORDER BY id DESC LIMIT $1 OFFSET $2",
     )
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
     Ok(members)

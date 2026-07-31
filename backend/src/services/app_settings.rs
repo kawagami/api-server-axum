@@ -22,11 +22,33 @@ const PUBLIC_KEYS: &[&str] = &[
 
 /// 平台保留設定 — 只有 platform:read 能在 GET /admin/settings 看到、platform:update 能改。
 /// 商家 instance 的管理員拿 setting:read/update 管日常設定，碰不到這些 key。
-const RESERVED_KEYS: &[&str] = &["enabled_features", "webauthn_rp_id", "webauthn_rp_origin"];
+/// `new_user_default_roles` 決定「新建管理員預設掛哪些角色」，那是平台層的權限決策，
+/// 不該只要 setting:update 就能改（否則等於另開一條指派角色的門）。
+const RESERVED_KEYS: &[&str] = &[
+    "enabled_features",
+    "webauthn_rp_id",
+    "webauthn_rp_origin",
+    "new_user_default_roles",
+];
 
 pub fn is_reserved(key: &str) -> bool {
     RESERVED_KEYS.contains(&key)
 }
+
+/// 只寫不讀的設定：GET /admin/settings 會把 value 遮掉，PATCH 仍可寫入。
+///
+/// smtp_password 是 Gmail App Password。原本任何持 setting:read 的人都會在回應 JSON 裡
+/// 拿到明文——本站目前只有 super_admin 有這個權限（內建 admin 角色沒有），所以不是現況
+/// 外洩；但 instance-per-merchant 的設計正是要讓商家管理員拿 setting:* 管日常設定，
+/// 屆時就會變成真的洩漏。先遮起來。
+const SECRET_KEYS: &[&str] = &["smtp_password"];
+
+pub fn is_secret(key: &str) -> bool {
+    SECRET_KEYS.contains(&key)
+}
+
+/// 遮蔽後的顯示值。用固定字串而非空字串，前端才分得出「有設定但不給看」與「沒設定」。
+const SECRET_MASK: &str = "********";
 
 /// 全部主題清單 — 與前端 libs/site-theme.ts 的 SITE_THEMES 一致
 const SITE_THEMES: &[&str] = &["forest", "ocean", "sky", "sunset", "sakura", "grape", "mono"];
@@ -146,6 +168,47 @@ fn validate_int_range(key: &str, value: &str, min: u32, max: u32) -> Result<(), 
     }
 }
 
+/// cors_allowed_origins 驗證：逗號分隔，每項必須是 `http(s)://host[:port]`。
+///
+/// 為什麼一定要擋 `*`：`routes.rs` 啟動時把這個值餵給 tower-http 的
+/// `AllowOrigin::list`，而那個建構子**遇到 `*` 會 panic**
+/// （tower-http-0.6 的 cors/allow_origin.rs）。CORS 只在啟動時讀，所以改成 `*`
+/// 當下不會報錯，但**下一次部署或重啟就會 panic**，配上 compose 的
+/// `restart: unless-stopped` 變成無限重啟迴圈，只能直接改 DB 才救得回來。
+///
+/// 順便擋掉靜默失敗：原本 `filter_map(parse::<HeaderValue>)` 會把打錯的項目
+/// 無聲丟掉，最壞變成空清單（所有跨源被拒）而沒有任何告警。
+fn validate_cors_allowed_origins(value: &str) -> Result<(), AppError> {
+    let items: Vec<&str> = value.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+    if items.is_empty() {
+        return Err(unprocessable("cors_allowed_origins 不可為空".into()));
+    }
+    for item in items {
+        if item.contains('*') {
+            return Err(unprocessable(
+                "cors_allowed_origins 不接受 *（會讓後端啟動時 panic）；請逐一列出來源".into(),
+            ));
+        }
+        let rest = item
+            .strip_prefix("https://")
+            .or_else(|| item.strip_prefix("http://"))
+            .ok_or_else(|| {
+                unprocessable(format!("cors_allowed_origins 的 {item} 必須以 http:// 或 https:// 開頭"))
+            })?;
+        // origin 只有 scheme://host[:port]，不含路徑／query／fragment
+        if rest.is_empty() || rest.contains('/') || rest.contains('?') || rest.contains('#') {
+            return Err(unprocessable(format!(
+                "cors_allowed_origins 的 {item} 必須是 scheme://host[:port]，不含路徑"
+            )));
+        }
+        // HeaderValue 是最終消費者，先在這裡確認轉得過去
+        if item.parse::<axum::http::HeaderValue>().is_err() {
+            return Err(unprocessable(format!("cors_allowed_origins 的 {item} 含非法字元")));
+        }
+    }
+    Ok(())
+}
+
 fn validate(key: &str, value: &str) -> Result<(), AppError> {
     if key == "theme_rotation" {
         return validate_theme_rotation(value);
@@ -174,6 +237,9 @@ fn validate(key: &str, value: &str) -> Result<(), AppError> {
     }
     if key == "webauthn_rp_origin" {
         return validate_webauthn_rp_origin(value);
+    }
+    if key == "cors_allowed_origins" {
+        return validate_cors_allowed_origins(value);
     }
 
     let allowed: Vec<&str> = match key {
@@ -204,9 +270,13 @@ pub async fn get_all(
 ) -> Result<BTreeMap<String, Vec<AppSetting>>, AppError> {
     let rows = repo::get_all(pool).await?;
     let mut grouped: BTreeMap<String, Vec<AppSetting>> = BTreeMap::new();
-    for setting in rows {
+    for mut setting in rows {
         if !include_reserved && is_reserved(&setting.key) {
             continue;
+        }
+        // 秘密值一律不出站；有值才遮，沒值就讓它保持空字串
+        if is_secret(&setting.key) && !setting.value.is_empty() {
+            setting.value = SECRET_MASK.to_string();
         }
         grouped.entry(setting.category.clone()).or_default().push(setting);
     }
@@ -309,5 +379,44 @@ mod tests {
         assert!(validate("home_features", r#"[1,2]"#).is_err());
         assert!(validate("home_features", r#"[""]"#).is_err());
         assert!(validate("home_features", r#"["blog","blog"]"#).is_err());
+    }
+
+    /// smtp_password 是 Gmail App Password，不可經 GET /admin/settings 出站
+    #[test]
+    fn secret_keys_are_masked() {
+        assert!(is_secret("smtp_password"));
+        assert!(!is_secret("smtp_username"));
+        assert!(!is_secret("site_theme"));
+    }
+
+    /// new_user_default_roles 決定新管理員的預設角色，屬平台層設定
+    #[test]
+    fn reserved_keys_cover_role_defaults() {
+        assert!(is_reserved("new_user_default_roles"));
+        assert!(is_reserved("enabled_features"));
+        assert!(!is_reserved("site_theme"));
+    }
+
+    #[test]
+    fn cors_accepts_valid_origin_lists() {
+        assert!(validate("cors_allowed_origins", "https://kawa.homes").is_ok());
+        assert!(validate("cors_allowed_origins", "https://kawa.homes,http://localhost:3000").is_ok());
+        assert!(validate("cors_allowed_origins", " https://a.example , https://b.example ").is_ok());
+    }
+
+    /// 這條是重點：`*` 會讓 AllowOrigin::list 在下次啟動時 panic → 無限重啟迴圈
+    #[test]
+    fn cors_rejects_wildcard() {
+        assert!(validate("cors_allowed_origins", "*").is_err());
+        assert!(validate("cors_allowed_origins", "https://kawa.homes,*").is_err());
+        assert!(validate("cors_allowed_origins", "https://*.kawa.homes").is_err());
+    }
+
+    #[test]
+    fn cors_rejects_malformed_entries() {
+        assert!(validate("cors_allowed_origins", "").is_err());
+        assert!(validate("cors_allowed_origins", "kawa.homes").is_err());          // 缺 scheme
+        assert!(validate("cors_allowed_origins", "https://kawa.homes/path").is_err()); // 含路徑
+        assert!(validate("cors_allowed_origins", "https://").is_err());
     }
 }
