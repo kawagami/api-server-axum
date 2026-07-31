@@ -15,7 +15,7 @@ const POLL_INTERVAL_MS = 7000;
 // 連線時長每秒重算一次
 const TICK_INTERVAL_MS = 1000;
 
-// 與後端 get_online_connections 同一套排序：新連線在前，同時間用 addr 破平手。
+// 與後端 list_connections 同一套排序：新連線在前，同時間用 addr 破平手。
 // connected_at 是固定寬度 ISO 字串，字典序 == 時間序。
 function sortRows(rows: WsConnection[]): WsConnection[] {
     return [...rows].sort(

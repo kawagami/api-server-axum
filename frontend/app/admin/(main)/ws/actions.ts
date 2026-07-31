@@ -29,7 +29,7 @@ export async function saySomethingToSomeone(
 
     try {
         await adminRequest({
-            url: `${process.env.API_URL}/ws/say_something_to_someone`,
+            url: `${process.env.API_URL}/ws/messages`,
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ addr, message }),

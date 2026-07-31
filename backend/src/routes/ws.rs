@@ -41,8 +41,8 @@ pub fn new(state: AppState) -> Router<AppState> {
     // 每次 WS 重連都會打的高頻端點，寫進 admin_audit_logs 只會把稽核表灌滿噪音。
     // 其餘 admin 模組一律用 with_auth。
     let admin_routes = Router::new()
-        .route("/get_online_connections", get(list_connections))
-        .route("/say_something_to_someone", post(say_something_to_someone))
+        .route("/connections", get(list_connections))
+        .route("/messages", post(send_message))
         .route("/ticket", post(create_ws_ticket))
         .layer(middleware::from_fn_with_state(
             state,
@@ -116,7 +116,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     }
 
     // 含 IP / email 個資，只推給 admin 連線，不對匿名訪客廣播。
-    // 欄位與 get_online_connections 的列一致，admin 頁可直接用這則事件插入新列，不必重抓。
+    // 欄位與 list_connections 的列一致，admin 頁可直接用這則事件插入新列，不必重抓。
     state.broadcast_to_admins(
         crate::structs::ws::WsEvent::UserJoined,
         serde_json::json!({
@@ -287,7 +287,7 @@ pub struct SendMessageParams {
 
 /// 失敗一律回非 2xx。舊版對「位址格式錯 / 連線不存在 / 送出失敗」都回 200 加一段錯誤字串，
 /// 呼叫端只看 status 的話會把失敗顯示成成功。
-async fn say_something_to_someone(
+async fn send_message(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Json(params): Json<SendMessageParams>,
@@ -326,7 +326,7 @@ async fn say_something_to_someone(
 /// 換發 WS 一次性連線票（30 秒 TTL）。登入中的 admin 用它連 WS 取得管理員身分，
 /// token 本體不再出現在 WS URL。
 ///
-/// 權限門檻必須與 `get_online_connections` 一致（同為 `ws:read`）：ticket 換來的連線會被
+/// 權限門檻必須與 `list_connections` 一致（同為 `ws:read`）：ticket 換來的連線會被
 /// 標成 admin 身分，因而收得到 `broadcast_to_admins` 推的 `user_joined` / `user_left`，
 /// 那兩個事件的 payload 含 `real_ip` 與 `user_email`。少了這道檢查，沒有 ws:read 的管理員
 /// HTTP 端查不到連線清單，卻能改走 WS 拿到同樣的個資。
