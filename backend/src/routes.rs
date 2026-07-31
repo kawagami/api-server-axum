@@ -128,7 +128,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/blogs", with_feature(state.clone(), Feature::Blog, blogs::new(state.clone())))
         .nest("/tools", with_feature(state.clone(), Feature::Tools, tools::new(state.clone())))
         .nest("/ws", ws::new(state.clone()))
-        .nest("/roster", with_feature(state.clone(), Feature::Roster, roster::new()))
+        .nest("/roster", with_feature(state.clone(), Feature::Roster, roster::new(state.clone())))
         .nest("/members", members::new(state.clone()))
         .nest("/messages", with_feature(state.clone(), Feature::Message, messages::new(state.clone())))
         .nest("/member/portfolio", with_feature(state.clone(), Feature::Portfolio, portfolio::new(state.clone())))

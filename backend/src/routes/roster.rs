@@ -1,17 +1,30 @@
 use crate::errors::AppError;
+use crate::middleware::rate_limit;
 use crate::state::AppState;
 use crate::structs::roster::{RosterRequest, RosterResponse, StaffShift};
-use axum::{routing::post, Json, Router};
+use axum::{middleware, routing::post, Json, Router};
 use std::collections::VecDeque;
 
-pub fn new() -> Router<AppState> {
-    // 用 post 考量參數資料量可能很大
-    Router::new().route("/", post(calculate_roster))
+pub fn new(state: AppState) -> Router<AppState> {
+    // 用 post 考量參數資料量可能很大。
+    // 沿用 tools 的 bucket（20 req/60s）：同屬公開未認證的計算工具，語意一致，
+    // 也不必為此再多一組常數。限流擋的是量，單發成本由 RosterRequest::validate 擋。
+    Router::new()
+        .route("/", post(calculate_roster))
+        .layer(middleware::from_fn_with_state(
+            state,
+            rate_limit::tools_rate_limit,
+        ))
 }
 
 pub async fn calculate_roster(
     Json(payload): Json<RosterRequest>,
 ) -> Result<Json<RosterResponse>, AppError> {
+    // 一定要在進配置迴圈之前擋：這支端點無認證，days 未設上限時單一請求即可 OOM 整機
+    payload
+        .validate()
+        .map_err(crate::errors::RequestError::UnprocessableContent)?;
+
     let names = payload.names;
     let days = payload.days as usize;
     let rule = payload.rule;
