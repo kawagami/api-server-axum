@@ -17,13 +17,14 @@ use axum::{
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
-    let admin_routes = Router::new()
-        .route("/", get(get_members))
-        .route("/{id}", get(get_member_by_id))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::authorize_and_load,
-        ));
+    // 走 super::with_auth 而不是直接掛 authorize_and_load：這兩支會吐會員個資（需
+    // member:read），必須進 admin_audit_logs。直接掛 auth middleware 會跳過 audit 層。
+    let admin_routes = super::with_auth(
+        state.clone(),
+        Router::new()
+            .route("/", get(get_members))
+            .route("/{id}", get(get_member_by_id)),
+    );
 
     let member_routes = Router::new()
         .route("/me", get(get_me))

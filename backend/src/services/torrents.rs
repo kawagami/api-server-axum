@@ -233,16 +233,23 @@ async fn run_torrent(state: AppState, row: Torrent) {
     };
 
     state.get_torrents().active.lock().await.remove(&id);
+    // 這兩個是狀態機轉換（不是快取寫入），失敗不能只用 `let _ =` 吞掉：任務會卡在
+    // downloading，list_resumable 一直把它撈出來重試，但 attempt_count 沒遞增，
+    // 於是永遠不會被判失敗 —— 變成無限重試迴圈。至少要留下可查的 error log。
     if retrying {
         tracing::warn!("torrent {id} {reason}");
-        let _ = torrents_repo::set_retry_pending(state.get_pool(), id, &reason).await;
+        if let Err(e) = torrents_repo::set_retry_pending(state.get_pool(), id, &reason).await {
+            tracing::error!("torrent {id} set_retry_pending failed: {e}（狀態可能卡在 downloading）");
+        }
         state.broadcast(
             WsEvent::TorrentRetrying,
             serde_json::json!({ "id": id, "name": row.name, "reason": reason, "attempt": attempt }),
         );
     } else {
         tracing::error!("torrent {id} start failed: {reason}");
-        let _ = torrents_repo::set_failed(state.get_pool(), id, &reason).await;
+        if let Err(e) = torrents_repo::set_failed(state.get_pool(), id, &reason).await {
+            tracing::error!("torrent {id} set_failed failed: {e}（狀態可能卡在 downloading）");
+        }
         broadcast_failed(&state, id, row.name.as_deref(), &reason);
     }
     tokio::spawn(sync_active(state));

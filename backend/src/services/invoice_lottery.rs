@@ -7,6 +7,7 @@ use crate::errors::AppError;
 use chrono::{Datelike, NaiveDate};
 use regex::Regex;
 use reqwest::Client;
+use std::sync::OnceLock;
 
 /// 財政部統一發票中獎號碼 RSS
 const FEED_URL: &str = "https://invoice.etax.nat.gov.tw/invoice.xml";
@@ -168,17 +169,48 @@ pub fn period_of_date(date: NaiveDate) -> String {
     format!("{:04}{:02}", date.year(), ending)
 }
 
+/// `parse_feed` 用到的 9 條 regex。編譯一次就好 —— 原本每次呼叫都重編一輪，
+/// 而同 codebase 的 `services/invoices.rs` 與 `services/blogs.rs` 都已走 OnceLock。
+struct FeedRegexes {
+    item: Regex,
+    title: Regex,
+    period: Regex,
+    special: Regex,
+    grand: Regex,
+    first_block: Regex,
+    add_block: Regex,
+    d8: Regex,
+    d3: Regex,
+}
+
+fn feed_res() -> &'static FeedRegexes {
+    static RES: OnceLock<FeedRegexes> = OnceLock::new();
+    RES.get_or_init(|| FeedRegexes {
+        item: Regex::new(r"(?s)<item>(.*?)</item>").unwrap(),
+        title: Regex::new(r"(?s)<title>(.*?)</title>").unwrap(),
+        period: Regex::new(r"(\d+)\s*年\s*0*(\d+)\s*[~～-]\s*0*(\d+)\s*月").unwrap(),
+        special: Regex::new(r"特別獎\D*?(\d{8})").unwrap(),
+        grand: Regex::new(r"特獎\D*?(\d{8})").unwrap(),
+        first_block: Regex::new(r"頭獎[^0-9]*([0-9、,\s]+)").unwrap(),
+        add_block: Regex::new(r"增開六獎[^0-9]*([0-9、,\s]+)").unwrap(),
+        d8: Regex::new(r"\d{8}").unwrap(),
+        d3: Regex::new(r"\d{3}").unwrap(),
+    })
+}
+
 /// 解析財政部 RSS，回傳各期 (period, PeriodNumbers)。純函式，可測。
 pub fn parse_feed(xml: &str) -> Vec<(String, PeriodNumbers)> {
-    let item_re = Regex::new(r"(?s)<item>(.*?)</item>").unwrap();
-    let title_re = Regex::new(r"(?s)<title>(.*?)</title>").unwrap();
-    let period_re = Regex::new(r"(\d+)\s*年\s*0*(\d+)\s*[~～-]\s*0*(\d+)\s*月").unwrap();
-    let special_re = Regex::new(r"特別獎\D*?(\d{8})").unwrap();
-    let grand_re = Regex::new(r"特獎\D*?(\d{8})").unwrap();
-    let first_block_re = Regex::new(r"頭獎[^0-9]*([0-9、,\s]+)").unwrap();
-    let add_block_re = Regex::new(r"增開六獎[^0-9]*([0-9、,\s]+)").unwrap();
-    let d8 = Regex::new(r"\d{8}").unwrap();
-    let d3 = Regex::new(r"\d{3}").unwrap();
+    let FeedRegexes {
+        item: item_re,
+        title: title_re,
+        period: period_re,
+        special: special_re,
+        grand: grand_re,
+        first_block: first_block_re,
+        add_block: add_block_re,
+        d8,
+        d3,
+    } = feed_res();
 
     let mut out = Vec::new();
     for item in item_re.captures_iter(xml) {
@@ -210,8 +242,19 @@ pub fn parse_feed(xml: &str) -> Vec<(String, PeriodNumbers)> {
 }
 
 /// 抓取中獎號碼（IO；薄包裝，解析交給純函式 `parse_feed`）
+///
+/// 走 `utils::reqwest` 而不是直接 `client.get(...).text()`：後者不檢查狀態碼，財政部
+/// 回 502 錯誤頁時 `.text()` 仍會成功，`parse_feed` 撈不到 `<item>` 就回空 Vec，
+/// 呼叫端的 `run_with_retries` 於是認定成功、不重試（整期號碼靜默沒進來）。
 pub async fn fetch_winning_numbers(client: &Client) -> Result<Vec<(String, PeriodNumbers)>, AppError> {
-    let text = client.get(FEED_URL).send().await?.text().await?;
+    let text = crate::utils::reqwest::get_raw_html_string(
+        client,
+        FEED_URL,
+        reqwest::Method::GET,
+        None,
+        None,
+    )
+    .await?;
     Ok(parse_feed(&text))
 }
 

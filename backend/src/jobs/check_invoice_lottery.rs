@@ -29,7 +29,15 @@ pub async fn run(state: AppState) {
 }
 
 async fn fetch_and_store(pool: &Pool<Postgres>, client: &reqwest::Client) -> Result<(), AppError> {
-    for (period, nums) in invoice_lottery::fetch_winning_numbers(client).await? {
+    let periods = invoice_lottery::fetch_winning_numbers(client).await?;
+
+    // 狀態碼檢查抓不到「上游回 200 但版面改了、regex 全部失配」這種情況，只有這條會叫。
+    // 沒號碼可寫時要嘛財政部還沒公告（正常），要嘛解析壞了（要修）——都值得留一行。
+    if periods.is_empty() {
+        tracing::warn!("invoice lottery feed parsed 0 periods (未公告或解析失效，可用 POST /admin/invoice_lottery_numbers 手動補)");
+    }
+
+    for (period, nums) in periods {
         // 一期一個 transaction：單期的號碼要嘛整套進去、要嘛完全不進去
         let mut tx = pool.begin().await?;
         invoices_repo::upsert_period_numbers_in_tx(&mut tx, &period, &nums).await?;

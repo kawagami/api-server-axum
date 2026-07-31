@@ -37,6 +37,9 @@ fn to_iso(t: SystemTime) -> String {
 }
 
 pub fn new(state: AppState) -> Router<AppState> {
+    // 刻意直接掛 authorize_and_load 而非 super::with_auth（＝不進 audit）：/ticket 是
+    // 每次 WS 重連都會打的高頻端點，寫進 admin_audit_logs 只會把稽核表灌滿噪音。
+    // 其餘 admin 模組一律用 with_auth。
     let admin_routes = Router::new()
         .route("/get_online_connections", get(get_online_connections))
         .route("/say_something_to_someone", post(say_something_to_someone))
