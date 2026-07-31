@@ -38,7 +38,7 @@ const UploadSection = ({
     };
 
     return (
-        <div className="max-w-3xl mx-auto">
+        <div>
             <input ref={fileInputRef} accept="image/*" type="file" multiple onChange={onImageChange} className="hidden" />
 
             {/* 拖放 / 點選上傳區 */}

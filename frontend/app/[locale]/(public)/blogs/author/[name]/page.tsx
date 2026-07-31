@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import BlogList from '@/components/blogs/blog-list';
+import { localeAlternates } from '@/libs/seo';
 
 interface Props {
     params: Promise<{ locale: string; name: string }>
@@ -17,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
         title,
         description: t('metaDescription'),
-        alternates: { canonical: `/${locale}/blogs/author/${name}` },
+        alternates: localeAlternates(locale, `/blogs/author/${name}`),
         openGraph: {
             type: 'website',
             title,

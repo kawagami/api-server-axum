@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { ScanLine, Ticket } from "lucide-react";
 import FeatureCard from "@/components/feature-card";
 import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
 import { MEMBER_LINKS, filterNavByFeatures } from "@/libs/site-nav";
 import { getPublicSettings } from "@/api/settings";
 import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
@@ -48,7 +49,7 @@ export default async function DashboardPage() {
                 )}
                 <div>
                     <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("welcomeBack")}</p>
-                    <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">{member.name}</h1>
+                    <PageTitle title={member.name} />
                 </div>
             </div>
 

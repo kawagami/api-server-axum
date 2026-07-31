@@ -2,6 +2,7 @@ import { getMember } from "@/api/members";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { AdminTable, AdminTh, AdminTd } from "@/components/admin/table";
+import PageHeader from "@/components/admin/page-header";
 import { formatDateTime } from "@/libs/admin-datetime";
 
 export const metadata: Metadata = {
@@ -30,11 +31,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                             {member.name.charAt(0).toUpperCase()}
                         </div>
                     )}
-                    <div>
-                        {/* 詳情頁的標題就是會員名稱，不另外套 PageHeader（麵包屑已標示所在位置） */}
-                        <h1 className="text-xl font-semibold text-neutral-800 dark:text-neutral-100">{member.name}</h1>
-                        <p className="text-neutral-500 dark:text-neutral-400 text-sm">ID：{member.id}</p>
-                    </div>
+                    {/* 詳情頁的標題就是會員名稱（麵包屑已標示所在位置），但 h1 規格仍走 PageHeader 單一來源 */}
+                    <PageHeader title={member.name} description={`ID：${member.id}`} />
                 </div>
 
                 <div className="overflow-x-auto">

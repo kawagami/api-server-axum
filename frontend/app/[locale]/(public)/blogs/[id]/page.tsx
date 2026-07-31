@@ -5,6 +5,7 @@ import { getBlog } from "@/api/blogs";
 import BlogArticle from "@/components/blogs/blog-article";
 import CommentSection from "@/components/blogs/comments/comment-section";
 import { extractExcerpt, firstImageUrl } from "@/libs/blog-markdown";
+import { localeAlternates } from "@/libs/seo";
 
 const fetchBlog = cache(getBlog);
 
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     return {
         title: `${title} | Kawa's Blog`,
         description,
-        alternates: { canonical: url },
+        alternates: localeAlternates(locale, `/blogs/${id}`),
         openGraph: {
             type: "article",
             title,

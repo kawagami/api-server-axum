@@ -95,10 +95,10 @@ export default function Search() {
     };
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full max-w-2xl flex flex-col gap-4">
             <PageHeader title="收盤價查詢" description="查詢特定股票在指定區間的收盤價與漲跌" />
 
-            <form action={formAction} className="space-y-4 bg-white dark:bg-neutral-900 p-4 sm:p-6 rounded-lg shadow-lg max-w-2xl">
+            <form action={formAction} className="space-y-4 bg-white dark:bg-neutral-900 p-4 sm:p-6 rounded-lg shadow-lg">
                 <div className="flex flex-col gap-1">
                     <label htmlFor="stockNo" className="text-sm font-medium text-neutral-700 dark:text-neutral-300">股票代號</label>
                     <input type="text" name="stockNo" id="stockNo" className={inputClass} placeholder="例如：3036" />

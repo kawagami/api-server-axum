@@ -105,7 +105,7 @@ export default function BlogComponent({ id, blog, allTags, compressConfig }: Pro
 
     return (
         <>
-            <div className="lg:h-[calc(100svh-180px)] w-full flex flex-col">
+            <div className="lg:h-[calc(100svh-224px)] w-full flex flex-col">
                 {draftRestored && (
                     <p className="text-primary-600 dark:text-primary-400 text-sm text-center mt-2">已從本機草稿復原未存檔內容</p>
                 )}
