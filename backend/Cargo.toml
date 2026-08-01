@@ -32,7 +32,7 @@ serde_json = "1.0"
 chrono = { version = "0.4.34", features = ["serde"] }
 futures = "0.3.30"
 reqwest = { version = "0.12", default-features = false, features = ["multipart", "json", "rustls-tls"] }
-jsonwebtoken = "9.3.0"
+jsonwebtoken = "11.0.0"
 bcrypt = "0.19.2"
 bb8 = "0.9"
 bb8-redis = "0.26"
