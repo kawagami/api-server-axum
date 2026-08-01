@@ -1,5 +1,5 @@
 # Stage 1: Dependencies (安裝依賴並快取)
-FROM node:24-alpine AS deps
+FROM node:25-alpine AS deps
 # Alpine 需要這個庫來執行某些原生模組
 RUN apk add --no-cache libc6-compat
 # 啟用 corepack，pnpm 版本由 package.json 的 packageManager 欄位釘住
@@ -10,7 +10,7 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Builder (建構專案)
-FROM node:24-alpine AS builder
+FROM node:25-alpine AS builder
 RUN corepack enable
 WORKDIR /app
 # 直接複製已經安裝好的 node_modules，不用重新安裝
@@ -23,7 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 
 # Stage 3: Runner (最終執行檔)
-FROM node:24-alpine AS runner
+FROM node:25-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
