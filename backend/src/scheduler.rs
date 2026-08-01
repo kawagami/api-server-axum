@@ -37,7 +37,21 @@ async fn add_job(scheduler: &JobScheduler, state: AppState, job: &'static AppJob
                 tracing::warn!("job {} still running, skip this tick", job.name());
                 return;
             };
-            job.run(state).await
+            // 包一層 spawn 只為了接住 panic：tokio-cron-scheduler 不 join handle，
+            // job panic 就只剩 runtime 預設 hook 印的那行 stderr，不進 tracing，
+            // 而生產 image 無 shell、debug 全靠 log —— 等於靜默消失。
+            // 預設 hook 那行仍會印（帶檔名行號），與這裡的 log 互補。
+            if let Err(e) = tokio::spawn(job.run(state)).await {
+                if e.is_panic() {
+                    let payload = e.into_panic();
+                    let msg = payload
+                        .downcast_ref::<&str>()
+                        .copied()
+                        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+                        .unwrap_or("<non-string panic payload>");
+                    tracing::error!("job {} panicked: {}", job.name(), msg);
+                }
+            }
         })
     }) {
         Ok(j) => j,
