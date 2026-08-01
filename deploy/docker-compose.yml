@@ -6,6 +6,17 @@
 #     /srv/kawa/env/      kawa.env(全站唯一 env 檔，三容器共用) / cloudflare.ini
 #     /srv/kawa/uploads/  /srv/kawa/torrents/  /srv/kawa/dbdata/
 #   範例見 env.example/
+#
+# ⚠ 改 kawa.env 一行 = 下次部署重建四個容器，即使本檔一個字都沒動。兩段機制疊加：
+#     ① compose 把 env_file 的**內容**納入容器配置比對，值變了就算配置變更
+#        → database / backend / frontend（這三個掛 env_file）直接 recreate
+#     ② 依賴方會跟著被重建 → nginx 自己沒掛 env_file，但 depends_on backend + frontend
+#   不受影響的只有 valkey 與 certbot：兩者既不吃 kawa.env，也不 depends_on 任何人。
+#   2026-08-01 在 kawa.env 加一行 REDIS_URL 就完整重演了一次（log 裡 database 還走了
+#   一輪 Waiting → Healthy）。dbdata 是 bind mount 不會掉，但生產會有一段中斷，而且
+#   1 核 1G 上 19 秒內重建四個容器是實打實的資源尖峰 —— 同一次部署的 nginx 冒煙檢查
+#   就在那個尖峰上拿到 exit 137（見 .github/workflows/deploy.yml 的冒煙檢查註解）。
+#   ⇒ 要動 kawa.env 就當成一次完整部署來安排，不要當作「只是改個設定」。
 name: kawa
 
 # ── 日誌 rotation ──────────────────────────────────────────────────────────
@@ -116,6 +127,14 @@ services:
     # 刻意不掛 volume：資料全在記憶體，重啟即清空。
     # ⚠ 代價是 member refresh token（TTL 30 天）也會沒了 → valkey 重啟等於把所有會員登出，
     #   需重新登入。其餘 key（權限快取 / oauth state / ws ticket）TTL 短，掉了會自動重算。
+    #
+    # ⚠ 也**刻意沒有 env_file**，而這正是上面「改 kawa.env 會重建容器」那條的保護傘：
+    #   valkey 不吃 kawa.env、也不 depends_on 任何人，所以改 env 的部署不會重建它，
+    #   會員不會被登出（2026-08-01 加 REDIS_URL 那次，其他四個容器全重建，只有 valkey
+    #   與 certbot 是 Running 沒動）。注意 backend depends_on valkey 是**反方向**、不會
+    #   把它拖下水 —— 被依賴方不會因為依賴方重建而重建。
+    #   要給 valkey 加任何 env（例如 requirepass）之前先想清楚：那等於把這層保護拿掉，
+    #   之後每次改 kawa.env 都會踢掉所有會員。密碼類需求優先用 command 參數或獨立 env 檔。
     image: "valkey/valkey:alpine"
     container_name: valkey
     restart: unless-stopped
