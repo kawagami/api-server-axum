@@ -113,5 +113,24 @@ jobs:
             # 只有重建才會重新解析 bind mount，拿到新的 nginx.conf inode。
             docker compose up -d --force-recreate --no-deps nginx
 
-            # 冒煙檢查：確認重建後真的能服務（失敗會讓這個 job 紅，不會靜默放過）
-            docker compose exec -T nginx nginx -t
+            # ── 冒煙檢查：確認重建後真的能服務 ───────────────────────────────
+            # ⚠ 不要改回 `docker compose exec -T nginx nginx -t`。那行有三個問題：
+            #   ① 資訊量為零 —— 上面那個一次性容器已經驗過同一份檔案；
+            #   ② 對不上題 —— nginx -t 只驗語法，不發任何請求，證明不了「能服務」；
+            #   ③ 有競態 —— 它對剛 force-recreate、才起來幾秒的容器 exec。
+            #      2026-08-01 就在這裡拿到 exit 137 讓 job 紅掉，而站其實一直是好的
+            #      （事後手動重跑同一行 exit=0、nginx 只吃 4.5MiB/64MiB、dmesg 無 OOM）。
+            # 改成打真實請求：--resolve 讓 SNI 與憑證都對得上，走完整路徑
+            # （TLS → vhost 匹配 → upstream → backend），並重試等剛重建的容器就緒。
+            for i in $(seq 1 10); do
+              if curl -fsS -o /dev/null --max-time 10 \
+                   --resolve api.kawa.homes:443:127.0.0.1 \
+                   https://api.kawa.homes/health; then
+                echo "冒煙檢查通過（第 $i 次嘗試）"
+                exit 0
+              fi
+              echo "第 $i 次未通過，3 秒後重試"
+              sleep 3
+            done
+            echo "冒煙檢查失敗：nginx 重建後 https://api.kawa.homes/health 打不通"
+            exit 1
