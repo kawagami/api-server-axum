@@ -2,6 +2,23 @@ use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
 use redis::{AsyncCommands, ErrorKind, RedisError};
 
+/// 讀 env 決定 Redis 連線 URL。與 `DATABASE_URL` 對稱：一個完整 URL 就能表達
+/// 密碼（`redis://:pw@host`）、TLS（`rediss://`）與 db index，不必為了加密碼改程式碼。
+///
+/// 前身是 `REDIS_HOST`（host + 6379 寫死在 state.rs）；2026-08-01 換掉，同日
+/// VPS 的 kawa.env 也改完，故過渡期的回退路徑已移除。
+pub fn redis_url_from_env() -> String {
+    env_redis_url().expect("找不到 REDIS_URL（例如 redis://valkey:6379）")
+}
+
+/// 空字串視同未設定 —— env 檔裡留著 `REDIS_URL=` 這種半調子的值比沒設更難查
+fn env_redis_url() -> Option<String> {
+    std::env::var("REDIS_URL")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
 pub async fn get_redis_conn(
     pool: &RedisPool<RedisConnectionManager>,
 ) -> Result<bb8::PooledConnection<'_, RedisConnectionManager>, RedisError> {
@@ -207,14 +224,14 @@ mod tests {
     //! 本機無 Redis 時自動跳過。設了 REDIS_TEST_REQUIRED 卻連不上會 panic，
     //! 避免 service 掛掉時測試靜默略過而假綠。
     //! 本機要跑：docker run -d -p 6379:6379 valkey/valkey:alpine
+    //! 想連別的位址就設 `REDIS_URL`（含 port，不必再映射到 6379）。
     use super::*;
     use bb8::Pool;
 
     async fn pool() -> Option<Pool<RedisConnectionManager>> {
-        let host = std::env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".into());
+        let url = env_redis_url().unwrap_or_else(|| "redis://127.0.0.1:6379".into());
         let required = std::env::var("REDIS_TEST_REQUIRED").is_ok();
-        let manager =
-            RedisConnectionManager::new(format!("redis://{host}:6379")).expect("build manager");
+        let manager = RedisConnectionManager::new(url).expect("build manager");
         let built = Pool::builder()
             .connection_timeout(std::time::Duration::from_secs(3))
             .build(manager)

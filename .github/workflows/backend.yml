@@ -35,7 +35,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     env:
-      REDIS_HOST: 127.0.0.1
+      REDIS_URL: redis://127.0.0.1:6379
       # 設了這個，連不上 Redis 會讓測試 panic 而非靜默跳過（避免 service 掛掉卻假綠）
       REDIS_TEST_REQUIRED: "1"
     steps:

@@ -40,6 +40,9 @@ async fn main() {
 
     // 設定伺服器監聽的主機與埠號
     let host = var("APP_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()); // 預設監聽所有 IP
+    // ⚠ APP_PORT 只服務「本機直跑」的情境（3000 被佔時換一個）。生產的 3000 被
+    // deploy/nginx/conf.d/02-proxy.conf 的 upstream 與 kawa.env 的 API_URL 寫死，
+    // 只改這個 env 會讓 nginx 照打 3000 → 502，故生產的 kawa.env 刻意不放這個 key。
     let port = var("APP_PORT").unwrap_or_else(|_| "3000".to_string()); // 預設使用 3000 埠
     let bind_addr = format!("{}:{}", host, port); // 組合完整的監聽地址
     let listener = TcpListener::bind(&bind_addr).await.unwrap(); // 綁定 TCP 監聽埠

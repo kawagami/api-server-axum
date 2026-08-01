@@ -99,10 +99,10 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | 變數 | 必填 | 預設值 |
 |------|------|--------|
 | `DATABASE_URL` | 是 | — |
-| `REDIS_HOST` | 是 | —（port 寫死 6379，不可設定） |
+| `REDIS_URL` | 是 | —（完整 URL，如 `redis://valkey:6379`；可帶密碼 / `rediss://` / db index） |
 | `JWT_SECRET` | 是 | — |
 | `APP_HOST` | 否 | `0.0.0.0` |
-| `APP_PORT` | 否 | `3000` |
+| `APP_PORT` | 否 | `3000`（**僅限本機直跑**；生產的 3000 被 nginx upstream 與 `API_URL` 寫死，改這個只會 502，故 `kawa.env` 不放這個 key） |
 | `UPLOAD_PATH` | 否 | `./uploads` |
 | `TORRENT_PATH` | 否 | `./torrents` |
 | `TRUST_CF_HEADER` | 否 | `false`（true/1 才信任 CF-Connecting-IP，僅限只經 Cloudflare 的部署） |
