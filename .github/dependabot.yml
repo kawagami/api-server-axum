@@ -36,12 +36,6 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     ignore:
-      # tailwind v4 是「遷移」不是「升版」：@tailwind 三行要換成 @import、tailwind.config.js
-      # 的色階（rgb(var(--x) / <alpha-value>)）要改寫成 @theme、darkMode/plugins 換語法、
-      # postcss 換 @tailwindcss/postcss。排到那個任務前先擋著，免得每週重開同一顆 PR。
-      # 要動手遷移時把這條拿掉即可。
-      - dependency-name: tailwindcss
-        update-types: ["version-update:semver-major"]
       # @types/node 的主版該跟 runtime 的 Node 走（Dockerfile + CI setup-node，現為 24 LTS），
       # 不是有新版就跟 —— 跟過頭會拿到 runtime 根本沒有的 API 型別。
       # 升 Node LTS 時三處一起手動改（Dockerfile / workflow / 這裡）。
