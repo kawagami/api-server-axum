@@ -29,12 +29,6 @@
   --color-neutral-900: rgb(var(--neutral-900));
   --color-neutral-950: rgb(var(--neutral-950));
 
-  --background-image-gradient-radial: radial-gradient(var(--tw-gradient-stops));
-  --background-image-gradient-conic: conic-gradient(
-    from 180deg at 50% 50%,
-    var(--tw-gradient-stops)
-  );
-
   --animate-fade-in: fadeIn 0.2s ease-in-out;
 
   @keyframes fadeIn {
@@ -46,24 +40,6 @@
       opacity: 1;
       transform: translateY(0);
     }
-  }
-}
-
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
   }
 }
 
