@@ -14,7 +14,7 @@ import type { LottoGame, LottoNote, LottoInput } from "@/types";
 
 type Mode = 'manual' | 'ocr';
 
-const inputClass = "border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
+const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 
 export default function LottoRegisterClient() {
     const t = useTranslations('Lotto');
@@ -141,20 +141,20 @@ export default function LottoRegisterClient() {
 
     if (doneCount > 0) {
         return (
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-8 shadow border dark:border-neutral-700 flex flex-col items-center gap-4 text-center">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-8 shadow-sm border dark:border-neutral-700 flex flex-col items-center gap-4 text-center">
                 <CheckCircle2 className="text-green-500" size={48} />
                 <p className="font-semibold">{t('registered', { count: doneCount })}</p>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('disclaimer')}</p>
                 <div className="flex gap-2">
                     <button
                         onClick={registerAnother}
-                        className="px-4 py-2 text-sm rounded bg-primary-500 text-white hover:bg-primary-600"
+                        className="px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600"
                     >
                         {t('registerAnother')}
                     </button>
                     <Link
                         href="/lotto"
-                        className="px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        className="px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                     >
                         {t('viewMyTickets')}
                     </Link>
@@ -166,7 +166,7 @@ export default function LottoRegisterClient() {
     return (
         <div className="flex flex-col gap-4">
             {/* 彩種 + 開獎日 */}
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700 flex flex-col gap-4">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700 flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
                     <span className="text-sm font-medium">{t('game')}</span>
                     <div className="grid grid-cols-2 gap-2">
@@ -214,7 +214,7 @@ export default function LottoRegisterClient() {
             </div>
 
             {mode === 'ocr' ? (
-                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700 flex flex-col gap-4">
+                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700 flex flex-col gap-4">
                     <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('ocrIntro')}</p>
                     <LottoOcrScanner onDecoded={tryApplyOcr} />
                     <p className="text-xs text-neutral-400 dark:text-neutral-500">{t('ocrDisclaimer')}</p>
@@ -229,7 +229,7 @@ export default function LottoRegisterClient() {
             )}
 
             {/* 選號區 */}
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700 flex flex-col gap-4">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700 flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
                         {spec.hasSecond ? t('firstZone') : t('pickHint', { count: spec.mainCount, max: spec.mainMax })}
@@ -240,7 +240,7 @@ export default function LottoRegisterClient() {
                     <button
                         type="button"
                         onClick={fillQuickPick}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                     >
                         <Shuffle size={14} />
                         {t('quickPick')}
@@ -264,7 +264,7 @@ export default function LottoRegisterClient() {
                         type="button"
                         onClick={clearCurrent}
                         disabled={picks.length === 0 && second === null}
-                        className="px-3 py-1.5 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
+                        className="px-3 py-1.5 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
                     >
                         {t('clear')}
                     </button>
@@ -272,7 +272,7 @@ export default function LottoRegisterClient() {
                         type="button"
                         onClick={addNote}
                         disabled={!currentComplete}
-                        className="flex items-center gap-1.5 px-4 py-1.5 text-sm rounded bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
                     >
                         <Plus size={15} />
                         {t('addNote')}
@@ -283,7 +283,7 @@ export default function LottoRegisterClient() {
             )}
 
             {/* 已加入的注 */}
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700 flex flex-col gap-3">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700 flex flex-col gap-3">
                 <span className="text-sm font-medium">{t('noteList', { count: notes.length })}</span>
                 {notes.length === 0 ? (
                     <p className="text-sm text-neutral-400 dark:text-neutral-500">{t('noNotes')}</p>
@@ -297,7 +297,7 @@ export default function LottoRegisterClient() {
                                     type="button"
                                     onClick={() => removeNote(i)}
                                     title={t('removeNote')}
-                                    className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 text-red-500 shrink-0"
+                                    className="p-1.5 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-red-500 shrink-0"
                                 >
                                     <Trash2 size={14} />
                                 </button>
@@ -314,7 +314,7 @@ export default function LottoRegisterClient() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={saving || totalNotes === 0}
-                className="self-end flex items-center gap-2 px-5 py-2.5 text-sm rounded bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                className="self-end flex items-center gap-2 px-5 py-2.5 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
             >
                 {saving && <Loader2 className="animate-spin" size={15} />}
                 {t('registerCount', { count: totalNotes })}

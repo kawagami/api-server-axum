@@ -105,7 +105,7 @@ export default function AuditLogsClient() {
         loadMore();
     }
 
-    const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
+    const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="w-full">
@@ -171,14 +171,14 @@ export default function AuditLogsClient() {
                         <button
                             onClick={handleSearch}
                             disabled={isPending}
-                            className="px-4 py-1.5 text-sm font-medium rounded bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors"
+                            className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors"
                         >
                             搜尋
                         </button>
                         <button
                             onClick={handleReset}
                             disabled={isPending}
-                            className="px-4 py-1.5 text-sm font-medium rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors"
+                            className="px-4 py-1.5 text-sm font-medium rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors"
                         >
                             重設
                         </button>
@@ -215,7 +215,7 @@ export default function AuditLogsClient() {
                                                 {log.user_email}
                                             </AdminTd>
                                             <AdminTd>
-                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${METHOD_BADGE[log.method] ?? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}`}>
+                                                <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${METHOD_BADGE[log.method] ?? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}`}>
                                                     {log.method}
                                                 </span>
                                             </AdminTd>
@@ -226,7 +226,7 @@ export default function AuditLogsClient() {
                                                 {log.query ?? '—'}
                                             </AdminTd>
                                             <AdminTd>
-                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${httpStatusBadgeClass(log.status_code)}`}>
+                                                <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${httpStatusBadgeClass(log.status_code)}`}>
                                                     {log.status_code}
                                                 </span>
                                             </AdminTd>
@@ -243,7 +243,7 @@ export default function AuditLogsClient() {
                         <button
                             onClick={handleLoadMore}
                             disabled={isPending}
-                            className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
+                            className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded-sm hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
                         >
                             {isPending ? '載入中…' : '載入更多'}
                         </button>

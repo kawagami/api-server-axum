@@ -69,7 +69,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
                     // 非 https 或瀏覽器不給剪貼簿權限，忽略
                 }
             }}
-            className="shrink-0 p-1 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+            className="shrink-0 p-1 rounded-sm text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
         >
             {copied
                 ? <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
@@ -198,7 +198,7 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
                             <button
                                 onClick={refresh}
                                 disabled={refreshing}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-sm transition-colors"
                             >
                                 {refreshing
                                     ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -273,7 +273,7 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
                                                 <button
                                                     type="button"
                                                     onClick={() => selectTarget(conn.addr)}
-                                                    className="flex items-center gap-1 px-2 py-1 whitespace-nowrap text-xs font-medium rounded border border-primary-600 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900 transition-colors"
+                                                    className="flex items-center gap-1 px-2 py-1 whitespace-nowrap text-xs font-medium rounded-sm border border-primary-600 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900 transition-colors"
                                                 >
                                                     <Send className="w-3 h-3" />
                                                     發訊息

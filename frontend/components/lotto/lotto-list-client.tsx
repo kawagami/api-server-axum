@@ -96,7 +96,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                     <div className="flex justify-end">
                         <Link
                             href="/lotto/register"
-                            className="flex items-center gap-2 px-4 py-2 rounded bg-primary-500 text-white hover:bg-primary-600 text-sm"
+                            className="flex items-center gap-2 px-4 py-2 rounded-sm bg-primary-500 text-white hover:bg-primary-600 text-sm"
                         >
                             <Plus size={16} />
                             {t('navRegister')}
@@ -104,13 +104,13 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                     </div>
 
                     {/* 篩選列 */}
-                    <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow border dark:border-neutral-700 flex flex-wrap items-end gap-3">
+                    <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow-sm border dark:border-neutral-700 flex flex-wrap items-end gap-3">
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-neutral-500 dark:text-neutral-400">{t('game')}</label>
                             <select
                                 value={game}
                                 onChange={e => setGame(e.target.value as '' | LottoGame)}
-                                className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                                className="border rounded-sm px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                             >
                                 <option value="">{t('all')}</option>
                                 <option value="lotto649">{t('gameLotto649')}</option>
@@ -122,7 +122,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                             <select
                                 value={status}
                                 onChange={e => setStatus(e.target.value as '' | LottoStatus)}
-                                className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                                className="border rounded-sm px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                             >
                                 <option value="">{t('all')}</option>
                                 <option value="pending">{t('filterPending')}</option>
@@ -133,7 +133,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                         {filterActive && (
                             <button
                                 onClick={() => { setGame(''); setStatus(''); }}
-                                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                             >
                                 <X size={14} />
                                 {t('clearFilters')}
@@ -160,7 +160,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                         return (
                             <div
                                 key={ticket.id}
-                                className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow border dark:border-neutral-700 flex items-center gap-3"
+                                className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow-sm border dark:border-neutral-700 flex items-center gap-3"
                             >
                                 <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -177,7 +177,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                                     onClick={() => handleDelete(ticket.id)}
                                     disabled={mutating}
                                     title={t('delete')}
-                                    className="p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 text-red-500 disabled:opacity-50 shrink-0"
+                                    className="p-2 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-red-500 disabled:opacity-50 shrink-0"
                                 >
                                     <Trash2 size={16} />
                                 </button>
@@ -189,7 +189,7 @@ export default function LottoListClient({ initialEntries, lockWon = false }: Pro
                         <button
                             onClick={handleLoadMore}
                             disabled={loadingMore}
-                            className="mt-2 self-center flex items-center gap-2 px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
+                            className="mt-2 self-center flex items-center gap-2 px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
                         >
                             {loadingMore && <Loader2 className="animate-spin" size={14} />}
                             {t('loadMore')}

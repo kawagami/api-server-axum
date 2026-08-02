@@ -45,7 +45,7 @@ export default async function ProfilePage() {
                 }
             />
 
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm flex flex-col gap-5">
                 <div className="flex items-center gap-4">
                     {member.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element

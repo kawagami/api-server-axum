@@ -48,7 +48,7 @@ export function FarmPlay({ farm }: { farm: UseFarmRoom }) {
 
             {/* 結算 */}
             {gameOver && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/80 p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/80 p-4 backdrop-blur-xs">
                     <div className="flex w-full max-w-md flex-col gap-3 rounded-lg bg-white p-5 dark:bg-neutral-800">
                         <h2 className="flex items-center justify-center gap-2 text-2xl font-bold text-neutral-800 dark:text-neutral-100">
                             <Trophy className="h-6 w-6 text-amber-500" />{t('gameOverTitle')}
@@ -58,7 +58,7 @@ export function FarmPlay({ farm }: { farm: UseFarmRoom }) {
                                 .map((score, seat) => ({ score, seat }))
                                 .sort((a, b) => b.score - a.score)
                                 .map((e, i) => (
-                                    <li key={e.seat} className="flex justify-between rounded px-2 py-1 odd:bg-neutral-100 dark:odd:bg-neutral-700">
+                                    <li key={e.seat} className="flex justify-between rounded-sm px-2 py-1 odd:bg-neutral-100 dark:odd:bg-neutral-700">
                                         <span>{i + 1}. {seatName(e.seat)}{e.seat === mySeat && `（${t('youTag')}）`}</span>
                                         <span className="font-mono font-semibold">{e.score}</span>
                                     </li>
@@ -155,7 +155,7 @@ function NumIn({ label, v, on }: { label: string; v: number; on: (v: number) => 
         <label className="flex items-center gap-1.5">
             {label}
             <input type="number" min={0} value={v} onChange={e => on(Math.max(0, Number(e.target.value) || 0))}
-                className="w-16 rounded border border-neutral-300 bg-white px-2 py-1 dark:border-neutral-600 dark:bg-neutral-900" />
+                className="w-16 rounded-sm border border-neutral-300 bg-white px-2 py-1 dark:border-neutral-600 dark:bg-neutral-900" />
         </label>
     );
 }

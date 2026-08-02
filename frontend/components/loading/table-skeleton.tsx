@@ -1,4 +1,4 @@
-const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse";
+const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
 // 寬度循環，讓骨架看起來不死板
 const WIDTHS = ["w-24", "w-40", "w-28", "w-32", "w-20", "w-36"];
 

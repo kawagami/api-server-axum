@@ -97,7 +97,7 @@ export default function RosterPage() {
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1">
                             {names.map((name, i) => (
-                                <span key={name} className="px-3 py-1 bg-white/80 dark:bg-neutral-600 rounded-full text-sm flex items-center gap-2 shadow-sm border border-neutral-100 dark:border-neutral-500">
+                                <span key={name} className="px-3 py-1 bg-white/80 dark:bg-neutral-600 rounded-full text-sm flex items-center gap-2 shadow-xs border border-neutral-100 dark:border-neutral-500">
                                     {name}
                                     <button
                                         onClick={() => removeName(i)}
@@ -141,7 +141,7 @@ export default function RosterPage() {
                 <button
                     onClick={handleGenerate}
                     disabled={loading || names.length === 0}
-                    className="w-full mt-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity active:scale-[0.98]"
+                    className="w-full mt-6 py-3 bg-linear-to-r from-primary-600 to-primary-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity active:scale-[0.98]"
                 >
                     {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}
                     {loading ? t("generating") : t("generate")}

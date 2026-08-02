@@ -40,7 +40,7 @@ export function GoBoard({
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-            className="max-h-full max-w-full select-none rounded-lg bg-amber-100 dark:bg-neutral-800 shadow" role="img">
+            className="max-h-full max-w-full select-none rounded-lg bg-amber-100 dark:bg-neutral-800 shadow-sm" role="img">
             <g className="stroke-neutral-500 dark:stroke-neutral-500" strokeWidth={1} fill="none">{lines}</g>
 
             {STARS.map(([c, r], i) => {

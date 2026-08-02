@@ -43,7 +43,7 @@ export default function FileDownloadModal({ torrent, downloadingKey, copiedKey, 
                     </span>
                     <button
                         onClick={onClose}
-                        className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                        className="p-1 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                         aria-label="關閉"
                     >
                         <X className="w-5 h-5 text-neutral-500" />

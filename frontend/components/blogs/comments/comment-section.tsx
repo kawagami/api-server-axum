@@ -104,7 +104,7 @@ export default function CommentSection({ blogId, isMember }: { blogId: string; i
                                         {c.author_name || t("guest")}
                                     </span>
                                     {c.is_member && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300">
+                                        <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300">
                                             {t("memberBadge")}
                                         </span>
                                     )}
@@ -112,7 +112,7 @@ export default function CommentSection({ blogId, isMember }: { blogId: string; i
                                         <ShowClientTime datetimeString={c.created_at} />
                                     </span>
                                 </div>
-                                <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap break-words">
+                                <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap wrap-break-word">
                                     {c.content}
                                 </p>
                             </div>

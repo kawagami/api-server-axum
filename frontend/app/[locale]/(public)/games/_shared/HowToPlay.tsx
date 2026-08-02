@@ -19,7 +19,7 @@ export function HowToPlayButton({ title, rules }: { title: string; rules: string
             </button>
 
             {open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/70 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/70 p-4 backdrop-blur-xs" onClick={() => setOpen(false)}>
                     <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-lg bg-white p-5 dark:bg-neutral-800" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between">
                             <h2 className="text-lg font-bold text-neutral-800 dark:text-neutral-100">{title}</h2>

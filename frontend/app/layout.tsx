@@ -39,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <script dangerouslySetInnerHTML={{ __html: `(function(){try{if(window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark');}}catch(e){}})();` }} />
                 )}
             </head>
-            <body className="bg-gradient-to-b from-primary-50 to-neutral-100 text-neutral-800 dark:from-primary-950 dark:to-neutral-900 dark:text-neutral-100">
+            <body className="bg-linear-to-b from-primary-50 to-neutral-100 text-neutral-800 dark:from-primary-950 dark:to-neutral-900 dark:text-neutral-100">
                 <WsProvider hasSession={hasSession} wsUrl={process.env.WS_URL ?? ''}>
                     <ThemeBackground theme={siteTheme} />
                     {children}

@@ -48,7 +48,7 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         onChange={e => setStockCode(e.target.value)}
                         required
                         placeholder="e.g. 2330"
-                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                        className="border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -58,7 +58,7 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         value={buyDate}
                         onChange={e => setBuyDate(e.target.value)}
                         required
-                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                        className="border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -70,7 +70,7 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         required
                         min="0"
                         step="0.01"
-                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                        className="border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -82,7 +82,7 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         required
                         min="1"
                         step="1"
-                        className="border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                        className="border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
             </div>
@@ -93,14 +93,14 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                 <button
                     type="button"
                     onClick={onCancel}
-                    className="px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                    className="px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                 >
                     {t('cancel')}
                 </button>
                 <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-2 text-sm rounded bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                    className="px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
                 >
                     {saving ? '...' : t('save')}
                 </button>

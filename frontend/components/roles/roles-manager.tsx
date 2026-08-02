@@ -154,7 +154,7 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
                                                     <button
                                                         onClick={() => handleGroupToggle(role, perms, !allActive)}
                                                         disabled={isPending}
-                                                        className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border border-neutral-300 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                                                        className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-sm border border-neutral-300 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
                                                     >
                                                         {allActive
                                                             ? <><X size={12} /> 全不選</>

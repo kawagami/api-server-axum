@@ -5,10 +5,10 @@ export default function Loading() {
             <div className="flex flex-col gap-8">
                 <section className="flex flex-col gap-3">
                     <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div className="h-7 w-40 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
-                        <div className="h-8 w-64 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                        <div className="h-7 w-40 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
+                        <div className="h-8 w-64 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
                     </div>
-                    <div className="h-4 w-56 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                    <div className="h-4 w-56 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
                     <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
                         <table className="w-full border-collapse border border-neutral-200 dark:border-neutral-700">
                             <thead>
@@ -31,7 +31,7 @@ export default function Loading() {
                                                 key={i}
                                                 className={`border border-neutral-300 dark:border-neutral-700 px-4 py-2 ${i === 1 ? 'hidden md:table-cell' : ''} ${i === 3 ? 'hidden sm:table-cell' : ''}`}
                                             >
-                                                <div className="h-4 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" style={{ width: `${w * 4}px` }} />
+                                                <div className="h-4 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" style={{ width: `${w * 4}px` }} />
                                             </td>
                                         ))}
                                     </tr>
@@ -41,13 +41,13 @@ export default function Loading() {
                     </div>
                 </section>
                 <section>
-                    <div className="h-7 w-52 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse mb-4" />
+                    <div className="h-7 w-52 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse mb-4" />
                     <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg p-6 flex flex-col gap-3">
-                        <div className="h-4 w-20 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
-                        <div className="h-7 w-44 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
-                        <div className="h-4 w-20 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
-                        <div className="h-20 w-full bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
-                        <div className="h-10 w-20 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                        <div className="h-4 w-20 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
+                        <div className="h-7 w-44 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
+                        <div className="h-4 w-20 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
+                        <div className="h-20 w-full bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
+                        <div className="h-10 w-20 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
                     </div>
                 </section>
             </div>

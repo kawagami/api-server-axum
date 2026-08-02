@@ -42,7 +42,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
                 : tone === 'balance' ? (Number(value.replace(/[^\d.-]/g, '')) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400')
                     : '';
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow border dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow-sm border dark:border-neutral-700">
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">{label}</p>
             <p className={`font-semibold text-lg tabular-nums ${color}`}>{value}</p>
         </div>
@@ -144,13 +144,13 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
             <MonthlyBars monthly={summary.monthly} />
 
             {/* 篩選列 */}
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow border dark:border-neutral-700 flex flex-wrap items-end gap-3">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow-sm border dark:border-neutral-700 flex flex-wrap items-end gap-3">
                 <div className="flex flex-col gap-1">
                     <label className="text-xs text-neutral-500 dark:text-neutral-400">{t('kind')}</label>
                     <select
                         value={filters.kind}
                         onChange={e => setFilters(f => ({ ...f, kind: e.target.value as Filters['kind'], category: '' }))}
-                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                        className="border rounded-sm px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     >
                         <option value="">{t('all')}</option>
                         <option value="income">{t('income')}</option>
@@ -163,7 +163,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                         value={filters.category}
                         onChange={e => setFilters(f => ({ ...f, category: e.target.value }))}
                         disabled={!filters.kind}
-                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 disabled:opacity-50"
+                        className="border rounded-sm px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600 disabled:opacity-50"
                     >
                         <option value="">{t('all')}</option>
                         {filterCategoryOptions.map(o => (
@@ -177,7 +177,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                         type="date"
                         value={filters.from}
                         onChange={e => setFilters(f => ({ ...f, from: e.target.value }))}
-                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                        className="border rounded-sm px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -186,13 +186,13 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                         type="date"
                         value={filters.to}
                         onChange={e => setFilters(f => ({ ...f, to: e.target.value }))}
-                        className="border rounded px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
+                        className="border rounded-sm px-2 py-1.5 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>
                 {filterActive && (
                     <button
                         onClick={() => setFilters({ kind: '', category: '', from: '', to: '' })}
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                     >
                         <X size={14} />
                         {t('clearFilters')}
@@ -205,14 +205,14 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                 <div className="flex justify-end gap-2">
                     <button
                         onClick={() => setMode({ type: 'scan' })}
-                        className="flex items-center gap-2 px-4 py-2 rounded border border-primary-500 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950 text-sm"
+                        className="flex items-center gap-2 px-4 py-2 rounded-sm border border-primary-500 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950 text-sm"
                     >
                         <ScanLine size={16} />
                         {t('scanInvoice')}
                     </button>
                     <button
                         onClick={() => setMode({ type: 'add' })}
-                        className="flex items-center gap-2 px-4 py-2 rounded bg-primary-500 text-white hover:bg-primary-600 text-sm"
+                        className="flex items-center gap-2 px-4 py-2 rounded-sm bg-primary-500 text-white hover:bg-primary-600 text-sm"
                     >
                         <Plus size={16} />
                         {t('addEntry')}
@@ -220,13 +220,13 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                 </div>
             )}
             {mode.type === 'add' && (
-                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
                     <h2 className="font-semibold mb-4">{t('addEntry')}</h2>
                     <LedgerForm categories={categories} onSave={input => handleSave(input)} onCancel={() => setMode({ type: 'list' })} />
                 </div>
             )}
             {mode.type === 'edit' && (
-                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
                     <h2 className="font-semibold mb-4">{t('editEntry')}</h2>
                     <LedgerForm categories={categories} initial={mode.entry} onSave={input => handleSave(input, mode.entry.id)} onCancel={() => setMode({ type: 'list' })} />
                 </div>
@@ -248,7 +248,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                         return (
                             <div
                                 key={entry.id}
-                                className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow border dark:border-neutral-700 flex items-center gap-3"
+                                className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow-sm border dark:border-neutral-700 flex items-center gap-3"
                             >
                                 <span className={`w-1 self-stretch rounded-full ${income ? 'bg-green-500' : 'bg-red-500'}`} aria-hidden="true" />
                                 <div className="flex flex-col gap-0.5 min-w-0 flex-1">
@@ -268,7 +268,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                                     <button
                                         onClick={() => setMode({ type: 'edit', entry })}
                                         title={t('editEntry')}
-                                        className="p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                                        className="p-2 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
                                     >
                                         <Pencil size={16} />
                                     </button>
@@ -276,7 +276,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                                         onClick={() => handleDelete(entry.id)}
                                         disabled={mutating}
                                         title={t('deleteEntry')}
-                                        className="p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 text-red-500 disabled:opacity-50"
+                                        className="p-2 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-red-500 disabled:opacity-50"
                                     >
                                         <Trash2 size={16} />
                                     </button>
@@ -289,7 +289,7 @@ export default function LedgerClient({ categories, initialEntries, initialSummar
                         <button
                             onClick={handleLoadMore}
                             disabled={loadingMore}
-                            className="mt-2 self-center flex items-center gap-2 px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
+                            className="mt-2 self-center flex items-center gap-2 px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
                         >
                             {loadingMore && <Loader2 className="animate-spin" size={14} />}
                             {t('loadMore')}

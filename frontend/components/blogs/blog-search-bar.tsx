@@ -68,7 +68,7 @@ export default function BlogSearchBar({ q, sort }: Props) {
                         type="button"
                         onClick={clearSearch}
                         aria-label={t('searchClear')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-sm text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
                     >
                         <X size={16} />
                     </button>

@@ -44,7 +44,7 @@ export function GomokuBoard({
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-            className="max-h-full max-w-full select-none rounded-lg bg-amber-50 dark:bg-neutral-900 shadow" role="img">
+            className="max-h-full max-w-full select-none rounded-lg bg-amber-50 dark:bg-neutral-900 shadow-sm" role="img">
             <g className="stroke-neutral-400 dark:stroke-neutral-600" strokeWidth={1.2} fill="none">{lines}</g>
 
             {/* 星位 */}

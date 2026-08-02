@@ -69,7 +69,7 @@ export default function GamesOverview({ initial }: { initial: GameOverview[] }) 
                         <button
                             onClick={refresh}
                             disabled={refreshing}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-sm transition-colors"
                         >
                             {refreshing
                                 ? <Loader2 className="w-4 h-4 animate-spin" />

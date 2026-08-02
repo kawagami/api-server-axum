@@ -28,7 +28,7 @@ function SummaryCard({ label, value, colored, positive }: {
     positive?: boolean;
 }) {
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow border dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow-sm border dark:border-neutral-700">
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">{label}</p>
             <p className={`font-semibold text-lg ${colored ? (positive ? 'text-red-500' : 'text-green-500') : ''}`}>
                 {value}
@@ -116,7 +116,7 @@ export default function PortfolioClient({ initialEntries }: Props) {
                 <div className="flex justify-end">
                     <button
                         onClick={() => setMode({ type: 'add' })}
-                        className="flex items-center gap-2 px-4 py-2 rounded bg-primary-500 text-white hover:bg-primary-600 text-sm"
+                        className="flex items-center gap-2 px-4 py-2 rounded-sm bg-primary-500 text-white hover:bg-primary-600 text-sm"
                     >
                         <Plus size={16} />
                         {t('addEntry')}
@@ -126,7 +126,7 @@ export default function PortfolioClient({ initialEntries }: Props) {
 
             {/* Add form */}
             {mode.type === 'add' && (
-                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
                     <h2 className="font-semibold mb-4">{t('addEntry')}</h2>
                     <PortfolioForm
                         onSave={handleAdd}
@@ -137,7 +137,7 @@ export default function PortfolioClient({ initialEntries }: Props) {
 
             {/* Edit form */}
             {mode.type === 'edit' && (
-                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+                <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
                     <h2 className="font-semibold mb-4">{t('editEntry')}</h2>
                     <PortfolioForm
                         initial={mode.entry}
@@ -157,7 +157,7 @@ export default function PortfolioClient({ initialEntries }: Props) {
                         return (
                             <div
                                 key={entry.id}
-                                className="bg-white dark:bg-neutral-800 rounded-xl px-5 py-4 shadow border dark:border-neutral-700 flex items-center justify-between gap-4"
+                                className="bg-white dark:bg-neutral-800 rounded-xl px-5 py-4 shadow-sm border dark:border-neutral-700 flex items-center justify-between gap-4"
                             >
                                 <div className="flex flex-col gap-1 min-w-0 flex-1">
                                     {/* Stock code + name */}
@@ -196,14 +196,14 @@ export default function PortfolioClient({ initialEntries }: Props) {
                                     <button
                                         onClick={() => setMode({ type: 'history', entry })}
                                         title={t('viewHistory')}
-                                        className="p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 text-primary-500"
+                                        className="p-2 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-primary-500"
                                     >
                                         <BarChart2 size={16} />
                                     </button>
                                     <button
                                         onClick={() => setMode({ type: 'edit', entry })}
                                         title={t('editEntry')}
-                                        className="p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                                        className="p-2 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
                                     >
                                         <Pencil size={16} />
                                     </button>
@@ -211,7 +211,7 @@ export default function PortfolioClient({ initialEntries }: Props) {
                                         onClick={() => handleDelete(entry.id)}
                                         disabled={mutating}
                                         title={t('deleteEntry')}
-                                        className="p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 text-red-500 disabled:opacity-50"
+                                        className="p-2 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 text-red-500 disabled:opacity-50"
                                     >
                                         <Trash2 size={16} />
                                     </button>

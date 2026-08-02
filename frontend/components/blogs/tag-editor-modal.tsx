@@ -88,7 +88,7 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
                             <button
                                 onClick={() => removeTag(tag)}
                                 aria-label={`移除 ${tag}`}
-                                className="p-1.5 rounded text-neutral-400 hover:text-red-600 transition-colors"
+                                className="p-1.5 rounded-sm text-neutral-400 hover:text-red-600 transition-colors"
                             >
                                 <X size={14} />
                             </button>
@@ -103,7 +103,7 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
                         value={input}
                         onChange={(e) => { setInput(e.target.value); setHint(null); }}
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addTag(input); }}
-                        className="flex-1 min-w-0 p-2 border rounded dark:bg-neutral-700 dark:border-neutral-600"
+                        className="flex-1 min-w-0 p-2 border rounded-sm dark:bg-neutral-700 dark:border-neutral-600"
                         placeholder="搜尋或輸入新 tag..."
                     />
                     <button

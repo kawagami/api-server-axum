@@ -16,7 +16,7 @@ interface Props {
 
 type Tab = 'qr' | 'barcode' | 'manual';
 
-const inputClass = "border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
+const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 const INVOICE_RE = /^[A-Z]{2}\d{8}$/;
 
 export default function InvoiceRegisterClient({ categories }: Props) {
@@ -128,20 +128,20 @@ export default function InvoiceRegisterClient({ categories }: Props) {
 
     if (done) {
         return (
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-8 shadow border dark:border-neutral-700 flex flex-col items-center gap-4 text-center">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-8 shadow-sm border dark:border-neutral-700 flex flex-col items-center gap-4 text-center">
                 <CheckCircle2 className="text-green-500" size={48} />
                 <p className="font-semibold">{t('registered')}</p>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('disclaimer')}</p>
                 <div className="flex gap-2">
                     <button
                         onClick={() => switchTab(tab)}
-                        className="px-4 py-2 text-sm rounded bg-primary-500 text-white hover:bg-primary-600"
+                        className="px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600"
                     >
                         {t('registerAnother')}
                     </button>
                     <Link
                         href="/invoices"
-                        className="px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        className="px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                     >
                         {t('viewMyInvoices')}
                     </Link>
@@ -174,7 +174,7 @@ export default function InvoiceRegisterClient({ categories }: Props) {
                 ))}
             </div>
 
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
                 {!ready ? (
                     <div className="flex flex-col gap-3">
                         <InvoiceScanner key={`${tab}-${scanKey}`} mode={tab === 'barcode' ? 'barcode' : 'qr'} onDecoded={handleDecoded} />
@@ -240,11 +240,11 @@ export default function InvoiceRegisterClient({ categories }: Props) {
 
                         <div className="flex gap-2 justify-end">
                             {tab !== 'manual' && (
-                                <button type="button" onClick={rescan} className="px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700">
+                                <button type="button" onClick={rescan} className="px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700">
                                     {t('rescan')}
                                 </button>
                             )}
-                            <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm rounded bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
+                            <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
                                 {saving && <Loader2 className="animate-spin" size={14} />}
                                 {t('register')}
                             </button>

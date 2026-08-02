@@ -116,7 +116,7 @@ export default function AdminCommandPalette({
                         placeholder="搜尋後台頁面…"
                         className="flex-1 min-w-0 bg-transparent text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 border-0 p-0"
                     />
-                    <kbd className="shrink-0 text-[10px] text-neutral-400 border border-neutral-200 dark:border-neutral-700 rounded px-1.5 py-0.5">
+                    <kbd className="shrink-0 text-[10px] text-neutral-400 border border-neutral-200 dark:border-neutral-700 rounded-sm px-1.5 py-0.5">
                         Esc
                     </kbd>
                 </div>

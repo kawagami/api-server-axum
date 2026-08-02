@@ -57,7 +57,7 @@ function SidebarFooter({ admin, colorMode, defaultIsDark, onOpenPalette, onNavig
                 <Search size={16} />
                 <span className="flex-1 text-left">快速跳頁</span>
                 {/* 兩個平台的快捷鍵一起標，免得為了偵測 OS 而弄出 hydration 不一致 */}
-                <kbd className="text-[10px] border border-neutral-200 dark:border-neutral-700 rounded px-1.5 py-0.5">⌘/Ctrl K</kbd>
+                <kbd className="text-[10px] border border-neutral-200 dark:border-neutral-700 rounded-sm px-1.5 py-0.5">⌘/Ctrl K</kbd>
             </button>
 
             <Link
@@ -237,7 +237,7 @@ export default function AdminSidebar({
 
             {/* Mobile: hamburger button */}
             <button
-                className="sm:hidden fixed top-3 left-3 z-40 p-1.5 rounded-lg bg-white dark:bg-neutral-800 shadow border border-neutral-200 dark:border-neutral-700"
+                className="sm:hidden fixed top-3 left-3 z-40 p-1.5 rounded-lg bg-white dark:bg-neutral-800 shadow-sm border border-neutral-200 dark:border-neutral-700"
                 onClick={() => setDrawerOpen(true)}
                 aria-label="開啟選單"
                 aria-expanded={drawerOpen}
@@ -260,7 +260,7 @@ export default function AdminSidebar({
                 aria-modal="true"
                 aria-label="後台選單"
                 inert={!drawerOpen}
-                className={`sm:hidden flex flex-col fixed top-0 left-0 z-50 h-[100dvh] w-64 bg-white dark:bg-neutral-900 shadow-xl transition-transform duration-300 motion-reduce:transition-none
+                className={`sm:hidden flex flex-col fixed top-0 left-0 z-50 h-dvh w-64 bg-white dark:bg-neutral-900 shadow-xl transition-transform duration-300 motion-reduce:transition-none
                     ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`}
             >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">

@@ -289,7 +289,7 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
                 </Link>
             </div>
             {me ? <LevelCard me={me} t={t} /> : <GuestBanner loginHref={loginHref} t={t} />}
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm flex flex-col gap-5">
                 <div className="grid grid-cols-2 gap-3">
                     <ModeButton label={t("modeSurvival")} desc={t("modeSurvivalDesc")}
                         best={bestOf("survival")?.correct_count} busy={busy}
@@ -407,7 +407,7 @@ function LevelCard({ me, t }: { me: VocabMe; t: T }) {
     const span = me.next_level_exp - me.level_exp;
     const progress = span > 0 ? Math.min(100, ((me.exp - me.level_exp) / span) * 100) : 100;
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-3">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm flex flex-col gap-3">
             <div className="flex items-end justify-between">
                 <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
                     {t("levelBadge", { level: me.level })}
@@ -499,7 +499,7 @@ function ChoiceCard({ question, feedback, busy, ja, onPick, t }: {
     question: VocabQuestion; feedback: Feedback | null; busy: boolean; ja: boolean; onPick: (i: number) => void; t: T;
 }) {
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm flex flex-col gap-5">
             <div className="flex flex-col items-center gap-2">
                 <DifficultyDots difficulty={question.difficulty} />
                 {/* lang="ja" + 日文字型:避免瀏覽器用中文字形渲染日文漢字 */}
@@ -546,7 +546,7 @@ function SpellingCard({ question, feedback, busy, ja, value, onChange, onSubmit,
     composingRef: React.RefObject<boolean>; t: T;
 }) {
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-5">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm flex flex-col gap-5">
             <div className="flex flex-col items-center gap-2">
                 <DifficultyDots difficulty={question.difficulty} />
                 <span className="text-2xl font-bold">{question.meaning_zh}</span>
@@ -595,7 +595,7 @@ function ScoredResultCard({ mode, result, busy, isMember, loginHref, onAgain, t 
 }) {
     const overKey = mode === "timed" || mode === "timed_survival" ? "timeUpOver" : "runOver";
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col items-center gap-4">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm flex flex-col items-center gap-4">
             <Trophy size={40} className="text-primary-500" />
             <h2 className="text-xl font-bold">{t(overKey)}</h2>
             {isMember && result.new_best && (
@@ -634,7 +634,7 @@ function ReviewResultCard({ result, busy, onAgain, t }: {
     result: VocabRunResult; busy: boolean; onAgain: () => void; t: T;
 }) {
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col items-center gap-4">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm flex flex-col items-center gap-4">
             <BookOpenCheck size={40} className="text-primary-500" />
             <h2 className="text-xl font-bold">{t("reviewOver")}</h2>
             <div className="grid grid-cols-3 gap-4 w-full text-center">
@@ -664,7 +664,7 @@ function LeaderboardCard({ board, period, loading, onPeriod, t }: {
     onPeriod: (p: VocabLeaderboardPeriod) => void; t: T;
 }) {
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow flex flex-col gap-2">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow-sm flex flex-col gap-2">
             <div className="flex items-center justify-between px-2">
                 <h2 className="font-bold flex items-center gap-1">
                     <Trophy size={18} className="text-primary-500" />{t("leaderboard")}
@@ -723,13 +723,13 @@ function LeaderboardCard({ board, period, loading, onPeriod, t }: {
 function MistakeBook({ mistakes, t }: { mistakes: VocabMistake[]; t: T }) {
     if (mistakes.length === 0) {
         return (
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow text-center text-sm text-neutral-500 dark:text-neutral-400">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm text-center text-sm text-neutral-500 dark:text-neutral-400">
                 {t("mistakeEmpty")}
             </div>
         );
     }
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow flex flex-col gap-2">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-4 shadow-sm flex flex-col gap-2">
             <div className="flex items-center justify-between px-2">
                 <h2 className="font-bold flex items-center gap-1">
                     <BookOpenCheck size={18} className="text-primary-500" />{t("mistakeBook")}

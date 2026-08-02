@@ -21,7 +21,7 @@ interface HeaderProps {
     enabledFeatures: string[] | null
 }
 
-const navLinkClass = "block px-4 rounded hover:text-primary-600 dark:hover:text-primary-300 hover:underline underline-offset-4 whitespace-nowrap";
+const navLinkClass = "block px-4 rounded-sm hover:text-primary-600 dark:hover:text-primary-300 hover:underline underline-offset-4 whitespace-nowrap";
 const navTriggerClass = navLinkClass.replace('block', 'inline-flex items-center gap-1');
 const activeNavClass = "text-primary-600 dark:text-primary-300 font-medium";
 const dropdownItemClass = "flex items-center gap-2 px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700";
@@ -134,8 +134,8 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
     return (
         <>
             {/* sticky：全站捲動一律由 body 負責，導航必須一直在（頁面不要自己開內捲區） */}
-            <header className="sticky top-0 z-50 min-h-[50px] flex items-center justify-between px-4 bg-primary-50/85 dark:bg-primary-950/85 backdrop-blur-sm">
-                <div className="flex items-center flex-shrink-0">
+            <header className="sticky top-0 z-50 min-h-[50px] flex items-center justify-between px-4 bg-primary-50/85 dark:bg-primary-950/85 backdrop-blur-xs">
+                <div className="flex items-center shrink-0">
                     <Link href="/" className="block px-2" aria-label={t('backToHome')} onClick={closeAll}>
                         <KawaLogo width={100} height={40} />
                     </Link>
@@ -151,14 +151,14 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
                         onMouseLeave={() => setIsResourcesOpen(false)}
                     >
                         <span className={`${navTriggerClass} ${isToolsActive ? activeNavClass : ''}`}>
-                            <Link href="/tools" aria-label={t('tools')} className="rounded" onClick={closeDesktopDropdowns}>
+                            <Link href="/tools" aria-label={t('tools')} className="rounded-sm" onClick={closeDesktopDropdowns}>
                                 {t('tools')}
                             </Link>
                             <button
                                 aria-label={t('openToolsMenu')}
                                 aria-expanded={isResourcesOpen}
                                 onClick={() => setIsResourcesOpen(o => !o)}
-                                className="rounded"
+                                className="rounded-sm"
                             >
                                 <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isResourcesOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -177,14 +177,14 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
                         onMouseLeave={() => setIsGamesOpen(false)}
                     >
                         <span className={`${navTriggerClass} ${isGamesActive ? activeNavClass : ''}`}>
-                            <Link href="/games" aria-label={t('games')} className="rounded" onClick={closeDesktopDropdowns}>
+                            <Link href="/games" aria-label={t('games')} className="rounded-sm" onClick={closeDesktopDropdowns}>
                                 {t('games')}
                             </Link>
                             <button
                                 aria-label={t('openGamesMenu')}
                                 aria-expanded={isGamesOpen}
                                 onClick={() => setIsGamesOpen(o => !o)}
-                                className="rounded"
+                                className="rounded-sm"
                             >
                                 <ChevronDown size={14} className={`transition-transform duration-200 motion-reduce:transition-none ${isGamesOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -207,7 +207,7 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
                             onMouseLeave={() => setIsMemberOpen(false)}
                         >
                             <button
-                                className="flex items-center gap-1 px-4 rounded hover:text-primary-600 dark:hover:text-primary-300"
+                                className="flex items-center gap-1 px-4 rounded-sm hover:text-primary-600 dark:hover:text-primary-300"
                                 aria-label={t('openMemberMenu')}
                                 aria-expanded={isMemberOpen}
                                 onClick={() => setIsMemberOpen(o => !o)}
@@ -237,7 +237,7 @@ export default function Header({ member, colorMode, defaultIsDark, enabledFeatur
                 {/* Mobile hamburger */}
                 <button
                     ref={hamburgerRef}
-                    className="md:hidden p-2 rounded"
+                    className="md:hidden p-2 rounded-sm"
                     onClick={() => setIsOpen(o => !o)}
                     aria-label={isOpen ? t('closeMenu') : t('openMenu')}
                     aria-expanded={isOpen}

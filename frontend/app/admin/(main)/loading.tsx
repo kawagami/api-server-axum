@@ -1,4 +1,4 @@
-const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse";
+const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
 
 // 對應 page.tsx 的儀表板版面（標題 + 統計卡 + 分組快速入口），形狀對不上載入完會跳版
 export default function Loading() {
@@ -10,7 +10,7 @@ export default function Loading() {
                 {Array.from({ length: 5 }).map((_, i) => (
                     <div
                         key={i}
-                        className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700"
+                        className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700"
                     >
                         <div className={`h-4 w-16 ${PULSE}`} />
                         <div className={`h-8 w-12 ${PULSE}`} />

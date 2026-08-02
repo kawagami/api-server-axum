@@ -49,7 +49,7 @@ function SnapshotCard({
     hint: string;
 }) {
     return (
-        <div className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700">
+        <div className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700">
             <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
                 <Icon size={16} />
                 <span className="text-sm">{label}</span>
@@ -57,7 +57,7 @@ function SnapshotCard({
             <div className="text-3xl font-bold text-neutral-800 dark:text-neutral-100 tabular-nums">
                 {value}
             </div>
-            <div className="text-xs text-neutral-400 dark:text-neutral-500 min-h-[1rem]">{hint}</div>
+            <div className="text-xs text-neutral-400 dark:text-neutral-500 min-h-4">{hint}</div>
         </div>
     );
 }
@@ -72,7 +72,7 @@ function ChartSection({
     children: React.ReactNode;
 }) {
     return (
-        <section className="bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 p-5">
+        <section className="bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-5">
             <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-sm text-neutral-700 dark:text-neutral-200">
                     {title}
@@ -184,7 +184,7 @@ export default function MetricsView({
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
             {latest === null ? (
-                <p className="text-center text-neutral-400 dark:text-neutral-500 text-sm py-16 bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700">
+                <p className="text-center text-neutral-400 dark:text-neutral-500 text-sm py-16 bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700">
                     近 {hours} 小時尚無採樣資料
                 </p>
             ) : (

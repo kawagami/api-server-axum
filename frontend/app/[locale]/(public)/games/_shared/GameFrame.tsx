@@ -76,7 +76,7 @@ export function GameFrame({
                 {board}
 
                 {phase === 'over' && result && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg bg-neutral-900/80 px-6 text-center backdrop-blur-sm">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg bg-neutral-900/80 px-6 text-center backdrop-blur-xs">
                         <p className="text-2xl font-bold text-neutral-50">{resultTitle}</p>
                         <p className="text-sm text-neutral-300">{reasonLabel(result.reason)}</p>
                         <button

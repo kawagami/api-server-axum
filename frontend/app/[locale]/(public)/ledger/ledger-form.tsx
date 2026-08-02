@@ -16,7 +16,7 @@ function todayTaipei() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 }
 
-const inputClass = "border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
+const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 
 export default function LedgerForm({ categories, initial, onSave, onCancel }: Props) {
     const t = useTranslations('Ledger');
@@ -141,14 +141,14 @@ export default function LedgerForm({ categories, initial, onSave, onCancel }: Pr
                 <button
                     type="button"
                     onClick={onCancel}
-                    className="px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                    className="px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                 >
                     {t('cancel')}
                 </button>
                 <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-2 text-sm rounded bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                    className="px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
                 >
                     {saving ? '...' : t('save')}
                 </button>

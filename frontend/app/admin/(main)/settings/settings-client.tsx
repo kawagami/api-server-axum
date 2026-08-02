@@ -105,7 +105,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
                     <button
                         type="button"
                         onClick={() => setRevealed(prev => ({ ...prev, [setting.key]: !shown }))}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-sm text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
                         aria-label={shown ? "隱藏" : "顯示"}
                     >
                         {shown ? <EyeOff size={16} /> : <Eye size={16} />}

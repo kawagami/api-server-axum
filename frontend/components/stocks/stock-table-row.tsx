@@ -22,7 +22,7 @@ export default function StockTableRow({ stock }: { stock: StockChange }) {
                     <input type="hidden" name="id" value={String(stock.id)} />
                     <button
                         type="submit"
-                        className="px-3 py-1.5 text-sm font-medium rounded bg-primary-600 hover:bg-primary-700 text-white transition-colors"
+                        className="px-3 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white transition-colors"
                     >
                         再查詢
                     </button>

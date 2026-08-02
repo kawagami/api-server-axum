@@ -200,7 +200,7 @@ export default function Login() {
                                 ref={labelRef}
                                 defaultValue="我的裝置"
                                 maxLength={64}
-                                className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm"
+                                className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-xs"
                             />
                         </div>
                         {upgradeError && <p role="alert" className="text-sm text-red-500">{upgradeError}</p>}
@@ -231,11 +231,11 @@ export default function Login() {
                         <form action={formAction} className="space-y-4">
                             <div>
                                 <label htmlFor="name" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">名稱</label>
-                                <input type="text" id="name" name="name" autoComplete="username webauthn" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm" placeholder="輸入管理員名稱" required />
+                                <input type="text" id="name" name="name" autoComplete="username webauthn" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-xs" placeholder="輸入管理員名稱" required />
                             </div>
                             <div>
                                 <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">密碼</label>
-                                <input type="password" id="password" name="password" autoComplete="current-password" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-sm" placeholder="輸入密碼" required />
+                                <input type="password" id="password" name="password" autoComplete="current-password" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-xs" placeholder="輸入密碼" required />
                             </div>
                             {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
                             <button

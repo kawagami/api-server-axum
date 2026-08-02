@@ -34,7 +34,7 @@ export default function BlogListCard({ id, toc, excerpt, tags, created_at, updat
                     {tags.map((tag) => (
                         <span
                             key={tag}
-                            className="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300 text-xs font-semibold px-2.5 py-0.5 rounded"
+                            className="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300 text-xs font-semibold px-2.5 py-0.5 rounded-sm"
                         >
                             {tag}
                         </span>

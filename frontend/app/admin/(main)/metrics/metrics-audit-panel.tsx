@@ -45,7 +45,7 @@ export default function MetricsAuditPanel({
     }, [load, from, to]);
 
     return (
-        <section className="bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 p-5 flex flex-col gap-4">
+        <section className="bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-5 flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-col gap-0.5">
                     <h2 className="font-semibold text-sm text-neutral-700 dark:text-neutral-200">
@@ -59,7 +59,7 @@ export default function MetricsAuditPanel({
                 <div className="flex items-center gap-2">
                     <Link
                         href={`/admin/audit_logs?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-sm bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
                     >
                         <ExternalLink size={14} />
                         在操作紀錄開啟
@@ -67,7 +67,7 @@ export default function MetricsAuditPanel({
                     <button
                         type="button"
                         onClick={onClear}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-sm bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
                     >
                         <X size={14} />
                         清除選取
@@ -84,7 +84,7 @@ export default function MetricsAuditPanel({
                             <AdminTh className="whitespace-nowrap">時間</AdminTh>
                             <AdminTh className="whitespace-nowrap hidden md:table-cell">使用者</AdminTh>
                             <AdminTh className="whitespace-nowrap">方法</AdminTh>
-                            <AdminTh className="min-w-[12rem]">路徑</AdminTh>
+                            <AdminTh className="min-w-48">路徑</AdminTh>
                             <AdminTh className="whitespace-nowrap">狀態</AdminTh>
                         </AdminHeadRow>
                     </thead>
@@ -103,13 +103,13 @@ export default function MetricsAuditPanel({
                                         {log.user_email}
                                     </AdminTd>
                                     <AdminTd>
-                                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${METHOD_BADGE[log.method] ?? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}`}>
+                                        <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${METHOD_BADGE[log.method] ?? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}`}>
                                             {log.method}
                                         </span>
                                     </AdminTd>
                                     <AdminTd className="font-mono text-xs break-all">{log.path}</AdminTd>
                                     <AdminTd>
-                                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${httpStatusBadgeClass(log.status_code)}`}>
+                                        <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${httpStatusBadgeClass(log.status_code)}`}>
                                             {log.status_code}
                                         </span>
                                     </AdminTd>
@@ -126,7 +126,7 @@ export default function MetricsAuditPanel({
                         type="button"
                         onClick={() => { if (!isPending) loadMore(); }}
                         disabled={isPending}
-                        className="px-5 py-1.5 text-sm font-medium rounded bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 transition-colors"
+                        className="px-5 py-1.5 text-sm font-medium rounded-sm bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 transition-colors"
                     >
                         {isPending ? "載入中…" : "載入更多"}
                     </button>

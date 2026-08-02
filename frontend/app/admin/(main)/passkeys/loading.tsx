@@ -1,6 +1,6 @@
 import { BorderedTableSkeleton } from "@/components/loading/table-skeleton";
 
-const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse";
+const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
 
 export default function Loading() {
     return (

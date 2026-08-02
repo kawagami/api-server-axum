@@ -16,12 +16,12 @@ export default function BlogsLoading() {
                             key={i}
                             className="bg-white dark:bg-neutral-800 shadow-md rounded-xl p-5 space-y-3"
                         >
-                            <div className="h-5 w-2/3 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
-                            <div className="h-4 w-full rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
-                            <div className="h-4 w-4/5 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+                            <div className="h-5 w-2/3 rounded-sm bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+                            <div className="h-4 w-full rounded-sm bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+                            <div className="h-4 w-4/5 rounded-sm bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
                             <div className="flex gap-2 pt-1">
-                                <div className="h-4 w-12 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
-                                <div className="h-4 w-16 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+                                <div className="h-4 w-12 rounded-sm bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+                                <div className="h-4 w-16 rounded-sm bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
                             </div>
                         </div>
                     ))}
@@ -30,7 +30,7 @@ export default function BlogsLoading() {
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div
                             key={i}
-                            className="h-7 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse"
+                            className="h-7 rounded-sm bg-neutral-200 dark:bg-neutral-700 animate-pulse"
                         />
                     ))}
                 </aside>

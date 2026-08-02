@@ -72,7 +72,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
         }
     }
 
-    const inputClass = "px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
+    const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="w-full">
@@ -127,11 +127,11 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                     </label>
                     <div className="flex gap-2">
                         <button onClick={() => search(filters)} disabled={isPending}
-                            className="px-4 py-1.5 text-sm font-medium rounded bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors">
+                            className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors">
                             搜尋
                         </button>
                         <button onClick={() => { setFilters(defaultFilters); search(defaultFilters); }} disabled={isPending}
-                            className="px-4 py-1.5 text-sm font-medium rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors">
+                            className="px-4 py-1.5 text-sm font-medium rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors">
                             重設
                         </button>
                     </div>
@@ -182,12 +182,12 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                                                 <AdminTd className="whitespace-nowrap">
                                                     <div className="flex items-center gap-2">
                                                         <button onClick={() => setEditing(w)}
-                                                            className="p-2 rounded text-neutral-400 hover:text-primary-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                                            className="p-2 rounded-sm text-neutral-400 hover:text-primary-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                                                             title="編輯" aria-label={`編輯 ${w.word}`}>
                                                             <Pencil size={15} />
                                                         </button>
                                                         <button onClick={() => toggleEnabled(w)} disabled={savingId === w.id}
-                                                            className="px-2 py-0.5 text-xs rounded border border-neutral-300 dark:border-neutral-600 hover:border-primary-400 disabled:opacity-50 transition-colors">
+                                                            className="px-2 py-0.5 text-xs rounded-sm border border-neutral-300 dark:border-neutral-600 hover:border-primary-400 disabled:opacity-50 transition-colors">
                                                             {savingId === w.id
                                                                 ? <Loader2 size={12} className="animate-spin" />
                                                                 : w.enabled ? '下架' : '上架'}
@@ -205,7 +205,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
 
                 {hasMore && (
                     <button onClick={loadMore} disabled={isPending}
-                        className="self-center px-6 py-2 text-sm font-medium rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors">
+                        className="self-center px-6 py-2 text-sm font-medium rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors">
                         {isPending ? '載入中…' : '載入更多'}
                     </button>
                 )}
@@ -279,7 +279,7 @@ function EditModal({ word, onClose, onSaved }: {
         }
     }
 
-    const fieldClass = "w-full px-2 py-1.5 text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
+    const fieldClass = "w-full px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -330,11 +330,11 @@ function EditModal({ word, onClose, onSaved }: {
                 {error && <p className="text-sm text-red-500">{error}</p>}
                 <div className="flex justify-end gap-2 pt-1">
                     <button onClick={onClose} disabled={saving}
-                        className="px-4 py-1.5 text-sm rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition-colors">
+                        className="px-4 py-1.5 text-sm rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition-colors">
                         取消
                     </button>
                     <button onClick={save} disabled={saving}
-                        className="px-4 py-1.5 text-sm font-medium rounded bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1">
+                        className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1">
                         {saving && <Loader2 size={14} className="animate-spin" />}儲存
                     </button>
                 </div>

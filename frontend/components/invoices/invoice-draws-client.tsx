@@ -49,7 +49,7 @@ export default function InvoiceDrawsClient({ initialDraws }: { initialDraws: Inv
             {initialDraws.map(d => (
                 <div
                     key={d.period}
-                    className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow border dark:border-neutral-700 flex flex-col gap-2"
+                    className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow-sm border dark:border-neutral-700 flex flex-col gap-2"
                 >
                     <div className="flex items-center gap-2 text-sm">
                         <span className="font-medium">{t('period')}</span>

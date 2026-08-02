@@ -61,7 +61,7 @@ export default function NotificationFeed() {
                 <p className="text-neutral-500 dark:text-neutral-400 text-sm">{t("waiting")}</p>
             ) : (
                 entries.map(entry => (
-                    <div key={entry.key} className="bg-white dark:bg-neutral-800 rounded-lg p-4 shadow text-sm font-mono">
+                    <div key={entry.key} className="bg-white dark:bg-neutral-800 rounded-lg p-4 shadow-sm text-sm font-mono">
                         <div className="flex items-center gap-3 mb-1">
                             <span className="text-primary-600 dark:text-primary-400 font-semibold">{entry.type}</span>
                             <span className="text-neutral-400 text-xs">{entry.ts}</span>

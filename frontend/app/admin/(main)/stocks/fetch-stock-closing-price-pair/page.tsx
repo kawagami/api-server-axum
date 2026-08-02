@@ -80,7 +80,7 @@ export default function Search() {
         const { price_diff, percent_change, is_increase, day_span } = data.stats;
         const priceChangeClass = is_increase ? "text-green-600" : "text-red-600";
         return (
-            <div className="bg-primary-50 dark:bg-primary-900/30 p-3 rounded text-sm text-neutral-800 dark:text-neutral-200">
+            <div className="bg-primary-50 dark:bg-primary-900/30 p-3 rounded-sm text-sm text-neutral-800 dark:text-neutral-200">
                 {data.prices.length >= 2 && (
                     <>
                         <p><span className="font-medium">起始收盤價：</span> {data.prices[0].close_price}</p>

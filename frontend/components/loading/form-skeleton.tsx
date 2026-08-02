@@ -1,4 +1,4 @@
-const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse";
+const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
 
 /**
  * 後台表單／設定頁的共用骨架（標題 + 數個「說明 + 輸入列」卡片）。

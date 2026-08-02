@@ -67,7 +67,7 @@ export default function LottoDrawsClient({ initialDraws }: { initialDraws: Lotto
                     {draws.map(d => (
                         <div
                             key={`${d.game}-${d.period}`}
-                            className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow border dark:border-neutral-700 flex flex-col gap-1.5"
+                            className="bg-white dark:bg-neutral-800 rounded-xl px-4 py-3 shadow-sm border dark:border-neutral-700 flex flex-col gap-1.5"
                         >
                             <div className="flex items-center gap-2 flex-wrap text-sm">
                                 <span className="font-medium">{t(GAME_KEY[d.game])}</span>

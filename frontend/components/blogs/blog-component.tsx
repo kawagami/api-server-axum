@@ -101,7 +101,7 @@ export default function BlogComponent({ id, blog, allTags, compressConfig }: Pro
         pv.scrollTop = ratio * (pv.scrollHeight - pv.clientHeight);
     };
 
-    const toolBtn = "p-2 rounded text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors";
+    const toolBtn = "p-2 rounded-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors";
 
     return (
         <>
@@ -151,7 +151,7 @@ export default function BlogComponent({ id, blog, allTags, compressConfig }: Pro
                             <button
                                 onClick={() => setTags(tags.filter((t) => t !== tag))}
                                 aria-label={`移除 ${tag}`}
-                                className="p-1.5 rounded text-neutral-400 hover:text-red-600 transition-colors"
+                                className="p-1.5 rounded-sm text-neutral-400 hover:text-red-600 transition-colors"
                             >
                                 <X size={14} />
                             </button>
@@ -183,11 +183,11 @@ export default function BlogComponent({ id, blog, allTags, compressConfig }: Pro
                             onChange={(e) => setMarkdown(e.target.value)}
                             onScroll={handleEditorScroll}
                             {...editorHandlers}
-                            className="w-full h-full p-4 rounded border border-neutral-300 font-mono resize-none dark:bg-neutral-800 dark:text-white dark:border-neutral-600"
+                            className="w-full h-full p-4 rounded-sm border border-neutral-300 font-mono resize-none dark:bg-neutral-800 dark:text-white dark:border-neutral-600"
                             placeholder="輸入 Markdown 內容..."
                         />
                     </div>
-                    <div ref={previewRef} className="p-4 h-full min-h-[300px] overflow-auto border border-neutral-300 bg-white dark:bg-neutral-800 dark:text-white rounded prose max-w-none dark:prose-invert">
+                    <div ref={previewRef} className="p-4 h-full min-h-[300px] overflow-auto border border-neutral-300 bg-white dark:bg-neutral-800 dark:text-white rounded-sm prose max-w-none dark:prose-invert">
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             rehypePlugins={[rehypeHighlight]}

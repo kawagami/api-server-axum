@@ -36,7 +36,7 @@ export default function LottoNotifySettingsClient({ hasEmail, email, initialEnab
     }
 
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700 flex flex-col gap-4">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700 flex flex-col gap-4">
             <div className="flex items-start gap-3">
                 <Bell className="text-primary-500 shrink-0 mt-0.5" size={20} />
                 <div className="flex flex-col gap-1 min-w-0 flex-1">

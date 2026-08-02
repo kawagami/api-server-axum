@@ -3,10 +3,10 @@ export default function Loading() {
         <div className="w-full">
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                    <div className="h-7 w-32 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
-                    <div className="h-9 w-28 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                    <div className="h-7 w-32 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
+                    <div className="h-9 w-28 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
                 </div>
-                <div className="h-4 w-48 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                <div className="h-4 w-48 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
                 <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
                     <table className="w-full border-collapse border border-neutral-200 dark:border-neutral-700">
                         <thead>
@@ -23,7 +23,7 @@ export default function Loading() {
                                 <tr key={i}>
                                     {Array.from({ length: 7 }).map((_, j) => (
                                         <td key={j} className="border border-neutral-300 dark:border-neutral-700 px-4 py-2">
-                                            <div className="h-4 w-16 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                                            <div className="h-4 w-16 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
                                         </td>
                                     ))}
                                 </tr>

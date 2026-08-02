@@ -44,7 +44,7 @@ export default function Pagination({ page, totalPages }: Props) {
     }
 
     const arrowBtn =
-        'p-1 rounded text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed'
+        'p-1 rounded-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed'
 
     return (
         <div className={`flex items-center justify-center gap-1.5 py-4 flex-wrap ${isPending ? 'opacity-50' : ''}`}>

@@ -26,7 +26,7 @@ export function AvalonChat({ chat, onSend }: { chat: ChatEntry[]; onSend: (text:
                 {chat.length === 0 ? (
                     <p className="text-neutral-400">{t('chatEmpty')}</p>
                 ) : chat.map(c => (
-                    <p key={c.id} className="break-words">
+                    <p key={c.id} className="wrap-break-word">
                         <span className="font-semibold text-primary-700 dark:text-primary-300">{c.name}</span>
                         <span className="text-neutral-700 dark:text-neutral-200">：{c.text}</span>
                     </p>

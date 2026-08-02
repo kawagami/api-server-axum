@@ -38,7 +38,7 @@ export function CategoryPie({ title, slices }: { title: string; slices: Slice[] 
 
     if (total <= 0) {
         return (
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
                 <h3 className="font-semibold text-sm mb-3">{title}</h3>
                 <p className="text-center text-neutral-400 dark:text-neutral-500 text-sm py-8">{t('noData')}</p>
             </div>
@@ -55,7 +55,7 @@ export function CategoryPie({ title, slices }: { title: string; slices: Slice[] 
     });
 
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
             <h3 className="font-semibold text-sm mb-3">{title}</h3>
             <div className="flex items-center gap-4">
                 <svg viewBox="0 0 120 120" className="w-28 h-28 shrink-0" role="img" aria-label={title}>
@@ -70,7 +70,7 @@ export function CategoryPie({ title, slices }: { title: string; slices: Slice[] 
                 <ul className="flex-1 min-w-0 flex flex-col gap-1 text-xs">
                     {arcs.map(a => (
                         <li key={a.label} className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: a.color }} />
+                            <span className="w-2.5 h-2.5 rounded-xs shrink-0" style={{ backgroundColor: a.color }} />
                             <span className="truncate flex-1">{a.label}</span>
                             <span className="text-neutral-500 dark:text-neutral-400 tabular-nums">{fmt(a.value)}</span>
                             <span className="text-neutral-400 dark:text-neutral-500 tabular-nums w-12 text-right">{a.pct.toFixed(1)}%</span>
@@ -89,7 +89,7 @@ export function MonthlyBars({ monthly }: { monthly: LedgerMonthly[] }) {
 
     if (rows.length === 0) {
         return (
-            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+            <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
                 <h3 className="font-semibold text-sm mb-3">{t('monthlyTrend')}</h3>
                 <p className="text-center text-neutral-400 dark:text-neutral-500 text-sm py-8">{t('noData')}</p>
             </div>
@@ -97,12 +97,12 @@ export function MonthlyBars({ monthly }: { monthly: LedgerMonthly[] }) {
     }
 
     return (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow border dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl p-5 shadow-sm border dark:border-neutral-700">
             <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm">{t('monthlyTrend')}</h3>
                 <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-500" />{t('income')}</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-500" />{t('expense')}</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-xs bg-green-500" />{t('income')}</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-xs bg-red-500" />{t('expense')}</span>
                 </div>
             </div>
             <div className="overflow-x-auto">

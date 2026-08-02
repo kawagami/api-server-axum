@@ -76,7 +76,7 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                                                 </a>
                                             )}
                                         </AdminTd>
-                                        <AdminTd className="max-w-md whitespace-pre-wrap break-words text-neutral-800 dark:text-neutral-200">
+                                        <AdminTd className="max-w-md whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200">
                                             {m.content}
                                         </AdminTd>
                                         {canDelete && (
@@ -84,7 +84,7 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                                                 <button
                                                     onClick={() => handleDelete(m.id)}
                                                     disabled={deletingId === m.id}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 transition-colors"
+                                                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 transition-colors"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                     刪除
@@ -104,7 +104,7 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                     <button
                         onClick={loadMore}
                         disabled={isPending}
-                        className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
+                        className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded-sm hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
                     >
                         {isPending ? '載入中…' : '載入更多'}
                     </button>

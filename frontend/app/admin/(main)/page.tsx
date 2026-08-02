@@ -40,7 +40,7 @@ function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
     return (
         <Link
             href={href}
-            className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 hover:border-primary-400 dark:hover:border-primary-500 hover:shadow-md transition-[border-color,box-shadow]"
+            className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 hover:border-primary-400 dark:hover:border-primary-500 hover:shadow-md transition-[border-color,box-shadow]"
         >
             <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
                 <Icon size={16} />
@@ -49,7 +49,7 @@ function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
             <div className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">
                 {value ?? "—"}
             </div>
-            <div className="text-xs text-neutral-400 dark:text-neutral-500 min-h-[1rem]">
+            <div className="text-xs text-neutral-400 dark:text-neutral-500 min-h-4">
                 {hint}
             </div>
         </Link>

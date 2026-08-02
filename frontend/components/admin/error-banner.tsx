@@ -14,7 +14,7 @@ export default function ErrorBanner({ message }: { message: string | null }) {
     return (
         <div
             role="alert"
-            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 text-red-700 dark:text-red-400 text-sm"
+            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-sm p-3 text-red-700 dark:text-red-400 text-sm"
         >
             {message}
         </div>

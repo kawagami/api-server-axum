@@ -1,6 +1,6 @@
 import PageShell from "@/components/page-shell";
 
-const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse";
+const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
 
 /**
  * 前台資料頁的載入骨架（會員功能頁全部走這支）。
@@ -41,7 +41,7 @@ export default function PublicPageSkeleton({
                     ))}
                 </div>
             ) : variant === "form" ? (
-                <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow flex flex-col gap-4">
+                <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow-sm flex flex-col gap-4">
                     {Array.from({ length: rows }).map((_, i) => (
                         <div key={i} className={`h-10 ${PULSE}`} />
                     ))}

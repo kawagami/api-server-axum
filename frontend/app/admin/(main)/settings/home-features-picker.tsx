@@ -74,7 +74,7 @@ export default function HomeFeaturesPicker({ initialEnabled }: { initialEnabled:
                             <button
                                 onClick={() => move(key, -1)}
                                 disabled={saving || index === 0}
-                                className="p-2 rounded text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors"
+                                className="p-2 rounded-sm text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors"
                                 aria-label="上移"
                             >
                                 <ArrowUp size={14} />
@@ -82,7 +82,7 @@ export default function HomeFeaturesPicker({ initialEnabled }: { initialEnabled:
                             <button
                                 onClick={() => move(key, 1)}
                                 disabled={saving || index === enabled.length - 1}
-                                className="p-2 rounded text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors"
+                                className="p-2 rounded-sm text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors"
                                 aria-label="下移"
                             >
                                 <ArrowDown size={14} />
@@ -90,7 +90,7 @@ export default function HomeFeaturesPicker({ initialEnabled }: { initialEnabled:
                             <button
                                 onClick={() => toggle(key)}
                                 disabled={saving}
-                                className="flex items-center gap-1 px-2 py-1.5 rounded text-xs text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                                className="flex items-center gap-1 px-2 py-1.5 rounded-sm text-xs text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
                             >
                                 <Eye size={14} />
                                 顯示中
@@ -111,7 +111,7 @@ export default function HomeFeaturesPicker({ initialEnabled }: { initialEnabled:
                             <button
                                 onClick={() => toggle(feature.key)}
                                 disabled={saving}
-                                className="flex items-center gap-1 px-2 py-1.5 rounded text-xs text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                                className="flex items-center gap-1 px-2 py-1.5 rounded-sm text-xs text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
                             >
                                 <EyeOff size={14} />
                                 已隱藏

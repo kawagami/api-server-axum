@@ -5,8 +5,8 @@ export default function Loading() {
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
                     <div className="space-y-2">
-                        <div className="h-6 w-40 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
-                        <div className="h-4 w-24 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                        <div className="h-6 w-40 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
+                        <div className="h-4 w-24 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
                     </div>
                 </div>
                 <table className="w-full border-collapse border border-neutral-200 dark:border-neutral-700">
@@ -17,7 +17,7 @@ export default function Loading() {
                                     {label}
                                 </th>
                                 <td className="border border-neutral-300 dark:border-neutral-700 px-4 py-2">
-                                    <div className="h-4 w-40 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                                    <div className="h-4 w-40 bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse" />
                                 </td>
                             </tr>
                         ))}

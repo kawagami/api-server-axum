@@ -1,4 +1,4 @@
-const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse";
+const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
 
 /**
  * 後台圖表頁（到訪統計 / 系統指標）的共用骨架：
@@ -16,7 +16,7 @@ export default function ChartPageSkeleton({ cards = 2, charts = 1 }: { cards?: n
                 {Array.from({ length: cards }).map((_, i) => (
                     <div
                         key={i}
-                        className="bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 p-5 flex flex-col gap-2"
+                        className="bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-5 flex flex-col gap-2"
                     >
                         <div className={`h-4 w-24 ${PULSE}`} />
                         <div className={`h-8 w-20 ${PULSE}`} />
@@ -28,7 +28,7 @@ export default function ChartPageSkeleton({ cards = 2, charts = 1 }: { cards?: n
             {Array.from({ length: charts }).map((_, i) => (
                 <section
                     key={i}
-                    className="bg-white dark:bg-neutral-900 rounded-lg shadow border border-neutral-200 dark:border-neutral-700 p-5 flex flex-col gap-3"
+                    className="bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-5 flex flex-col gap-3"
                 >
                     <div className={`h-4 w-28 ${PULSE}`} />
                     <div className={`h-48 w-full ${PULSE}`} />

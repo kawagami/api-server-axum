@@ -43,7 +43,7 @@ export default function AlarmSettings({ hour, setHour, minute, setMinute, disabl
                     min="0"
                     max="23"
                     disabled={disabled}
-                    className="w-full p-3 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-sm bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-center text-xl"
+                    className="w-full p-3 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-xs bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-center text-xl"
                 />
                 <span className="text-2xl font-bold text-neutral-700 dark:text-neutral-300">:</span>
                 <input
@@ -56,7 +56,7 @@ export default function AlarmSettings({ hour, setHour, minute, setMinute, disabl
                     min="0"
                     max="59"
                     disabled={disabled}
-                    className="w-full p-3 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-sm bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-center text-xl"
+                    className="w-full p-3 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-xs bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-center text-xl"
                 />
             </div>
             <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400 text-center">

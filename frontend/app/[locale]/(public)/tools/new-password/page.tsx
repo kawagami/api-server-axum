@@ -97,12 +97,12 @@ export default function NewPasswordPage() {
                         {newPasswords.map((password, index) => (
                             <li
                                 key={index}
-                                className="flex items-center justify-between gap-3 rounded-md bg-white dark:bg-neutral-800 px-3 py-2 shadow-sm"
+                                className="flex items-center justify-between gap-3 rounded-md bg-white dark:bg-neutral-800 px-3 py-2 shadow-xs"
                             >
                                 <span className="font-mono text-sm break-all text-neutral-800 dark:text-neutral-100">{password}</span>
                                 <button
                                     onClick={() => handleCopy(password)}
-                                    className="shrink-0 flex items-center gap-1 px-2 py-1 text-sm rounded border border-neutral-200 dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                                    className="shrink-0 flex items-center gap-1 px-2 py-1 text-sm rounded-sm border border-neutral-200 dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
                                 >
                                     <Copy size={14} />
                                     {t("copy")}

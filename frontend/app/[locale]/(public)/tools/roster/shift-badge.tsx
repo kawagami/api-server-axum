@@ -32,7 +32,7 @@ export default function ShiftBadge({ type }: { type: string }) {
     const key = SHIFT_KEY[type];
 
     return (
-        <span className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-200 shadow-sm ${currentStyle.container}`}>
+        <span className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-200 shadow-xs ${currentStyle.container}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${currentStyle.dot}`} />
             {key ? t(key) : type}
         </span>

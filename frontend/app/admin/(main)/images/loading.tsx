@@ -1,4 +1,4 @@
-const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse";
+const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
 
 export default function Loading() {
     return (
@@ -15,7 +15,7 @@ export default function Loading() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="bg-white dark:bg-neutral-900 p-4 rounded shadow-md flex flex-col items-center gap-3">
+                    <div key={i} className="bg-white dark:bg-neutral-900 p-4 rounded-sm shadow-md flex flex-col items-center gap-3">
                         <div className={`w-[150px] h-[150px] rounded-lg ${PULSE}`} />
                         <div className={`h-4 w-20 ${PULSE}`} />
                         <div className={`h-8 w-20 ${PULSE}`} />

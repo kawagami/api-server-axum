@@ -46,7 +46,7 @@ export function BanqiBoard({
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-            className="max-h-full max-w-full select-none rounded-lg bg-amber-100 dark:bg-neutral-900 shadow" role="img">
+            className="max-h-full max-w-full select-none rounded-lg bg-amber-100 dark:bg-neutral-900 shadow-sm" role="img">
             {/* 格線 */}
             {Array.from({ length: COLS * ROWS }, (_, idx) => {
                 const c = idx % COLS;

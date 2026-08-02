@@ -97,7 +97,7 @@ export default function LogsClient() {
                                         <AdminRow key={log.id} tone={LEVEL_ROW_BG[log.level]}>
                                             <AdminTd className="text-neutral-500 dark:text-neutral-500 font-mono hidden sm:table-cell">{log.id}</AdminTd>
                                             <AdminTd>
-                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${LEVEL_BADGE[log.level]}`}>
+                                                <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${LEVEL_BADGE[log.level]}`}>
                                                     {log.level}
                                                 </span>
                                             </AdminTd>
@@ -122,7 +122,7 @@ export default function LogsClient() {
                         <button
                             onClick={handleLoadMore}
                             disabled={isPending}
-                            className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
+                            className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded-sm hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
                         >
                             {isPending ? '載入中…' : '載入更多'}
                         </button>

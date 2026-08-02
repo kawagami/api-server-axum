@@ -14,7 +14,7 @@ interface Props {
     onImported: () => void;
 }
 
-const inputClass = "border rounded px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
+const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 
 export default function InvoiceImportModal({ categories, onClose, onImported }: Props) {
     const t = useTranslations('Ledger');
@@ -85,7 +85,7 @@ export default function InvoiceImportModal({ categories, onClose, onImported }: 
             >
                 <div className="flex items-center justify-between px-5 py-4 border-b dark:border-neutral-700">
                     <h2 className="font-semibold">{parsed ? t('importTitle') : t('scanTitle')}</h2>
-                    <button onClick={onClose} className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700" aria-label={t('cancel')}>
+                    <button onClick={onClose} className="p-1 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700" aria-label={t('cancel')}>
                         <X size={18} />
                     </button>
                 </div>
@@ -125,10 +125,10 @@ export default function InvoiceImportModal({ categories, onClose, onImported }: 
                             {error && <p className="text-red-500 text-sm">{error}</p>}
 
                             <div className="flex gap-2 justify-end">
-                                <button type="button" onClick={rescan} className="px-4 py-2 text-sm rounded border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700">
+                                <button type="button" onClick={rescan} className="px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700">
                                     {t('rescan')}
                                 </button>
-                                <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm rounded bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
+                                <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
                                     {saving && <Loader2 className="animate-spin" size={14} />}
                                     {t('import')}
                                 </button>

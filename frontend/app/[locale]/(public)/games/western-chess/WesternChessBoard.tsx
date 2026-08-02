@@ -65,7 +65,7 @@ export function WesternChessBoard({
     return (
         <div className="relative max-h-full max-w-full">
             <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-                className="max-h-full max-w-full select-none rounded-lg shadow" role="img">
+                className="max-h-full max-w-full select-none rounded-lg shadow-sm" role="img">
                 {/* 棋格（棋盤色固定，明暗格） */}
                 {Array.from({ length: SIZE * SIZE }, (_, idx) => {
                     const c = idx % SIZE;

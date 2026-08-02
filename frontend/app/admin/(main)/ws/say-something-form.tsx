@@ -45,7 +45,7 @@ export default function SaySomethingForm({ addr, online, focusToken }: Props) {
             <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">目標連線</span>
                 <div className="flex items-center gap-2 flex-wrap">
-                    <code className="font-mono text-sm px-2 py-1 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 break-all">
+                    <code className="font-mono text-sm px-2 py-1 rounded-sm bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 break-all">
                         {addr}
                     </code>
                     {!online && (
@@ -65,14 +65,14 @@ export default function SaySomethingForm({ addr, online, focusToken }: Props) {
                     name="message"
                     rows={3}
                     placeholder="會以 admin_message 事件推給該連線"
-                    className="border border-neutral-300 dark:border-neutral-600 rounded px-3 py-2 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm resize-y"
+                    className="border border-neutral-300 dark:border-neutral-600 rounded-sm px-3 py-2 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm resize-y"
                     required
                 />
             </div>
             <button
                 type="submit"
                 disabled={isPending}
-                className="self-start flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
+                className="self-start flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-sm transition-colors"
             >
                 {isPending
                     ? <Loader2 className="w-4 h-4 animate-spin" />

@@ -113,7 +113,7 @@ export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
 
             {/* 結局遮罩 */}
             {gameOver && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/80 p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/80 p-4 backdrop-blur-xs">
                     <div className="flex w-full max-w-md flex-col gap-3 rounded-lg bg-white p-5 dark:bg-neutral-800">
                         <h2 className="text-center text-2xl font-bold text-neutral-800 dark:text-neutral-100">
                             {gameOver.winner === 'good' ? t('goodWins') : gameOver.winner === 'evil' ? t('evilWins') : t('draw')}
@@ -121,7 +121,7 @@ export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
                         <p className="text-center text-sm text-neutral-500 dark:text-neutral-400">{t(`reason_${gameOver.reason}`)}</p>
                         <ul className="flex flex-col gap-1 text-sm">
                             {gameOver.roles.map(r => (
-                                <li key={r.seat} className="flex justify-between rounded px-2 py-1 odd:bg-neutral-100 dark:odd:bg-neutral-700">
+                                <li key={r.seat} className="flex justify-between rounded-sm px-2 py-1 odd:bg-neutral-100 dark:odd:bg-neutral-700">
                                     <span>{seatName(r.seat)}</span>
                                     <span className={EVIL_ROLES.has(r.role) ? 'text-red-600 dark:text-red-400' : 'text-primary-600 dark:text-primary-300'}>{t(`role_${r.role}`)}</span>
                                 </li>

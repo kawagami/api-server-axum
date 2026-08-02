@@ -51,7 +51,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                                 <AdminTd>
                                     <div className="flex gap-2 flex-wrap">
                                         {member.providers.length > 0 ? member.providers.map(p => (
-                                            <span key={p} className="px-2 py-1 bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 rounded text-sm font-medium">
+                                            <span key={p} className="px-2 py-1 bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 rounded-sm text-sm font-medium">
                                                 {p}
                                             </span>
                                         )) : <span className="text-neutral-500 dark:text-neutral-400">—</span>}
