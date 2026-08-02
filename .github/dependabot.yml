@@ -4,8 +4,16 @@
 # 但釘死就不會自動拿到修補。Dependabot 認得 `@<sha> # v7` 這種寫法，
 # 會同時更新 SHA 與後面的版本註解，等於「釘死」與「跟得上」兼得。
 #
-# Dependabot 只開 PR，不會直接動 master。三個 CI workflow 都只在 push master 觸發，
-# 所以 PR 本身不會部署 —— 你 review、merge 之後才會走正常的部署流程。
+# Dependabot 只開 PR，不會直接動 master。PR 會觸發三個 workflow 的驗證 job
+# （backend/frontend 的 test、deploy 的 validate-nginx），但 build 與 deploy 都被
+# `if: github.event_name == 'push'` 擋在 master 之外 —— 所以 PR 不推 image、不碰 VPS，
+# 你 review、merge 之後才會走正常的部署流程。
+#
+# ⚠ test 綠燈不等於改動安全：Dependabot 只改版號，不會補新版要求的 feature。
+# 2026-08-02 的 jsonwebtoken 9→11 就是實例 —— 少挑 crypto backend 能編過、
+# clippy 過、既有測試全過，卻在真的簽 JWT 時才 panic（那條路徑上是全站認證）。
+# 現在有 `services/auth.rs` 的 jwt_crypto_provider 測試守著這一格，
+# 但同類陷阱（跨大版改 feature 語意）還會出現在別的 crate，major PR 一律自己驗過再合。
 
 version: 2
 updates:
@@ -27,6 +35,18 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # tailwind v4 是「遷移」不是「升版」：@tailwind 三行要換成 @import、tailwind.config.js
+      # 的色階（rgb(var(--x) / <alpha-value>)）要改寫成 @theme、darkMode/plugins 換語法、
+      # postcss 換 @tailwindcss/postcss。排到那個任務前先擋著，免得每週重開同一顆 PR。
+      # 要動手遷移時把這條拿掉即可。
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
+      # @types/node 的主版該跟 runtime 的 Node 走（Dockerfile + CI setup-node，現為 24 LTS），
+      # 不是有新版就跟 —— 跟過頭會拿到 runtime 根本沒有的 API 型別。
+      # 升 Node LTS 時三處一起手動改（Dockerfile / workflow / 這裡）。
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # 開發期依賴（eslint / 型別 / tailwind 等）合併成一個 PR，減少噪音。
       # ⚠ update-types 不可省：少了它，major 也會被掃進這個群組而「看起來只是例行更新」。
@@ -61,3 +81,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    ignore:
+      # node 的主版只跟 LTS（偶數版）。dependabot 認得的是「有沒有新 tag」，
+      # 不認得 25 是 Current、生產不該用，所以奇偶要靠這條擋。
+      # Node 26 進 LTS（2026-10）時把 Dockerfile、CI setup-node 一起手動升。
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
