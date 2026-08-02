@@ -32,7 +32,11 @@ serde_json = "1.0"
 chrono = { version = "0.4.34", features = ["serde"] }
 futures = "0.3.30"
 reqwest = { version = "0.12", default-features = false, features = ["multipart", "json", "rustls-tls"] }
-jsonwebtoken = "9.3.0"
+# v10 起改用 trait 抽象 crypto backend，必須自己挑一個，否則沒有 provider 可用。
+# 挑 aws_lc_rs：aws-lc-sys 早已被 librqbit 的 sha1-ring 拉進來編（cmake 也已在 Dockerfile），
+# 等於零新增 C 依賴；rust_crypto 反而會多帶 p256/p384/ed25519-dalek/rsa 等 16 個用不到的 crate。
+# default-features = false 砍掉 use_pem —— 全案只用 from_secret 簽驗 HS256，不碰 PEM。
+jsonwebtoken = { version = "11", default-features = false, features = ["aws_lc_rs"] }
 bcrypt = "0.19.2"
 bb8 = "0.9"
 bb8-redis = "0.26"

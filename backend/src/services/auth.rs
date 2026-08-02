@@ -129,3 +129,65 @@ pub(crate) async fn hash_password(password: String) -> Result<String, AppError> 
         .map_err(|_| AppError::SystemError(SystemError::Internal("密碼 hash task 失敗".to_string())))?
         .map_err(|_| AppError::SystemError(SystemError::Internal("密碼 hash 失敗".to_string())))
 }
+
+/// JWT 簽驗的煙霧測試 —— 存在的唯一理由是守住 `Cargo.toml` 的 jsonwebtoken feature。
+///
+/// v10 起 crypto backend 改成執行期查表（`CryptoProvider`），少挑一個 backend
+/// **編譯完全過得去**，clippy 也不會吭聲，直到真的簽 token 才 panic
+/// （"Could not automatically determine the process-level CryptoProvider"）。
+/// 那條路徑上是登入、middleware 驗 token、torrent 簽名連結 —— 等於全站認證掛掉。
+/// 2026-08-02 Dependabot 的升版 PR 就是這個形態：CI 全綠，因為當時沒有任何測試碰 JWT。
+#[cfg(test)]
+mod jwt_crypto_provider {
+    use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct Claims {
+        sub: String,
+        exp: usize,
+    }
+
+    fn claims() -> Claims {
+        Claims {
+            sub: "smoke@test".to_string(),
+            exp: 9_999_999_999,
+        }
+    }
+
+    #[test]
+    fn hs256_sign_then_verify() {
+        let token = encode(
+            &Header::default(),
+            &claims(),
+            &EncodingKey::from_secret(b"secret"),
+        )
+        .expect("簽發失敗");
+
+        let decoded = decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(b"secret"),
+            &Validation::default(),
+        )
+        .expect("驗證失敗");
+
+        assert_eq!(decoded.claims.sub, "smoke@test");
+    }
+
+    #[test]
+    fn wrong_secret_is_rejected() {
+        let token = encode(
+            &Header::default(),
+            &claims(),
+            &EncodingKey::from_secret(b"secret"),
+        )
+        .expect("簽發失敗");
+
+        assert!(decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(b"another-secret"),
+            &Validation::default(),
+        )
+        .is_err());
+    }
+}
