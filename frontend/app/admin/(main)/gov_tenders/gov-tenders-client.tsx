@@ -28,7 +28,7 @@ export default function GovTendersClient() {
 
     useEffect(() => {
         // 初次載入沿用 URL 帶進來的條件（重新整理 / 貼連結不掉查詢）
-        load(page => getGovTenders({ ...initial, page, per_page: LIMIT }));
+        load(async page => (await getGovTenders({ ...initial, page, per_page: LIMIT })).data);
         getGovTenderTypes().then(setTypes).catch(() => setTypes([]));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [load]);
@@ -36,13 +36,13 @@ export default function GovTendersClient() {
     function handleSearch() {
         if (isPending) return;
         write(filters);
-        load(page => getGovTenders({ ...filters, page, per_page: LIMIT }));
+        load(async page => (await getGovTenders({ ...filters, page, per_page: LIMIT })).data);
     }
 
     function handleReset() {
         setFilters(defaultFilters);
         write(defaultFilters);
-        load(page => getGovTenders({ page, per_page: LIMIT }));
+        load(async page => (await getGovTenders({ page, per_page: LIMIT })).data);
     }
 
     const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";

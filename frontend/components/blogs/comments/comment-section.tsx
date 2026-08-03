@@ -25,9 +25,9 @@ export default function CommentSection({ blogId, isMember }: { blogId: string; i
 
     useEffect(() => {
         load(async page => {
-            const data = await getBlogComments(blogId, page, LIMIT);
+            const res = await getBlogComments(blogId, page, LIMIT);
             setLoaded(true);
-            return data;
+            return res.data;
         });
     }, [load, blogId]);
 

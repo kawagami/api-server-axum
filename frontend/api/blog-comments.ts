@@ -11,12 +11,12 @@ export async function getBlogComments(
     blogId: string,
     page = 1,
     per_page = 50,
-): Promise<BlogComment[]> {
-    const res = await fetchApi<BlogCommentListResponse>(
+): Promise<BlogCommentListResponse> {
+    // fetchApi 已在 !res.ok 時 throw,拿到值就一定是完整 envelope,不需 fallback
+    return fetchApi<BlogCommentListResponse>(
         `${process.env.API_URL}/blogs/${blogId}/comments?page=${page}&per_page=${per_page}`,
         { cache: "no-store" },
     );
-    return res.data;
 }
 
 // 公開端:提交留言。有 access_token cookie 就帶上(後端 optional-auth 綁 member_id),否則為訪客
@@ -34,17 +34,15 @@ export async function postBlogComment(blogId: string, input: NewBlogComment): Pr
     });
 }
 
-interface AdminCommentListResponse {
-    data: BlogComment[];
-    total: number;
-}
-
 // 後台:全站留言分頁列表(需 comment:read)
-export async function getAllBlogComments(page = 1, per_page = 50): Promise<BlogComment[]> {
-    const res = await adminRequest<AdminCommentListResponse>({
+export async function getAllBlogComments(
+    page = 1,
+    per_page = 50,
+): Promise<BlogCommentListResponse> {
+    const res = await adminRequest<BlogCommentListResponse>({
         url: `${process.env.API_URL}/admin/blog_comments?page=${page}&per_page=${per_page}`,
     });
-    return res?.data ?? [];
+    return res ?? { data: [], total: 0 };
 }
 
 // 後台:刪除留言(需 comment:delete)

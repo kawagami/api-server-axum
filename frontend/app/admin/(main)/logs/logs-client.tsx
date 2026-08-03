@@ -34,7 +34,7 @@ export default function LogsClient() {
     );
 
     useEffect(() => {
-        load(page => getLogs({ level: level || undefined, page, per_page: LIMIT }));
+        load(async page => (await getLogs({ level: level || undefined, page, per_page: LIMIT })).data);
         // 初次載入沿用 URL 帶進來的條件；後續改條件走 handleFilterChange
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [load]);
@@ -43,7 +43,7 @@ export default function LogsClient() {
         if (newLevel === level || isPending) return;
         setLevel(newLevel);
         write({ level: newLevel });
-        load(page => getLogs({ level: newLevel || undefined, page, per_page: LIMIT }));
+        load(async page => (await getLogs({ level: newLevel || undefined, page, per_page: LIMIT })).data);
     }
 
     function handleLoadMore() {

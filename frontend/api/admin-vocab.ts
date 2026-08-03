@@ -1,7 +1,7 @@
 "use server";
 
 import adminRequest from "@/libs/adminRequest";
-import type { AdminVocabWord, UpdateVocabWordInput } from "@/types";
+import type { AdminVocabWord, PaginatedResponse, UpdateVocabWordInput } from "@/types";
 
 export interface GetAdminVocabWordsParams {
     language?: string;
@@ -13,10 +13,7 @@ export interface GetAdminVocabWordsParams {
     per_page?: number;
 }
 
-export interface AdminVocabWordsResponse {
-    data: AdminVocabWord[];
-    total: number;
-}
+export type AdminVocabWordsResponse = PaginatedResponse<AdminVocabWord>;
 
 export async function getAdminVocabWords({
     language,

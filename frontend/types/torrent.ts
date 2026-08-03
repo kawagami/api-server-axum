@@ -1,3 +1,5 @@
+import type { PaginatedResponse } from './pagination';
+
 // Torrent
 export type TorrentStatus = 'pending' | 'downloading' | 'completed' | 'failed';
 
@@ -31,10 +33,7 @@ export interface Torrent {
   live?: TorrentLive;
 }
 
-export interface TorrentPaginatedResponse {
-  data: Torrent[];
-  total: number;
-}
+export type TorrentPaginatedResponse = PaginatedResponse<Torrent>;
 
 export interface TorrentDownloadLink {
   file_index: number;

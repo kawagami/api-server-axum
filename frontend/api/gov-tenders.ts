@@ -1,7 +1,7 @@
 "use server";
 
 import adminRequest from "@/libs/adminRequest";
-import type { GovTender } from "@/types";
+import type { GovTender, PaginatedResponse } from "@/types";
 
 export interface GetGovTendersParams {
     q?: string;
@@ -11,18 +11,13 @@ export interface GetGovTendersParams {
     per_page?: number;
 }
 
-interface GovTenderListResponse {
-    data: GovTender[];
-    total: number;
-}
-
 export async function getGovTenders({
     q,
     keyword,
     tender_type,
     page = 1,
     per_page = 50,
-}: GetGovTendersParams = {}): Promise<GovTender[]> {
+}: GetGovTendersParams = {}): Promise<PaginatedResponse<GovTender>> {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (keyword) params.set('keyword', keyword);
@@ -30,10 +25,10 @@ export async function getGovTenders({
     params.set('page', String(page));
     params.set('per_page', String(per_page));
 
-    const res = await adminRequest<GovTenderListResponse>({
+    const res = await adminRequest<PaginatedResponse<GovTender>>({
         url: `${process.env.API_URL}/admin/gov_tenders?${params}`,
     });
-    return res?.data ?? [];
+    return res ?? { data: [], total: 0 };
 }
 
 export async function getGovTenderTypes(): Promise<string[]> {

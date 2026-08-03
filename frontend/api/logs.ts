@@ -9,11 +9,12 @@ interface GetLogsParams {
     per_page?: number;
 }
 
-/**
- * `GET /logs` 回 `{ data, total }`（2026-08-03 起，原本是裸陣列）。
- * 這裡只回 `data` 配 `usePagedList` 的「載入更多」，慣例同 `getGovTenders`。
- */
-export async function getLogs({ level, page = 1, per_page = 100 }: GetLogsParams = {}): Promise<Log[]> {
+/** `GET /logs` 回 `{ data, total }`（2026-08-03 起，原本是裸陣列） */
+export async function getLogs({
+    level,
+    page = 1,
+    per_page = 100,
+}: GetLogsParams = {}): Promise<PaginatedResponse<Log>> {
     const params = new URLSearchParams();
     if (level) params.set('level', level);
     params.set('page', String(page));
@@ -22,7 +23,7 @@ export async function getLogs({ level, page = 1, per_page = 100 }: GetLogsParams
     const res = await adminRequest<PaginatedResponse<Log>>({
         url: `${process.env.API_URL}/logs?${params}`,
     });
-    return res?.data ?? [];
+    return res ?? { data: [], total: 0 };
 }
 
 export interface GetAuditLogsParams {

@@ -20,7 +20,7 @@ export default function BlogCommentsClient({ canDelete }: { canDelete: boolean }
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     useEffect(() => {
-        load(page => getAllBlogComments(page, LIMIT));
+        load(async page => (await getAllBlogComments(page, LIMIT)).data);
     }, [load]);
 
     async function handleDelete(id: number) {

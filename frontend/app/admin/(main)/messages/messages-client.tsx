@@ -19,7 +19,7 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     useEffect(() => {
-        load(page => getContactMessages(page, LIMIT));
+        load(async page => (await getContactMessages(page, LIMIT)).data);
     }, [load]);
 
     async function handleDelete(id: number) {

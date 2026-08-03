@@ -1,3 +1,5 @@
+import type { PaginatedResponse } from './pagination';
+
 // Stock
 export interface StockDayAll {
   id: number;
@@ -32,7 +34,4 @@ export interface StockChange {
   change: number;
 }
 
-export interface StockChangePaginatedResponse {
-  data: StockChange[];
-  total: number;
-}
+export type StockChangePaginatedResponse = PaginatedResponse<StockChange>;
