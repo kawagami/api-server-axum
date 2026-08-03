@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+"""kawa production 唯讀查詢 CLI —— 查線上問題用,輸出 JSONL 方便管線/agent 消費。
+
+設定檔 `~/.config/kawa/config`(權限 600,**不進 repo**):
+
+    KAWA_API_URL=https://api.kawa.homes
+    KAWA_USER=log_reader
+    KAWA_PASSWORD=<長隨機字串>
+
+那個帳號在後台只掛了 `log:read` / `metric:read` / `audit:read` 三個權限、非 super_admin,
+所以憑證外洩的上限就是這三支唯讀端點(已實測其餘 `/admin/*` 一律 403)。
+**不要拿 super_admin 帳號來設定這支。**
+
+用法:
+    kawa-logs rid <request_id>        單一請求的完整軌跡(時間正序)——查線上問題的第一步
+    kawa-logs errors [-H 6] [-n 20]   近 N 小時的 ERROR
+    kawa-logs logs [-q kw] [-l WARN,ERROR] [-t target] [--from ISO] [--to ISO] [-n 50] [-p 1]
+    kawa-logs metrics [-H 24]         系統指標(桶內取峰值,非平均)
+    kawa-logs audit [--user x] [--path /admin] [--from ISO] [--to ISO] [-n 50]
+
+輸出:stdout 一行一筆 JSON;統計與提示走 stderr,所以 `| head`、`| jq` 都乾淨。
+    -f text 改成人類可讀的單行摘要。
+    ⚠ `audit` 那支端點**沒有 total**(全站 4 支無 total 之一),所以 stderr 只會有回傳筆數。
+      拿到滿 per_page 筆就代表「還有更多」,要算總量得上 VPS 用 psql COUNT。
+
+判讀重點:
+  * **錯誤細節在 `fields.self`,不在 `message`** —— message 常只是 "System error occurred"
+    這種固定字串。`fields` 另有 method / path / latency。
+  * 一個 5xx 通常是 3 筆同 request_id(來源處 error + errors.rs 的統一 error + tower_http
+    的 response failed)。拿 `rid` 一次撈齊。
+  * `logs` 表只收 **WARN+ 且只留 14 天**。要全 level 或更早的,得上 VPS 看 `docker logs backend`
+    (rotation 20MB×5),那邊沒有 request_id。
+  * 2026-08-03 之前的存量 log 沒有 request_id / fields(欄位那天才加)。
+  * ⚠ **每次查詢都會在 `admin_audit_logs` 留一筆**(audit middleware 不分讀寫)。別寫成高頻輪詢。
+"""
+
+import argparse
+import json
+import os
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+CONFIG = os.path.expanduser("~/.config/kawa/config")
+TOKEN_CACHE = os.path.expanduser("~/.cache/kawa/token")
+TIMEOUT = 30
+
+# ⚠ 必須自訂 User-Agent。api.kawa.homes 在 Cloudflare 後面,而 CF 的 browser integrity
+# check 會把 urllib 的預設 UA(`Python-urllib/3.x`)擋成 **HTTP 403 + `error code: 1010`**
+# —— 那是 CF 回的,根本沒到 backend,所以看起來像「帳號沒權限」但其實不是。
+# 換句話說:這裡看到 403 要先看 body 是不是 1010,再懷疑權限。
+USER_AGENT = "kawa-logs/1.0"
+
+
+def die(msg):
+    print(f"kawa-logs: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def load_config():
+    if not os.path.exists(CONFIG):
+        die(f"找不到設定檔 {CONFIG}(格式見本檔開頭的 docstring)")
+    conf = {}
+    with open(CONFIG) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                conf[key.strip()] = value.strip()
+    for key in ("KAWA_API_URL", "KAWA_USER", "KAWA_PASSWORD"):
+        if not conf.get(key):
+            die(f"{CONFIG} 缺少 {key}")
+    return conf
+
+
+def request(url, *, token=None, data=None):
+    """回 (status, parsed_json)。4xx 不 raise,交給呼叫端判斷(401 要觸發重登)。"""
+    req = urllib.request.Request(url, data=data, method="POST" if data else "GET")
+    req.add_header("User-Agent", USER_AGENT)
+    if data:
+        req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            body = resp.read()
+            return resp.status, (json.loads(body) if body else None)
+    except urllib.error.HTTPError as e:
+        body = e.read()
+        try:
+            return e.code, json.loads(body) if body else None
+        except json.JSONDecodeError:
+            return e.code, {"raw": body.decode("utf-8", "replace")[:500]}
+    except urllib.error.URLError as e:
+        die(f"連不上 {url}: {e.reason}")
+
+
+def login(conf):
+    payload = json.dumps({"name": conf["KAWA_USER"], "password": conf["KAWA_PASSWORD"]}).encode()
+    status, body = request(f"{conf['KAWA_API_URL']}/admin/auth", data=payload)
+    if status != 200 or not isinstance(body, str):
+        die(f"登入失敗({status}): {body}")
+    os.makedirs(os.path.dirname(TOKEN_CACHE), exist_ok=True)
+    # token 等同 1 小時的憑證,權限比照設定檔
+    with open(TOKEN_CACHE, "w") as f:
+        os.chmod(TOKEN_CACHE, 0o600)
+        f.write(body)
+    return body
+
+
+def api_get(conf, path, params=None):
+    """帶快取 token 打 GET;401 就重登一次再試(token 只有 1 小時)。"""
+    url = f"{conf['KAWA_API_URL']}{path}"
+    if params:
+        clean = {k: v for k, v in params.items() if v is not None}
+        if clean:
+            url += "?" + urllib.parse.urlencode(clean)
+
+    token = None
+    if os.path.exists(TOKEN_CACHE):
+        with open(TOKEN_CACHE) as f:
+            token = f.read().strip() or None
+
+    if token:
+        status, body = request(url, token=token)
+        if status != 401:
+            return check(status, body, path)
+    status, body = request(url, token=login(conf))
+    return check(status, body, path)
+
+
+def check(status, body, path):
+    if status == 403:
+        die(f"403 {path} —— 這個帳號沒有該端點的權限(只有 log/metric/audit:read)")
+    if status >= 400:
+        die(f"{status} {path}: {json.dumps(body, ensure_ascii=False)[:300]}")
+    return body
+
+
+def emit(rows, total, fmt):
+    """rows 走 stdout、統計走 stderr,管線才乾淨"""
+    if fmt == "jsonl":
+        for row in rows:
+            print(json.dumps(row, ensure_ascii=False))
+    else:
+        for row in rows:
+            print(summarize(row))
+    # stdout 導向管線時是 block-buffered、stderr 不是,不先 flush 的話統計行會先冒出來
+    sys.stdout.flush()
+    note = f"{len(rows)} 筆"
+    if total is not None:
+        note += f" / 總計 {total}"
+    print(f"— {note}", file=sys.stderr)
+
+
+def summarize(row):
+    fields = row.get("fields") or {}
+    # 錯誤細節在 fields.self,message 常只是固定字串 —— 有 self 就優先顯示它
+    detail = fields.get("self") or row.get("message", "")
+    parts = [
+        row.get("created_at", "")[:19],
+        f"{row.get('level', ''):<5}",
+        f"{fields.get('method', '-')} {fields.get('path', '-')}",
+        str(detail)[:140],
+    ]
+    if row.get("request_id"):
+        parts.append(f"[{row['request_id'][:8]}]")
+    return "  ".join(str(p) for p in parts)
+
+
+def unwrap(body):
+    """/logs 與 /admin/audit_logs 形狀不同:前者 {data,total},後者仍是裸陣列"""
+    if isinstance(body, dict):
+        return body.get("data", []), body.get("total")
+    return body or [], None
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="kawa-logs",
+        description="kawa production 唯讀查詢(log / metric / audit)",
+        epilog="細節與判讀重點見本檔開頭的 docstring",
+    )
+    # -f 在子命令前後都能寫（`kawa-logs -f text logs` 與 `kawa-logs logs -f text` 等效）。
+    # 子命令那份用不同的 dest 且 default=None，否則它的 default 會蓋掉主 parser 已解析的值。
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("-f", "--format", dest="format_sub",
+                        choices=("jsonl", "text"), default=None)
+    parser.add_argument("-f", "--format", choices=("jsonl", "text"), default="jsonl")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("rid", parents=[common], help="單一 request_id 的完整軌跡(時間正序)")
+    p.add_argument("request_id")
+
+    p = sub.add_parser("errors", parents=[common], help="近 N 小時的 ERROR")
+    p.add_argument("-H", "--hours", type=int, default=6)
+    p.add_argument("-n", "--limit", type=int, default=20)
+
+    p = sub.add_parser("logs", parents=[common], help="通用查詢")
+    p.add_argument("-q", "--query", help="message 與 fields 模糊比對")
+    p.add_argument("-l", "--level", help="逗號分隔多值,如 WARN,ERROR")
+    p.add_argument("-t", "--target", help="tracing target 模糊比對")
+    p.add_argument("--from", dest="from_", help="ISO 時間下界")
+    p.add_argument("--to", help="ISO 時間上界")
+    p.add_argument("-n", "--limit", type=int, default=50)
+    p.add_argument("-p", "--page", type=int, default=1)
+
+    p = sub.add_parser("metrics", parents=[common], help="系統指標(桶內取峰值)")
+    p.add_argument("-H", "--hours", type=int, default=24)
+
+    p = sub.add_parser("audit", parents=[common], help="管理員操作紀錄")
+    p.add_argument("--user")
+    p.add_argument("--path")
+    p.add_argument("--from", dest="from_")
+    p.add_argument("--to")
+    p.add_argument("-n", "--limit", type=int, default=50)
+
+    args = parser.parse_args()
+    args.format = args.format_sub or args.format
+    conf = load_config()
+
+    if args.cmd == "rid":
+        rows = api_get(conf, f"/logs/request/{urllib.parse.quote(args.request_id)}")
+        emit(rows or [], None, args.format)
+
+    elif args.cmd == "errors":
+        from datetime import datetime, timedelta, timezone
+        since = (datetime.now(timezone.utc) - timedelta(hours=args.hours)).isoformat()
+        rows, total = unwrap(api_get(conf, "/logs", {
+            "level": "ERROR", "from": since, "per_page": args.limit,
+        }))
+        emit(rows, total, args.format)
+
+    elif args.cmd == "logs":
+        rows, total = unwrap(api_get(conf, "/logs", {
+            "q": args.query, "level": args.level, "target": args.target,
+            "from": args.from_, "to": args.to,
+            "per_page": args.limit, "page": args.page,
+        }))
+        emit(rows, total, args.format)
+
+    elif args.cmd == "metrics":
+        rows = api_get(conf, "/metrics", {"hours": args.hours})
+        emit(rows or [], None, "jsonl")
+
+    elif args.cmd == "audit":
+        rows, total = unwrap(api_get(conf, "/admin/audit_logs", {
+            "user_email": args.user, "path": args.path,
+            "from": args.from_, "to": args.to, "per_page": args.limit,
+        }))
+        emit(rows, total, args.format)
+
+
+if __name__ == "__main__":
+    main()
