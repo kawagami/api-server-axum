@@ -1,7 +1,8 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::messages as repo,
-    structs::messages::{Message, MessagePaginatedResponse, NewMessage},
+    structs::pagination::Paginated,
+    structs::messages::{Message, NewMessage}
 };
 use sqlx::{Pool, Postgres};
 
@@ -53,10 +54,10 @@ pub async fn list(
     pool: &Pool<Postgres>,
     limit: i64,
     offset: i64,
-) -> Result<MessagePaginatedResponse, AppError> {
+) -> Result<Paginated<Message>, AppError> {
     let total = repo::count(pool).await?;
     let data = repo::list(pool, limit, offset).await?;
-    Ok(MessagePaginatedResponse { data, total })
+    Ok(Paginated::new(data, total))
 }
 
 pub async fn delete(pool: &Pool<Postgres>, id: i64) -> Result<(), AppError> {

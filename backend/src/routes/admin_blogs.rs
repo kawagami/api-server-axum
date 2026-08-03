@@ -2,7 +2,7 @@ use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,
     routing::{get, patch, put},
-    Json, Router,
+    Json, Router
 };
 use uuid::Uuid;
 
@@ -13,11 +13,11 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        blogs::{BlogsResponse, DeleteTagQuery, PutBlog, RenameTagRequest, TagMutationResponse},
-        pagination::PageQuery,
+        blogs::{DbBlog, DeleteTagQuery, PutBlog, RenameTagRequest, TagMutationResponse},
+        pagination::{PageQuery, Paginated},
         roles::Perm,
-        ws::WsEvent,
-    },
+        ws::WsEvent
+    }
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -36,7 +36,7 @@ async fn list_blogs(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<BlogsResponse>, AppError> {
+) -> Result<Json<Paginated<DbBlog>>, AppError> {
     auth_user.require_permission(Perm::BlogRead)?;
     Ok(Json(
         blogs_service::get_admin_blogs(state.get_pool(), auth_user.owner_filter(), &page).await?,

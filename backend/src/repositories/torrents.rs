@@ -1,6 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
-    structs::torrents::{Torrent, TorrentPaginatedResponse, STATUS_DOWNLOADING, STATUS_PENDING},
+    structs::pagination::Paginated,
+    structs::torrents::{Torrent, STATUS_DOWNLOADING, STATUS_PENDING}
 };
 use sqlx::{Pool, Postgres};
 
@@ -56,7 +57,7 @@ pub async fn list(
     owner_id: Option<i64>,
     limit: i64,
     offset: i64,
-) -> Result<TorrentPaginatedResponse, AppError> {
+) -> Result<Paginated<Torrent>, AppError> {
     let data = sqlx::query_as::<_, Torrent>(&format!(
         "SELECT {COLUMNS} FROM torrents
          WHERE ($1::text IS NULL OR status = $1)
@@ -80,7 +81,7 @@ pub async fn list(
     .fetch_one(pool)
     .await?;
 
-    Ok(TorrentPaginatedResponse { data, total })
+    Ok(Paginated::new(data, total))
 }
 
 /// 取可啟動的任務：pending（排隊中）與 downloading（重啟後待 resume）。

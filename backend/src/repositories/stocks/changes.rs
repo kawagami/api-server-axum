@@ -1,15 +1,16 @@
 use crate::{
     errors::AppError,
+    structs::pagination::Paginated,
     structs::stocks::{
-        Conditions, StockChange, StockChangePaginatedResponse, StockChangeRef,
-    },
+        Conditions, StockChange, StockChangeRef
+    }
 };
 use sqlx::{Pool, Postgres, QueryBuilder, Row};
 
 pub async fn get_all_stock_changes(
     pool: &Pool<Postgres>,
     conditions: Conditions,
-) -> Result<StockChangePaginatedResponse, AppError> {
+) -> Result<Paginated<StockChange>, AppError> {
     let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM stock_changes s WHERE 1=1");
     let mut data_query = QueryBuilder::new("SELECT * FROM stock_changes s WHERE 1=1");
 
@@ -36,7 +37,7 @@ pub async fn get_all_stock_changes(
         .fetch_all(pool)
         .await?;
 
-    Ok(StockChangePaginatedResponse { data, total })
+    Ok(Paginated::new(data, total))
 }
 
 pub async fn get_one_pending_stock_change(

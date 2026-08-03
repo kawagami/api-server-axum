@@ -4,19 +4,19 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        pagination::PageQuery,
+        pagination::{PageQuery, Paginated},
         roles::Perm,
         stocks::{
-            Conditions, GetStockDayAll, StockBuybackMoreInfo, StockBuybackPeriod,
-            StockChangePaginatedResponse, StockClosingPriceResponse, StockDayAll, StockRequest,
-        },
-    },
+            Conditions, GetStockDayAll, StockBuybackMoreInfo, StockBuybackPeriod, StockChange,
+            StockClosingPriceResponse, StockDayAll, StockRequest
+        }
+    }
 };
 use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,
     routing::{get, patch},
-    Json, Router,
+    Json, Router
 };
 use serde::Deserialize;
 
@@ -43,7 +43,7 @@ async fn list_stock_changes(
     State(state): State<AppState>,
     Query(filter): Query<StatusFilter>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<StockChangePaginatedResponse>, AppError> {
+) -> Result<Json<Paginated<StockChange>>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
     let (limit, offset) = page.to_limit_offset(50);
     let conditions = Conditions { status: filter.status, limit, offset };

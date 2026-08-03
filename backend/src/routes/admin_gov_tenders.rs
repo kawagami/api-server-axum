@@ -4,15 +4,15 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        gov_tenders::{GovTenderListQuery, GovTenderPaginatedResponse},
-        pagination::PageQuery,
-        roles::Perm,
-    },
+        gov_tenders::{GovTender, GovTenderListQuery},
+        pagination::{PageQuery, Paginated},
+        roles::Perm
+    }
 };
 use axum::{
     extract::{Extension, Query, State},
     routing::get,
-    Json, Router,
+    Json, Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -30,7 +30,7 @@ async fn list_tenders(
     State(state): State<AppState>,
     Query(filter): Query<GovTenderListQuery>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<GovTenderPaginatedResponse>, AppError> {
+) -> Result<Json<Paginated<GovTender>>, AppError> {
     auth_user.require_permission(Perm::GovTenderRead)?;
     let (limit, offset) = page.to_limit_offset(50);
     Ok(Json(

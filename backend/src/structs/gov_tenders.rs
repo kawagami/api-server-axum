@@ -43,8 +43,3 @@ pub struct GovTenderListQuery {
     pub q: Option<String>,
 }
 
-#[derive(Serialize)]
-pub struct GovTenderPaginatedResponse {
-    pub data: Vec<GovTender>,
-    pub total: i64,
-}

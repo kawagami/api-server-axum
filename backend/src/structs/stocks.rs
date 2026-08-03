@@ -46,12 +46,6 @@ pub struct Conditions {
     pub offset: i64,
 }
 
-#[derive(Serialize)]
-pub struct StockChangePaginatedResponse {
-    pub data: Vec<StockChange>,
-    pub total: i64,
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct StockDayAvgResponse {
     pub stat: String,

@@ -4,17 +4,17 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        pagination::PageQuery,
+        pagination::{PageQuery, Paginated},
         roles::Perm,
-        torrents::{CreateTorrent, DownloadLink, Torrent, TorrentPaginatedResponse},
-    },
+        torrents::{CreateTorrent, DownloadLink, Torrent}
+    }
 };
 use axum::{
     extract::{Extension, Path, Query, Request, State},
     http::{header, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, patch, post},
-    Json, Router,
+    Json, Router
 };
 use serde::Deserialize;
 use tower::ServiceExt;
@@ -58,7 +58,7 @@ async fn list_torrents(
     State(state): State<AppState>,
     Query(filter): Query<StatusFilter>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<TorrentPaginatedResponse>, AppError> {
+) -> Result<Json<Paginated<Torrent>>, AppError> {
     auth_user.require_permission(Perm::TorrentRead)?;
     let (limit, offset) = page.to_limit_offset(50);
     Ok(Json(

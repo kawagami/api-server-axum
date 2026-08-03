@@ -1,7 +1,8 @@
 use crate::{
     errors::AppError,
     repositories::gov_tenders as repo,
-    structs::gov_tenders::{GovTender, GovTenderListQuery, GovTenderPaginatedResponse, NewGovTender},
+    structs::pagination::Paginated,
+    structs::gov_tenders::{GovTender, GovTenderListQuery, NewGovTender}
 };
 use chrono::NaiveDate;
 use reqwest::Client;
@@ -18,10 +19,10 @@ pub async fn list(
     query: &GovTenderListQuery,
     limit: i64,
     offset: i64,
-) -> Result<GovTenderPaginatedResponse, AppError> {
+) -> Result<Paginated<GovTender>, AppError> {
     let total = repo::count(pool, query).await?;
     let data = repo::list(pool, query, limit, offset).await?;
-    Ok(GovTenderPaginatedResponse { data, total })
+    Ok(Paginated::new(data, total))
 }
 
 /// 所有出現過的標案類型（供前端下拉選單）

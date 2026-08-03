@@ -1,8 +1,8 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::{blogs as blogs_repo, images as images_repo},
-    structs::blogs::{BlogsResponse, DbBlog, PutBlog, TagCount},
-    structs::pagination::PageQuery,
+    structs::blogs::{DbBlog, PutBlog, TagCount},
+    structs::pagination::{PageQuery, Paginated}
 };
 use regex::Regex;
 use sqlx::{Pool, Postgres};
@@ -50,9 +50,8 @@ pub async fn get_blogs(
     author: Option<String>,
     q: Option<String>,
     sort: Option<String>,
-) -> Result<BlogsResponse, AppError> {
+) -> Result<Paginated<DbBlog>, AppError> {
     let (per_page, offset) = page.to_limit_offset(10);
-    let (page, per_page, offset) = (page.page.unwrap_or(1).max(1) as usize, per_page as usize, offset as usize);
     let tag_ref = tag.as_deref();
     let author_ref = author.as_deref();
     // 關鍵字空白視同無過濾；排序只認 oldest，其餘一律 newest
@@ -62,7 +61,7 @@ pub async fn get_blogs(
         blogs_repo::count_blogs(pool, tag_ref, author_ref, q_ref),
         blogs_repo::get_blogs_with_pagination(pool, per_page, offset, tag_ref, author_ref, q_ref, ascending),
     )?;
-    Ok(BlogsResponse { total, page, per_page, data })
+    Ok(Paginated::new(data, total))
 }
 
 pub async fn get_blog(pool: &Pool<Postgres>, id: Uuid) -> Result<DbBlog, AppError> {
@@ -74,14 +73,13 @@ pub async fn get_admin_blogs(
     pool: &Pool<Postgres>,
     owner_id: Option<i64>,
     page: &PageQuery,
-) -> Result<BlogsResponse, AppError> {
+) -> Result<Paginated<DbBlog>, AppError> {
     let (per_page, offset) = page.to_limit_offset(50);
-    let (page_no, per_page_usize) = (page.page.unwrap_or(1).max(1) as usize, per_page as usize);
     let (total, data) = tokio::try_join!(
         blogs_repo::count_for_owner(pool, owner_id),
         blogs_repo::list_for_owner(pool, owner_id, per_page, offset),
     )?;
-    Ok(BlogsResponse { total, page: page_no, per_page: per_page_usize, data })
+    Ok(Paginated::new(data, total))
 }
 
 pub async fn get_tags(pool: &Pool<Postgres>) -> Result<Vec<String>, AppError> {

@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     middleware,
     routing::{get, post},
-    Json, Router,
+    Json, Router
 };
 use uuid::Uuid;
 
@@ -12,11 +12,11 @@ use crate::{
     middleware::{auth, rate_limit},
     services::blog_comments as comments_service,
     services::blogs as blogs_service,
-    structs::blog_comments::{BlogComment, BlogCommentPaginatedResponse, NewComment},
-    structs::blogs::{BlogFilter, BlogsResponse, DbBlog, TagCount},
+    structs::blog_comments::{BlogComment, NewComment},
+    structs::blogs::{BlogFilter, DbBlog, TagCount},
     structs::members::AuthenticatedMember,
-    structs::pagination::PageQuery,
-    state::AppState,
+    structs::pagination::{PageQuery, Paginated},
+    state::AppState
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -45,7 +45,7 @@ async fn list_blogs(
     Query(page): Query<PageQuery>,
     Query(filter): Query<BlogFilter>,
     State(state): State<AppState>,
-) -> Result<Json<BlogsResponse>, AppError> {
+) -> Result<Json<Paginated<DbBlog>>, AppError> {
     let blogs = blogs_service::get_blogs(
         state.get_pool(),
         &page,
@@ -85,7 +85,7 @@ async fn list_comments(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<BlogCommentPaginatedResponse>, AppError> {
+) -> Result<Json<Paginated<BlogComment>>, AppError> {
     let (limit, offset) = page.to_limit_offset(50);
     Ok(Json(
         comments_service::list_by_blog(state.get_pool(), id, limit, offset).await?,

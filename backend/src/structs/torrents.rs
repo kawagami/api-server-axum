@@ -34,11 +34,6 @@ pub struct CreateTorrent {
     pub magnet_uri: String,
 }
 
-#[derive(Serialize)]
-pub struct TorrentPaginatedResponse {
-    pub data: Vec<Torrent>,
-    pub total: i64,
-}
 
 /// 下載連結的短效 JWT claims（與 admin/member JWT 無關）
 #[derive(Serialize, Deserialize)]

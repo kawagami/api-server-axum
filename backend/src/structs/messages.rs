@@ -20,9 +20,3 @@ pub struct NewMessage {
     pub content: String,
 }
 
-/// 後台留言分頁列表回應(同 gov_tenders 形狀)
-#[derive(Serialize)]
-pub struct MessagePaginatedResponse {
-    pub data: Vec<Message>,
-    pub total: i64,
-}

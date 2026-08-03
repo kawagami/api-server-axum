@@ -2,17 +2,18 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::stocks::{
         get_stock_closing_prices_by_date_range, insert_stock_day_all_batch,
-        upsert_stock_closing_prices,
+        upsert_stock_closing_prices
     },
     repositories::stocks as stocks_repo,
+    structs::pagination::Paginated,
     structs::stocks::{
         Conditions, GetStockDayAll, NewStockClosingPrice, StockBuybackMoreInfo,
-        StockBuybackPeriod, StockChange, StockChangePaginatedResponse, StockChangeRef,
+        StockBuybackPeriod, StockChange, StockChangeRef,
         StockClosingPriceResponse, StockDayAll, StockDayAllInsertRow, StockDayAvgResponse,
-        BuybackRecord, StockRequest, StockStats,
+        BuybackRecord, StockRequest, StockStats
     },
     utils::date::{parse_roc_compact_date, parse_roc_date},
-    utils::reqwest::get_raw_html_string,
+    utils::reqwest::get_raw_html_string
 };
 use chrono::{Duration, NaiveDate};
 use reqwest::Client;
@@ -310,7 +311,7 @@ fn parse_csv_line(line: &str) -> Vec<String> {
 pub async fn get_all_stock_changes(
     pool: &Pool<Postgres>,
     conditions: Conditions,
-) -> Result<StockChangePaginatedResponse, AppError> {
+) -> Result<Paginated<StockChange>, AppError> {
     stocks_repo::get_all_stock_changes(pool, conditions).await
 }
 

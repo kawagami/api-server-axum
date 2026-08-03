@@ -6,8 +6,8 @@ use sqlx::{PgConnection, Pool, Postgres};
 
 pub async fn get_blogs_with_pagination(
     pool: &Pool<Postgres>,
-    limit: usize,
-    offset: usize,
+    limit: i64,
+    offset: i64,
     tag: Option<&str>,
     author: Option<&str>,
     q: Option<&str>,
@@ -31,8 +31,8 @@ pub async fn get_blogs_with_pagination(
         .bind(tag)
         .bind(author)
         .bind(q)
-        .bind(limit as i64)
-        .bind(offset as i64)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await
         .map_err(AppError::from)

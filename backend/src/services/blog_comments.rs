@@ -1,7 +1,8 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::blog_comments as repo,
-    structs::blog_comments::{BlogComment, BlogCommentPaginatedResponse, NewComment},
+    structs::pagination::Paginated,
+    structs::blog_comments::{BlogComment, NewComment}
 };
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
@@ -61,10 +62,10 @@ pub async fn list_by_blog(
     blog_id: Uuid,
     limit: i64,
     offset: i64,
-) -> Result<BlogCommentPaginatedResponse, AppError> {
+) -> Result<Paginated<BlogComment>, AppError> {
     let total = repo::count_by_blog(pool, blog_id).await?;
     let data = repo::list_by_blog(pool, blog_id, limit, offset).await?;
-    Ok(BlogCommentPaginatedResponse { data, total })
+    Ok(Paginated::new(data, total))
 }
 
 /// 後台:全站留言分頁
@@ -72,10 +73,10 @@ pub async fn list_all(
     pool: &Pool<Postgres>,
     limit: i64,
     offset: i64,
-) -> Result<BlogCommentPaginatedResponse, AppError> {
+) -> Result<Paginated<BlogComment>, AppError> {
     let total = repo::count_all(pool).await?;
     let data = repo::list_all(pool, limit, offset).await?;
-    Ok(BlogCommentPaginatedResponse { data, total })
+    Ok(Paginated::new(data, total))
 }
 
 pub async fn delete(pool: &Pool<Postgres>, id: i64) -> Result<(), AppError> {

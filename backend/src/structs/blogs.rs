@@ -62,14 +62,6 @@ pub struct Toc {
     text: String,
 }
 
-#[derive(Serialize)]
-pub struct BlogsResponse {
-    pub total: i64,
-    pub page: usize,
-    pub per_page: usize,
-    pub data: Vec<DbBlog>,
-}
-
 #[derive(Serialize, Deserialize, FromRow, Default)]
 pub struct DbBlog {
     pub id: Uuid,

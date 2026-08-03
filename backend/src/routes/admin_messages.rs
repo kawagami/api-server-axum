@@ -3,15 +3,17 @@ use crate::{
     services::messages as messages_service,
     state::AppState,
     structs::{
-        auth::AuthenticatedUser, messages::MessagePaginatedResponse, pagination::PageQuery,
-        roles::Perm,
-    },
+        auth::AuthenticatedUser,
+        messages::Message,
+        pagination::{PageQuery, Paginated},
+        roles::Perm
+    }
 };
 use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,
     routing::get,
-    Json, Router,
+    Json, Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -28,7 +30,7 @@ async fn list_messages(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<MessagePaginatedResponse>, AppError> {
+) -> Result<Json<Paginated<Message>>, AppError> {
     auth_user.require_permission(Perm::MessageRead)?;
     let (limit, offset) = page.to_limit_offset(50);
     Ok(Json(

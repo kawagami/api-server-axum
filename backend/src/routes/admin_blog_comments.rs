@@ -3,15 +3,17 @@ use crate::{
     services::blog_comments as comments_service,
     state::AppState,
     structs::{
-        auth::AuthenticatedUser, blog_comments::BlogCommentPaginatedResponse,
-        pagination::PageQuery, roles::Perm,
-    },
+        auth::AuthenticatedUser,
+        blog_comments::BlogComment,
+        pagination::{PageQuery, Paginated},
+        roles::Perm
+    }
 };
 use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,
     routing::get,
-    Json, Router,
+    Json, Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -28,7 +30,7 @@ async fn list_comments(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<BlogCommentPaginatedResponse>, AppError> {
+) -> Result<Json<Paginated<BlogComment>>, AppError> {
     auth_user.require_permission(Perm::CommentRead)?;
     let (limit, offset) = page.to_limit_offset(50);
     Ok(Json(

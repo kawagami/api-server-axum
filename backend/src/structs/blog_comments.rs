@@ -24,9 +24,3 @@ pub struct NewComment {
     pub name: Option<String>,
 }
 
-/// 留言分頁列表回應(公開列表與後台列表共用,同 messages 形狀)
-#[derive(Serialize)]
-pub struct BlogCommentPaginatedResponse {
-    pub data: Vec<BlogComment>,
-    pub total: i64,
-}
