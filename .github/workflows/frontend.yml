@@ -3,6 +3,10 @@ name: frontend-ci
 # PR 只跑 test（讓 Dependabot PR 有驗證）；build 與 deploy 只在 push master 跑。
 # 兩者的區隔靠下方 job 的 `if: github.event_name == 'push'`，不可拿掉 ——
 # 否則每個 PR 都會推 image 到 Docker Hub 並 SSH 部署到 VPS。
+#
+# test 與 build 刻意「不」相依（理由同 backend.yml 檔頭）：build 是全新 runner，
+# 用不到 test job 的產物，閘門改掛 deploy 的 `needs: [test, build]`。
+# 代價：測試失敗時 image 仍會被推上 Docker Hub，`:latest` 可能指向沒過 tsc 的 commit。
 on:
   push:
     branches:
@@ -48,7 +52,7 @@ jobs:
         run: pnpm exec tsc --noEmit
 
   build:
-    needs: test
+    # 不掛 needs: test —— 與 test 並行，閘門在 deploy（理由見檔頭）
     if: github.event_name == 'push'   # PR 不推 image
     runs-on: ubuntu-latest
     steps:
@@ -78,7 +82,7 @@ jobs:
           cache-to: type=registry,ref=kawagami77/my-next-blog:buildcache,mode=max
 
   deploy:
-    needs: build
+    needs: [test, build]   # 測試沒過不部署（build 並行故必須同時列 test）
     if: github.event_name == 'push'   # PR 不部署
     runs-on: ubuntu-latest
     # 與 backend.yml 的 deploy job 共用 group：build 各自並行，只有部署階段序列化（排隊、不取消）

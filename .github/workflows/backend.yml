@@ -3,6 +3,12 @@ name: backend-ci
 # PR 只跑 test（讓 Dependabot PR 有驗證）；build 與 deploy 只在 push master 跑。
 # 兩者的區隔靠下方 job 的 `if: github.event_name == 'push'`，不可拿掉 ——
 # 否則每個 PR 都會推 image 到 Docker Hub 並 SSH 部署到 VPS。
+#
+# test 與 build 刻意「不」相依（build job 是全新 runner + Docker 從頭編，用不到
+# test job 的任何產物，`needs: test` 只是閘門）。閘門改掛在 deploy 的
+# `needs: [test, build]`：測試沒過一樣不會部署，但兩個 job 並行省掉整個 test 的
+# 時間（實測 206s → ~120s）。代價：測試失敗時 image 仍會被推上 Docker Hub，
+# 所以 `:latest` 有可能指向沒過測試的 commit —— 手動 `docker pull :latest` 前要留意。
 on:
   push:
     branches:
@@ -52,6 +58,9 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: backend
+          # PR 不回存快取（post 步驟要 20~30s，而 PR 的 target dir 對 master 沒用）；
+          # master 照存，下次 push 才有得 restore。
+          save-if: ${{ github.ref == 'refs/heads/master' }}
       -
         name: Clippy
         run: cargo clippy --all-targets --locked -- -D warnings
@@ -60,7 +69,7 @@ jobs:
         run: cargo test --locked
 
   build:
-    needs: test
+    # 不掛 needs: test —— 與 test 並行，閘門在 deploy（理由見檔頭）
     if: github.event_name == 'push'   # PR 不推 image
     runs-on: ubuntu-latest
     steps:
@@ -90,7 +99,7 @@ jobs:
           cache-to: type=registry,ref=kawagami77/api-server:buildcache,mode=max
 
   deploy:
-    needs: build
+    needs: [test, build]   # 測試沒過不部署（build 並行故必須同時列 test）
     if: github.event_name == 'push'   # PR 不部署
     runs-on: ubuntu-latest
     # 與 frontend.yml 的 deploy job 共用 group：build 各自並行，只有部署階段序列化（排隊、不取消）
