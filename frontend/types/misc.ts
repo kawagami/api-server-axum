@@ -61,5 +61,10 @@ export interface Log {
   target: string;
   file: string;
   line: number;
+  // 對應 `x-request-id` / 錯誤 body 的 request_id；非請求路徑的 log（排程 job、啟動期）為 null
+  request_id: string | null;
+  // event 與 span 的其餘 field。`self` = 真正的錯誤細節（message 只是固定字串）、
+  // 另有 method / path / latency 等，內容依 log 來源而異，故不收斂成具名型別
+  fields: Record<string, unknown> | null;
   created_at: string;
 }

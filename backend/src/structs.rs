@@ -8,6 +8,7 @@ pub mod gov_tenders;
 pub mod invoices;
 pub mod jobs;
 pub mod ledger;
+pub mod logs;
 pub mod lotto;
 pub mod members;
 pub mod messages;

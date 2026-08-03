@@ -1,7 +1,7 @@
 "use server";
 
 import adminRequest from "@/libs/adminRequest";
-import type { Log, LogLevel, AuditLog, HttpMethod } from "@/types";
+import type { Log, LogLevel, AuditLog, HttpMethod, PaginatedResponse } from "@/types";
 
 interface GetLogsParams {
     level?: LogLevel;
@@ -9,15 +9,20 @@ interface GetLogsParams {
     per_page?: number;
 }
 
+/**
+ * `GET /logs` 回 `{ data, total }`（2026-08-03 起，原本是裸陣列）。
+ * 這裡只回 `data` 配 `usePagedList` 的「載入更多」，慣例同 `getGovTenders`。
+ */
 export async function getLogs({ level, page = 1, per_page = 100 }: GetLogsParams = {}): Promise<Log[]> {
     const params = new URLSearchParams();
     if (level) params.set('level', level);
     params.set('page', String(page));
     params.set('per_page', String(per_page));
 
-    return adminRequest<Log[]>({
+    const res = await adminRequest<PaginatedResponse<Log>>({
         url: `${process.env.API_URL}/logs?${params}`,
     });
+    return res?.data ?? [];
 }
 
 export interface GetAuditLogsParams {
