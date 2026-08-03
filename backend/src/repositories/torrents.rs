@@ -7,6 +7,10 @@ use sqlx::{Pool, Postgres};
 
 const COLUMNS: &str = "id, info_hash, magnet_uri, name, status, total_size, files, error, created_by, created_at, completed_at";
 
+/// `list` 內 data 與 total 兩個查詢共用的篩選條件（$1..$2）。**兩邊 bind 順序必須一致**。
+const LIST_FILTER: &str = "($1::text IS NULL OR status = $1)
+           AND ($2::bigint IS NULL OR owner_id = $2)";
+
 pub async fn insert(
     pool: &Pool<Postgres>,
     info_hash: &str,
@@ -60,8 +64,7 @@ pub async fn list(
 ) -> Result<Paginated<Torrent>, AppError> {
     let data = sqlx::query_as::<_, Torrent>(&format!(
         "SELECT {COLUMNS} FROM torrents
-         WHERE ($1::text IS NULL OR status = $1)
-           AND ($2::bigint IS NULL OR owner_id = $2)
+         WHERE {LIST_FILTER}
          ORDER BY id DESC LIMIT $3 OFFSET $4"
     ))
     .bind(&status)
@@ -71,11 +74,9 @@ pub async fn list(
     .fetch_all(pool)
     .await?;
 
-    let total: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM torrents
-         WHERE ($1::text IS NULL OR status = $1)
-           AND ($2::bigint IS NULL OR owner_id = $2)",
-    )
+    let total: i64 = sqlx::query_scalar(&format!(
+        "SELECT COUNT(*) FROM torrents WHERE {LIST_FILTER}"
+    ))
     .bind(&status)
     .bind(owner_id)
     .fetch_one(pool)

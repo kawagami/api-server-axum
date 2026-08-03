@@ -14,11 +14,12 @@ pub async fn get_all_stock_changes(
     let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM stock_changes s WHERE 1=1");
     let mut data_query = QueryBuilder::new("SELECT * FROM stock_changes s WHERE 1=1");
 
-    if let Some(status) = &conditions.status {
-        count_query.push(" AND s.status = ");
-        count_query.push_bind(status);
-        data_query.push(" AND s.status = ");
-        data_query.push_bind(status);
+    // 篩選條件只寫一次、套用到兩個 builder —— 逐一 push 兩份就是 total 與 data 對不上的來源
+    for query in [&mut count_query, &mut data_query] {
+        if let Some(status) = &conditions.status {
+            query.push(" AND s.status = ");
+            query.push_bind(status);
+        }
     }
 
     data_query.push(" ORDER BY s.start_date DESC LIMIT ");

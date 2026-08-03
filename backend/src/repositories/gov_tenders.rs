@@ -7,6 +7,12 @@ use sqlx::{Pool, Postgres};
 const COLS: &str = "id, filename, date, tender_type, title, category, unit_id, unit_name, \
      job_number, companies, keyword, detail_url, notified_at, created_at";
 
+/// list 與 count 共用的篩選條件（$1..$3）。**兩邊的 bind 順序必須一致**，
+/// 加參數要同時改 `list` 與 `count` —— 條件寫兩份就是 `total` 與 `data` 對不上的來源。
+const LIST_FILTER: &str = "($1::text IS NULL OR keyword = $1)
+           AND ($2::text IS NULL OR tender_type = $2)
+           AND ($3::text IS NULL OR title ILIKE '%' || $3 || '%' OR unit_name ILIKE '%' || $3 || '%')";
+
 /// 寫入一筆標案；filename 已存在則跳過並回 None，新寫入回 Some
 pub async fn insert_ignore(
     pool: &Pool<Postgres>,
@@ -72,9 +78,7 @@ pub async fn list(
 ) -> Result<Vec<GovTender>, AppError> {
     let rows = sqlx::query_as(&format!(
         "SELECT {COLS} FROM gov_tenders
-         WHERE ($1::text IS NULL OR keyword = $1)
-           AND ($2::text IS NULL OR tender_type = $2)
-           AND ($3::text IS NULL OR title ILIKE '%' || $3 || '%' OR unit_name ILIKE '%' || $3 || '%')
+         WHERE {LIST_FILTER}
          ORDER BY date DESC, id DESC
          LIMIT $4 OFFSET $5"
     ))
@@ -98,12 +102,9 @@ pub async fn distinct_types(pool: &Pool<Postgres>) -> Result<Vec<String>, AppErr
 }
 
 pub async fn count(pool: &Pool<Postgres>, query: &GovTenderListQuery) -> Result<i64, AppError> {
-    let (total,): (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM gov_tenders
-         WHERE ($1::text IS NULL OR keyword = $1)
-           AND ($2::text IS NULL OR tender_type = $2)
-           AND ($3::text IS NULL OR title ILIKE '%' || $3 || '%' OR unit_name ILIKE '%' || $3 || '%')",
-    )
+    let (total,): (i64,) = sqlx::query_as(&format!(
+        "SELECT COUNT(*) FROM gov_tenders WHERE {LIST_FILTER}"
+    ))
     .bind(&query.keyword)
     .bind(&query.tender_type)
     .bind(&query.q)

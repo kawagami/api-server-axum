@@ -4,6 +4,16 @@ use crate::{
 };
 use sqlx::{PgConnection, Pool, Postgres};
 
+/// 公開列表的篩選條件（$1..$3，依賴 `blogs b` / `users u` 兩個 alias）。
+/// 被 `get_blogs_with_pagination` 與 `count_blogs` 共用 —— **兩邊 bind 順序必須一致**，
+/// 加參數要同時改；條件寫兩份就是 `total` 與 `data` 對不上的來源。
+const PUBLIC_FILTER: &str = "($1::text IS NULL OR b.tags @> ARRAY[$1])
+              AND ($2::text IS NULL OR u.name = $2)
+              AND ($3::text IS NULL OR b.markdown ILIKE '%' || $3 || '%')";
+
+/// 後台列表（依擁有者過濾）的篩選條件（$1）。被 `list_for_owner` 與 `count_for_owner` 共用。
+const OWNER_FILTER: &str = "($1::bigint IS NULL OR author_id = $1)";
+
 pub async fn get_blogs_with_pagination(
     pool: &Pool<Postgres>,
     limit: i64,
@@ -20,9 +30,7 @@ pub async fn get_blogs_with_pagination(
             SELECT b.id, b.markdown, b.tocs, b.tags, b.created_at, b.updated_at, u.name AS author_name
             FROM blogs b
             LEFT JOIN users u ON u.id = b.author_id
-            WHERE ($1::text IS NULL OR b.tags @> ARRAY[$1])
-              AND ($2::text IS NULL OR u.name = $2)
-              AND ($3::text IS NULL OR b.markdown ILIKE '%' || $3 || '%')
+            WHERE {PUBLIC_FILTER}
             ORDER BY b.created_at {order}
             LIMIT $4 OFFSET $5
             "#,
@@ -57,15 +65,15 @@ pub async fn list_for_owner(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<DbBlog>, AppError> {
-    sqlx::query_as(
+    sqlx::query_as(&format!(
         r#"
             SELECT id, markdown, tocs, tags, created_at, updated_at
             FROM blogs
-            WHERE ($1::bigint IS NULL OR author_id = $1)
+            WHERE {OWNER_FILTER}
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
-            "#,
-    )
+            "#
+    ))
     .bind(owner_id)
     .bind(limit)
     .bind(offset)
@@ -75,7 +83,7 @@ pub async fn list_for_owner(
 }
 
 pub async fn count_for_owner(pool: &Pool<Postgres>, owner_id: Option<i64>) -> Result<i64, AppError> {
-    sqlx::query_scalar("SELECT COUNT(*) FROM blogs WHERE ($1::bigint IS NULL OR author_id = $1)")
+    sqlx::query_scalar(&format!("SELECT COUNT(*) FROM blogs WHERE {OWNER_FILTER}"))
         .bind(owner_id)
         .fetch_one(pool)
         .await
@@ -103,16 +111,14 @@ pub async fn count_blogs(
     author: Option<&str>,
     q: Option<&str>,
 ) -> Result<i64, AppError> {
-    sqlx::query_scalar(
+    sqlx::query_scalar(&format!(
         r#"
             SELECT COUNT(*)
             FROM blogs b
             LEFT JOIN users u ON u.id = b.author_id
-            WHERE ($1::text IS NULL OR b.tags @> ARRAY[$1])
-              AND ($2::text IS NULL OR u.name = $2)
-              AND ($3::text IS NULL OR b.markdown ILIKE '%' || $3 || '%')
-            "#,
-    )
+            WHERE {PUBLIC_FILTER}
+            "#
+    ))
     .bind(tag)
     .bind(author)
     .bind(q)
