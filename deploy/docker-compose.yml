@@ -52,10 +52,18 @@ x-logging-quiet: &logging-quiet
 # 隨機挑一個殺。代價：設太低會讓容器在正常尖峰被 OOM-kill，所以第一版刻意寬鬆。
 #
 # ⚠ 這些數字是**起步值，不是量測結果**。上線後看 /admin/metrics 的 RSS 曲線再收緊。
-#   各上限之和（約 1.2G）刻意略高於實體記憶體 —— mem_limit 是上限不是預留，
+#   各上限之和（約 1.4G）刻意高於實體記憶體 —— mem_limit 是上限不是預留，
 #   真正的用途是攔住單一失控的容器。
-# ⚠ 刻意不設 memswap_limit：未設時 Docker 允許再用等量 swap，失控的容器會先變慢
-#   而不是立刻被殺，在這台機器上是想要的行為（有緩衝時間可以介入）。
+# ⚠ 設太低不一定會 OOM-kill，可能變成**永不結束的活鎖** —— 見 certbot 那段的事故。
+#   容器撞到 mem_limit 時 kernel 先做回收，回收「勉強成功」就不觸發 OOM killer：
+#   沒有 exit code、沒有 log、沒有 restart，只有整機 load +1.0 與 TB 級的 BLOCK 讀取。
+#   ⇒ 排查無聲的資源異常，`docker stats` 的 MEM%（貼著 100% 就是這個）與 BLOCK I/O
+#     比 log 更早說實話。
+# ⚠ 刻意不設 memswap_limit。原本這裡寫「未設時 Docker 允許再用等量 swap」——
+#   **在這台機器上是錯的**：kernel 沒開 swap accounting（`docker update --memory-swap`
+#   會回 "Your kernel does not support swap limit capabilities"），所以 Docker 對 swap
+#   根本沒有任何限制，不是「等量」。結論（失控的容器會先變慢而不是立刻被殺）碰巧仍成立，
+#   但機制不同；要真的靠 swap 上限擋容器，得先在 kernel cmdline 開 swapaccount=1。
 x-hardening: &hardening
   security_opt:
     - no-new-privileges:true
@@ -87,7 +95,15 @@ services:
   certbot:
     <<: [*logging-quiet, *hardening]
     image: certbot/dns-cloudflare
-    mem_limit: 64m
+    # ⚠ 這裡曾經是 64m —— 太低,而且症狀完全不像記憶體問題。2026-08-03 17:18Z 憑證進入
+    # 續期窗口(到期前 30 天),renew 第一次真的做事(載入 cryptography + DNS-01 challenge)
+    # 就撞上 64m 天花板,然後**活鎖 12 小時**:cgroup 回收每次都勉強成功 → 不觸發 OOM
+    # killer(`oom=false`、`restarts=0`、`--quiet` 故 log 全空)→ 沒有任何錯誤訊號,只有
+    # 整機 load 憑空 +1.0、cpu 從 ~43% 跳到 ~89%,以及 `docker stats` 上 19.3TB 的 BLOCK
+    # 讀取(其他容器都是 GB 級)。在窗口外 renew 是幾秒結束的 no-op,所以這個上限撐了三天
+    # 才爆 —— 「跑很久都沒事」不代表額度夠。
+    # ⇒ 判讀提示:certbot 沒 log + 整機 load 釘死 1.0,先看 `docker stats` 的 BLOCK I/O。
+    mem_limit: 256m
     container_name: certbot
     volumes:
       - letsencrypt:/etc/letsencrypt
