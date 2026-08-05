@@ -4,7 +4,7 @@ use chrono::{Duration, NaiveDate};
 /// 每日台北 00:05（UTC 16:05）：將剛結束的前一台北日的 HLL 計數落地 daily_visitor_stats。
 /// 即時當日計數仍直接讀 Redis，不在此處理。
 pub async fn run(state: AppState) {
-    let yesterday = visitors::taipei_today() - Duration::days(1);
+    let yesterday = crate::utils::date::taipei_today() - Duration::days(1);
 
     // 這個 job 沒有自癒能力：算的是「前一台北日」，下一輪跑的是隔天的區間、不會回頭補。
     // 當下 Redis 或 DB 不通就是那天永久空洞，所以要重試（Redis 的 HLL key 有 40 天 TTL，

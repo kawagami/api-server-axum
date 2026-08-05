@@ -41,7 +41,7 @@ async fn visitors_stats(
     auth_user.require_permission(Perm::StatRead)?;
 
     let days = query.days.unwrap_or(30).clamp(1, 365);
-    let today = visitors::taipei_today();
+    let today = crate::utils::date::taipei_today();
 
     let today_count = visitors::count_day(state.get_redis_pool(), today).await?;
 

@@ -431,10 +431,10 @@ fn end_game<E: GameEngine>(
     push_lobby_update(hub, outbox);
 }
 
+/// 送出一批 outbox。**同一收件人的多則訊息保證按 push 順序抵達**
+/// （靠 `AppState::send_outbox`）—— `move_made` 必須早於同批的 `game_over`。
 fn flush(state: &AppState, outbox: Vec<(SocketAddr, String)>) {
-    for (addr, m) in outbox {
-        state.send_to(addr, m);
-    }
+    state.send_outbox(outbox);
 }
 
 // ---- 計時掃描 ----

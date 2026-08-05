@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
     structs::lotto::WinnerRow,
 };
-use chrono::{Datelike, Duration, FixedOffset, Utc};
+use chrono::{Datelike, Duration};
 use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
 
@@ -43,8 +43,7 @@ async fn fetch_and_store(pool: &Pool<Postgres>, client: &reqwest::Client) -> Res
 
 /// 以台灣時間（UTC+8）算「當月」與「上月」的 YYYY-MM
 fn months_to_fetch() -> Vec<String> {
-    let tz = FixedOffset::east_opt(8 * 3600).unwrap();
-    let now = Utc::now().with_timezone(&tz);
+    let now = crate::utils::date::taipei_now();
     let cur = format!("{:04}-{:02}", now.year(), now.month());
     let prev_dt = now - Duration::days(now.day() as i64); // 退到上個月
     let prev = format!("{:04}-{:02}", prev_dt.year(), prev_dt.month());

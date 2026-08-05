@@ -47,8 +47,7 @@ pub async fn complete_admin_login(
     jwt_secret: &str,
     id: i64,
 ) -> Result<String, AppError> {
-    let login_key = format!("user:login:{}", id);
-    redis::redis_set(redis_pool, &login_key, &id.to_string()).await?;
+    redis::set_user_login(redis_pool, id).await?;
 
     let permissions = roles_repo::get_user_permission_strings_by_id(pool, id).await?;
     redis::set_user_permissions(redis_pool, id, &permissions).await?;
@@ -61,8 +60,7 @@ pub async fn refresh_admin_token(
     jwt_secret: &str,
     id: i64,
 ) -> Result<String, AppError> {
-    let login_key = format!("user:login:{}", id);
-    redis::redis_set(redis_pool, &login_key, &id.to_string()).await?;
+    redis::set_user_login(redis_pool, id).await?;
     encode_jwt(id, jwt_secret)
 }
 
@@ -89,7 +87,7 @@ pub async fn change_password(
 
     // 密碼已經換了，這一步失敗只代表舊 session 多活最多 1 小時（access token 效期），
     // 不該把整個改密碼判定成失敗 —— 但要留下可查的 error log。
-    if let Err(e) = crate::repositories::redis::del_user_login(redis_pool, id).await {
+    if let Err(e) = redis::del_user_login(redis_pool, id).await {
         tracing::error!("change_password: 撤銷 user:login:{id} 失敗: {e}");
     }
     Ok(())

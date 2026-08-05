@@ -163,7 +163,7 @@ pub async fn fetch_stock_price_for_date(
     stock_no: &str,
     date: NaiveDate,
 ) -> Result<NewStockClosingPrice, AppError> {
-    let today = chrono::Local::now().date_naive();
+    let today = crate::utils::date::taipei_today();
     if date > today {
         return Err(RequestError::InvalidContent(format!(
             "Cannot fetch stock price for future date: {}",

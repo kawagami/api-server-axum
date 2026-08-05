@@ -85,7 +85,7 @@ pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<App
 }
 
 pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
-    let state = AppState::new().await;
+    let (state, audit_rx) = AppState::new().await;
 
     sqlx::migrate!("./migrations")
         .run(state.get_pool())
@@ -107,7 +107,13 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .filter_map(|s| s.trim().parse().ok())
         .collect();
 
+    // 兩個批次寫入器：WARN+ 的 log 與 /admin/* 的稽核紀錄。
+    // 都刻意不在請求路徑上碰 DB —— 尖峰時不與真正的查詢搶那 20 條連線。
     tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone()));
+    tokio::spawn(crate::services::audit_logs::audit_writer(
+        audit_rx,
+        state.get_pool().clone(),
+    ));
 
     initialize_scheduler(state.clone()).await;
 

@@ -7,10 +7,10 @@ use crate::{
     },
     state::AppState,
 };
-use chrono::{Datelike, Duration, Local, Months, NaiveDate};
+use chrono::{Datelike, Duration, Months, NaiveDate};
 
 pub async fn run(state: AppState) {
-    let today = Local::now().naive_local().date();
+    let today = crate::utils::date::taipei_today();
     let six_months_ago = today - Duration::days(180);
     // NaiveDate 加 3 個月實務上不會溢位，但同函式其他錯誤都走 log，這裡不該是唯一的 panic 點
     let three_months_later = today.checked_add_months(Months::new(3)).unwrap_or(today);

@@ -100,10 +100,10 @@ pub fn msg<K: RoomKind>(typ: &str, data: Value) -> String {
     crate::structs::ws::game_envelope(K::NAME, typ, data)
 }
 
+/// 送出一批 outbox。**同一收件人的多則訊息保證按 push 順序抵達**
+/// （靠 `AppState::send_outbox`；逐則 `send_to` 做不到，見該函式註解）。
 pub fn flush(state: &AppState, outbox: Vec<(SocketAddr, String)>) {
-    for (addr, m) in outbox {
-        state.send_to(addr, m);
-    }
+    state.send_outbox(outbox);
 }
 
 pub fn err1<K: RoomKind>(state: &AppState, who: SocketAddr, reason: &str) {

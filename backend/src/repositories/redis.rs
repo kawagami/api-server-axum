@@ -30,21 +30,54 @@ pub async fn get_redis_conn(
     })
 }
 
-pub async fn redis_set(
-    pool: &RedisPool<RedisConnectionManager>,
-    key: &str,
-    value: &str,
-) -> Result<(), RedisError> {
-    let mut conn = get_redis_conn(pool).await?;
-    conn.set_ex(key, value, 3600).await
+// ---- TTL ----
+//
+// 全部命名，不留裸數字：這些值決定「多久後被登出」「權限改動多久生效」「重放窗口多寬」，
+// 是行為契約而不是實作細節。
+
+/// 登入 session 效期。與 access token 效期（1 小時）對齊：token 還能用的期間 session
+/// 就該存在，token 一過期 session 也不必留。登入 / refresh 都會續期。
+const LOGIN_TTL_SECS: u64 = 3600;
+/// 權限快取效期。過期只是回頭查一次 DB；改動要立刻生效走
+/// [`invalidate_user_permissions`]，不靠這個 TTL。
+const PERMISSIONS_TTL_SECS: u64 = 3600;
+/// OAuth state 效期 = 使用者在第三方頁面停留的容忍上限。
+const OAUTH_STATE_TTL_SECS: u64 = 300;
+/// member refresh token 效期（30 天）。
+const MEMBER_REFRESH_TTL_SECS: u64 = 30 * 24 * 3600;
+/// WS 一次性連線票效期 —— 只夠拿到票後立刻握手，不夠被撿走重用。
+const WS_TICKET_TTL_SECS: u64 = 30;
+
+// ---- 登入 session ----
+//
+// key 的存在性就是「這個 user 已登入且未被撤銷」的唯一判斷（`middleware::auth` 每個請求
+// 都查）。format 字串一度散在 4 個檔案 —— 寫錯一處的後果是「全部請求被判未授權」或
+// 「已登出的 token 仍有效」，兩種都不會有編譯期徵兆，所以三個操作一律只走這裡。
+//
+// 注意這是 **per-user** 而非 per-token：多裝置共用同一把，撤銷即全部裝置撤銷
+// （改密碼刻意如此，見 `services::auth::change_password`）。
+
+fn login_key(user_id: i64) -> String {
+    format!("user:login:{}", user_id)
 }
 
-pub async fn redis_check_key_exists(
+/// 建立 / 續期登入 session。
+pub async fn set_user_login(
     pool: &RedisPool<RedisConnectionManager>,
-    key: &str,
+    user_id: i64,
+) -> Result<(), RedisError> {
+    let mut conn = get_redis_conn(pool).await?;
+    conn.set_ex(login_key(user_id), user_id.to_string(), LOGIN_TTL_SECS)
+        .await
+}
+
+/// 登入 session 是否還在（middleware 每請求呼叫）。
+pub async fn user_login_exists(
+    pool: &RedisPool<RedisConnectionManager>,
+    user_id: i64,
 ) -> Result<bool, RedisError> {
     let mut conn = get_redis_conn(pool).await?;
-    conn.exists(key).await
+    conn.exists(login_key(user_id)).await
 }
 
 pub async fn set_user_permissions(
@@ -56,7 +89,7 @@ pub async fn set_user_permissions(
     let key = format!("user:permissions:{}", user_id);
     let value = serde_json::to_string(permissions)
         .map_err(crate::errors::AppError::from)?;
-    conn.set_ex::<_, _, ()>(key, value, 3600).await?;
+    conn.set_ex::<_, _, ()>(key, value, PERMISSIONS_TTL_SECS).await?;
     Ok(())
 }
 
@@ -86,7 +119,7 @@ pub async fn set_oauth_state(
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
     let key = format!("oauth:state:{}", state_value);
-    conn.set_ex::<_, _, ()>(key, "1", 300).await?;
+    conn.set_ex::<_, _, ()>(key, "1", OAUTH_STATE_TTL_SECS).await?;
     Ok(())
 }
 
@@ -107,7 +140,7 @@ pub async fn set_member_refresh_token(
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
     let key = format!("member:refresh:{}", member_id);
-    conn.set_ex::<_, _, ()>(key, jti, 30 * 24 * 3600).await?;
+    conn.set_ex::<_, _, ()>(key, jti, MEMBER_REFRESH_TTL_SECS).await?;
     Ok(())
 }
 
@@ -139,13 +172,13 @@ pub async fn invalidate_permissions_for_ids(
     }
 }
 
+/// 撤銷登入 session（登出 / 改密碼）。
 pub async fn del_user_login(
     pool: &RedisPool<RedisConnectionManager>,
     user_id: i64,
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    let key = format!("user:login:{}", user_id);
-    conn.del::<_, ()>(key).await?;
+    conn.del::<_, ()>(login_key(user_id)).await?;
     Ok(())
 }
 
@@ -157,7 +190,7 @@ pub async fn set_ws_ticket(
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
     let key = format!("ws:ticket:{}", ticket);
-    conn.set_ex::<_, _, ()>(key, email, 30).await?;
+    conn.set_ex::<_, _, ()>(key, email, WS_TICKET_TTL_SECS).await?;
     Ok(())
 }
 
@@ -349,13 +382,35 @@ mod tests {
         );
     }
 
+    /// 登入 session 的三個操作必須是一組：set 之後查得到、del 之後查不到。
+    /// middleware 每個請求都靠 `user_login_exists` 判授權，這條錯了就是全站認證錯。
     #[tokio::test]
-    async fn exists_reflects_key_presence() {
+    async fn user_login_set_check_del() {
         let Some(p) = pool().await else { return };
-        let k = uniq("exists");
-        assert!(!redis_check_key_exists(&p, &k).await.unwrap());
-        redis_set(&p, &k, "x").await.unwrap();
-        assert!(redis_check_key_exists(&p, &k).await.unwrap());
-        cache_del(&p, &k).await.unwrap();
+        let uid = 9_000_000 + (rand::random::<u32>() % 100_000) as i64;
+        assert!(!user_login_exists(&p, uid).await.unwrap(), "未登入應為 false");
+        set_user_login(&p, uid).await.unwrap();
+        assert!(user_login_exists(&p, uid).await.unwrap(), "登入後應為 true");
+        del_user_login(&p, uid).await.unwrap();
+        assert!(!user_login_exists(&p, uid).await.unwrap(), "撤銷後應為 false");
+    }
+
+    /// 登入 session 一定要有 TTL —— 少了它，Redis 裡的 session 永不過期。
+    #[tokio::test]
+    async fn user_login_has_ttl() {
+        let Some(p) = pool().await else { return };
+        let uid = 9_000_000 + (rand::random::<u32>() % 100_000) as i64;
+        set_user_login(&p, uid).await.unwrap();
+        let mut conn = get_redis_conn(&p).await.unwrap();
+        let ttl: i64 = redis::cmd("TTL")
+            .arg(login_key(uid))
+            .query_async(&mut *conn)
+            .await
+            .unwrap();
+        assert!(
+            (1..=LOGIN_TTL_SECS as i64).contains(&ttl),
+            "TTL 應在 1..={LOGIN_TTL_SECS}，實際 {ttl}"
+        );
+        del_user_login(&p, uid).await.unwrap();
     }
 }

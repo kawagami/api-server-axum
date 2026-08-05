@@ -1,4 +1,26 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
+
+/// 台北時區偏移（UTC+8，無 DST）。
+///
+/// 「今天」在這個專案裡一律以台北日為準：資料來源（TWSE / 台彩 / 財政部）都照台北營業日
+/// 發佈，統計的日界也是台北 00:00。而生產 image 沒有設 `TZ` —— `chrono::Local` 實際等於
+/// UTC，會讓台北 00:00–08:00 那八小時的「今天」算成昨天。
+///
+/// **偏移量只在這裡出現一次**：不要再寫第二個 `FixedOffset::east_opt(8 * 3600)`，也不要在
+/// 任何地方用 `Local::now()` 當「今天」。
+pub fn taipei_offset() -> FixedOffset {
+    FixedOffset::east_opt(8 * 3600).expect("UTC+8 是合法偏移")
+}
+
+/// 台北時間的「現在」
+pub fn taipei_now() -> DateTime<FixedOffset> {
+    Utc::now().with_timezone(&taipei_offset())
+}
+
+/// 台北時間的「今天」
+pub fn taipei_today() -> NaiveDate {
+    taipei_now().date_naive()
+}
 
 /// 解析民國日期字串（如 "114/06/10"）為西元 NaiveDate
 pub fn parse_roc_date(s: &str) -> Option<NaiveDate> {
@@ -29,6 +51,21 @@ pub fn parse_roc_compact_date(s: &str) -> Option<NaiveDate> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 守住「台北 = UTC+8」這件事本身：偏移寫錯會讓所有日界（訪客統計、排行榜週界、
+    /// 對獎的當日判斷）整批偏移，而那種錯不會有任何編譯或執行期徵兆。
+    #[test]
+    fn taipei_is_utc_plus_eight() {
+        assert_eq!(taipei_offset().local_minus_utc(), 8 * 3600);
+    }
+
+    /// 台北日必為 UTC 日或其後一日 —— 不可能落在 UTC 日之前。
+    #[test]
+    fn taipei_today_is_never_behind_utc() {
+        let utc_today = Utc::now().date_naive();
+        let diff = (taipei_today() - utc_today).num_days();
+        assert!((0..=1).contains(&diff), "台北日與 UTC 日相差 {diff} 天");
+    }
 
     #[test]
     fn parses_compact_roc_date() {

@@ -1,19 +1,14 @@
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
-use chrono::{Datelike, FixedOffset, NaiveDate, Utc};
+use chrono::{Datelike, NaiveDate};
 use serde::Serialize;
 use sqlx::{Pool, Postgres};
 
 use super::redis::get_redis_conn;
+use crate::utils::date::taipei_today;
 
 /// HLL key 保留天數（過後 Redis 自動清；歷史已落 daily_visitor_stats）
 const KEY_TTL_SECS: i64 = 40 * 24 * 3600;
-
-/// 以台北時間（UTC+8）取「今天」的日期
-pub fn taipei_today() -> NaiveDate {
-    let tz = FixedOffset::east_opt(8 * 3600).unwrap();
-    Utc::now().with_timezone(&tz).date_naive()
-}
 
 fn day_key(date: NaiveDate) -> String {
     format!("visitors:{:04}-{:02}-{:02}", date.year(), date.month(), date.day())

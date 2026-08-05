@@ -13,10 +13,15 @@ use crate::{
 };
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
-use chrono::{Datelike, Local, Months, NaiveDate};
+use chrono::{Datelike, Months, NaiveDate};
 use futures::future::try_join_all;
 use reqwest::Client;
 use sqlx::{Pool, Postgres};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
+use tokio::time::{Duration, Instant};
 use uuid::Uuid;
 
 // TWT49U field indices — adjust here if TWSE changes column order
@@ -27,6 +32,51 @@ const EX_IDX_STOCK_RATE: usize = 4;
 const EX_IDX_CASH_DIV: usize = 5;
 
 use super::twse::{self, TwseResponse};
+
+/// 單次請求能打幾個月的 TWSE。
+const MAX_UPSTREAM_FETCHES: usize = 6;
+/// 單次請求花在上游的時間上限。
+const UPSTREAM_TIME_BUDGET: Duration = Duration::from_secs(8);
+
+/// 互動端點對上游（TWSE）的抓取預算。
+///
+/// **為什麼必須有**：`fetch_all_closing_prices` 是逐月抓，而 `services::twse` 有全域
+/// `semaphore(1)`。沒有預算的話，一個三年前買入、持股十檔的 member 按一次 summary
+/// 就是 ~360 次序列上游請求（每次 timeout 30 秒）—— 那個請求本身撐不到回應，還會把
+/// TWSE 通道從排程 job 手上整段搶走。
+///
+/// 逾預算的月份直接當成「沒資料」回空：**已抓到的都寫進了 `stock_closing_prices`**，
+/// 下次請求會從 DB 命中並接著往前補，幾次之後就完整。所以代價是「剛加入的舊持股，
+/// 歷史圖要多按幾次才長齊」，換到的是「任何一次請求都有上限」。
+///
+/// clone 共用同一份額度與同一個 deadline（summary 對多筆持股平行抓時要算成一份預算）。
+#[derive(Clone)]
+struct UpstreamBudget {
+    deadline: Instant,
+    remaining: Arc<AtomicUsize>,
+}
+
+impl UpstreamBudget {
+    fn new() -> Self {
+        Self {
+            deadline: Instant::now() + UPSTREAM_TIME_BUDGET,
+            remaining: Arc::new(AtomicUsize::new(MAX_UPSTREAM_FETCHES)),
+        }
+    }
+
+    /// 取一次額度；已用完或已逾時回 false（呼叫端不得再打上游）。
+    fn try_take(&self) -> bool {
+        if Instant::now() >= self.deadline {
+            return false;
+        }
+        // fetch_update：額度歸零後不再往下減，避免 wrap
+        self.remaining
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                (n > 0).then(|| n - 1)
+            })
+            .is_ok()
+    }
+}
 
 struct DayClose {
     date: NaiveDate,
@@ -73,10 +123,11 @@ pub async fn get_history(
     member_id: i64,
 ) -> Result<Vec<HistoryRecord>, AppError> {
     let entry = portfolio_repo::get_by_id_for_member(pool, id, member_id).await?;
-    let today = Local::now().date_naive();
+    let today = crate::utils::date::taipei_today();
+    let budget = UpstreamBudget::new();
 
-    let closes = fetch_all_closing_prices(pool, redis_pool, client, &entry.stock_code, entry.buy_date, today).await?;
-    let ex_events = fetch_ex_events(pool, redis_pool, client, &entry.stock_code, entry.buy_date, today).await?;
+    let closes = fetch_all_closing_prices(pool, redis_pool, client, &entry.stock_code, entry.buy_date, today, &budget).await?;
+    let ex_events = fetch_ex_events(pool, redis_pool, client, &entry.stock_code, entry.buy_date, today, &budget).await?;
 
     Ok(build_history(entry.cost_per_share, entry.shares, closes, ex_events))
 }
@@ -88,16 +139,19 @@ pub async fn get_summary(
     member_id: i64,
 ) -> Result<Vec<PortfolioSummaryEntry>, AppError> {
     let entries = portfolio_repo::get_by_member(pool, member_id).await?;
-    let today = Local::now().date_naive();
+    let today = crate::utils::date::taipei_today();
+    // 一份預算給整個 summary（多筆持股共用），不是每筆一份
+    let budget = UpstreamBudget::new();
 
     let result = try_join_all(entries.into_iter().map(|entry| {
         let pool = pool.clone();
         let redis_pool = redis_pool.clone();
         let client = client.clone();
+        let budget = budget.clone();
         async move {
             let (closes, ex_events, stock_name) = tokio::try_join!(
-                fetch_all_closing_prices(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today),
-                fetch_ex_events(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today),
+                fetch_all_closing_prices(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today, &budget),
+                fetch_ex_events(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today, &budget),
                 async { Ok::<_, AppError>(get_stock_name_by_code(&pool, &entry.stock_code).await.unwrap_or(None)) },
             )?;
 
@@ -143,9 +197,10 @@ async fn fetch_closing_month(
     client: &Client,
     stock_code: &str,
     month: NaiveDate,
+    budget: &UpstreamBudget,
 ) -> Result<Vec<DayClose>, AppError> {
     let cache_key = format!("twse:stock_day:{}:{}", stock_code, month.format("%Y%m"));
-    let today = Local::now().date_naive();
+    let today = crate::utils::date::taipei_today();
     let is_current = month.year() == today.year() && month.month() == today.month();
     let ttl = if is_current { 3600u64 } else { 604800u64 };
 
@@ -174,7 +229,15 @@ async fn fetch_closing_month(
         }
     }
 
-    // 3. TWSE
+    // 3. TWSE（受單次請求的預算限制；逾預算當成沒資料，下次請求再補）
+    if !budget.try_take() {
+        tracing::debug!(
+            "portfolio 上游預算已用盡，跳過 {}/{}",
+            stock_code,
+            month.format("%Y%m")
+        );
+        return Ok(vec![]);
+    }
     let resp: TwseResponse = match twse::fetch_stock_day(client, stock_code, month).await {
         Ok(r) => r,
         Err(e) => {
@@ -224,15 +287,25 @@ async fn fetch_all_closing_prices(
     stock_code: &str,
     from: NaiveDate,
     to: NaiveDate,
+    budget: &UpstreamBudget,
 ) -> Result<Vec<DayClose>, AppError> {
-    let mut all: Vec<DayClose> = Vec::new();
-    let mut current = NaiveDate::from_ymd_opt(from.year(), from.month(), 1).unwrap();
-    let end_month = NaiveDate::from_ymd_opt(to.year(), to.month(), 1).unwrap();
-
+    let mut months = Vec::new();
+    let mut current = NaiveDate::from_ymd_opt(from.year(), from.month(), 1).expect("每月必有 1 日");
+    let end_month = NaiveDate::from_ymd_opt(to.year(), to.month(), 1).expect("每月必有 1 日");
     while current <= end_month {
-        let mut month_data = fetch_closing_month(pool, redis_pool, client, stock_code, current).await?;
+        months.push(current);
+        let Some(next) = current.checked_add_months(Months::new(1)) else { break };
+        current = next;
+    }
+
+    // **由新到舊抓**：上游預算有限時，額度要先花在最新的月份 —— summary 的現價與
+    // history 的最右端都取自最後一筆收盤價。由舊到新會把額度耗在最舊的月份上，
+    // 結果是最該有的現價反而拿不到。最後統一排序，順序對呼叫端不可見。
+    let mut all: Vec<DayClose> = Vec::new();
+    for month in months.into_iter().rev() {
+        let mut month_data =
+            fetch_closing_month(pool, redis_pool, client, stock_code, month, budget).await?;
         all.append(&mut month_data);
-        current = current.checked_add_months(Months::new(1)).unwrap();
     }
 
     all.retain(|d| d.date >= from);
@@ -247,6 +320,7 @@ async fn fetch_ex_events(
     stock_code: &str,
     from: NaiveDate,
     to: NaiveDate,
+    budget: &UpstreamBudget,
 ) -> Result<Vec<ExEvent>, AppError> {
     let start_str = from.format("%Y%m%d").to_string();
     let end_str = to.format("%Y%m%d").to_string();
@@ -290,7 +364,13 @@ async fn fetch_ex_events(
         }
     }
 
-    // 3. TWSE
+    // 3. TWSE（同一份請求預算）。
+    // 逾預算必須在這裡就回，不能往下走 —— 下面 4.5 的 `upsert_ex_rights_checked` 代表
+    // 「已向 TWSE 確認過這 30 天沒有除權息」，沒真的問就寫等於騙了自己 30 天。
+    if !budget.try_take() {
+        tracing::debug!("portfolio 上游預算已用盡，跳過 {stock_code} 的除權息查詢");
+        return Ok(vec![]);
+    }
     let resp: TwseResponse = match twse::fetch_ex_rights(client, &start_str, &end_str).await {
         Ok(r) => r,
         Err(e) => {

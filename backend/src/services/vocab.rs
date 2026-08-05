@@ -9,7 +9,7 @@ use crate::{
         StartRunResponse, VocabMe, Word,
     },
 };
-use chrono::{DateTime, Datelike, Duration, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use rand::Rng;
 use uuid::Uuid;
 
@@ -689,7 +689,7 @@ const LEADERBOARD_SIZE: i64 = 20;
 
 /// 週期起點:台北時間(UTC+8)本週一 00:00 / 本月 1 日 00:00,轉回 UTC 給查詢用
 fn period_start(now: DateTime<Utc>, period: LeaderboardPeriod) -> DateTime<Utc> {
-    let tz = FixedOffset::east_opt(8 * 3600).expect("UTC+8 合法偏移");
+    let tz = crate::utils::date::taipei_offset();
     let today = now.with_timezone(&tz).date_naive();
     let start = match period {
         LeaderboardPeriod::Weekly => {

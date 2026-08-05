@@ -21,10 +21,20 @@ use axum::{
 use axum_extra::{headers, TypedHeader};
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::{net::SocketAddr, ops::ControlFlow, sync::Arc, time::SystemTime};
-use tokio::{sync::Mutex, time::Duration};
+use tokio::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 // --- WebSocket Ping-Pong 設定 ---
 const PING_INTERVAL_SECONDS: u64 = 30;
+/// 沒收到 Pong 的容忍上限（兩個 ping 週期 + 緩衝）。
+///
+/// **只靠 send 失敗抓不到半開連線**：對端消失但 TCP 沒斷（拔網路、手機睡眠、NAT 逾時）時，
+/// 寫入會先進 kernel buffer 而「成功」，可能要好幾分鐘才回報錯誤。期間那條連線會一直掛在
+/// `connections` map（後台連線列表看得到）、遊戲桌位上（對手在等一個永遠不會來的走步）。
+/// 瀏覽器的 WS 實作會自動回 Pong，所以收不到 Pong 就是真的沒人在了。
+const PONG_TIMEOUT_SECONDS: u64 = PING_INTERVAL_SECONDS * 2 + 15;
 
 #[derive(serde::Deserialize)]
 struct WsQuery {
@@ -136,8 +146,13 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
         }),
     );
 
+    // 最後一次收到 Pong 的時間；recv_task 更新、ping_task 判逾時。
+    // std Mutex：只包一個 Instant，鎖不跨 await。
+    let last_pong = Arc::new(std::sync::Mutex::new(Instant::now()));
+
     // --- recv_task: 接收客戶端訊息 ---
     let recv_state_clone = state.clone();
+    let recv_last_pong = last_pong.clone();
     let mut recv_task = tokio::spawn(async move {
         let mut cnt = 0;
         let mut receiver = receiver;
@@ -145,6 +160,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
             match msg_result {
                 Ok(msg) => {
                     cnt += 1;
+                    // 存活證明只認 Pong（其餘訊息可能來自沒在讀我們 ping 的客戶端）
+                    if matches!(msg, Message::Pong(_)) {
+                        *recv_last_pong.lock().unwrap() = Instant::now();
+                    }
                     if process_message(msg, who, &recv_state_clone).await.is_break() {
                         break;
                     }
@@ -158,14 +177,26 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
         cnt
     });
 
-    // --- ping_task: 後端主動發送 Ping 並檢查 Pong 回應 ---
+    // --- ping_task: 主動發 Ping，並在遲遲收不到 Pong 時收掉連線 ---
+    // 這個 task 結束 = 下面的 select! 收到 → abort recv_task → cleanup_connection，
+    // 所以「判定死掉」只要 break 就會走完整的清理流程（含遊戲桌位斷線處理）。
     let ping_sender_clone = sender_arc.clone();
+    let ping_last_pong = last_pong.clone();
     let mut ping_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECONDS));
         interval.tick().await; // 跳過第一次立即觸發
 
         loop {
             interval.tick().await;
+
+            let silent_for = ping_last_pong.lock().unwrap().elapsed();
+            if silent_for >= Duration::from_secs(PONG_TIMEOUT_SECONDS) {
+                tracing::info!(
+                    "{who} 已 {} 秒沒回 Pong，判定連線已死並清理",
+                    silent_for.as_secs()
+                );
+                break;
+            }
 
             {
                 let mut sender_guard = ping_sender_clone.lock().await;
@@ -249,7 +280,9 @@ async fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> Con
             }
             return ControlFlow::Break(());
         }
+        // Pong 的存活記帳在 handle_socket 的 recv 迴圈（要更新 last_pong），這裡不重複處理
         Message::Pong(_) => {}
+        // axum 會自動回 Pong
         Message::Ping(_) => {}
     }
     ControlFlow::Continue(())

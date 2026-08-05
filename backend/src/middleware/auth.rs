@@ -123,16 +123,13 @@ pub(crate) async fn verify_admin_token(state: &AppState, token: String) -> Resul
         .sub
         .parse()
         .map_err(|_| AppError::AuthError(AuthError::InvalidToken))?;
-    let login_key = format!("user:login:{}", id);
-    verify_user_login(state, &login_key).await?;
-    Ok(id)
-}
 
-async fn verify_user_login(state: &AppState, key: &str) -> Result<(), AppError> {
-    redis::redis_check_key_exists(state.get_redis_pool(), key)
-        .await?
-        .then_some(())
-        .ok_or(AppError::AuthError(AuthError::Unauthorized))
+    // 簽章有效不代表 session 還在：登出 / 改密碼會撤掉 `user:login:{id}`，
+    // 撤銷後未過期的 token 必須立刻失效。
+    if !redis::user_login_exists(state.get_redis_pool(), id).await? {
+        return Err(AppError::AuthError(AuthError::Unauthorized));
+    }
+    Ok(id)
 }
 
 pub(crate) fn decode_jwt(jwt: String, secret: &str) -> Result<TokenData<Claims>, AppError> {
