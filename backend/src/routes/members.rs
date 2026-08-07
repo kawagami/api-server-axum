@@ -6,7 +6,7 @@ use crate::{
     structs::{
         auth::AuthenticatedUser,
         members::{AuthenticatedMember, Member, MemberDetail},
-        pagination::PageQuery,
+        pagination::{PageQuery, Paginated},
         roles::Perm,
     },
 };
@@ -38,7 +38,7 @@ async fn list_members(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<Vec<Member>>, AppError> {
+) -> Result<Json<Paginated<Member>>, AppError> {
     auth_user.require_permission(Perm::MemberRead)?;
     // 預設取 PageQuery 的上限（200）：前端目前沒有分頁 UI、預期拿完整清單，
     // 所以先只把查詢加界、不改行為。會員數逼近 200 時前端要補分頁。

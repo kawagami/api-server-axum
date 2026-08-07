@@ -18,11 +18,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
     const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
     const perPage = parseInt(params.per_page ?? "100", 10);
 
-    const data = await getStockDayAll({ trade_date, stock_code, page, perPage });
+    const { data, total } = await getStockDayAll({ trade_date, stock_code, page, perPage });
 
     return (
         <div className="w-full flex flex-col gap-4">
-            <PageHeader title="全市場行情" description={`本頁 ${data.length} 筆`} />
+            <PageHeader title="全市場行情" description={`共 ${total} 筆，本頁 ${data.length} 筆`} />
 
             <form method="get" className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
                 <div className="flex flex-col gap-1">
@@ -96,7 +96,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                         上一頁
                     </a>
                 )}
-                {data.length === perPage && (
+                {/* 有 total 就能精確判斷還有沒有下一頁；靠「本頁剛好滿」猜的話，
+                    最後一頁滿版時會多出一顆按了是空白的「下一頁」 */}
+                {page * perPage < total && (
                     <a
                         href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page + 1}`}
                         className="px-4 py-2 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"

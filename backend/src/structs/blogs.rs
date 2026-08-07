@@ -3,10 +3,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+/// `PUT /admin/blogs/:id` 的 body。
+///
+/// **不收 `tocs`** —— 標題由後端從 `markdown` 解析（`services::blogs::extract_toc_texts`）。
+/// 以前是 client 自己 parse 一份送上來，等於讓呼叫端決定文章標題。
 #[derive(Deserialize, Serialize)]
 pub struct PutBlog {
     pub markdown: String,
-    pub tocs: Vec<Toc>,
     pub tags: Vec<String>,
 }
 
@@ -46,20 +49,6 @@ pub struct DeleteTagQuery {
 #[derive(Serialize)]
 pub struct TagMutationResponse {
     pub affected: u64,
-}
-
-impl PutBlog {
-    /// 提取 tocs 中的 text 字段，返回 Vec<String>
-    pub fn extract_toc_texts(&self) -> Vec<String> {
-        self.tocs.iter().map(|toc| toc.text.clone()).collect()
-    }
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-pub struct Toc {
-    id: String,
-    level: u32,
-    text: String,
 }
 
 #[derive(Serialize, Deserialize, FromRow, Default)]

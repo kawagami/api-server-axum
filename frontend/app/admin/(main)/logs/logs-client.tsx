@@ -26,7 +26,7 @@ const VALID_LEVELS: LevelFilter[] = LEVEL_FILTERS.map(f => f.value);
 const defaultFilters = { level: '' as string };
 
 export default function LogsClient() {
-    const { items: logs, hasMore, isPending, failed, load, loadMore } = usePagedList<Log>(LIMIT);
+    const { items: logs, hasMore, isPending, failed, load, loadMore } = usePagedList<Log>();
     const { initial, write } = useFilterUrl(defaultFilters);
     // URL 是使用者可以亂打的，不在白名單內的 level 一律當成「全部」
     const [level, setLevel] = useState<LevelFilter>(
@@ -34,7 +34,7 @@ export default function LogsClient() {
     );
 
     useEffect(() => {
-        load(async page => (await getLogs({ level: level || undefined, page, per_page: LIMIT })).data);
+        load(page => getLogs({ level: level || undefined, page, per_page: LIMIT }));
         // 初次載入沿用 URL 帶進來的條件；後續改條件走 handleFilterChange
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [load]);
@@ -43,7 +43,7 @@ export default function LogsClient() {
         if (newLevel === level || isPending) return;
         setLevel(newLevel);
         write({ level: newLevel });
-        load(async page => (await getLogs({ level: newLevel || undefined, page, per_page: LIMIT })).data);
+        load(page => getLogs({ level: newLevel || undefined, page, per_page: LIMIT }));
     }
 
     function handleLoadMore() {

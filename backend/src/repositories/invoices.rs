@@ -57,6 +57,11 @@ pub async fn link_ledger_in_tx(
     Ok(row)
 }
 
+/// list 與 count 共用的 WHERE —— 兩邊漂移會讓 total 與實際筆數對不上
+const INVOICE_FILTER: &str = "member_id = $1
+           AND ($2::text IS NULL OR period = $2)
+           AND ($3::bool IS NULL OR (prize_tier IS NOT NULL) = $3)";
+
 pub async fn list(
     pool: &Pool<Postgres>,
     member_id: i64,
@@ -66,9 +71,7 @@ pub async fn list(
 ) -> Result<Vec<Invoice>, AppError> {
     let rows = sqlx::query_as(&format!(
         "SELECT {COLS} FROM invoices
-         WHERE member_id = $1
-           AND ($2::text IS NULL OR period = $2)
-           AND ($3::bool IS NULL OR (prize_tier IS NOT NULL) = $3)
+         WHERE {INVOICE_FILTER}
          ORDER BY invoice_date DESC, created_at DESC
          LIMIT $4 OFFSET $5"
     ))
@@ -80,6 +83,22 @@ pub async fn list(
     .fetch_all(pool)
     .await?;
     Ok(rows)
+}
+
+pub async fn count(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    query: &InvoiceListQuery,
+) -> Result<i64, AppError> {
+    let (total,): (i64,) = sqlx::query_as(&format!(
+        "SELECT COUNT(*) FROM invoices WHERE {INVOICE_FILTER}"
+    ))
+    .bind(member_id)
+    .bind(&query.period)
+    .bind(query.won)
+    .fetch_one(pool)
+    .await?;
+    Ok(total)
 }
 
 pub async fn get_for_member(

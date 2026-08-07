@@ -34,6 +34,10 @@ export interface Invoice {
 export interface InvoiceInput {
   invoice_number: string;
   invoice_date: string;
+  // 對獎期別 YYYYMM（期末偶數月）。只有一維條碼來源讀得到（條碼裡沒有開立日），
+  // 後端拿它跟 invoice_date 推出的期別對帳，不一致回 422 —— 沒有它的話，
+  // 使用者把日期改到別期會靜默拿去對錯期的獎
+  period?: string;
   amount?: string | null;
   seller_tax_id?: string | null;
   source: InvoiceSource;

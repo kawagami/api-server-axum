@@ -346,8 +346,10 @@ async fn send_message(
         RequestError::NotFound
     })?;
 
+    // 事件名一律走 WsEvent enum，不要在這裡手寫字串 ——
+    // 手寫的那份不會出現在 enum 裡，前端對照表也就跟著漏掉（admin_message 原本就是這樣走丟的）
     let payload = crate::structs::ws::envelope(
-        "admin_message",
+        crate::structs::ws::WsEvent::AdminMessage.as_str(),
         serde_json::json!({ "content": params.message, "from": auth_user.name }),
     );
 

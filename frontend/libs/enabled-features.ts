@@ -25,13 +25,20 @@ export type BackendFeatureKey = (typeof BACKEND_FEATURES)[number]["key"];
  * 解析後端 enabled_features 設定值。
  * `null` = 全開（值為 "all"、缺值或壞值 —— 後端 PATCH 已嚴格驗證，fail-open 不擋站）。
  * 回傳陣列而非 Set：要跨 server → client component 邊界（Header props）。
+ *
+ * `GET /settings/public` 現在直接下發**陣列**（後端出站前已 parse）；
+ * 仍吃字串形是為了容忍舊值與後端 parse 失敗時的原樣退回 ——
+ * 這裡若把陣列當成「不是字串」而回 null，商家 instance 會**靜默全開**。
  */
 export function resolveEnabledFeatures(setting: unknown): string[] | null {
-    if (typeof setting !== "string" || setting === "all") return null;
+    const value = typeof setting === "string" && setting !== "all" ? safeParse(setting) : setting;
+    if (!Array.isArray(value)) return null;
+    return value.filter((k): k is string => typeof k === "string");
+}
+
+function safeParse(raw: string): unknown {
     try {
-        const parsed = JSON.parse(setting);
-        if (!Array.isArray(parsed)) return null;
-        return parsed.filter((k): k is string => typeof k === "string");
+        return JSON.parse(raw);
     } catch {
         return null;
     }

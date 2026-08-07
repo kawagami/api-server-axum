@@ -32,6 +32,8 @@ export default function InvoiceRegisterClient({ categories }: Props) {
     // 表單欄位
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [invoiceDate, setInvoiceDate] = useState('');
+    // 只有一維條碼帶得出期別（條碼裡沒有開立日）；空字串 = 這次登錄沒有期別可對帳
+    const [period, setPeriod] = useState('');
     const [amount, setAmount] = useState('');
     const [sellerTaxId, setSellerTaxId] = useState<string | null>(null);
     const [recordAsExpense, setRecordAsExpense] = useState(false);
@@ -45,6 +47,7 @@ export default function InvoiceRegisterClient({ categories }: Props) {
     function resetForm() {
         setInvoiceNumber('');
         setInvoiceDate('');
+        setPeriod('');
         setAmount('');
         setSellerTaxId(null);
         setRecordAsExpense(false);
@@ -76,7 +79,9 @@ export default function InvoiceRegisterClient({ categories }: Props) {
             const r = parseInvoiceBarcode(text);
             if (!r) return false;
             setInvoiceNumber(r.invoiceNumber);
-            setInvoiceDate(r.occurredAt);
+            // 條碼只有期別、沒有開立日：period 是要送給後端的事實，日期只是表單預設值
+            setPeriod(r.period);
+            setInvoiceDate(r.defaultDate);
         }
         setReady(true);
         return true;
@@ -109,6 +114,9 @@ export default function InvoiceRegisterClient({ categories }: Props) {
             const input: InvoiceInput = {
                 invoice_number: number,
                 invoice_date: invoiceDate,
+                // 只有條碼來源讀得到期別；後端拿它跟 invoice_date 對帳，
+                // 使用者把日期改到別期會 422，不會靜默拿去對錯期
+                ...(period ? { period } : {}),
                 amount: amount.trim() || null,
                 seller_tax_id: sellerTaxId,
                 source,

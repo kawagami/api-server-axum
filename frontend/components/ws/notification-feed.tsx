@@ -5,9 +5,9 @@ import PageShell from "@/components/page-shell";
 import PageTitle from "@/components/page-title";
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import type { WsEventType } from "@/types";
+import type { WsNotifyEventType } from "@/types";
 
-const EVENT_TYPES: WsEventType[] = [
+const EVENT_TYPES: WsNotifyEventType[] = [
     'stock_completed',
     'stock_failed',
     'blog_created',
@@ -18,7 +18,7 @@ const EVENT_TYPES: WsEventType[] = [
 
 interface FeedEntry {
     key: number;
-    type: WsEventType;
+    type: WsNotifyEventType;
     data: unknown;
     ts: string;
 }

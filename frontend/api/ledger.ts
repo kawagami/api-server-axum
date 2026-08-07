@@ -1,7 +1,7 @@
 "use server";
 
 import memberRequest from "@/libs/memberRequest";
-import type { LedgerEntry, LedgerInput, LedgerCategories, LedgerSummary } from "@/types";
+import type { LedgerEntry, LedgerInput, LedgerCategories, LedgerSummary, PaginatedResponse } from "@/types";
 
 export interface LedgerListParams {
     kind?: string;
@@ -18,7 +18,7 @@ export async function getLedgerCategories(): Promise<LedgerCategories> {
     });
 }
 
-export async function getLedger(params: LedgerListParams = {}): Promise<LedgerEntry[]> {
+export async function getLedger(params: LedgerListParams = {}): Promise<PaginatedResponse<LedgerEntry>> {
     const qs = new URLSearchParams();
     if (params.kind) qs.set('kind', params.kind);
     if (params.category) qs.set('category', params.category);
@@ -27,9 +27,10 @@ export async function getLedger(params: LedgerListParams = {}): Promise<LedgerEn
     if (params.page) qs.set('page', String(params.page));
     if (params.per_page) qs.set('per_page', String(params.per_page));
     const q = qs.toString();
-    return memberRequest<LedgerEntry[]>({
+    const res = await memberRequest<PaginatedResponse<LedgerEntry>>({
         url: `${process.env.API_URL}/member/ledger${q ? `?${q}` : ''}`,
     });
+    return res ?? { data: [], total: 0 };
 }
 
 export async function getLedgerSummary(params: { from?: string; to?: string } = {}): Promise<LedgerSummary> {

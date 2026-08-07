@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateSetting } from "../settings/actions";
+import { updateSettings } from "../settings/actions";
 
 interface Props {
     initialRpId: string;
@@ -20,8 +20,9 @@ export default function WebauthnSettings({ initialRpId, initialRpOrigin }: Props
 
     const dirty = rpId !== saved.rpId || rpOrigin !== saved.rpOrigin;
 
-    // 配對規則在這裡驗（兩值同表單）：rp_id 必須是 origin hostname 的有效網域。
-    // 後端 PATCH 刻意只驗單值形狀——用另一半現值驗配對會讓「整組換新網域」死鎖存不進去
+    // 配對規則（rp_id 必須是 origin hostname 本身或其上層網域）的權威在後端：
+    // 兩個 key 走同一支批次 PATCH，後端在同一 transaction 內驗最終狀態才寫入。
+    // 這裡保留同一份檢查只是為了即時回饋，不是唯一防線——繞過它後端仍會擋。
     function pairError(id: string, origin: string): string | null {
         let hostname: string;
         try {
@@ -55,12 +56,11 @@ export default function WebauthnSettings({ initialRpId, initialRpOrigin }: Props
 
         setSaving(true);
         try {
-            if (origin !== saved.rpOrigin) {
-                await updateSetting("webauthn_rp_origin", origin);
-            }
-            if (id !== saved.rpId) {
-                await updateSetting("webauthn_rp_id", id);
-            }
+            // 兩個值一起送：分兩次 PATCH 的中間狀態會是互斥的一組，後端不會放行
+            const values: Record<string, string> = {};
+            if (origin !== saved.rpOrigin) values.webauthn_rp_origin = origin;
+            if (id !== saved.rpId) values.webauthn_rp_id = id;
+            await updateSettings(values);
             setSaved({ rpId: id, rpOrigin: origin });
             setSuccess(true);
         } catch (err) {

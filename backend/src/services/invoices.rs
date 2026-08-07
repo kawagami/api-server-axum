@@ -8,6 +8,7 @@ use crate::{
             PeriodDraw,
         },
         ledger::EXPENSE_CATEGORIES,
+        pagination::Paginated,
     },
 };
 use regex::Regex;
@@ -50,6 +51,34 @@ fn expense_fields(req: &InvoiceRequest) -> Result<Option<(Decimal, String)>, App
     Ok(Some((amount, category)))
 }
 
+fn period_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^\d{4}(02|04|06|08|10|12)$").unwrap())
+}
+
+/// 決定這張發票的對獎期別。
+///
+/// 沒帶 `period` 就照舊由 `invoice_date` 推。帶了就當作**對帳用的檢查碼**：
+/// 條碼來源讀得到真正的期別（條碼裡沒有開立日），拿它跟日期推出來的期別比對，
+/// 不一致代表使用者把日期改到別期了 —— 那張發票會被拿去跟錯的期別對獎、
+/// 而且是靜默對不中，所以直接擋下來。
+fn resolve_period(req: &InvoiceRequest) -> Result<String, AppError> {
+    let derived = period_of_date(req.invoice_date);
+    let Some(claimed) = req.period.as_deref().map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(derived);
+    };
+    if !period_re().is_match(claimed) {
+        return Err(unprocessable("period 格式須為 YYYYMM 且月份為期末偶數月，如 202608"));
+    }
+    if claimed != derived {
+        return Err(unprocessable(&format!(
+            "invoice_date（{}）不屬於 period {claimed}",
+            req.invoice_date
+        )));
+    }
+    Ok(derived)
+}
+
 /// 登錄發票（前門）；record_as_expense 時一併建 ledger 並連結
 pub async fn register(
     pool: &Pool<Postgres>,
@@ -75,7 +104,7 @@ pub async fn register(
     }
 
     let expense = expense_fields(req)?;
-    let period = period_of_date(req.invoice_date);
+    let period = resolve_period(req)?;
 
     // 三次寫入（invoices → ledger_entries → 回寫 ledger_entry_id）包同一 transaction：
     // 中途失敗若各自 commit，會留下孤兒 ledger 支出 + ledger_entry_id 為 NULL 的發票，
@@ -109,13 +138,18 @@ pub async fn list(
     pool: &Pool<Postgres>,
     member_id: i64,
     query: &InvoiceListQuery,
-) -> Result<Vec<Invoice>, AppError> {
+) -> Result<Paginated<Invoice>, AppError> {
     let page = crate::structs::pagination::PageQuery {
         page: query.page,
         per_page: query.per_page,
     };
     let (limit, offset) = page.to_limit_offset(50);
-    invoices_repo::list(pool, member_id, query, limit, offset).await
+    // count 與 list 併發跑：序列 await 是白吃一倍延遲（範本同 services/logs.rs）
+    let (data, total) = tokio::try_join!(
+        invoices_repo::list(pool, member_id, query, limit, offset),
+        invoices_repo::count(pool, member_id, query),
+    )?;
+    Ok(Paginated::new(data, total))
 }
 
 pub async fn get(pool: &Pool<Postgres>, id: Uuid, member_id: i64) -> Result<Invoice, AppError> {
@@ -177,6 +211,7 @@ mod tests {
         InvoiceRequest {
             invoice_number: "AB12345678".to_string(),
             invoice_date: NaiveDate::from_ymd_opt(2026, 7, 1).unwrap(),
+            period: None,
             amount: amount.map(Decimal::from),
             seller_tax_id: None,
             source: "manual".to_string(),
@@ -205,6 +240,37 @@ mod tests {
     #[test]
     fn expense_without_amount_is_rejected() {
         assert!(expense_fields(&req(true, None, Some("food"))).is_err());
+    }
+
+    /// period 是條碼來源唯一讀得到的真事實（條碼裡沒有開立日）。
+    /// 拿它跟 invoice_date 推出的期別對帳，才不會因為使用者改了日期就跑去對錯期
+    #[test]
+    fn period_defaults_to_the_one_derived_from_invoice_date() {
+        // 2026-07-01 屬於 2026 年 7-8 月期 → 202608
+        assert_eq!(resolve_period(&req(false, None, None)).unwrap(), "202608");
+    }
+
+    #[test]
+    fn matching_period_is_accepted() {
+        let mut r = req(false, None, None);
+        r.period = Some("202608".to_string());
+        assert_eq!(resolve_period(&r).unwrap(), "202608");
+    }
+
+    #[test]
+    fn period_from_another_term_is_rejected() {
+        let mut r = req(false, None, None);
+        r.period = Some("202606".to_string());
+        assert!(resolve_period(&r).is_err());
+    }
+
+    #[test]
+    fn malformed_period_is_rejected() {
+        for bad in ["2026-08", "202607", "20268", "abc", "202613"] {
+            let mut r = req(false, None, None);
+            r.period = Some(bad.to_string());
+            assert!(resolve_period(&r).is_err(), "{bad} 應被擋下");
+        }
     }
 
     #[test]

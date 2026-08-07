@@ -19,6 +19,22 @@ export async function updateSetting(key: string, value: string): Promise<Setting
     return response;
 }
 
+/**
+ * 一次更新多個 key（後端同 transaction、全過才寫）。
+ * 用在「互相約束的設定組」—— 逐 key PATCH 的中間狀態必然違反不變式，
+ * 後端會擋（如 webauthn_rp_id / webauthn_rp_origin 整組換網域）。
+ */
+export async function updateSettings(values: Record<string, string>): Promise<Setting[]> {
+    const response = await adminRequest<Setting[]>({
+        url: `${process.env.API_URL}/admin/settings`,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ values }),
+    });
+    revalidatePath("/admin/settings");
+    return response;
+}
+
 /** 改全站主題：PATCH 後失效整站 layout cache，讓 getPublicSettings 立即重抓 */
 export async function updateSiteTheme(theme: string): Promise<Setting> {
     const response = await updateSetting("site_theme", theme);

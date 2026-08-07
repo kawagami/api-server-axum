@@ -38,7 +38,7 @@ export default function MetricsAuditPanel({
     to: string;
     onClear: () => void;
 }) {
-    const { items: logs, hasMore, isPending, failed, load, loadMore } = usePagedList<AuditLog>(LIMIT);
+    const { items: logs, total, hasMore, isPending, failed, load, loadMore } = usePagedList<AuditLog>();
 
     useEffect(() => {
         load(page => getAuditLogs({ from, to, page, per_page: LIMIT }));
@@ -53,7 +53,8 @@ export default function MetricsAuditPanel({
                     </h2>
                     <p className="text-xs text-neutral-400 dark:text-neutral-500 tabular-nums">
                         {fmtRange.format(new Date(from))} – {fmtRange.format(new Date(to))}
-                        {logs.length > 0 && `・${logs.length}${hasMore ? "+" : ""} 筆`}
+                        {/* 端點回 total，不必再用「已載入筆數 +」暗示可能還有 */}
+                        {total > 0 && `・${total} 筆`}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">

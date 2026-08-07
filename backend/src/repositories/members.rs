@@ -22,6 +22,13 @@ pub async fn get_members(
     Ok(members)
 }
 
+pub async fn count_members(pool: &Pool<Postgres>) -> Result<i64, AppError> {
+    let (total,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM members")
+        .fetch_one(pool)
+        .await?;
+    Ok(total)
+}
+
 pub async fn get_member_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<MemberDetail>, AppError> {
     let member: Option<Member> = sqlx::query_as(
         "SELECT id, name, email, avatar_url, created_at FROM members WHERE id = $1",

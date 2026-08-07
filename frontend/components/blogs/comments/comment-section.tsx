@@ -16,7 +16,7 @@ type ErrorKey = "empty" | "rateLimit" | "invalid" | "failed";
 export default function CommentSection({ blogId, isMember }: { blogId: string; isMember: boolean }) {
     const t = useTranslations("BlogComments");
     const { items: comments, hasMore, isPending, failed, load, loadMore, setItems } =
-        usePagedList<BlogComment>(LIMIT);
+        usePagedList<BlogComment>();
     const [content, setContent] = useState("");
     const [name, setName] = useState("");
     const [submitting, setSubmitting] = useState(false);
@@ -27,7 +27,7 @@ export default function CommentSection({ blogId, isMember }: { blogId: string; i
         load(async page => {
             const res = await getBlogComments(blogId, page, LIMIT);
             setLoaded(true);
-            return res.data;
+            return res;
         });
     }, [load, blogId]);
 

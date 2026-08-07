@@ -15,16 +15,19 @@ export const DEFAULT_IMAGE_COMPRESS: ImageCompressConfig = {
     maxEdge: 2560,
 };
 
-function toInt(value: string | undefined, fallback: number, min: number, max: number): number {
-    const n = Number(value);
+// 後端已把值轉成布林/數字；仍容忍字串形（設定是 runtime 可改的，壞值不該讓頁面掛掉）
+function toInt(value: unknown, fallback: number, min: number, max: number): number {
+    const n = typeof value === 'number' ? value : Number(value);
     if (!Number.isInteger(n) || n < min || n > max) return fallback;
     return n;
 }
 
 /** 從公開設定收斂出前端壓縮設定;任何欄位缺失或不合法都退回預設。 */
 export function resolveImageCompressConfig(s: PublicSettings): ImageCompressConfig {
+    const compress = s.image_client_compress;
     return {
-        enabled: s.image_client_compress !== 'false', // 只有明確 "false" 才關閉
+        // 只有明確的 false 才關閉；缺值或壞值一律維持開啟
+        enabled: compress !== false && compress !== 'false',
         quality: toInt(s.image_client_quality, DEFAULT_IMAGE_COMPRESS.quality, 1, 100),
         maxEdge: toInt(s.image_client_max_edge, DEFAULT_IMAGE_COMPRESS.maxEdge, 64, 16383),
     };

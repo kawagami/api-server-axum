@@ -73,7 +73,7 @@ export default async function AdminDashboardPage() {
 
     const stats: Stat[] = [
         { label: "文章", value: blogs?.total ?? null, href: "/admin/blogs", icon: FileText, permission: "blog:read", feature: "blog" },
-        { label: "會員", value: members?.length ?? null, href: "/admin/members", icon: Users, permission: "member:read" },
+        { label: "會員", value: members?.total ?? null, href: "/admin/members", icon: Users, permission: "member:read" },
         {
             label: "圖片",
             value: images?.length ?? null,

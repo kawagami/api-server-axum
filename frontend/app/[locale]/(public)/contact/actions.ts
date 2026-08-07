@@ -1,6 +1,7 @@
 "use server";
 
 import { postContactMessage } from "@/api/contact";
+import { apiErrorStatus } from "@/libs/api-error";
 
 export interface ContactFormState {
     status: "success" | "error" | null;
@@ -28,9 +29,15 @@ export async function submitMessageAction(
         });
         return { status: "success", messageKey: "success" };
     } catch (e) {
-        const msg = e instanceof Error ? e.message : "";
-        if (msg.includes("429")) return { status: "error", messageKey: "rateLimit" };
-        if (msg.includes("422")) return { status: "error", messageKey: "invalid" };
-        return { status: "error", messageKey: "failed" };
+        // 用真正的狀態碼判斷。原本是比對錯誤訊息字串（`msg.includes("429")`），
+        // 因為當時 fetchApi 不附 status —— 那種寫法在訊息改文案的當下就靜默失效
+        switch (apiErrorStatus(e)) {
+            case 429:
+                return { status: "error", messageKey: "rateLimit" };
+            case 422:
+                return { status: "error", messageKey: "invalid" };
+            default:
+                return { status: "error", messageKey: "failed" };
+        }
     }
 }

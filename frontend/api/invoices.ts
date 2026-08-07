@@ -1,18 +1,19 @@
 "use server";
 
 import memberRequest from "@/libs/memberRequest";
-import type { Invoice, InvoiceInput, InvoiceListParams, InvoiceDraw, InvoiceDrawParams } from "@/types";
+import type { Invoice, InvoiceInput, InvoiceListParams, InvoiceDraw, InvoiceDrawParams, PaginatedResponse } from "@/types";
 
-export async function getInvoices(params: InvoiceListParams = {}): Promise<Invoice[]> {
+export async function getInvoices(params: InvoiceListParams = {}): Promise<PaginatedResponse<Invoice>> {
     const qs = new URLSearchParams();
     if (params.period) qs.set('period', params.period);
     if (params.won !== undefined) qs.set('won', String(params.won));
     if (params.page) qs.set('page', String(params.page));
     if (params.per_page) qs.set('per_page', String(params.per_page));
     const q = qs.toString();
-    return memberRequest<Invoice[]>({
+    const res = await memberRequest<PaginatedResponse<Invoice>>({
         url: `${process.env.API_URL}/member/invoices${q ? `?${q}` : ''}`,
     });
+    return res ?? { data: [], total: 0 };
 }
 
 export async function getInvoice(id: string): Promise<Invoice> {

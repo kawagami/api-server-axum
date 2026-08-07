@@ -22,3 +22,25 @@ pub async fn update(pool: &Pool<Postgres>, key: &str, value: &str) -> Result<App
         .await?,
     )
 }
+
+/// 一個 transaction 內更新多個 key —— 讓「兩個值互相約束」的設定組（webauthn_rp_id /
+/// webauthn_rp_origin）能一次換掉，不會中途留下互斥的一半。回傳順序同輸入。
+pub async fn update_many(
+    pool: &Pool<Postgres>,
+    updates: &[(String, String)],
+) -> Result<Vec<AppSetting>, AppError> {
+    let mut tx = pool.begin().await?;
+    let mut out = Vec::with_capacity(updates.len());
+    for (key, value) in updates {
+        let setting: AppSetting = sqlx::query_as(
+            "UPDATE app_settings SET value = $2 WHERE key = $1 RETURNING key, value, description, category",
+        )
+        .bind(key)
+        .bind(value)
+        .fetch_one(&mut *tx)
+        .await?;
+        out.push(setting);
+    }
+    tx.commit().await?;
+    Ok(out)
+}

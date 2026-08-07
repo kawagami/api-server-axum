@@ -21,7 +21,7 @@ export default async function InvoicesPage() {
         <PageShell className="flex flex-col gap-6">
             <PageTitle title={t('myInvoicesTitle')} />
             <InvoiceNav />
-            <InvoiceListClient initialEntries={entries} />
+            <InvoiceListClient initialPage={entries} />
         </PageShell>
     );
 }

@@ -1,9 +1,12 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::ledger as ledger_repo,
-    structs::ledger::{
-        CategoryList, CategoryOption, LedgerEntry, LedgerListQuery, LedgerRequest, LedgerSummary,
-        SummaryQuery, EXPENSE_CATEGORIES, INCOME_CATEGORIES,
+    structs::{
+        ledger::{
+            CategoryList, CategoryOption, LedgerEntry, LedgerListQuery, LedgerRequest,
+            LedgerSummary, SummaryQuery, EXPENSE_CATEGORIES, INCOME_CATEGORIES,
+        },
+        pagination::Paginated,
     },
 };
 use chrono::NaiveDate;
@@ -68,13 +71,18 @@ pub async fn list(
     pool: &Pool<Postgres>,
     member_id: i64,
     query: &LedgerListQuery,
-) -> Result<Vec<LedgerEntry>, AppError> {
+) -> Result<Paginated<LedgerEntry>, AppError> {
     let page = crate::structs::pagination::PageQuery {
         page: query.page,
         per_page: query.per_page,
     };
     let (limit, offset) = page.to_limit_offset(50);
-    ledger_repo::get_by_member(pool, member_id, query, limit, offset).await
+    // count 與 list 併發跑：序列 await 是白吃一倍延遲（範本同 services/logs.rs）
+    let (data, total) = tokio::try_join!(
+        ledger_repo::get_by_member(pool, member_id, query, limit, offset),
+        ledger_repo::count_by_member(pool, member_id, query),
+    )?;
+    Ok(Paginated::new(data, total))
 }
 
 pub async fn create(

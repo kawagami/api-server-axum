@@ -6,12 +6,13 @@ import { Link } from "@/i18n/navigation";
 import { Trash2, Loader2, QrCode, ScanBarcode, Keyboard, Trophy, Plus, X } from "lucide-react";
 import { getInvoices, deleteInvoice } from "@/api/invoices";
 import usePagedList from "@/hooks/usePagedList";
-import type { Invoice, InvoiceSource, PrizeTier } from "@/types";
+import type { Invoice, InvoiceSource, PaginatedResponse, PrizeTier } from "@/types";
 
 const PER_PAGE = 50;
 
 interface Props {
-    initialEntries: Invoice[];
+    /** server 端抓好的第 1 頁（整包，含 total） */
+    initialPage: PaginatedResponse<Invoice>;
     lockWon?: boolean; // 我的中獎頁鎖 won=true、隱藏 filter
 }
 
@@ -40,13 +41,14 @@ function fmtAmount(s: string | null) {
     return Number(s).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-export default function InvoiceListClient({ initialEntries, lockWon = false }: Props) {
+export default function InvoiceListClient({ initialPage, lockWon = false }: Props) {
     const t = useTranslations('Invoices');
     const locale = useLocale();
     const dateFmt = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Taipei' });
 
-    const { items: entries, setItems: setEntries, hasMore, isPending, failed, load, loadMore } = usePagedList<Invoice>(PER_PAGE, {
-        items: initialEntries,
+    const { items: entries, setItems: setEntries, hasMore, isPending, failed, load, loadMore } = usePagedList<Invoice>({
+        items: initialPage.data,
+        total: initialPage.total,
         fetcher: page => getInvoices({ won: lockWon ? true : undefined, page, per_page: PER_PAGE }),
     });
     const [period, setPeriod] = useState('');

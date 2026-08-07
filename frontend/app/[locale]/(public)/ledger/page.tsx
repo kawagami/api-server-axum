@@ -35,7 +35,7 @@ export default async function LedgerPage() {
                     </Link>
                 }
             />
-            <LedgerClient categories={categories} initialEntries={entries} initialSummary={summary} />
+            <LedgerClient categories={categories} initialPage={entries} initialSummary={summary} />
         </PageShell>
     );
 }

@@ -74,7 +74,7 @@ async fn stock_day_all(
     State(state): State<AppState>,
     Query(payload): Query<GetStockDayAll>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<Vec<StockDayAll>>, AppError> {
+) -> Result<Json<Paginated<StockDayAll>>, AppError> {
     auth_user.require_permission(Perm::StockRead)?;
     let (limit, offset) = page.to_limit_offset(100);
     Ok(Json(stocks_service::get_stock_day_all_list(state.get_pool(), payload, limit, offset).await?))

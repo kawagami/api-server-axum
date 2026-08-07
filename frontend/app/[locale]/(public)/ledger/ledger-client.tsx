@@ -8,13 +8,14 @@ import usePagedList from "@/hooks/usePagedList";
 import LedgerForm from "./ledger-form";
 import InvoiceImportModal from "./invoice-import-modal";
 import { CategoryPie, MonthlyBars } from "./ledger-charts";
-import type { LedgerEntry, LedgerInput, LedgerSummary, LedgerCategories, LedgerKind } from "@/types";
+import type { LedgerEntry, LedgerInput, LedgerSummary, LedgerCategories, LedgerKind, PaginatedResponse } from "@/types";
 
 const PER_PAGE = 50;
 
 interface Props {
     categories: LedgerCategories;
-    initialEntries: LedgerEntry[];
+    /** server 端抓好的第 1 頁（整包，含 total） */
+    initialPage: PaginatedResponse<LedgerEntry>;
     initialSummary: LedgerSummary;
 }
 
@@ -49,10 +50,11 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
     );
 }
 
-export default function LedgerClient({ categories, initialEntries, initialSummary }: Props) {
+export default function LedgerClient({ categories, initialPage, initialSummary }: Props) {
     const t = useTranslations('Ledger');
-    const { items: entries, hasMore, isPending, failed, load, loadMore } = usePagedList<LedgerEntry>(PER_PAGE, {
-        items: initialEntries,
+    const { items: entries, hasMore, isPending, failed, load, loadMore } = usePagedList<LedgerEntry>({
+        items: initialPage.data,
+        total: initialPage.total,
         fetcher: page => getLedger({ kind: '', category: '', from: '', to: '', page, per_page: PER_PAGE }),
     });
     const [summary, setSummary] = useState<LedgerSummary>(initialSummary);

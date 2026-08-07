@@ -9,6 +9,7 @@ use crate::{
             TicketListQuery,
         },
         members::AuthenticatedMember,
+        pagination::Paginated,
     },
 };
 use axum::{
@@ -42,7 +43,7 @@ async fn list(
     Extension(auth_member): Extension<AuthenticatedMember>,
     State(state): State<AppState>,
     Query(query): Query<TicketListQuery>,
-) -> Result<Json<Vec<Ticket>>, AppError> {
+) -> Result<Json<Paginated<Ticket>>, AppError> {
     Ok(Json(
         lotto_service::list(state.get_pool(), auth_member.member_id, &query).await?,
     ))

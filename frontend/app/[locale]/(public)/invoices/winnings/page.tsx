@@ -21,7 +21,7 @@ export default async function InvoiceWinningsPage() {
         <PageShell className="flex flex-col gap-6">
             <PageTitle title={t('winningsTitle')} />
             <InvoiceNav />
-            <InvoiceListClient initialEntries={entries} lockWon />
+            <InvoiceListClient initialPage={entries} lockWon />
         </PageShell>
     );
 }

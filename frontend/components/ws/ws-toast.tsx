@@ -1,7 +1,7 @@
 "use client";
 
 import { useWsNotification } from '@/hooks/useWsNotification';
-import type { WsEventType } from '@/types';
+import type { WsNotifyEventType } from '@/types';
 import { useTranslations } from 'next-intl';
 import { X } from 'lucide-react';
 
@@ -85,7 +85,7 @@ function AdminMessageToast({ data, onDismiss }: ToastItemProps) {
     );
 }
 
-const TOAST_MAP: Record<WsEventType, ToastComponent> = {
+const TOAST_MAP: Record<WsNotifyEventType, ToastComponent> = {
     user_joined: UserJoinedToast,
     user_left: UserLeftToast,
     blog_created: BlogCreatedToast,

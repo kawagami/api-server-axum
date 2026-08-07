@@ -28,6 +28,12 @@ pub struct Invoice {
 pub struct InvoiceRequest {
     pub invoice_number: String,
     pub invoice_date: NaiveDate,
+    /// 對獎期別 `YYYYMM`（期末偶數月），可省略。
+    ///
+    /// 一維條碼裡**只有期別、沒有開立日**，`invoice_date` 是使用者在表單上確認的。
+    /// 條碼來源把讀到的期別一併送上來，後端拿它跟 `invoice_date` 推出的期別對帳：
+    /// 使用者把日期改到別期時會 422，而不是靜默拿去跟錯的期別對獎。
+    pub period: Option<String>,
     pub amount: Option<Decimal>,
     pub seller_tax_id: Option<String>,
     pub source: String,

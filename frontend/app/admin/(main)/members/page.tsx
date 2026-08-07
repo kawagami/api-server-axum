@@ -12,11 +12,11 @@ export const metadata: Metadata = {
 };
 
 export default async function MembersPage() {
-    const members = await getMembers();
+    const { data: members, total } = await getMembers();
 
     return (
         <div className="w-full flex flex-col gap-4">
-            <PageHeader title="會員列表" description={`共 ${members.length} 位會員`} />
+            <PageHeader title="會員列表" description={`共 ${total} 位會員`} />
             <AdminTableContainer stickyHead>
                 <AdminTable>
                     <thead>

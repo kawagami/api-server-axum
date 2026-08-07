@@ -3,38 +3,57 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use sqlx::{Pool, Postgres, QueryBuilder};
 
-pub async fn get_stock_day_all(
-    pool: &Pool<Postgres>,
-    stock_code: Option<String>,
-    trade_date: Option<NaiveDate>,
-    limit: i64,
-    offset: i64,
-) -> Result<Vec<StockDayAll>, AppError> {
-    let mut builder = QueryBuilder::new("SELECT * FROM stock_day_all");
+/// list 與 count 共用的 WHERE —— 兩邊漂移會讓 total 與實際筆數對不上
+fn push_day_all_filter(
+    builder: &mut QueryBuilder<'_, Postgres>,
+    stock_code: &Option<String>,
+    trade_date: &Option<NaiveDate>,
+) {
+    if stock_code.is_none() && trade_date.is_none() {
+        return;
+    }
+    builder.push(" WHERE ");
 
     let mut has_where = false;
-
-    if stock_code.is_some() || trade_date.is_some() {
-        builder.push(" WHERE ");
-    }
-
     if let Some(code) = stock_code {
-        builder.push("stock_code = ").push_bind(code);
+        builder.push("stock_code = ").push_bind(code.clone());
         has_where = true;
     }
-
     if let Some(date) = trade_date {
         if has_where {
             builder.push(" AND ");
         }
-        builder.push("trade_date = ").push_bind(date);
+        builder.push("trade_date = ").push_bind(*date);
     }
+}
+
+pub async fn get_stock_day_all(
+    pool: &Pool<Postgres>,
+    stock_code: &Option<String>,
+    trade_date: &Option<NaiveDate>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<StockDayAll>, AppError> {
+    let mut builder = QueryBuilder::new("SELECT * FROM stock_day_all");
+    push_day_all_filter(&mut builder, stock_code, trade_date);
 
     builder.push(" ORDER BY trade_date DESC, stock_code ASC");
     builder.push(" LIMIT ").push_bind(limit);
     builder.push(" OFFSET ").push_bind(offset);
 
     Ok(builder.build_query_as::<StockDayAll>().fetch_all(pool).await?)
+}
+
+pub async fn count_stock_day_all(
+    pool: &Pool<Postgres>,
+    stock_code: &Option<String>,
+    trade_date: &Option<NaiveDate>,
+) -> Result<i64, AppError> {
+    let mut builder = QueryBuilder::new("SELECT COUNT(*) FROM stock_day_all");
+    push_day_all_filter(&mut builder, stock_code, trade_date);
+
+    let (total,): (i64,) = builder.build_query_as().fetch_one(pool).await?;
+    Ok(total)
 }
 
 pub async fn get_stock_name_by_code(

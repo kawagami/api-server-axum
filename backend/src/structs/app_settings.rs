@@ -13,3 +13,9 @@ pub struct AppSetting {
 pub struct UpdateSetting {
     pub value: String,
 }
+
+/// 批次更新 body：`{ "values": { key: value, … } }`
+#[derive(Deserialize)]
+pub struct UpdateSettings {
+    pub values: std::collections::BTreeMap<String, String>,
+}

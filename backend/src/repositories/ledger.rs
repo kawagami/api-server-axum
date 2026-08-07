@@ -10,6 +10,13 @@ use uuid::Uuid;
 const COLS: &str = "id, member_id, kind, amount, category, note, occurred_at, \
      invoice_number, seller_tax_id, source, created_at, updated_at";
 
+/// list 與 count 共用的 WHERE —— 兩邊漂移會讓 total 與實際筆數對不上
+const LEDGER_FILTER: &str = "member_id = $1
+           AND ($2::text IS NULL OR kind = $2)
+           AND ($3::text IS NULL OR category = $3)
+           AND ($4::date IS NULL OR occurred_at >= $4)
+           AND ($5::date IS NULL OR occurred_at <= $5)";
+
 pub async fn get_by_member(
     pool: &Pool<Postgres>,
     member_id: i64,
@@ -19,11 +26,7 @@ pub async fn get_by_member(
 ) -> Result<Vec<LedgerEntry>, AppError> {
     let rows = sqlx::query_as(&format!(
         "SELECT {COLS} FROM ledger_entries
-         WHERE member_id = $1
-           AND ($2::text IS NULL OR kind = $2)
-           AND ($3::text IS NULL OR category = $3)
-           AND ($4::date IS NULL OR occurred_at >= $4)
-           AND ($5::date IS NULL OR occurred_at <= $5)
+         WHERE {LEDGER_FILTER}
          ORDER BY occurred_at DESC, created_at DESC
          LIMIT $6 OFFSET $7"
     ))
@@ -37,6 +40,24 @@ pub async fn get_by_member(
     .fetch_all(pool)
     .await?;
     Ok(rows)
+}
+
+pub async fn count_by_member(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    query: &LedgerListQuery,
+) -> Result<i64, AppError> {
+    let (total,): (i64,) = sqlx::query_as(&format!(
+        "SELECT COUNT(*) FROM ledger_entries WHERE {LEDGER_FILTER}"
+    ))
+    .bind(member_id)
+    .bind(&query.kind)
+    .bind(&query.category)
+    .bind(query.from)
+    .bind(query.to)
+    .fetch_one(pool)
+    .await?;
+    Ok(total)
 }
 
 pub async fn create(

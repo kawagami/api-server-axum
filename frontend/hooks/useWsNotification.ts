@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useWsSubscribe } from '@/hooks/useWsSubscribe';
-import type { WsNotification, WsEventType } from '@/types';
+import type { WsNotification, WsNotifyEventType } from '@/types';
 
 export function useWsNotification() {
     const [notifications, setNotifications] = useState<WsNotification[]>([]);
 
-    const addNotification = (type: WsEventType) => (data: unknown) => {
+    const addNotification = (type: WsNotifyEventType) => (data: unknown) => {
         const id = Date.now() + Math.random();
         setNotifications(prev => [...prev, { id, type, data }]);
         setTimeout(() => {

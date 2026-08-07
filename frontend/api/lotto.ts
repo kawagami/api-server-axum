@@ -7,18 +7,20 @@ import type {
     LottoListParams,
     LottoDraw,
     LottoDrawParams,
+    PaginatedResponse,
 } from "@/types";
 
-export async function getLottoTickets(params: LottoListParams = {}): Promise<LottoTicket[]> {
+export async function getLottoTickets(params: LottoListParams = {}): Promise<PaginatedResponse<LottoTicket>> {
     const qs = new URLSearchParams();
     if (params.game) qs.set('game', params.game);
     if (params.status) qs.set('status', params.status);
     if (params.page) qs.set('page', String(params.page));
     if (params.per_page) qs.set('per_page', String(params.per_page));
     const q = qs.toString();
-    return memberRequest<LottoTicket[]>({
+    const res = await memberRequest<PaginatedResponse<LottoTicket>>({
         url: `${process.env.API_URL}/member/lotto${q ? `?${q}` : ''}`,
     });
+    return res ?? { data: [], total: 0 };
 }
 
 export async function getLottoTicket(id: string): Promise<LottoTicket> {

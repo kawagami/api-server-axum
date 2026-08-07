@@ -14,12 +14,12 @@ const LIMIT = 50;
 
 export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
     const { items: messages, hasMore, isPending, failed, load, loadMore, setItems } =
-        usePagedList<ContactMessage>(LIMIT);
+        usePagedList<ContactMessage>();
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     useEffect(() => {
-        load(async page => (await getContactMessages(page, LIMIT)).data);
+        load(page => getContactMessages(page, LIMIT));
     }, [load]);
 
     async function handleDelete(id: number) {

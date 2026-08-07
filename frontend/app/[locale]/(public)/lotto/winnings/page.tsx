@@ -21,7 +21,7 @@ export default async function LottoWinningsPage() {
         <PageShell className="flex flex-col gap-6">
             <PageTitle title={t('winningsTitle')} />
             <LottoNav />
-            <LottoListClient initialEntries={entries} lockWon />
+            <LottoListClient initialPage={entries} lockWon />
         </PageShell>
     );
 }

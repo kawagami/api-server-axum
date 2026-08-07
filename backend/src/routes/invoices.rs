@@ -9,6 +9,7 @@ use crate::{
             NotifyPrefResponse, PeriodDraw,
         },
         members::AuthenticatedMember,
+        pagination::Paginated,
     },
 };
 use axum::{
@@ -42,7 +43,7 @@ async fn list(
     Extension(auth_member): Extension<AuthenticatedMember>,
     State(state): State<AppState>,
     Query(query): Query<InvoiceListQuery>,
-) -> Result<Json<Vec<Invoice>>, AppError> {
+) -> Result<Json<Paginated<Invoice>>, AppError> {
     Ok(Json(
         invoices_service::list(state.get_pool(), auth_member.member_id, &query).await?,
     ))

@@ -47,7 +47,7 @@ function toLocalInput(iso: string | null | undefined): string {
 }
 
 export default function AuditLogsClient() {
-    const { items: logs, setItems: setLogs, hasMore, isPending, failed, load, loadMore } = usePagedList<AuditLog>(LIMIT);
+    const { items: logs, setItems: setLogs, hasMore, isPending, failed, load, loadMore } = usePagedList<AuditLog>();
     const { initial, write } = useFilterUrl(defaultFilters);
     // 條件全部可從 URL 帶入（供 /admin/metrics 選區跳轉、重新整理、貼連結）；只在首次渲染讀一次。
     // from / to 在 URL 上是 ISO，輸入框吃的是 datetime-local，兩邊各自轉換
@@ -79,7 +79,7 @@ export default function AuditLogsClient() {
             try {
                 const fresh = await getAuditLogs({ ...toQuery(appliedFiltersRef.current), page: 1, per_page: LIMIT });
                 const existingIds = new Set(logsRef.current.map(l => l.id));
-                const newEntries = fresh.filter(l => !existingIds.has(l.id));
+                const newEntries = fresh.data.filter(l => !existingIds.has(l.id));
                 if (newEntries.length > 0) {
                     setLogs(prev => [...newEntries, ...prev]);
                 }

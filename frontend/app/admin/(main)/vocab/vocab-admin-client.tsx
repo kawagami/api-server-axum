@@ -33,21 +33,16 @@ function toParams(f: Filters) {
 }
 
 export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) {
-    const { items: words, setItems, hasMore, isPending, failed, load, loadMore } = usePagedList<AdminVocabWord>(LIMIT);
+    const { items: words, setItems, total, hasMore, isPending, failed, load, loadMore } = usePagedList<AdminVocabWord>();
     const { initial, write } = useFilterUrl(defaultFilters);
     const [filters, setFilters] = useState<Filters>(initial);
-    const [total, setTotal] = useState(0);
     const [editing, setEditing] = useState<AdminVocabWord | null>(null);
     const [savingId, setSavingId] = useState<number | null>(null);
 
     /** 查詢並把條件寫回 URL（重新整理 / 貼連結不掉查詢） */
     const search = useCallback((f: Filters) => {
         write(f);
-        load(async page => {
-            const res = await getAdminVocabWords({ ...toParams(f), page, per_page: LIMIT });
-            setTotal(res.total);
-            return res.data;
-        });
+        load(page => getAdminVocabWords({ ...toParams(f), page, per_page: LIMIT }));
     }, [load, write]);
 
     // 初次載入沿用 URL 帶進來的條件

@@ -3,7 +3,7 @@ use crate::{
     services::app_settings as settings_service,
     state::AppState,
     structs::{
-        app_settings::{AppSetting, UpdateSetting},
+        app_settings::{AppSetting, UpdateSetting, UpdateSettings},
         auth::AuthenticatedUser,
         roles::Perm,
     },
@@ -19,7 +19,7 @@ pub fn new(state: AppState) -> Router<AppState> {
     super::with_auth(
         state,
         Router::new()
-            .route("/", get(list_settings))
+            .route("/", get(list_settings).patch(update_many))
             .route("/{key}", patch(update)),
     )
 }
@@ -29,7 +29,7 @@ pub fn public() -> Router<AppState> {
     Router::new().route("/public", get(public_settings))
 }
 
-async fn public_settings(State(state): State<AppState>) -> Json<BTreeMap<String, String>> {
+async fn public_settings(State(state): State<AppState>) -> Json<BTreeMap<String, serde_json::Value>> {
     Json(settings_service::get_public(&state.get_settings()))
 }
 
@@ -42,18 +42,39 @@ async fn list_settings(
     Ok(Json(settings_service::get_all(state.get_pool(), include_reserved).await?))
 }
 
+/// 平台保留 key（如 enabled_features）走 platform:update，一般設定走 setting:update
+fn require_update_permission(auth_user: &AuthenticatedUser, key: &str) -> Result<(), AppError> {
+    if settings_service::is_reserved(key) {
+        auth_user.require_permission(Perm::PlatformUpdate)
+    } else {
+        auth_user.require_permission(Perm::SettingUpdate)
+    }
+}
+
 async fn update(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Path(key): Path<String>,
     Json(payload): Json<UpdateSetting>,
 ) -> Result<Json<AppSetting>, AppError> {
-    // 平台保留 key（如 enabled_features）走 platform:update，一般設定走 setting:update
-    if settings_service::is_reserved(&key) {
-        auth_user.require_permission(Perm::PlatformUpdate)?;
-    } else {
-        auth_user.require_permission(Perm::SettingUpdate)?;
-    }
+    require_update_permission(&auth_user, &key)?;
     let settings = state.get_settings();
     Ok(Json(settings_service::update(state.get_pool(), &settings, &key, &payload.value).await?))
+}
+
+/// 批次更新多個 key（同 transaction、全過才寫）。
+/// 給「互相約束的設定組」用 —— 逐 key PATCH 換不過去的組合走這支，
+/// 例如 webauthn_rp_id / webauthn_rp_origin 整組換網域。
+async fn update_many(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<AppState>,
+    Json(payload): Json<UpdateSettings>,
+) -> Result<Json<Vec<AppSetting>>, AppError> {
+    for key in payload.values.keys() {
+        require_update_permission(&auth_user, key)?;
+    }
+    let settings = state.get_settings();
+    Ok(Json(
+        settings_service::update_many(state.get_pool(), &settings, &payload.values).await?,
+    ))
 }

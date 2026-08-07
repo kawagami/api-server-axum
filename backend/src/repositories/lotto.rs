@@ -40,6 +40,14 @@ pub async fn create_batch(
     Ok(out)
 }
 
+/// list 與 count 共用的 WHERE —— 兩邊漂移會讓 total 與實際筆數對不上
+const TICKET_FILTER: &str = "member_id = $1
+           AND ($2::text IS NULL OR game = $2)
+           AND ($3::text IS NULL
+                OR ($3 = 'pending' AND checked = false)
+                OR ($3 = 'won' AND prize_tier IS NOT NULL)
+                OR ($3 = 'lost' AND checked = true AND prize_tier IS NULL))";
+
 pub async fn list(
     pool: &Pool<Postgres>,
     member_id: i64,
@@ -49,12 +57,7 @@ pub async fn list(
 ) -> Result<Vec<Ticket>, AppError> {
     let rows = sqlx::query_as(&format!(
         "SELECT {COLS} FROM lotto_tickets
-         WHERE member_id = $1
-           AND ($2::text IS NULL OR game = $2)
-           AND ($3::text IS NULL
-                OR ($3 = 'pending' AND checked = false)
-                OR ($3 = 'won' AND prize_tier IS NOT NULL)
-                OR ($3 = 'lost' AND checked = true AND prize_tier IS NULL))
+         WHERE {TICKET_FILTER}
          ORDER BY created_at DESC
          LIMIT $4 OFFSET $5"
     ))
@@ -66,6 +69,22 @@ pub async fn list(
     .fetch_all(pool)
     .await?;
     Ok(rows)
+}
+
+pub async fn count(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    query: &TicketListQuery,
+) -> Result<i64, AppError> {
+    let (total,): (i64,) = sqlx::query_as(&format!(
+        "SELECT COUNT(*) FROM lotto_tickets WHERE {TICKET_FILTER}"
+    ))
+    .bind(member_id)
+    .bind(&query.game)
+    .bind(&query.status)
+    .fetch_one(pool)
+    .await?;
+    Ok(total)
 }
 
 pub async fn get_for_member(
@@ -138,6 +157,22 @@ pub async fn upsert_draw(pool: &Pool<Postgres>, draw: &Draw) -> Result<(), AppEr
     .execute(pool)
     .await?;
     Ok(())
+}
+
+/// 該彩種在這一天是否真的開過獎。用來放行非標準開獎日（春節等調整期）的登錄，
+/// 標準週幾在 service 層就過了，只有落在這裡才查一次 DB。
+pub async fn draw_exists(
+    pool: &Pool<Postgres>,
+    game: &str,
+    draw_date: NaiveDate,
+) -> Result<bool, AppError> {
+    let exists: Option<(i32,)> =
+        sqlx::query_as("SELECT 1 FROM lotto_draws WHERE game = $1 AND draw_date = $2")
+            .bind(game)
+            .bind(draw_date)
+            .fetch_optional(pool)
+            .await?;
+    Ok(exists.is_some())
 }
 
 pub async fn recent_draws(

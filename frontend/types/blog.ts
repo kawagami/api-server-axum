@@ -1,12 +1,6 @@
 import type { PaginatedResponse } from './pagination';
 
 // Blog
-export interface Toc {
-  id: string;
-  level: number;
-  text: string;
-}
-
 export interface Blog {
   id: string;
   markdown: string;
@@ -26,8 +20,10 @@ export interface TagCount {
 // 但那兩欄只是把 request 參數回抄給 client，全站無人讀，已隨後端一起移除
 export type BlogPaginatedResponse = PaginatedResponse<Blog>;
 
+// PUT /admin/blogs/:id 的 body。**沒有 tocs** ——
+// 標題與目錄由後端從 markdown 解析（services/blogs.rs 的 extract_toc_texts），
+// 原本由編輯器自己 parse 一份送上去，等於讓 client 決定文章標題
 export interface BlogInput {
   markdown: string;
   tags: string[];
-  tocs: Toc[];
 }

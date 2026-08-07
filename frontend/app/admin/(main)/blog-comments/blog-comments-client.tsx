@@ -15,12 +15,12 @@ const LIMIT = 50;
 
 export default function BlogCommentsClient({ canDelete }: { canDelete: boolean }) {
     const { items: comments, hasMore, isPending, failed, load, loadMore, setItems } =
-        usePagedList<BlogComment>(LIMIT);
+        usePagedList<BlogComment>();
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     useEffect(() => {
-        load(async page => (await getAllBlogComments(page, LIMIT)).data);
+        load(page => getAllBlogComments(page, LIMIT));
     }, [load]);
 
     async function handleDelete(id: number) {

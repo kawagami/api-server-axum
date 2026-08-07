@@ -21,14 +21,14 @@ interface Filters {
 const defaultFilters: Filters = { q: '', keyword: '', tender_type: '' };
 
 export default function GovTendersClient() {
-    const { items: tenders, hasMore, isPending, failed, load, loadMore } = usePagedList<GovTender>(LIMIT);
+    const { items: tenders, hasMore, isPending, failed, load, loadMore } = usePagedList<GovTender>();
     const { initial, write } = useFilterUrl(defaultFilters);
     const [filters, setFilters] = useState<Filters>(initial);
     const [types, setTypes] = useState<string[]>([]);
 
     useEffect(() => {
         // 初次載入沿用 URL 帶進來的條件（重新整理 / 貼連結不掉查詢）
-        load(async page => (await getGovTenders({ ...initial, page, per_page: LIMIT })).data);
+        load(page => getGovTenders({ ...initial, page, per_page: LIMIT }));
         getGovTenderTypes().then(setTypes).catch(() => setTypes([]));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [load]);
@@ -36,13 +36,13 @@ export default function GovTendersClient() {
     function handleSearch() {
         if (isPending) return;
         write(filters);
-        load(async page => (await getGovTenders({ ...filters, page, per_page: LIMIT })).data);
+        load(page => getGovTenders({ ...filters, page, per_page: LIMIT }));
     }
 
     function handleReset() {
         setFilters(defaultFilters);
         write(defaultFilters);
-        load(async page => (await getGovTenders({ page, per_page: LIMIT })).data);
+        load(page => getGovTenders({ page, per_page: LIMIT }));
     }
 
     const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";

@@ -21,6 +21,8 @@ pub enum WsEvent {
     TorrentFailed,
     /// metadata 這輪沒找到 peers，還有額度 → 留在 pending 排隊重試
     TorrentRetrying,
+    /// 後台「發訊息給指定連線」的單點推送（非廣播，走 routes/ws.rs 的 say_something_to_someone）
+    AdminMessage,
 }
 
 impl WsEvent {
@@ -35,6 +37,7 @@ impl WsEvent {
             Self::TorrentCompleted => "torrent_completed",
             Self::TorrentFailed => "torrent_failed",
             Self::TorrentRetrying => "torrent_retrying",
+            Self::AdminMessage => "admin_message",
         }
     }
 }

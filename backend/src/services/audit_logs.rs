@@ -1,5 +1,8 @@
-use crate::{errors::AppError, repositories::audit_logs};
-use chrono::{DateTime, Utc};
+use crate::{
+    errors::AppError,
+    repositories::audit_logs,
+    structs::{audit_logs::AuditLogQuery, pagination::Paginated},
+};
 use sqlx::{Pool, Postgres};
 use tokio::sync::mpsc;
 
@@ -64,15 +67,15 @@ async fn flush(pool: &Pool<Postgres>, buf: &mut Vec<AuditEntry>) {
 #[allow(clippy::too_many_arguments)]
 pub async fn get_audit_logs(
     pool: &Pool<Postgres>,
-    user_email: Option<String>,
-    method: Option<String>,
-    path: Option<String>,
-    from: Option<DateTime<Utc>>,
-    to: Option<DateTime<Utc>>,
+    filter: &AuditLogQuery,
     limit: i64,
     offset: i64,
-) -> Result<Vec<AuditLog>, AppError> {
-    audit_logs::get_audit_logs(pool, user_email, method, path, from, to, limit, offset)
-        .await
-        .map_err(AppError::from)
+) -> Result<Paginated<AuditLog>, AppError> {
+    // count 與 list 併發跑：序列 await 是白吃一倍延遲（範本同 services/logs.rs）
+    let (data, total) = tokio::try_join!(
+        audit_logs::get_audit_logs(pool, filter, limit, offset),
+        audit_logs::count_audit_logs(pool, filter),
+    )?;
+
+    Ok(Paginated::new(data, total))
 }

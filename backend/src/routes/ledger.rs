@@ -8,6 +8,7 @@ use crate::{
             CategoryList, LedgerEntry, LedgerListQuery, LedgerRequest, LedgerSummary, SummaryQuery,
         },
         members::AuthenticatedMember,
+        pagination::Paginated,
     },
 };
 use axum::{
@@ -32,7 +33,7 @@ async fn list(
     Extension(auth_member): Extension<AuthenticatedMember>,
     State(state): State<AppState>,
     Query(query): Query<LedgerListQuery>,
-) -> Result<Json<Vec<LedgerEntry>>, AppError> {
+) -> Result<Json<Paginated<LedgerEntry>>, AppError> {
     Ok(Json(
         ledger_service::list(state.get_pool(), auth_member.member_id, &query).await?,
     ))

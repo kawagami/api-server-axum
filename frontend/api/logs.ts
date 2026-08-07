@@ -36,6 +36,7 @@ export interface GetAuditLogsParams {
     per_page?: number;
 }
 
+/** `GET /admin/audit_logs` 回 `{ data, total }`（與 `/logs` 同形） */
 export async function getAuditLogs({
     user_email,
     method,
@@ -44,7 +45,7 @@ export async function getAuditLogs({
     to,
     page = 1,
     per_page = 100,
-}: GetAuditLogsParams = {}): Promise<AuditLog[]> {
+}: GetAuditLogsParams = {}): Promise<PaginatedResponse<AuditLog>> {
     const params = new URLSearchParams();
     if (user_email) params.set('user_email', user_email);
     if (method) params.set('method', method);
@@ -54,7 +55,8 @@ export async function getAuditLogs({
     params.set('page', String(page));
     params.set('per_page', String(per_page));
 
-    return adminRequest<AuditLog[]>({
+    const res = await adminRequest<PaginatedResponse<AuditLog>>({
         url: `${process.env.API_URL}/admin/audit_logs?${params}`,
     });
+    return res ?? { data: [], total: 0 };
 }

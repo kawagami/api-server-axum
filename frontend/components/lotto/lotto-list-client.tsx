@@ -8,12 +8,13 @@ import { getLottoTickets, deleteLottoTicket } from "@/api/lotto";
 import usePagedList from "@/hooks/usePagedList";
 import { GAME_KEY, PRIZE_KEY } from "@/libs/lotto";
 import Balls from "@/components/lotto/balls";
-import type { LottoTicket, LottoSource, LottoGame, LottoStatus } from "@/types";
+import type { LottoTicket, LottoSource, LottoGame, LottoStatus, PaginatedResponse } from "@/types";
 
 const PER_PAGE = 50;
 
 interface Props {
-    initialEntries: LottoTicket[];
+    /** server 端抓好的第 1 頁（整包，含 total） */
+    initialPage: PaginatedResponse<LottoTicket>;
     lockWon?: boolean; // 我的中獎頁鎖 status=won、隱藏 filter
 }
 
@@ -22,13 +23,14 @@ const SOURCE_ICON: Record<LottoSource, typeof QrCode> = {
     manual: Keyboard,
 };
 
-export default function LottoListClient({ initialEntries, lockWon = false }: Props) {
+export default function LottoListClient({ initialPage, lockWon = false }: Props) {
     const t = useTranslations('Lotto');
     const locale = useLocale();
     const dateFmt = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Taipei' });
 
-    const { items: entries, setItems: setEntries, hasMore, isPending, failed, load, loadMore } = usePagedList<LottoTicket>(PER_PAGE, {
-        items: initialEntries,
+    const { items: entries, setItems: setEntries, hasMore, isPending, failed, load, loadMore } = usePagedList<LottoTicket>({
+        items: initialPage.data,
+        total: initialPage.total,
         fetcher: page => getLottoTickets({ status: lockWon ? 'won' : undefined, page, per_page: PER_PAGE }),
     });
     const [game, setGame] = useState<'' | LottoGame>('');

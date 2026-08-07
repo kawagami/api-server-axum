@@ -324,8 +324,13 @@ pub async fn get_stock_day_all_list(
     params: GetStockDayAll,
     limit: i64,
     offset: i64,
-) -> Result<Vec<StockDayAll>, AppError> {
-    stocks_repo::get_stock_day_all(pool, params.stock_code, params.trade_date, limit, offset).await
+) -> Result<Paginated<StockDayAll>, AppError> {
+    // count 與 list 併發跑：序列 await 是白吃一倍延遲（範本同 services/logs.rs）
+    let (data, total) = tokio::try_join!(
+        stocks_repo::get_stock_day_all(pool, &params.stock_code, &params.trade_date, limit, offset),
+        stocks_repo::count_stock_day_all(pool, &params.stock_code, &params.trade_date),
+    )?;
+    Ok(Paginated::new(data, total))
 }
 
 pub async fn get_active_buyback_prices(

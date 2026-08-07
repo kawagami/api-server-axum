@@ -43,6 +43,37 @@ fn extract_image_urls(markdown: &str) -> Vec<String> {
         .collect()
 }
 
+static MD_FENCE_RE: OnceLock<Regex> = OnceLock::new();
+static MD_HEADING_RE: OnceLock<Regex> = OnceLock::new();
+static MD_HEADING_TRAILER_RE: OnceLock<Regex> = OnceLock::new();
+
+/// 從 markdown 抽出各級標題文字（`tocs` 欄位、`tocs[0]` 即文章標題）。
+///
+/// 這件事原本是**前端**做的：編輯器 `blog-component.tsx` 自己 parse 一份 `tocs` 隨
+/// `PUT /admin/blogs/:id` 送上來，後端照單全收。但後端手上就有完整 markdown，
+/// 沒有理由信任 client 算的衍生資料 —— 送不匹配的 tocs 就能讓標題與內文對不上
+/// （標題會進列表卡片、WS 廣播與 SEO title）。改由這裡產生後，
+/// 請求 body 只剩 `{ markdown, tags }`，也不必再要求 client 產出它用不到的 `{id, level}`。
+///
+/// 規則對齊前端顯示端的 `libs/blog-markdown.ts::extractHeadings`（TOC 側欄用的那份）：
+/// 先剝掉 fenced code block（否則程式碼裡的 `# 註解` 會被當標題），
+/// 再去掉行尾的 closing `#`。
+pub fn extract_toc_texts(markdown: &str) -> Vec<String> {
+    let fence = MD_FENCE_RE
+        .get_or_init(|| Regex::new(r"(?s)```.*?```").expect("static regex is always valid"));
+    let heading = MD_HEADING_RE
+        .get_or_init(|| Regex::new(r"(?m)^#{1,6}[ \t]+(.+)$").expect("static regex is always valid"));
+    let trailer = MD_HEADING_TRAILER_RE
+        .get_or_init(|| Regex::new(r"\s+#*\s*$").expect("static regex is always valid"));
+
+    let without_code = fence.replace_all(markdown, "");
+    heading
+        .captures_iter(&without_code)
+        .map(|cap| trailer.replace(cap[1].trim_end(), "").trim().to_string())
+        .filter(|text| !text.is_empty())
+        .collect()
+}
+
 pub async fn get_blogs(
     pool: &Pool<Postgres>,
     page: &PageQuery,
@@ -118,7 +149,7 @@ pub async fn delete_tag(pool: &Pool<Postgres>, owner: Option<i64>, tag: String) 
 }
 
 pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_id: i64) -> Result<String, AppError> {
-    let tocs = blog.extract_toc_texts();
+    let tocs = extract_toc_texts(&blog.markdown);
     let title = tocs.first().cloned().unwrap_or_default();
 
     let old_urls = match blogs_repo::get_blog_by_id(pool, id).await {
@@ -182,7 +213,7 @@ pub async fn delete_blog_with_images(pool: &Pool<Postgres>, id: Uuid) -> Result<
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_tags;
+    use super::{extract_toc_texts, normalize_tags};
 
     fn v(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -206,5 +237,37 @@ mod tests {
     #[test]
     fn preserves_order() {
         assert_eq!(normalize_tags(v(&["b", "a", "c", "A"])), v(&["b", "a", "c"]));
+    }
+
+    #[test]
+    fn extracts_headings_in_document_order() {
+        let md = "# 標題\n\n內文\n\n## 小節 A\n\n### 更小的\n";
+        assert_eq!(extract_toc_texts(md), v(&["標題", "小節 A", "更小的"]));
+    }
+
+    /// tocs[0] 就是文章標題，會進列表卡片 / WS 廣播 / SEO title。
+    /// code block 裡的 `#` 註解若被當成標題，整篇文章的標題就變成一行程式碼註解
+    #[test]
+    fn ignores_hashes_inside_fenced_code_blocks() {
+        let md = "# 真標題\n\n```bash\n# 這是註解不是標題\necho hi\n```\n\n## 真小節\n";
+        assert_eq!(extract_toc_texts(md), v(&["真標題", "真小節"]));
+    }
+
+    #[test]
+    fn strips_closing_hashes_and_trailing_space() {
+        assert_eq!(extract_toc_texts("## 置中式標題 ##\n"), v(&["置中式標題"]));
+        assert_eq!(extract_toc_texts("# 有尾巴空白   \n"), v(&["有尾巴空白"]));
+    }
+
+    /// `#hashtag`（無空白）與 7 個以上的 `#` 都不是 markdown 標題
+    #[test]
+    fn requires_space_and_at_most_six_hashes() {
+        assert!(extract_toc_texts("#沒空白\n").is_empty());
+        assert!(extract_toc_texts("####### 七個井字\n").is_empty());
+    }
+
+    #[test]
+    fn no_headings_yields_empty_title() {
+        assert!(extract_toc_texts("只有內文，沒有任何標題").is_empty());
     }
 }

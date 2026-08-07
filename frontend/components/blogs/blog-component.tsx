@@ -15,16 +15,8 @@ import { compressAndUploadEach } from '@/libs/client-image';
 import { useMarkdownTextarea } from '@/hooks/useMarkdownTextarea';
 import { useBlogDraft } from './useBlogDraft';
 import TagEditorModal from './tag-editor-modal';
-import type { Blog, Toc } from '@/types';
+import type { Blog } from '@/types';
 import type { ImageCompressConfig } from '@/libs/image-config';
-
-function extractTocs(markdown: string): Toc[] {
-    return markdown.match(/^#{1,6}\s+(.+)$/gm)?.map((h, index) => ({
-        id: String(index),
-        level: h.match(/^#+/)![0].length,
-        text: h.replace(/^#{1,6}\s+/, ''),
-    })) || [];
-}
 
 interface Props {
     id: string;
@@ -54,8 +46,8 @@ export default function BlogComponent({ id, blog, allTags, compressConfig }: Pro
         setIsSaving(true);
         setSaveError(null);
         try {
-            const tocs = extractTocs(markdown);
-            await putBlog(id, { markdown, tags, tocs });
+            // tocs（含文章標題）由後端從 markdown 解析，不再由編輯器算好送上去
+            await putBlog(id, { markdown, tags });
             clearDraft();
             router.push('/admin/blogs');
         } catch (err) {

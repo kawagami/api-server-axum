@@ -6,16 +6,20 @@
 //   5–14  (10) 發票字軌號碼（2 大寫英文 + 8 數字）
 //   15–18 (4)  隨機碼
 //
-// 條碼不含開立日期與金額（那些在左方 QR）。對獎只需期別，後端由 invoice_date 反推 period，
-// 故這裡把 occurredAt 取「期末偶數月首日」（必落在該期別內、period 必正確），
-// 使用者可在預覽表單微調確切日期（不影響對獎，只影響選擇記為支出時的記帳日）。
+// 條碼不含開立日期與金額（那些在左方 QR）。**期別才是條碼裡真正有的事實**，
+// 登錄時直接把 period 送給後端（`POST /member/invoices` 的 period 欄）；
+// 後端拿它跟使用者確認的 invoice_date 對帳，改到別期會 422，不會靜默對錯獎。
+// defaultDate 只是表單日期欄的預設值（取期末偶數月首日，必落在該期別內），
+// 使用者可在預覽表單微調確切日期。
 
 export const INVOICE_BARCODE_LEN = 19;
 
 export interface ParsedInvoiceBarcode {
     invoiceNumber: string;
-    period: string;       // 西元 YYYYMM（期末偶數月）
-    occurredAt: string;   // 西元 YYYY-MM-DD（期末偶數月首日）
+    /** 西元 YYYYMM（期末偶數月）—— 條碼裡真正帶的資訊，直接送後端對獎 */
+    period: string;
+    /** 表單日期欄的預設值（西元 YYYY-MM-DD，期末偶數月首日）；條碼本身沒有開立日 */
+    defaultDate: string;
 }
 
 /**
@@ -39,6 +43,6 @@ export function parseInvoiceBarcode(raw: string): ParsedInvoiceBarcode | null {
     return {
         invoiceNumber,
         period: `${year}${mm}`,
-        occurredAt: `${year}-${mm}-01`,
+        defaultDate: `${year}-${mm}-01`,
     };
 }

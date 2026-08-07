@@ -7,17 +7,36 @@ use crate::{
 use sqlx::{Pool, Postgres};
 use std::collections::BTreeMap;
 
-/// 可由無認證端點讀取的設定白名單 — 新增公開設定時在此加 key
-const PUBLIC_KEYS: &[&str] = &[
-    "site_theme",
-    "default_color_mode",
-    "theme_rotation",
-    "home_features",
-    "enabled_features",
+/// 公開設定在 `GET /settings/public` 回應裡的型別。
+///
+/// `app_settings` 的 value 欄是 text，那是**儲存層**的限制，不該滲進 API 契約：
+/// 原本整包回 `{key: string}`，於是 `theme_rotation` / `home_features` /
+/// `enabled_features` 是「JSON 字串包在 JSON 裡」，每個消費端都得自己再 parse 一次
+/// 並各自處理壞值。這裡在出站前轉成該有的型別，前端直接吃。
+#[derive(Clone, Copy)]
+enum PublicKind {
+    /// 原樣輸出字串
+    Text,
+    /// `"true"` / `"false"` → JSON bool
+    Bool,
+    /// 整數字串 → JSON number
+    Int,
+    /// JSON 字面值 → 解析後的物件/陣列；**parse 失敗保留原字串**
+    /// （`enabled_features` 的合法值 `all` 就不是 JSON，靠這條走 Text 路徑）
+    Json,
+}
+
+/// 可由無認證端點讀取的設定白名單 — 新增公開設定時在此加一行（key + 出站型別）
+const PUBLIC_KEYS: &[(&str, PublicKind)] = &[
+    ("site_theme", PublicKind::Text),
+    ("default_color_mode", PublicKind::Text),
+    ("theme_rotation", PublicKind::Json),
+    ("home_features", PublicKind::Json),
+    ("enabled_features", PublicKind::Json),
     // 前端上傳前壓縮參數（image_webp_quality 只後端讀，不公開）
-    "image_client_compress",
-    "image_client_quality",
-    "image_client_max_edge",
+    ("image_client_compress", PublicKind::Bool),
+    ("image_client_quality", PublicKind::Int),
+    ("image_client_max_edge", PublicKind::Int),
 ];
 
 /// 平台保留設定 — 只有 platform:read 能在 GET /admin/settings 看到、platform:update 能改。
@@ -135,9 +154,9 @@ fn validate_enabled_features(value: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// webauthn 設定只驗單值形狀，**不驗兩 key 配對**——用另一半現值驗會讓「整組換新網域」
-/// 先存哪個都 422（死鎖，永遠遷不出預設值）。配對規則（rp_id 是 origin 的有效網域）
-/// 由前端 /admin/platform 存檔前檢查 + Settings::reload 時建構失敗記 error log、instance 設 None。
+/// 這兩支只驗**單值形狀**；兩 key 的配對規則在 `validate_webauthn_pair`。
+/// 拆開是因為逐 key PATCH 的中間狀態必然違反配對，整組換網域會死鎖 ——
+/// 解法是批次端點 `PATCH /admin/settings` 一次寫兩個 key，配對就驗最終狀態。
 fn validate_webauthn_rp_id(value: &str) -> Result<(), AppError> {
     if value.is_empty() || value.contains('/') || value.contains(':') || value.contains(' ') {
         return Err(unprocessable(
@@ -255,11 +274,78 @@ fn validate(key: &str, value: &str) -> Result<(), AppError> {
     }
 }
 
+/// 跨欄位不變式：rp_id 必須是 rp_origin hostname 本身或其上層網域，
+/// 否則 WebAuthn ceremony 一律失敗（等於全站 passkey 登入壞掉）。
+///
+/// 這條規則原本只寫在前端表單（`platform/webauthn-settings.tsx`），後端只驗單值形狀 ——
+/// 直接打 API 就能存進互斥的一組值。之所以當初沒收在後端，是因為「用另一半的現值驗配對」
+/// 會讓整組換新網域死鎖；解法是 `PATCH /admin/settings`（批次）能一次寫兩個 key，
+/// 於是這裡可以無條件檢查最終狀態。
+///
+/// 任一邊為空 = 尚未設定完成（全新安裝），此時不檢查配對，讓管理員能逐一填入。
+fn validate_webauthn_pair(rp_id: &str, rp_origin: &str) -> Result<(), AppError> {
+    if rp_id.is_empty() || rp_origin.is_empty() {
+        return Ok(());
+    }
+    let host = webauthn_rs::prelude::Url::parse(rp_origin)
+        .ok()
+        .and_then(|u| u.host_str().map(String::from));
+    let Some(host) = host else {
+        // 形狀本身的錯誤由 validate_webauthn_rp_origin 負責報，這裡不重複
+        return Ok(());
+    };
+    if host == rp_id || host.ends_with(&format!(".{rp_id}")) {
+        return Ok(());
+    }
+    Err(unprocessable(format!(
+        "webauthn_rp_id（{rp_id}）必須是 webauthn_rp_origin 網域（{host}）本身或其上層網域"
+    )))
+}
+
+/// 套用這批更新後的最終狀態是否自洽。目前只有 webauthn 這一組跨欄位規則。
+fn validate_cross(settings: &Settings, updates: &BTreeMap<String, String>) -> Result<(), AppError> {
+    let effective = |key: &str| -> String {
+        updates
+            .get(key)
+            .cloned()
+            .or_else(|| settings.get(key))
+            .unwrap_or_default()
+    };
+    if updates.contains_key("webauthn_rp_id") || updates.contains_key("webauthn_rp_origin") {
+        validate_webauthn_pair(&effective("webauthn_rp_id"), &effective("webauthn_rp_origin"))?;
+    }
+    Ok(())
+}
+
+/// 把 DB 存的字串轉成出站型別；轉不動一律退回字串（壞值不該讓整個端點壞掉，
+/// 前端各 resolver 本來就有 fallback）
+fn public_value(kind: PublicKind, raw: String) -> serde_json::Value {
+    match kind {
+        PublicKind::Text => serde_json::Value::String(raw),
+        PublicKind::Bool => match raw.as_str() {
+            "true" => serde_json::Value::Bool(true),
+            "false" => serde_json::Value::Bool(false),
+            _ => serde_json::Value::String(raw),
+        },
+        PublicKind::Int => match raw.parse::<i64>() {
+            Ok(n) => serde_json::Value::Number(n.into()),
+            Err(_) => serde_json::Value::String(raw),
+        },
+        PublicKind::Json => {
+            serde_json::from_str(&raw).unwrap_or(serde_json::Value::String(raw))
+        }
+    }
+}
+
 /// 公開設定 — 直接讀記憶體中的 settings map（PATCH 時已自動 reload），不打 DB
-pub fn get_public(settings: &Settings) -> BTreeMap<String, String> {
+pub fn get_public(settings: &Settings) -> BTreeMap<String, serde_json::Value> {
     PUBLIC_KEYS
         .iter()
-        .filter_map(|key| settings.get(key).map(|v| (key.to_string(), v)))
+        .filter_map(|(key, kind)| {
+            settings
+                .get(key)
+                .map(|raw| (key.to_string(), public_value(*kind, raw)))
+        })
         .collect()
 }
 
@@ -290,9 +376,36 @@ pub async fn update(
     value: &str,
 ) -> Result<AppSetting, AppError> {
     validate(key, value)?;
+    let mut one = BTreeMap::new();
+    one.insert(key.to_string(), value.to_string());
+    validate_cross(settings, &one)?;
     let setting = repo::update(pool, key, value).await?;
     settings.reload(pool).await;
     Ok(setting)
+}
+
+/// 批次更新：全部驗證通過（含跨欄位）才在同一 transaction 寫入，最後 reload 一次。
+///
+/// 存在的理由是「互相約束的設定組」—— 逐 key PATCH 時，中間狀態必然違反不變式，
+/// 沒有這支就只能把檢查搬到前端（那等於沒有檢查）。
+pub async fn update_many(
+    pool: &Pool<Postgres>,
+    settings: &Settings,
+    updates: &BTreeMap<String, String>,
+) -> Result<Vec<AppSetting>, AppError> {
+    if updates.is_empty() {
+        return Err(unprocessable("沒有要更新的設定".into()));
+    }
+    for (key, value) in updates {
+        validate(key, value)?;
+    }
+    validate_cross(settings, updates)?;
+
+    let pairs: Vec<(String, String)> =
+        updates.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let written = repo::update_many(pool, &pairs).await?;
+    settings.reload(pool).await;
+    Ok(written)
 }
 
 #[cfg(test)]
@@ -343,8 +456,60 @@ mod tests {
         assert!(validate("webauthn_rp_origin", "ftp://kawa.homes").is_err());
         assert!(validate("webauthn_rp_origin", "").is_err());
 
-        // 不驗配對——整組換新網域時單 key PATCH 不會被另一半現值卡死
+        // 單值 validate 只看形狀，配對交給 validate_webauthn_pair（見下）
         assert!(validate("webauthn_rp_id", "totally-unrelated.example").is_ok());
+    }
+
+    /// `GET /settings/public` 的出站型別：DB 存字串，但契約上該是布林/數字/物件。
+    /// 壞值一律退回字串 —— 前端 resolver 本來就有 fallback，不該讓整個端點噴掉
+    #[test]
+    fn public_values_are_typed_not_stringly() {
+        use serde_json::json;
+
+        assert_eq!(public_value(PublicKind::Text, "forest".into()), json!("forest"));
+        assert_eq!(public_value(PublicKind::Bool, "true".into()), json!(true));
+        assert_eq!(public_value(PublicKind::Bool, "false".into()), json!(false));
+        assert_eq!(public_value(PublicKind::Int, "80".into()), json!(80));
+        assert_eq!(
+            public_value(PublicKind::Json, r#"["blog","vocab"]"#.into()),
+            json!(["blog", "vocab"])
+        );
+        assert_eq!(
+            public_value(PublicKind::Json, r#"{"0":"forest"}"#.into()),
+            json!({"0": "forest"})
+        );
+    }
+
+    #[test]
+    fn unparseable_public_values_fall_back_to_the_raw_string() {
+        use serde_json::json;
+
+        // enabled_features 的合法值 "all" 不是 JSON —— 必須原樣傳出去
+        assert_eq!(public_value(PublicKind::Json, "all".into()), json!("all"));
+        assert_eq!(public_value(PublicKind::Json, "壞掉的值".into()), json!("壞掉的值"));
+        assert_eq!(public_value(PublicKind::Bool, "yes".into()), json!("yes"));
+        assert_eq!(public_value(PublicKind::Int, "abc".into()), json!("abc"));
+    }
+
+    /// 配對規則：rp_id 必須是 origin hostname 本身或其上層網域。
+    /// 這條原本只在前端表單擋，直接打 API 就能存進互斥的一組值 → passkey 全站失效
+    #[test]
+    fn webauthn_pair_must_be_consistent() {
+        assert!(validate_webauthn_pair("kawa.homes", "https://kawa.homes").is_ok());
+        // origin 是子網域、rp_id 是上層 → 合法
+        assert!(validate_webauthn_pair("kawa.homes", "https://www.kawa.homes").is_ok());
+        assert!(validate_webauthn_pair("localhost", "http://localhost:3000").is_ok());
+
+        // 完全不相干
+        assert!(validate_webauthn_pair("kawa.homes", "https://evil.example").is_err());
+        // 方向相反：rp_id 比 origin 更深一層
+        assert!(validate_webauthn_pair("www.kawa.homes", "https://kawa.homes").is_err());
+        // 後綴字串相同但不是網域邊界（kawa.homes vs notkawa.homes）
+        assert!(validate_webauthn_pair("kawa.homes", "https://notkawa.homes").is_err());
+
+        // 任一邊尚未設定 → 不檢查，讓全新安裝能逐一填入
+        assert!(validate_webauthn_pair("", "https://kawa.homes").is_ok());
+        assert!(validate_webauthn_pair("kawa.homes", "").is_ok());
     }
 
     #[test]
