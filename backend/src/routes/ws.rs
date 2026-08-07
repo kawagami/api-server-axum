@@ -86,20 +86,16 @@ async fn ws_handler(
             .flatten(),
         None => None,
     };
-    // 與 middleware/rate_limit.rs 同一條規則：只有確定流量都經 Cloudflare
-    // （TRUST_CF_HEADER=true）才信任這個 header。生產靠 nginx 在 server 層無條件
-    // 覆寫成 $remote_addr 擋著，但不能只有一層 —— 直連 origin 或本地開發時，
-    // 偽造值會進到訪客去重統計、後台連線列表、與 user_joined 廣播。
-    let real_ip = if state.get_config().trust_cf_header {
-        req_headers
-            .get("CF-Connecting-IP")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| addr.ip().to_string())
-    } else {
-        addr.ip().to_string()
-    };
-    tracing::info!("{real_ip} connected ({}) email={:?}", user_agent, user_email);
+    // 與 middleware/rate_limit.rs 同一條規則（同一個函式）：只有確定流量都經 Cloudflare
+    // （TRUST_CF_HEADER=true）才信任這個 header
+    let real_ip = crate::utils::net::client_ip(
+        state.get_config().trust_cf_header,
+        &req_headers,
+        Some(addr.ip()),
+    );
+    // debug：每個訪客一行、且帶 IP / UA / email 個資。連線清單走 GET /ws/connections，
+    // 新連線走 user_joined（只推 admin），這行只是本機開發時的方便，不該進生產 stdout。
+    tracing::debug!("{real_ip} connected ({}) email={:?}", user_agent, user_email);
 
     // 每日不重複到訪統計：以 WS 握手為採集點（天然濾掉不跑 JS 的 bot），
     // 去重元素 = ip|ua。best-effort，不阻塞連線。
@@ -169,7 +165,11 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Error receiving message from {}: {}", who, e);
+                    // debug 不是 warn：這裡幾乎清一色是 "Connection reset without closing
+                    // handshake" —— 關分頁、手機睡眠、NAT 逾時都會產生，是公開網站的常態
+                    // （實測佔了 logs 表 WARN+ 的 45%）。而且斷線後下面照樣走完整清理，
+                    // 沒有任何要人介入的事。真正需要注意的送出失敗另有其他 log。
+                    tracing::debug!("Error receiving message from {}: {}", who, e);
                     break;
                 }
             }
@@ -335,16 +335,16 @@ async fn send_message(
 ) -> Result<Json<serde_json::Value>, AppError> {
     auth_user.require_permission(Perm::WsRead)?;
 
+    // 這兩個分支不另外記 log：錯誤本身已經回給呼叫端，也已經由 errors.rs 統一記下
+    // （帶 request_id），再印一行 info 只是同一件事的第二份，而且 info 不落地 logs 表。
     let socket_addr = params.addr.parse::<SocketAddr>().map_err(|_| {
-        tracing::info!("Invalid socket address format: {}", params.addr);
         RequestError::InvalidContent(format!("無效的連線位址格式：{}", params.addr))
     })?;
 
     let connections = state.get_connections().lock().await;
-    let tracked_conn = connections.get(&socket_addr).ok_or_else(|| {
-        tracing::info!("No connection found for address: {}", params.addr);
-        RequestError::NotFound
-    })?;
+    let tracked_conn = connections
+        .get(&socket_addr)
+        .ok_or(RequestError::NotFound)?;
 
     // 事件名一律走 WsEvent enum，不要在這裡手寫字串 ——
     // 手寫的那份不會出現在 enum 裡，前端對照表也就跟著漏掉（admin_message 原本就是這樣走丟的）

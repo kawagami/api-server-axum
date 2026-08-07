@@ -13,7 +13,8 @@ pub async fn run(state: AppState) {
         match get_active_buyback_prices_filtered(pool, StartPriceFilter::MissingOnly).await {
             Ok(data) => data,
             Err(e) => {
-                tracing::error!("{}", e.to_string());
+                // 同檔其他 error 都帶得出「哪支股票哪一天」，這行原本只有一句裸訊息
+                tracing::error!("get_active_buyback_prices_filtered fail: {}", e);
                 return;
             }
         };

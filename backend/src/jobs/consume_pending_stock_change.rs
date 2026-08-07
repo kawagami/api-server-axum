@@ -27,6 +27,13 @@ pub async fn run(state: AppState) {
             let is_data_error =
                 matches!(&err, AppError::RequestError(RequestError::InvalidContent(_)));
             if is_data_error {
+                // 這一筆從此是 failed（不會再被 pending 迴圈撿起），而失敗的**原因**只存在
+                // 這個 err 裡 —— 不記的話 DB 只剩一個 status=failed，事後查不出為什麼。
+                tracing::warn!(
+                    "stock_change 判定資料錯誤，標記 failed stock_no={} 原因={:?}",
+                    pending_stock.stock_no,
+                    err
+                );
                 if let Err(e) = update_stock_change_failed(pool, &pending_stock).await {
                     tracing::error!("update_stock_change_failed stock_no={}: {:?}", pending_stock.stock_no, e);
                 }

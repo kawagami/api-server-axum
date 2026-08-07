@@ -11,13 +11,14 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Extension, Json, Path, State},
-    http::StatusCode,
+    extract::{ConnectInfo, Extension, Json, Path, State},
+    http::{HeaderMap, StatusCode},
     middleware,
     routing::{delete, get, post},
     Router,
 };
 use serde::Serialize;
+use std::net::SocketAddr;
 use webauthn_rs::prelude::CreationChallengeResponse;
 
 pub fn new(state: AppState) -> Router<AppState> {
@@ -62,10 +63,25 @@ struct MeResponse {
     is_super_admin: bool,
 }
 
+/// 登入是**唯一一支結果不會進 `admin_audit_logs` 的重要端點** —— audit middleware 掛在
+/// `with_auth` 內層，靠 `AuthenticatedUser` extension 認人，而登入時還沒有那個身分。
+/// 所以「誰在什麼時候從哪個 IP 登入成功/失敗」只能靠這裡自己記，否則爆破的痕跡就只剩
+/// 一句沒有帳號也沒有 IP 的 `Authentication error occurred`。
+///
+/// 失敗記 WARN（會落地 `logs` 表），成功記 INFO（預設不落地，調 `log_db_level=INFO`
+/// 才收 —— 平時不需要每次登入都寫一列 DB，要查的時候現場打開即可）。
+/// **密碼一律不進 log**，帳號名進，那是查「被試的是哪個帳號」的必要資訊。
 async fn sign_in(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(user_data): Json<SignInData>,
 ) -> Result<Json<String>, AppError> {
+    let ip = crate::utils::net::client_ip(
+        state.get_config().trust_cf_header,
+        &headers,
+        Some(addr.ip()),
+    );
     let token = auth_service::sign_in(
         state.get_pool(),
         state.get_redis_pool(),
@@ -73,7 +89,11 @@ async fn sign_in(
         &user_data.name,
         &user_data.password,
     )
-    .await?;
+    .await
+    .inspect_err(|e| {
+        tracing::warn!("admin 登入失敗 name={:?} ip={} 原因={}", user_data.name, ip, e)
+    })?;
+    tracing::info!("admin 登入成功 name={:?} ip={}", user_data.name, ip);
     Ok(Json(token))
 }
 
@@ -141,12 +161,23 @@ async fn passkey_login_begin(
     Ok(Json(webauthn_service::begin_login(&state).await?))
 }
 
-// 回傳與 POST /admin/auth 同形（Json<String> token），前端代理可照抄
+// 回傳與 POST /admin/auth 同形（Json<String> token），前端代理可照抄。
+// 與密碼登入同理不進 audit（公開端點、還沒有身分），登入結果自己記。
 async fn passkey_login_finish(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(body): Json<PasskeyLoginFinishData>,
 ) -> Result<Json<String>, AppError> {
-    let token = webauthn_service::finish_login(&state, &body.auth_id, &body.credential).await?;
+    let ip = crate::utils::net::client_ip(
+        state.get_config().trust_cf_header,
+        &headers,
+        Some(addr.ip()),
+    );
+    let token = webauthn_service::finish_login(&state, &body.auth_id, &body.credential)
+        .await
+        .inspect_err(|e| tracing::warn!("passkey 登入失敗 ip={} 原因={}", ip, e))?;
+    tracing::info!("passkey 登入成功 ip={}", ip);
     Ok(Json(token))
 }
 

@@ -72,19 +72,14 @@ async fn rate_limit(
     let socket_ip = req
         .extensions()
         .get::<ConnectInfo<SocketAddr>>()
-        .map(|ci| ci.0.ip().to_string());
+        .map(|ci| ci.0.ip());
 
     // 只有確定流量經 Cloudflare（TRUST_CF_HEADER=true）才信任 header，否則 header 可偽造繞過 rate limit
-    let ip = if state.get_config().trust_cf_header {
-        req.headers()
-            .get("CF-Connecting-IP")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
-            .or(socket_ip)
-            .unwrap_or_else(|| "unknown".to_string())
-    } else {
-        socket_ip.unwrap_or_else(|| "unknown".to_string())
-    };
+    let ip = crate::utils::net::client_ip(
+        state.get_config().trust_cf_header,
+        req.headers(),
+        socket_ip,
+    );
 
     let key = format!("rate_limit:{}:{}", scope, ip);
     let mut conn = state.get_redis_conn().await?;
@@ -101,6 +96,19 @@ async fn rate_limit(
     .await?;
 
     if count > max_requests {
+        // 限流被觸發是安全訊號，不是普通 4xx：`auth` 桶（5 req/60s）打爆＝有人在試密碼，
+        // `messages` / `comments` 打爆＝灌水。errors.rs 對 RequestError 只記 debug（不落地），
+        // 所以這一則必須自己記，否則爆破防護會完全靜默 —— 只有 429 回給對方，我方零紀錄。
+        // 只在「剛超過」那一刻記一筆：持續打的話後續請求同樣被擋，但不需要每筆都寫一列。
+        if count == max_requests + 1 {
+            tracing::warn!(
+                "rate limit 觸發：scope={} ip={} 已達 {}/{}s 上限",
+                scope,
+                ip,
+                max_requests,
+                WINDOW_SECS
+            );
+        }
         // 走 AppError 而不是自組 JSON：全站錯誤形狀只有 errors.rs 那一種
         // （帶 code / message / details? / request_id），這裡曾是唯一的破口。
         return Err(RequestError::TooManyRequests("請求過於頻繁，請稍後再試".to_string()).into());

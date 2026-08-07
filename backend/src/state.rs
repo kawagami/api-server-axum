@@ -176,6 +176,11 @@ impl Settings {
                     .get("enabled_features")
                     .and_then(|v| Feature::parse_setting(v));
                 let webauthn = build_webauthn(&map);
+                // logs 表的落地門檻。值住在 logging.rs 的 static（subscriber 是 process
+                // 全域、且早於 AppState 就存在），這裡只負責把設定推過去。
+                if let Some(level) = map.get("log_db_level") {
+                    crate::logging::set_db_level(level);
+                }
                 *self.map.write().unwrap() = map;
                 *self.enabled_features.write().unwrap() = enabled;
                 *self.webauthn.write().unwrap() = webauthn;
@@ -278,7 +283,8 @@ impl AppState {
             let mut guard = sender.lock().await;
             for msg in msgs {
                 if let Err(e) = guard.send(Message::Text(msg.into())).await {
-                    tracing::warn!("send_to {} failed: {}", addr, e);
+                    // 同 ws.rs 的收訊錯誤：對端關頁/睡眠時送出失敗是常態，清理照常走
+                    tracing::debug!("send_to {} failed: {}", addr, e);
                     // 連線已壞，同批後續訊息沒有意義；清理交給 handle_socket
                     break;
                 }
@@ -334,7 +340,7 @@ impl AppState {
                 tokio::spawn(async move {
                     let mut guard = sender.lock().await;
                     if let Err(e) = guard.send(Message::Text(msg.into())).await {
-                        tracing::warn!("broadcast to {} failed: {}", addr, e);
+                        tracing::debug!("broadcast to {} failed: {}", addr, e);
                     }
                 });
             }

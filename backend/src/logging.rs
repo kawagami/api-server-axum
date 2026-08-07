@@ -1,6 +1,7 @@
 use serde_json::{Map, Value};
 use sqlx::{Pool, Postgres};
 use std::fmt;
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use tokio::sync::mpsc;
 use tracing::{
     field::{Field, Visit},
@@ -23,6 +24,61 @@ pub struct LogEntry {
 /// 單一 field 值的長度上限。`?self` 這類 Debug 輸出可以很長（含上游回應片段、
 /// anyhow chain），而這張表跑在 1 核 1G 的機器上，截斷比整包放行安全。
 const MAX_FIELD_LEN: usize = 2000;
+
+const LEVEL_ERROR: u8 = 0;
+const LEVEL_WARN: u8 = 1;
+const LEVEL_INFO: u8 = 2;
+
+/// `logs` 表的落地門檻，由 app_settings 的 `log_db_level` 熱更新。
+///
+/// **刻意是 process 全域的 static**：tracing subscriber 本來就是 process 全域，而
+/// `DbLogLayer` 在 `AppState` 存在之前就得初始化（tracing 必須先於 DB pool）。
+/// 為了它把一個 `Arc<AtomicU8>` 穿過 `AppStateInner::new` / `Settings::new` /
+/// `routes::app` 四層建構子，換不到任何東西。
+///
+/// 預設 WARN = 設定載入前（啟動那幾百毫秒）與 DB 沒有該列時的行為，與加這個旋鈕
+/// 之前完全一致。
+static DB_LEVEL: AtomicU8 = AtomicU8::new(LEVEL_WARN);
+
+/// 佇列滿而丟棄的筆數。這裡**不能**用 `tracing` 回報 —— 那會從 `on_event` 再遞迴回
+/// `on_event`。改由 `log_writer` 的 tick 匯總後 `eprintln!` 進 stdout（docker logs），
+/// 也就是這條管線壞掉時唯一還活著的通道。
+static DROPPED: AtomicU64 = AtomicU64::new(0);
+
+/// `log_db_level` 接受的值。**上限刻意停在 INFO**：再往下開 DEBUG 的話
+/// `errors.rs` 會把每個 4xx 寫進 PG，一隻掃描器打一輪 404 就灌爆 1 核 1G 那台的
+/// `logs` 表。要看 DEBUG 只能調 `RUST_LOG` 走 stdout。
+pub const DB_LEVEL_VALUES: &[&str] = &["ERROR", "WARN", "INFO"];
+
+fn level_code(value: &str) -> Option<u8> {
+    match value.to_ascii_uppercase().as_str() {
+        "ERROR" => Some(LEVEL_ERROR),
+        "WARN" => Some(LEVEL_WARN),
+        "INFO" => Some(LEVEL_INFO),
+        _ => None,
+    }
+}
+
+fn code_level(code: u8) -> tracing::Level {
+    match code {
+        LEVEL_ERROR => tracing::Level::ERROR,
+        LEVEL_INFO => tracing::Level::INFO,
+        _ => tracing::Level::WARN,
+    }
+}
+
+/// 套用 `log_db_level` 設定值。`Settings::reload` 每次重載都會呼叫。
+///
+/// ⚠️ 這個門檻只能在 `RUST_LOG` 這個**天花板底下**調 —— `EnvFilter` 掛在 registry 上
+/// 是全域 filter，被它擋掉的 event 根本到不了這一層。生產的 release 預設是
+/// `info,tower_http=warn`（見 `main.rs`），所以 INFO 剛好是可用的上限。
+pub fn set_db_level(value: &str) {
+    match level_code(value) {
+        Some(code) => DB_LEVEL.store(code, Ordering::Relaxed),
+        // PATCH 有驗證，走到這裡代表 DB 那列被手動改壞了。維持現值不動。
+        None => tracing::error!("log_db_level 設定值 {value:?} 無法解析，維持原設定"),
+    }
+}
 
 /// 把 event / span 的 field 收成 JSON。
 ///
@@ -125,8 +181,9 @@ where
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let meta = event.metadata();
 
-        // 只落地 WARN / ERROR（業務事件走 admin_audit_logs，不在此表）
-        if *meta.level() > tracing::Level::WARN {
+        // 落地門檻預設 WARN，可由 app_settings 的 log_db_level 熱調到 ERROR / INFO
+        // （業務事件走 admin_audit_logs，不在此表）
+        if *meta.level() > code_level(DB_LEVEL.load(Ordering::Relaxed)) {
             return;
         }
 
@@ -164,7 +221,11 @@ where
             fields: (!fields.is_empty()).then_some(Value::Object(fields)),
         };
 
-        let _ = self.tx.try_send(entry);
+        // 滿了就丟（寫入器追不上尖峰）。丟棄本身要看得見，否則「log 表突然變安靜」
+        // 與「真的沒事發生」長得一模一樣 —— 計數交給 log_writer 匯總印出。
+        if self.tx.try_send(entry).is_err() {
+            DROPPED.fetch_add(1, Ordering::Relaxed);
+        }
     }
 }
 
@@ -195,8 +256,17 @@ pub async fn log_writer(mut rx: mpsc::Receiver<LogEntry>, pool: Pool<Postgres>) 
                 if !buf.is_empty() {
                     flush(&pool, &mut buf).await;
                 }
+                report_dropped();
             }
         }
+    }
+}
+
+/// 把累積的丟棄數印進 stdout 並歸零。最多每 `FLUSH_INTERVAL_MS` 一行，不會自己變成洪水。
+fn report_dropped() {
+    let n = DROPPED.swap(0, Ordering::Relaxed);
+    if n > 0 {
+        eprintln!("log_writer: 佇列已滿，丟棄 {n} 筆 log（未落地 logs 表）");
     }
 }
 
@@ -213,7 +283,7 @@ async fn flush(pool: &Pool<Postgres>, buf: &mut Vec<LogEntry>) {
         .map(|e| e.fields.as_ref().map(|f| f.to_string()))
         .collect();
 
-    let _ = sqlx::query(
+    let result = sqlx::query(
         "INSERT INTO logs (level, message, target, file, line, request_id, fields)
          SELECT level, message, target, file, line, request_id, fields::jsonb
          FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::int[], $6::text[], $7::text[])
@@ -228,6 +298,12 @@ async fn flush(pool: &Pool<Postgres>, buf: &mut Vec<LogEntry>) {
     .bind(&fields)
     .execute(pool)
     .await;
+
+    // 同理不能用 tracing 回報（會遞迴回 on_event，而且這條路正是壞掉的那條）。
+    // 吞掉的話 `logs` 表停止寫入時零徵兆 —— 查線上問題的主入口靜默失效是最糟的失敗模式。
+    if let Err(e) = result {
+        eprintln!("log_writer: 落地 {} 筆 log 失敗: {e}", buf.len());
+    }
 
     buf.clear();
 }

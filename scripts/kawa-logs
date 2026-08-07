@@ -28,7 +28,9 @@
     這種固定字串。`fields` 另有 method / path / latency。
   * 一個 5xx 通常是 3 筆同 request_id(來源處 error + errors.rs 的統一 error + tower_http
     的 response failed)。拿 `rid` 一次撈齊。
-  * `logs` 表只收 **WARN+ 且只留 14 天**。要全 level 或更早的,得上 VPS 看 `docker logs backend`
+  * `logs` 表預設只收 **WARN+ 且只留 14 天**。門檻是後台設定 `log_db_level`(ERROR/WARN/INFO,
+    即時生效):要追一段沒有 WARN 的行為就先調到 INFO,查完調回。**沒有 DEBUG** ——
+    那會把每個 4xx 寫進表裡;要 DEBUG 或更早的資料得上 VPS 看 `docker logs backend`
     (rotation 20MB×5),那邊沒有 request_id。
   * 2026-08-03 之前的存量 log 沒有 request_id / fields(欄位那天才加)。
   * ⚠ **每次查詢都會在 `admin_audit_logs` 留一筆**(audit middleware 不分讀寫)。別寫成高頻輪詢。

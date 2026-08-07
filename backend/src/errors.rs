@@ -182,6 +182,23 @@ impl AppError {
     }
 }
 
+/// 「沒帶票 / 票過期」這類日常 401 —— 記 debug。
+///
+/// 反過來說，留在 WARN 的是**帶著身分卻被擋下**的那些：`Forbidden`（權限不足）、
+/// `InvalidPassword` / `InvalidCredentials`（登入失敗）、`WebauthnFailed`、
+/// `UserNotFound`（token 有效但帳號已刪 —— 撤銷沒撤乾淨的徵兆）。那幾種每一筆
+/// 都值得看，且可以用 `request_id` 對回 `admin_audit_logs` 查是誰。
+fn is_routine_auth(err: &AuthError) -> bool {
+    matches!(
+        err,
+        AuthError::MissingToken
+            | AuthError::TokenExpired
+            | AuthError::InvalidToken
+            | AuthError::InvalidHeader
+            | AuthError::Unauthorized
+    )
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let error_response = self.error_response();
@@ -193,6 +210,13 @@ impl IntoResponse for AppError {
             }
             AppError::ConnectionError(_) => {
                 tracing::error!(?self, "Connection error occurred");
+            }
+            // 憑證過期 / 沒帶 token 是客戶端的**常態**（前端 token 只有 1 小時、
+            // kawa-logs CLI 也是 401 才續期），全部記 WARN 的話它們會淹掉真正的
+            // 安全訊號 —— 實測 14 天內這條佔了 logs 表 WARN 的三成，內容幾乎都是
+            // TokenExpired / MissingToken。所以只有「有身分但不該過」的那幾種留在 WARN。
+            AppError::AuthError(err) if is_routine_auth(err) => {
+                tracing::debug!(?self, "Authentication error occurred");
             }
             AppError::AuthError(_) => {
                 tracing::warn!(?self, "Authentication error occurred");

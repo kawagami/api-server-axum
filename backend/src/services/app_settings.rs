@@ -260,6 +260,21 @@ fn validate(key: &str, value: &str) -> Result<(), AppError> {
     if key == "cors_allowed_origins" {
         return validate_cors_allowed_origins(value);
     }
+    if key == "log_db_level" {
+        // 大小寫不敏感（logs 表存的是 tracing 的 "WARN" 這種大寫形），但存進去的值
+        // 照原樣 —— set_db_level 自己會 uppercase
+        let ok = crate::logging::DB_LEVEL_VALUES
+            .iter()
+            .any(|v| v.eq_ignore_ascii_case(value));
+        return if ok {
+            Ok(())
+        } else {
+            Err(unprocessable(format!(
+                "log_db_level 只接受 {}（DEBUG 不開放：會把每個 4xx 寫進 logs 表，請改用 RUST_LOG 看 stdout）",
+                crate::logging::DB_LEVEL_VALUES.join(" / ")
+            )))
+        };
+    }
 
     let allowed: Vec<&str> = match key {
         // site_theme = 7 套主題 ＋ auto（auto = 走每日輪播）
@@ -560,6 +575,20 @@ mod tests {
         assert!(is_reserved("new_user_default_roles"));
         assert!(is_reserved("enabled_features"));
         assert!(!is_reserved("site_theme"));
+    }
+
+    /// DEBUG 被擋下是這條驗證的重點：開下去每個 4xx（含 bot 掃的 404）都會寫進 logs 表
+    #[test]
+    fn log_db_level_accepts_only_error_warn_info() {
+        assert!(validate("log_db_level", "WARN").is_ok());
+        assert!(validate("log_db_level", "ERROR").is_ok());
+        assert!(validate("log_db_level", "INFO").is_ok());
+        assert!(validate("log_db_level", "info").is_ok()); // 大小寫不敏感
+
+        assert!(validate("log_db_level", "DEBUG").is_err());
+        assert!(validate("log_db_level", "TRACE").is_err());
+        assert!(validate("log_db_level", "").is_err());
+        assert!(validate("log_db_level", "WARN,ERROR").is_err());
     }
 
     #[test]
