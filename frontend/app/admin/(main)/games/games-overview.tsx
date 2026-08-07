@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { getGamesOverview } from "@/api/games";
 import type { GameOverview } from "@/types";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import PageHeader from "@/components/admin/page-header";
+import usePolling from "@/hooks/usePolling";
 
 const POLL_INTERVAL_MS = 7000;
 
@@ -43,11 +44,8 @@ export default function GamesOverview({ initial }: { initial: GameOverview[] }) 
         }
     }, []);
 
-    useEffect(() => {
-        if (!autoRefresh) return;
-        const id = setInterval(refresh, POLL_INTERVAL_MS);
-        return () => clearInterval(id);
-    }, [autoRefresh, refresh]);
+    // 分頁在背景時不打，切回來若已過期就補一次
+    usePolling(refresh, POLL_INTERVAL_MS, autoRefresh);
 
     const totalInGame = rows.reduce((sum, g) => sum + g.players_in_game, 0);
 

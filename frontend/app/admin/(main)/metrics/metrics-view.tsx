@@ -5,6 +5,7 @@ import { Cpu, MemoryStick, HardDrive, Activity, Loader2 } from "lucide-react";
 import { getSystemMetrics } from "@/api/metrics";
 import type { SystemMetric } from "@/types";
 import PageHeader from "@/components/admin/page-header";
+import usePolling from "@/hooks/usePolling";
 import { ADMIN_LOCALE, ADMIN_TIME_ZONE } from "@/libs/admin-datetime";
 import MetricsTrendChart, { type TimeRange } from "./metrics-trend-chart";
 import MetricsAuditPanel from "./metrics-audit-panel";
@@ -132,11 +133,8 @@ export default function MetricsView({
         [refresh],
     );
 
-    // 每分鐘輪詢當前範圍（拉最新採樣）
-    useEffect(() => {
-        const id = setInterval(() => refresh(hoursRef.current), POLL_MS);
-        return () => clearInterval(id);
-    }, [refresh]);
+    // 每分鐘輪詢當前範圍（拉最新採樣）；分頁在背景時不打，切回來若已過期就補一次
+    usePolling(() => refresh(hoursRef.current), POLL_MS);
 
     const latest = metrics.length > 0 ? metrics[metrics.length - 1] : null;
     // 四張圖共用同一組選區狀態：在任一張圖拖曳，其他張同步顯示灰帶

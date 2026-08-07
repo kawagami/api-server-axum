@@ -6,6 +6,7 @@ import { getWsConnections } from "@/api/ws";
 import { useWsContext } from "@/libs/ws-context";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import PageHeader from "@/components/admin/page-header";
+import usePolling from "@/hooks/usePolling";
 import { formatDateTime, formatTimeOfDay } from "@/libs/admin-datetime";
 import SaySomethingForm from "./say-something-form";
 import type { WsConnection, WsUserEventData } from "@/types";
@@ -119,11 +120,8 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
         };
     }, []);
 
-    useEffect(() => {
-        if (!autoRefresh) return;
-        const id = setInterval(refresh, POLL_INTERVAL_MS);
-        return () => clearInterval(id);
-    }, [autoRefresh, refresh]);
+    // 分頁在背景時不打，切回來若已過期就補一次（連線增減本來就靠 WS 事件即時反映）
+    usePolling(refresh, POLL_INTERVAL_MS, autoRefresh);
 
     // 即時增減：後端 broadcast_to_admins 只推給已登入連線，本頁 admin 收得到
     useEffect(() => {

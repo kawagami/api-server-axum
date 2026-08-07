@@ -6,12 +6,14 @@ import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import usePagedList from "@/hooks/usePagedList";
+import usePolling from "@/hooks/usePolling";
 import useFilterUrl from "@/hooks/useFilterUrl";
 import type { AuditLog, HttpMethod } from "@/types";
 import { METHOD_BADGE, httpStatusBadgeClass } from "@/libs/badge-styles";
 import { formatDateTimeSeconds } from "@/libs/admin-datetime";
 
 const LIMIT = 100;
+const REFRESH_MS = 1_800_000;
 
 interface Filters {
     user_email: string;
@@ -71,8 +73,9 @@ export default function AuditLogsClient() {
         load(page => getAuditLogs({ ...initial, page, per_page: LIMIT }));
     }, [load]);
 
-    useEffect(() => {
-        const id = setInterval(async () => {
+    // 半小時補一次新紀錄（分頁在背景時不打，切回來若已過期就補一次）
+    usePolling(() => {
+        void (async () => {
             try {
                 const fresh = await getAuditLogs({ ...toQuery(appliedFiltersRef.current), page: 1, per_page: LIMIT });
                 const existingIds = new Set(logsRef.current.map(l => l.id));
@@ -81,9 +84,8 @@ export default function AuditLogsClient() {
                     setLogs(prev => [...newEntries, ...prev]);
                 }
             } catch { /* silent */ }
-        }, 1_800_000);
-        return () => clearInterval(id);
-    }, [setLogs]);
+        })();
+    }, REFRESH_MS);
 
     function handleSearch() {
         if (isPending) return;

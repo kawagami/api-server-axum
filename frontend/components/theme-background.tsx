@@ -1,5 +1,5 @@
-"use client";
-
+// 純靜態標記（粒子動畫全由 CSS keyframes 跑），沒有 hook / 事件處理，
+// 所以刻意不標 "use client"：掛在 root layout 等於每頁都載，留在 server 端渲染省下這份 client bundle
 import type { SiteTheme } from "@/libs/site-theme";
 
 // size: px、left: %、delay/duration: 主動畫（s）、swayDuration: 搖擺週期（s）

@@ -5,6 +5,7 @@ import { Users, CalendarRange, Loader2 } from "lucide-react";
 import { getVisitorStats } from "@/api/stats";
 import type { VisitorStats } from "@/types";
 import PageHeader from "@/components/admin/page-header";
+import usePolling from "@/hooks/usePolling";
 import VisitorTrendChart from "./visitor-trend-chart";
 
 const DAY_OPTIONS = [7, 30, 90];
@@ -81,11 +82,8 @@ export default function VisitorStatsView({
         [refresh],
     );
 
-    // 每分鐘輪詢當前天數（更新今日累積數字）
-    useEffect(() => {
-        const id = setInterval(() => refresh(daysRef.current), POLL_MS);
-        return () => clearInterval(id);
-    }, [refresh]);
+    // 每分鐘輪詢當前天數（更新今日累積數字）；分頁在背景時不打，切回來若已過期就補一次
+    usePolling(() => refresh(daysRef.current), POLL_MS);
 
     return (
         <div className="flex flex-col gap-6">

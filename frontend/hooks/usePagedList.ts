@@ -19,6 +19,10 @@ function isNavigationError(e: unknown): boolean {
  * 失敗只回 `failed` 布林、不回訊息：fetcher 幾乎都是 Server Action，
  * production 下 Next 會把拋出的 error 抹成通用訊息（只留 digest），
  * 拿不到後端的 code / message；文案交由呼叫端出（公開頁要能 i18n）。
+ *
+ * 每次 load / loadMore 會拿一個遞增的請求序號，回應時序號對不上就整包丟棄：
+ * 連按「搜尋」「重設」或改篩選條件時舊查詢可能後回，沒有這道閘就會蓋掉新結果
+ * （fetcher 是 Server Action，無法 abort，只能在回應端裁決）。
  */
 export default function usePagedList<T>(perPage: number, initial?: { items: T[]; fetcher: Fetcher<T> }) {
     const [items, setItems] = useState<T[]>(initial ? initial.items : []);
@@ -27,18 +31,22 @@ export default function usePagedList<T>(perPage: number, initial?: { items: T[];
     const [isPending, startTransition] = useTransition();
     const pageRef = useRef(1);
     const fetcherRef = useRef<Fetcher<T> | null>(initial ? initial.fetcher : null);
+    // 最新一次請求的序號；回應時比對，不是最新的就丟棄
+    const reqIdRef = useRef(0);
 
     const load = useCallback((fetcher: Fetcher<T>) => {
         fetcherRef.current = fetcher;
+        const reqId = ++reqIdRef.current;
         startTransition(async () => {
             setFailed(false);
             try {
                 const data = await fetcher(1);
+                if (reqIdRef.current !== reqId) return;
                 pageRef.current = 1;
                 setItems(data);
                 setHasMore(data.length >= perPage);
             } catch (e) {
-                if (isNavigationError(e)) return;
+                if (isNavigationError(e) || reqIdRef.current !== reqId) return;
                 console.error('usePagedList: load failed', e);
                 setFailed(true);
             }
@@ -48,16 +56,21 @@ export default function usePagedList<T>(perPage: number, initial?: { items: T[];
     const loadMore = useCallback(() => {
         const fetcher = fetcherRef.current;
         if (!fetcher) return;
+        const reqId = ++reqIdRef.current;
+        // 頁碼在發請求時就推進，連點兩次「載入更多」不會重抓同一頁
+        const nextPage = pageRef.current + 1;
+        pageRef.current = nextPage;
         startTransition(async () => {
             setFailed(false);
             try {
-                const nextPage = pageRef.current + 1;
                 const data = await fetcher(nextPage);
-                pageRef.current = nextPage;
+                if (reqIdRef.current !== reqId) return;
                 setItems(prev => [...prev, ...data]);
                 setHasMore(data.length >= perPage);
             } catch (e) {
-                if (isNavigationError(e)) return;
+                if (isNavigationError(e) || reqIdRef.current !== reqId) return;
+                // 這一頁沒拿到，頁碼退回去，重試才不會跳頁
+                if (pageRef.current === nextPage) pageRef.current = nextPage - 1;
                 console.error('usePagedList: loadMore failed', e);
                 setFailed(true);
             }
