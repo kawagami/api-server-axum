@@ -99,6 +99,8 @@ pub async fn create(
     member_id: i64,
     req: &PortfolioRequest,
 ) -> Result<PortfolioEntry, AppError> {
+    req.validate(crate::utils::date::taipei_today())
+        .map_err(crate::errors::RequestError::UnprocessableContent)?;
     portfolio_repo::create(pool, member_id, req).await
 }
 
@@ -108,6 +110,8 @@ pub async fn update(
     member_id: i64,
     req: &PortfolioRequest,
 ) -> Result<PortfolioEntry, AppError> {
+    req.validate(crate::utils::date::taipei_today())
+        .map_err(crate::errors::RequestError::UnprocessableContent)?;
     portfolio_repo::update(pool, id, member_id, req).await
 }
 
@@ -289,8 +293,15 @@ async fn fetch_all_closing_prices(
     to: NaiveDate,
     budget: &UpstreamBudget,
 ) -> Result<Vec<DayClose>, AppError> {
+    // 迴圈起點夾在 MIN_BUY_DATE：寫入端的 `PortfolioRequest::validate` 只擋得住新資料，
+    // 這道是給**存量列**的 —— 驗證是後來才補的，在那之前寫進來的 buy_date 沒有下限，
+    // 而這個迴圈每個月都要打一次 Redis 加一次 DB。比 1992 更早的月份 TWSE 本來就沒有
+    // 資料，夾掉只是省下白跑的查詢，不會少算任何東西。
+    let from_month = from.max(crate::structs::portfolio::min_buy_date());
+
     let mut months = Vec::new();
-    let mut current = NaiveDate::from_ymd_opt(from.year(), from.month(), 1).expect("每月必有 1 日");
+    let mut current =
+        NaiveDate::from_ymd_opt(from_month.year(), from_month.month(), 1).expect("每月必有 1 日");
     let end_month = NaiveDate::from_ymd_opt(to.year(), to.month(), 1).expect("每月必有 1 日");
     while current <= end_month {
         months.push(current);

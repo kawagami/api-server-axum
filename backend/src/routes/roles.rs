@@ -58,7 +58,14 @@ async fn set_permissions(
     Json(body): Json<SetRolePermissions>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::RoleUpdate)?;
-    roles_service::set_role_permissions(state.get_pool(), state.get_redis_pool(), id, body).await?;
+    roles_service::set_role_permissions(
+        state.get_pool(),
+        state.get_redis_pool(),
+        &auth_user,
+        id,
+        body,
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

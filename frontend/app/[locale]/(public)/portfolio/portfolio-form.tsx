@@ -10,6 +10,17 @@ interface Props {
     onCancel: () => void;
 }
 
+// 權威在後端（structs/portfolio.rs 的 MIN_BUY_YEAR + PortfolioRequest::validate，
+// 超出範圍回 422）。這裡只是即時回饋：buy_date 是後端逐月抓價迴圈的起點，
+// 打錯一個世紀會變成上萬次查詢，讓使用者當場看到比吞成通用「儲存失敗」好。
+const MIN_BUY_DATE = '1992-01-01';
+
+// 台北日，與後端的 taipei_today() 對齊；用瀏覽器當地日會讓 UTC+9 以東的使用者
+// 選到後端眼中的「明天」而被 422。en-CA 的輸出剛好是 YYYY-MM-DD。
+function taipeiToday(): string {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+}
+
 export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
     const t = useTranslations('Portfolio');
     const [stockCode, setStockCode] = useState(initial?.stock_code ?? '');
@@ -58,6 +69,8 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                         value={buyDate}
                         onChange={e => setBuyDate(e.target.value)}
                         required
+                        min={MIN_BUY_DATE}
+                        max={taipeiToday()}
                         className="border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600"
                     />
                 </div>

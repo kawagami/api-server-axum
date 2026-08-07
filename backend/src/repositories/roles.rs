@@ -62,6 +62,29 @@ pub async fn contains_super_admin(
     .await?)
 }
 
+/// 這組 role 合起來擁有的 permission 字串（`resource:action`，去重）。
+/// 供「不得指派超出自己權限的角色」的檢查用，格式與 `AuthenticatedUser.permissions` 一致。
+pub async fn permission_strings_for_roles(
+    pool: &Pool<Postgres>,
+    role_ids: &[i32],
+) -> Result<Vec<String>, AppError> {
+    if role_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        r#"
+        SELECT DISTINCT p.resource, p.action
+        FROM role_permissions rp
+        JOIN permissions p ON p.id = rp.permission_id
+        WHERE rp.role_id = ANY($1)
+        "#,
+    )
+    .bind(role_ids)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().map(|(r, a)| format!("{r}:{a}")).collect())
+}
+
 /// 依角色名稱批次查 id，不存在的名稱直接略過（供建立管理員的預設角色 fallback 用）
 pub async fn get_role_ids_by_names(
     pool: &Pool<Postgres>,

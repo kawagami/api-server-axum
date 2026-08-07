@@ -2,7 +2,7 @@ use crate::{
     errors::AppError,
     repositories::{redis, roles as roles_repo, users as users_repo},
     state::Settings,
-    structs::{roles::Role, users::{NewUser, User}},
+    structs::{auth::AuthenticatedUser, roles::Role, users::{NewUser, User}},
 };
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
@@ -15,9 +15,9 @@ pub async fn get_users(pool: &Pool<Postgres>) -> Result<Vec<User>, AppError> {
 pub async fn create_user(
     pool: &Pool<Postgres>,
     settings: &Settings,
+    actor: &AuthenticatedUser,
     mut user: NewUser,
 ) -> Result<(), AppError> {
-    user.password = super::auth::hash_password(user.password).await?;
     let role_ids = if user.role_ids.is_empty() {
         default_role_ids(pool, settings).await?
     } else {
@@ -25,7 +25,9 @@ pub async fn create_user(
     };
     // 預設角色那條路徑也要過 guard：`new_user_default_roles` 是 app_settings，
     // 只需 setting:update 就能改，不擋的話等於另開一條提權門。
-    super::roles::ensure_assignable(pool, &role_ids).await?;
+    // 先驗再 hash：bcrypt 是百毫秒級的 CPU，沒必要為一個註定被拒的請求先燒掉。
+    super::roles::ensure_assignable(pool, actor, &role_ids).await?;
+    user.password = super::auth::hash_password(user.password).await?;
     users_repo::create_user(pool, user, &role_ids).await
 }
 
@@ -65,10 +67,11 @@ pub async fn get_user_roles(pool: &Pool<Postgres>, user_id: i64) -> Result<Vec<R
 pub async fn set_user_roles(
     pool: &Pool<Postgres>,
     redis_pool: &RedisPool<RedisConnectionManager>,
+    actor: &AuthenticatedUser,
     user_id: i64,
     role_ids: Vec<i32>,
 ) -> Result<(), AppError> {
-    super::roles::ensure_assignable(pool, &role_ids).await?;
+    super::roles::ensure_assignable(pool, actor, &role_ids).await?;
     users_repo::set_user_roles(pool, user_id, &role_ids).await?;
     redis::invalidate_user_permissions(redis_pool, user_id).await;
     Ok(())

@@ -46,7 +46,7 @@ async fn create_user(
     if !user.role_ids.is_empty() {
         auth_user.require_permission(Perm::RoleAssign)?;
     }
-    users_service::create_user(state.get_pool(), &state.get_settings(), user).await?;
+    users_service::create_user(state.get_pool(), &state.get_settings(), &auth_user, user).await?;
     Ok(StatusCode::CREATED)
 }
 
@@ -83,6 +83,13 @@ async fn set_user_roles(
             "不可變更自己的角色，請由其他管理員操作".to_string(),
         )));
     }
-    users_service::set_user_roles(state.get_pool(), state.get_redis_pool(), user_id, body.role_ids).await?;
+    users_service::set_user_roles(
+        state.get_pool(),
+        state.get_redis_pool(),
+        &auth_user,
+        user_id,
+        body.role_ids,
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }
