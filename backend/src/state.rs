@@ -16,6 +16,7 @@ use tokio::sync::{mpsc, Mutex};
 use crate::games::registry::GameRegistry;
 use crate::repositories::audit_logs::AuditEntry;
 use crate::services::audit_logs::CHANNEL_CAPACITY as AUDIT_CHANNEL_CAPACITY;
+use crate::services::system_metrics::CpuTimes;
 use crate::services::torrents::TorrentManager;
 use crate::storage::Storage;
 use crate::structs::config::AppConfig;
@@ -40,6 +41,9 @@ pub struct AppStateInner {
     /// 由 app_settings 的 webauthn_rp_id / webauthn_rp_origin 建構（reload 時重建）；
     /// None = 設定缺漏或無效，passkey 端點回錯、密碼登入不受影響
     pub webauthn: Arc<RwLock<Option<webauthn_rs::Webauthn>>>,
+    /// 上一次讀到的 /proc/stat 累計值，`CollectSystemMetrics` 用來算整個採樣間隔的 CPU 平均。
+    /// None = 行程剛起來還沒有基準（第一輪不落地）。
+    pub cpu_times: Arc<RwLock<Option<CpuTimes>>>,
 }
 
 impl AppStateInner {
@@ -83,6 +87,7 @@ impl AppStateInner {
             games: GameRegistry::new(),
             audit_tx,
             webauthn: Arc::new(RwLock::new(None)),
+            cpu_times: Arc::new(RwLock::new(None)),
         };
         (inner, audit_rx)
     }
@@ -252,6 +257,17 @@ impl AppState {
     /// 稽核佇列的送出端（audit middleware 用）
     pub fn get_audit_tx(&self) -> &mpsc::Sender<AuditEntry> {
         &self.0.audit_tx
+    }
+
+    /// CPU 採樣基準：上一輪讀到的 /proc/stat 累計值（行程剛起來時為 None）。
+    /// 讀寫都只有 `CollectSystemMetrics` 一個呼叫端，而 scheduler 的 per-job guard 保證
+    /// 上一輪沒跑完就跳過本輪，所以 get 與 set 分兩次 lock 不會交錯。
+    pub fn cpu_times(&self) -> Option<CpuTimes> {
+        *self.0.cpu_times.read().unwrap()
+    }
+
+    pub fn set_cpu_times(&self, now: CpuTimes) {
+        *self.0.cpu_times.write().unwrap() = Some(now);
     }
 
     /// 點對點送文字訊息給單一連線（找不到連線就靜默丟棄）。

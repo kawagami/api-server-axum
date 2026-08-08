@@ -7,6 +7,8 @@ use sqlx::{Pool, Postgres};
 pub struct SystemMetric {
     pub id: i64,
     pub cpu_pct: f32,
+    /// hypervisor 抽走 vCPU 的時間佔比,不含在 `cpu_pct` 內(2026-08-08 前兩者混在一起算)
+    pub cpu_steal_pct: f32,
     pub mem_used_mb: i32,
     pub mem_total_mb: i32,
     pub disk_used_mb: i32,
@@ -22,6 +24,7 @@ pub struct SystemMetric {
 /// 採集當下的量測值(尚未寫入,無 id / created_at)。
 pub struct MetricSample {
     pub cpu_pct: f32,
+    pub cpu_steal_pct: f32,
     pub mem_used_mb: i32,
     pub mem_total_mb: i32,
     pub disk_used_mb: i32,
@@ -35,10 +38,11 @@ pub struct MetricSample {
 pub async fn insert(pool: &Pool<Postgres>, s: &MetricSample) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"INSERT INTO system_metrics
-           (cpu_pct, mem_used_mb, mem_total_mb, disk_used_mb, disk_total_mb, load1, load5, load15, backend_rss_mb)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+           (cpu_pct, cpu_steal_pct, mem_used_mb, mem_total_mb, disk_used_mb, disk_total_mb, load1, load5, load15, backend_rss_mb)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
     )
     .bind(s.cpu_pct)
+    .bind(s.cpu_steal_pct)
     .bind(s.mem_used_mb)
     .bind(s.mem_total_mb)
     .bind(s.disk_used_mb)
@@ -69,11 +73,13 @@ pub fn bucket_seconds(hours: i64) -> i64 {
 ///
 /// 依 [`bucket_seconds`] 聚合成時間桶,`created_at` 是桶的起點。
 /// 桶內取 **max** 而非 avg —— 這頁是拿來找尖峰的,平均會把短暫的 CPU/load 爆衝抹平。
+/// 每筆原始採樣本身已是整個採樣間隔(1 分鐘)的平均,所以這裡的 max = 該桶內最忙的那一分鐘。
 /// 12 小時以內桶寬會退化成 60 秒,等同原始每分鐘採樣。
 pub async fn get_recent(pool: &Pool<Postgres>, hours: i64) -> Result<Vec<SystemMetric>, sqlx::Error> {
     sqlx::query_as::<_, SystemMetric>(
         r#"SELECT max(id) AS id,
                   max(cpu_pct) AS cpu_pct,
+                  max(cpu_steal_pct) AS cpu_steal_pct,
                   max(mem_used_mb) AS mem_used_mb,
                   max(mem_total_mb) AS mem_total_mb,
                   max(disk_used_mb) AS disk_used_mb,
@@ -86,9 +92,10 @@ pub async fn get_recent(pool: &Pool<Postgres>, hours: i64) -> Result<Vec<SystemM
            FROM system_metrics
            WHERE created_at >= now() - make_interval(hours => $1::int)
            -- 用輸出欄位序號而非別名:別名 created_at 與來源欄位同名,
-           -- PG 遇到 GROUP BY 名稱歧義時會選「輸入欄位」,那樣等於沒分桶
-           GROUP BY 11
-           ORDER BY 11 ASC"#,
+           -- PG 遇到 GROUP BY 名稱歧義時會選「輸入欄位」,那樣等於沒分桶。
+           -- ⚠ 序號 = date_bin 那欄的位置,SELECT 加欄位要同步改這兩個數字
+           GROUP BY 12
+           ORDER BY 12 ASC"#,
     )
     .bind(hours)
     .bind(bucket_seconds(hours))

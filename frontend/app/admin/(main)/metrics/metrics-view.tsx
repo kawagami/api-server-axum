@@ -192,11 +192,15 @@ export default function MetricsView({
                             icon={Cpu}
                             label="CPU 使用率"
                             value={pct(latest.cpu_pct)}
-                            // 有聚合時卡片值是該桶的峰值而非單一採樣，標示清楚免得被當成即時值
+                            // 有聚合時卡片值是該桶的峰值而非單一採樣，標示清楚免得被當成即時值。
+                            // steal 只在真的被抽走時才顯示（一般 VPS 是 0，平時不佔版面）
                             hint={
-                                bucketMinutes > 1
+                                (bucketMinutes > 1
                                     ? `最近 ${bucketMinutes} 分鐘峰值：${fmtSnapshotTime(latest.created_at)}`
-                                    : `最新採樣：${fmtSnapshotTime(latest.created_at)}`
+                                    : `最新採樣：${fmtSnapshotTime(latest.created_at)}`) +
+                                (latest.cpu_steal_pct >= 1
+                                    ? `・steal ${pct(latest.cpu_steal_pct)}`
+                                    : "")
                             }
                         />
                         <SnapshotCard
@@ -267,7 +271,8 @@ export default function MetricsView({
 
                     <p className="text-xs text-neutral-400 dark:text-neutral-500">
                         資料由後端定時採樣，時間以台北時區顯示；此頁每分鐘自動拉取最新採樣。
-                        {bucketMinutes > 1 && `範圍較長時會聚合顯示，圖上每點為 ${bucketMinutes} 分鐘內的峰值。`}
+                        CPU 為整個採樣間隔（1 分鐘）的平均，不含 hypervisor 抽走的 steal。
+                        {bucketMinutes > 1 && `範圍較長時會聚合顯示，圖上每點為 ${bucketMinutes} 分鐘內最忙的那一分鐘。`}
                         {canReadAudit && "在任一張圖上橫向拖曳可選取時間區間，下方會列出該區間的後台操作紀錄。"}
                     </p>
                 </>

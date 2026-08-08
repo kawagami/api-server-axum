@@ -1,7 +1,8 @@
 // 系統指標（admin）：後端排程定時採樣 CPU / 記憶體 / 磁碟 / load，時間由舊到新排序
 export interface SystemMetric {
   id: number;
-  cpu_pct: number; // 0~100
+  cpu_pct: number; // 0~100，整個採樣間隔（1 分鐘）的平均，不含 steal
+  cpu_steal_pct: number; // 0~100，hypervisor 抽走 vCPU 的時間佔比（2026-08-08 前的資料為 0）
   mem_used_mb: number;
   mem_total_mb: number;
   disk_used_mb: number;
