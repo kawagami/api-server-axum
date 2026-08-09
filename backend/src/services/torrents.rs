@@ -329,7 +329,11 @@ async fn start_torrent(
     match manager.active.lock().await.get_mut(&row.id) {
         Some(slot) => slot.handle = Some(handle.clone()),
         None => {
-            let _ = manager.session.delete(handle.id().into(), true).await;
+            // 刪不掉就是 librqbit session 裡留了一個沒人管的 torrent（繼續佔頻寬與磁碟），
+            // 而外層只會看到「任務已被移除」這個預期內的錯誤 —— 不記就查不出殘留從哪來
+            if let Err(e) = manager.session.delete(handle.id().into(), true).await {
+                tracing::warn!("torrent {} 佔位格消失後回收 session 失敗: {}", row.id, e);
+            }
             return Err(StartFailure::Fatal(
                 "任務已於啟動期間被移除".to_string(),
             ));
@@ -679,12 +683,17 @@ pub async fn resolve_download_file(
                 issuer_id,
             )
             .await?;
-            let _ = crate::repositories::redis::set_user_permissions(
+            // 回寫快取失敗不影響本次授權（perms 已經拿到了），但要留痕：
+            // 靜默失敗的症狀是「每次簽名下載都多打一次 DB」，看不出原因
+            if let Err(e) = crate::repositories::redis::set_user_permissions(
                 state.get_redis_pool(),
                 issuer_id,
                 &perms,
             )
-            .await;
+            .await
+            {
+                tracing::warn!("權限快取回寫失敗 user_id={}: {}", issuer_id, e);
+            }
             perms
         }
     };

@@ -45,9 +45,18 @@ static DB_LEVEL: AtomicU8 = AtomicU8::new(LEVEL_WARN);
 /// 也就是這條管線壞掉時唯一還活著的通道。
 static DROPPED: AtomicU64 = AtomicU64::new(0);
 
+/// access log 的 target（`routes.rs` 的 `TraceLayer::on_response` 用）。
+///
+/// 不放在 crate 名底下是為了能單獨開關：它的量是「每個請求一行」，跟其他 INFO 差一個
+/// 數量級，臨時要靜音時 `RUST_LOG=api_server_axum=info,http_access=off` 就好。
+/// ⚠ 代價是 `main.rs::default_log_filter()` **必須明確列出這個 target** —— EnvFilter
+/// 沒有 directive 命中的 target 一律當關閉，漏了就靜默失效。
+pub const ACCESS_TARGET: &str = "http_access";
+
 /// `log_db_level` 接受的值。**上限刻意停在 INFO**：再往下開 DEBUG 的話
-/// `errors.rs` 會把每個 4xx 寫進 PG，一隻掃描器打一輪 404 就灌爆 1 核 1G 那台的
-/// `logs` 表。要看 DEBUG 只能調 `RUST_LOG` 走 stdout。
+/// `errors.rs` 會把每筆 404 與過期 token 寫進 PG，一隻掃描器打一輪就灌爆 1 核 1G 那台
+/// 的 `logs` 表（那兩類刻意留在 debug，其餘 4xx 已在 WARN）。要看 DEBUG 只能調
+/// `RUST_LOG` 走 stdout。
 pub const DB_LEVEL_VALUES: &[&str] = &["ERROR", "WARN", "INFO"];
 
 fn level_code(value: &str) -> Option<u8> {

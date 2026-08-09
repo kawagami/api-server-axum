@@ -19,8 +19,13 @@ export type SettingsResponse = Record<string, Setting[]>;
 // Audit Log
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+/** 操作者身分。member 的稽核 2026-08-09 起才記，在那之前的列一律 admin */
+export type AuditActorType = 'admin' | 'member';
+
 export interface AuditLog {
   id: number;
+  actor_type: AuditActorType;
+  /** admin 是顯示名；member 是 `member#{id}`（後端不為了稽核多打一次 DB 取名字） */
   user_email: string;
   method: string;
   path: string;

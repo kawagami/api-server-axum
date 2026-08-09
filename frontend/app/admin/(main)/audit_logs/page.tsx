@@ -13,7 +13,7 @@ export default async function AuditLogsPage() {
     await requirePermission("audit:read");
     // AuditLogsClient 讀 useSearchParams（?from=&to=），需要 Suspense 邊界
     return (
-        <Suspense fallback={<ListTableSkeleton headers={['時間', '管理員', '方法', '路徑', 'Query', '狀態']} rows={10} />}>
+        <Suspense fallback={<ListTableSkeleton headers={['時間', '操作者', '方法', '路徑', 'Query', '狀態']} rows={10} />}>
             <AuditLogsClient />
         </Suspense>
     );

@@ -199,6 +199,29 @@ fn is_routine_auth(err: &AuthError) -> bool {
     )
 }
 
+/// 「量大又沒有診斷價值」的 4xx —— 記 debug。
+///
+/// 反過來說，留在 WARN 的是**請求進得來、卻在業務規則上被擋下**的那些：
+/// `UnprocessableContent`（驗證失敗）、`Conflict`（資源衝突）、`InsufficientStorage`、
+/// `MultipartError` / `InvalidContent`（上傳與請求體壞掉）。
+///
+/// 為什麼要提到 WARN：原本整個 `RequestError` 都是 debug，而生產的落地門檻是 WARN，
+/// 於是所有 4xx 在 `logs` 表**零紀錄**。使用者回報最多的「按了沒反應 / 存不進去」正是
+/// 422 與 409。
+///
+/// 兩個例外：
+/// - `NotFound` —— 爬蟲掃站（/wp-admin 之類）與 `with_feature` 關閉功能都走這條，
+///   跟 `TokenExpired` 同一種噪音。
+/// - `TooManyRequests` —— 被擋下的請求**本來就是連續一整串**，每筆一列等於讓攻擊者
+///   決定 `logs` 表的寫入量。這條的訊號已經由 `middleware/rate_limit.rs` 記了：
+///   只在 `count == max + 1`（剛超過）那一刻一筆 WARN，帶 scope 與 ip。
+fn is_routine_request(err: &RequestError) -> bool {
+    matches!(
+        err,
+        RequestError::NotFound | RequestError::TooManyRequests(_)
+    )
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let error_response = self.error_response();
@@ -221,13 +244,42 @@ impl IntoResponse for AppError {
             AppError::AuthError(_) => {
                 tracing::warn!(?self, "Authentication error occurred");
             }
-            AppError::RequestError(_) => {
+            // 4xx 分兩級，理由同上面的 AuthError：只有 404 那種掃站噪音留 debug，
+            // 其餘（422 / 409 / 429 / 400 / 507）進 WARN，否則生產的 logs 表看不到任何 4xx。
+            AppError::RequestError(err) if is_routine_request(err) => {
                 tracing::debug!(?self, "Request error occurred");
+            }
+            AppError::RequestError(_) => {
+                tracing::warn!(?self, "Request error occurred");
             }
         }
 
         (self.status_code(), Json(error_response)).into_response()
     }
+}
+
+/// handler panic 的回應（給 `CatchPanicLayer::custom` 用）。
+///
+/// 沒有這層的話 panic 只會讓連線被切斷：client 看到的是 network error 而不是 500、
+/// `logs` 表零筆、request span 沒有結束、`admin_audit_logs` 也不會有那筆（audit 在
+/// `next.run` 之後才寫）。唯一的痕跡是 runtime 預設 panic hook 印在 stderr 的那行
+/// —— 它不經過 tracing，而生產 image 無 shell，只能靠 `docker logs` 撈。
+/// job 那側早就補上了同樣的防護（`scheduler.rs` 把 `job.run` 包進自己的 spawn 檢查
+/// `is_panic`），請求路徑一直沒有。
+///
+/// 回應形狀走 `AppError`，所以自動帶 `request_id`、細節不外洩（統一的 500 訊息）。
+pub fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
+    // panic payload 只有 &str / String 兩種常見型別，取不到就留個明確字串
+    let detail = err
+        .downcast_ref::<&'static str>()
+        .map(|s| (*s).to_string())
+        .or_else(|| err.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "non-string panic payload".to_string());
+
+    // 這行才是查得到的那筆：`?q=panic` 能直接撈出來，位置資訊在 stderr 的 hook 輸出裡
+    tracing::error!(panic = %detail, "handler panicked");
+
+    AppError::SystemError(SystemError::Internal(format!("handler panic: {detail}"))).into_response()
 }
 
 // 便利函數

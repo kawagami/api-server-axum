@@ -29,7 +29,11 @@ pub async fn authorize_and_load(
         None => {
             let perms =
                 roles_repo::get_user_permission_strings_by_id(state.get_pool(), id).await?;
-            let _ = redis::set_user_permissions(state.get_redis_pool(), id, &perms).await;
+            // 回寫失敗不擋這次請求（權限已經拿到），但要留痕 —— 這條靜默失敗的症狀是
+            // 「每個 /admin/* 請求都多一次 roles JOIN」，在 log 上完全看不出原因
+            if let Err(e) = redis::set_user_permissions(state.get_redis_pool(), id, &perms).await {
+                tracing::warn!("權限快取回寫失敗 user_id={}: {}", id, e);
+            }
             perms
         }
     };

@@ -227,7 +227,7 @@ async fn fetch_closing_month(
         if !db_rows.is_empty() {
             let closes: Vec<DayClose> = db_rows.iter().map(|r| DayClose { date: r.date, close: r.close_price }).collect();
             if let Some(json) = redis_serialize_closes(&closes) {
-                let _ = redis_repo::cache_set(redis_pool, &cache_key, &json, ttl).await;
+                cache_set_logged(redis_pool, &cache_key, &json, ttl).await;
             }
             return Ok(closes);
         }
@@ -278,10 +278,24 @@ async fn fetch_closing_month(
 
     // 5. Write Redis
     if let Some(json) = redis_serialize_closes(&closes) {
-        let _ = redis_repo::cache_set(redis_pool, &cache_key, &json, ttl).await;
+        cache_set_logged(redis_pool, &cache_key, &json, ttl).await;
     }
 
     Ok(closes)
+}
+
+/// 寫快取失敗要留痕 —— 這幾條路徑原本是 `let _ = cache_set(...)`，於是 Redis 半死時
+/// 症狀只有「頁面變慢 + 一直打 TWSE」，log 裡沒有任何線索指向快取。
+/// 失敗本身不該讓請求失敗（資料已經算出來了），所以吞掉回傳值、只記 WARN。
+async fn cache_set_logged(
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    key: &str,
+    json: &str,
+    ttl: u64,
+) {
+    if let Err(e) = redis_repo::cache_set(redis_pool, key, json, ttl).await {
+        tracing::warn!("portfolio 快取寫入失敗 key={}: {}", key, e);
+    }
 }
 
 async fn fetch_all_closing_prices(
@@ -437,7 +451,7 @@ async fn cache_ex_events(redis_pool: &RedisPool<RedisConnectionManager>, key: &s
         .map(|e| (e.date.format("%Y-%m-%d").to_string(), e.close_before, e.cash_div, e.stock_rate))
         .collect();
     if let Ok(json) = serde_json::to_string(&v) {
-        let _ = redis_repo::cache_set(redis_pool, key, &json, 86400).await;
+        cache_set_logged(redis_pool, key, &json, 86400).await;
     }
 }
 

@@ -39,13 +39,14 @@ use crate::{
     structs::features::Feature,
 };
 use axum::{
-    extract::{DefaultBodyLimit, Request, State},
+    extract::{connect_info::ConnectInfo, DefaultBodyLimit, Request, State},
     http::{header, HeaderValue, Method},
     middleware::{self, Next},
     response::IntoResponse,
     routing::get,
     Json, Router,
 };
+use std::{net::SocketAddr, time::Duration};
 use tokio::sync::mpsc;
 use tower_http::cors::AllowOrigin;
 use tower_http::limit::RequestBodyLimitLayer;
@@ -81,6 +82,27 @@ pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<App
         .layer(middleware::from_fn_with_state(
             state,
             crate::middleware::auth::authorize_and_load,
+        ))
+}
+
+/// member 版的 `with_auth`：驗證會員身分 + 稽核（audit 掛內層，讀 `AuthenticatedMember`）。
+///
+/// `/member/*` 一直是直接掛 `authorize_member`、跳過 audit 的，於是「會員改了什麼、
+/// 刪了什麼」零紀錄，出事只能靠 DB 現值猜。
+///
+/// **只有資料 CRUD 的四支走這裡**（portfolio / ledger / invoices / lotto）。
+/// `vocab` 刻意不掛：它每答一題就是一個 `POST /runs/{id}/answer`，掛上去等於用 180 天
+/// 保留期的稽核表存遊戲操作，而那些事件的稽核價值近乎零。
+/// audit middleware 對 member 也只記非 GET（見 `middleware/audit.rs`）。
+pub(super) fn with_member_auth(state: AppState, router: Router<AppState>) -> Router<AppState> {
+    router
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::audit::audit_log,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state,
+            crate::middleware::auth::authorize_member,
         ))
 }
 
@@ -129,6 +151,9 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
 
     let upload_path = std::env::var("UPLOAD_PATH").unwrap_or_else(|_| "./uploads".to_string());
 
+    // 複製成 bool 讓 span 的閉包不必抓整個 AppState（閉包要 Clone + Send + Sync）
+    let trust_cf_header = state.get_config().trust_cf_header;
+
     Router::new()
         .nest("/admin", admin::new(state.clone()))
         .nest("/blogs", with_feature(state.clone(), Feature::Blog, blogs::new(state.clone())))
@@ -174,21 +199,61 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
                 // 讓瀏覽器端 JS 可讀到追蹤 id，方便回報問題時附上
                 .expose_headers([header::HeaderName::from_static("x-request-id")]),
         )
-        // 每請求一條 span：method / path / status / 延遲，並帶上 request_id（由下方 middleware 塞入 extensions）
+        // handler panic → 500（帶 request_id）+ 一筆 ERROR。掛在 TraceLayer **內層**：
+        // panic 被接住的當下 request span 仍然活著、request_id 的 task-local 也還在
+        // scope 內，那筆 ERROR 才對得回這次請求。往外掛就兩個都拿不到。
+        .layer(tower_http::catch_panic::CatchPanicLayer::custom(
+            crate::errors::handle_panic,
+        ))
+        // 每請求一條 span：method / path / query / ip / request_id（由下方 middleware 塞入 extensions）
+        //
+        // `on_response` 補一行 INFO：沒有它，`logs` 表只有出錯時才有紀錄，
+        // `GET /logs/request/{id}` 對一個成功請求回空陣列 —— 答不出「這個 request 回什麼
+        // status、跑多久」，追「變慢」或「回 200 但資料錯」完全沒有時間軸。
         .layer(
-            TraceLayer::new_for_http().make_span_with(|req: &axum::http::Request<_>| {
-                let request_id = req
-                    .extensions()
-                    .get::<crate::middleware::request_id::RequestId>()
-                    .map(|r| r.0.as_str())
-                    .unwrap_or("-");
-                tracing::info_span!(
-                    "request",
-                    method = %req.method(),
-                    path = %req.uri().path(),
-                    request_id = %request_id,
-                )
-            }),
+            TraceLayer::new_for_http()
+                .make_span_with(move |req: &axum::http::Request<_>| {
+                    let request_id = req
+                        .extensions()
+                        .get::<crate::middleware::request_id::RequestId>()
+                        .map(|r| r.0.as_str())
+                        .unwrap_or("-");
+                    // query 要遮罩：/ws?ticket= 與 oauth callback 的 ?code= 都是憑證
+                    let query = req
+                        .uri()
+                        .query()
+                        .map(crate::utils::redact::redact_query)
+                        .unwrap_or_default();
+                    // 與限流 / 到訪統計同一套判斷（`utils::net`），漂移會造成
+                    // 「限流認得出真 IP、log 認不出」這種最難查的不一致
+                    let socket_ip = req
+                        .extensions()
+                        .get::<ConnectInfo<SocketAddr>>()
+                        .map(|ci| ci.0.ip());
+                    let ip = crate::utils::net::client_ip(trust_cf_header, req.headers(), socket_ip);
+                    tracing::info_span!(
+                        "request",
+                        method = %req.method(),
+                        path = %req.uri().path(),
+                        query = %query,
+                        ip = %ip,
+                        request_id = %request_id,
+                    )
+                })
+                .on_response(
+                    |res: &axum::http::Response<_>, latency: Duration, _: &tracing::Span| {
+                        // 專屬 target：access log 的量級跟其他 INFO 差一個數量級，
+                        // 要能單獨關掉（`RUST_LOG=...,http_access=off`）而不影響其餘。
+                        // ⚠ 這個 target 不在 crate 名底下，`default_log_filter()` 必須
+                        // 明確列它，否則 EnvFilter 會整條丟掉（沒有 directive 命中 = 關）。
+                        tracing::info!(
+                            target: crate::logging::ACCESS_TARGET,
+                            status = res.status().as_u16(),
+                            latency_ms = latency.as_millis() as u64,
+                            "request completed"
+                        );
+                    },
+                ),
         )
         // 最外層：產生 request_id → 供上面 span 讀取、寫回 response header、供錯誤 body 回溯
         .layer(middleware::from_fn(

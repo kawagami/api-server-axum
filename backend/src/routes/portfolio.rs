@@ -1,6 +1,5 @@
 use crate::{
     errors::AppError,
-    middleware::auth,
     services::portfolio as portfolio_service,
     state::AppState,
     structs::{
@@ -11,19 +10,22 @@ use crate::{
 use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
-    middleware,
     routing::get,
     Json, Router,
 };
 use uuid::Uuid;
 
+// 走 super::with_member_auth 而不是直接掛 authorize_member：寫入要進 admin_audit_logs
+// （直接掛 auth middleware 會跳過 audit 層，那是 member 操作長年零紀錄的原因）
 pub fn new(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/", get(list).post(create))
-        .route("/summary", get(summary))
-        .route("/{id}", axum::routing::put(update).delete(delete))
-        .route("/{id}/history", get(history))
-        .layer(middleware::from_fn_with_state(state, auth::authorize_member))
+    super::with_member_auth(
+        state,
+        Router::new()
+            .route("/", get(list).post(create))
+            .route("/summary", get(summary))
+            .route("/{id}", axum::routing::put(update).delete(delete))
+            .route("/{id}/history", get(history)),
+    )
 }
 
 async fn list(

@@ -1,7 +1,7 @@
 "use server";
 
 import adminRequest from "@/libs/adminRequest";
-import type { Log, LogLevel, AuditLog, HttpMethod, PaginatedResponse } from "@/types";
+import type { Log, LogLevel, AuditLog, AuditActorType, HttpMethod, PaginatedResponse } from "@/types";
 
 interface GetLogsParams {
     level?: LogLevel;
@@ -32,6 +32,8 @@ export interface GetAuditLogsParams {
     path?: string;
     from?: string;
     to?: string;
+    /** 不給 = admin + member 都列 */
+    actor_type?: AuditActorType | '';
     page?: number;
     per_page?: number;
 }
@@ -43,6 +45,7 @@ export async function getAuditLogs({
     path,
     from,
     to,
+    actor_type,
     page = 1,
     per_page = 100,
 }: GetAuditLogsParams = {}): Promise<PaginatedResponse<AuditLog>> {
@@ -50,6 +53,7 @@ export async function getAuditLogs({
     if (user_email) params.set('user_email', user_email);
     if (method) params.set('method', method);
     if (path) params.set('path', path);
+    if (actor_type) params.set('actor_type', actor_type);
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     params.set('page', String(page));

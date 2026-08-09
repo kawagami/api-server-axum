@@ -8,7 +8,7 @@ import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } f
 import usePagedList from "@/hooks/usePagedList";
 import usePolling from "@/hooks/usePolling";
 import useFilterUrl from "@/hooks/useFilterUrl";
-import type { AuditLog, HttpMethod } from "@/types";
+import type { AuditActorType, AuditLog, HttpMethod } from "@/types";
 import { METHOD_BADGE, httpStatusBadgeClass } from "@/libs/badge-styles";
 import { formatDateTimeSeconds } from "@/libs/admin-datetime";
 
@@ -21,9 +21,10 @@ interface Filters {
     path: string;
     from: string;
     to: string;
+    actor_type: AuditActorType | '';
 }
 
-const defaultFilters: Filters = { user_email: '', method: '', path: '', from: '', to: '' };
+const defaultFilters: Filters = { user_email: '', method: '', path: '', from: '', to: '', actor_type: '' };
 
 // datetime-local 是無時區的本地時間字串（2026-07-27T10:30），後端要 RFC3339；
 // 必須在瀏覽器轉才吃得到使用者當地時區，不能丟給 server action 換算
@@ -112,18 +113,30 @@ export default function AuditLogsClient() {
     return (
         <div className="w-full">
             <div className="flex flex-col gap-4">
-                <PageHeader title="操作紀錄" description="後台 API 的寫入與讀取紀錄" />
+                <PageHeader title="操作紀錄" description="後台 API 的寫入與讀取紀錄，以及會員的寫入操作" />
 
                 {/* Filter bar */}
                 <div className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-neutral-500 dark:text-neutral-400">管理員 Email</label>
+                        <label className="text-xs text-neutral-500 dark:text-neutral-400">身分</label>
+                        <select
+                            value={filters.actor_type}
+                            onChange={e => setFilters(f => ({ ...f, actor_type: e.target.value as AuditActorType | '' }))}
+                            className={inputClass}
+                        >
+                            <option value="">全部</option>
+                            <option value="admin">管理員</option>
+                            <option value="member">會員</option>
+                        </select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-neutral-500 dark:text-neutral-400">操作者</label>
                         <input
                             type="text"
                             value={filters.user_email}
                             onChange={e => setFilters(f => ({ ...f, user_email: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                            placeholder="admin@example.com"
+                            placeholder="管理員顯示名 / member#1"
                             className={`${inputClass} w-48`}
                         />
                     </div>
@@ -195,7 +208,7 @@ export default function AuditLogsClient() {
                             <thead>
                                 <AdminHeadRow>
                                     <AdminTh className="w-32 md:w-44">時間</AdminTh>
-                                    <AdminTh className="hidden md:table-cell">管理員</AdminTh>
+                                    <AdminTh className="hidden md:table-cell">操作者</AdminTh>
                                     <AdminTh className="w-20">方法</AdminTh>
                                     <AdminTh>路徑</AdminTh>
                                     <AdminTh className="hidden lg:table-cell">Query</AdminTh>
@@ -214,6 +227,12 @@ export default function AuditLogsClient() {
                                                 {formatDateTimeSeconds(log.created_at)}
                                             </AdminTd>
                                             <AdminTd className="text-xs font-mono hidden md:table-cell">
+                                                {/* 會員與管理員混在同一張表，身分要一眼分得出來 */}
+                                                {log.actor_type === 'member' && (
+                                                    <span className="mr-1 px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
+                                                        會員
+                                                    </span>
+                                                )}
                                                 {log.user_email}
                                             </AdminTd>
                                             <AdminTd>

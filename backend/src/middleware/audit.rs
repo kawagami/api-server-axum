@@ -1,20 +1,35 @@
 use crate::{
-    repositories::audit_logs::AuditEntry, state::AppState, structs::auth::AuthenticatedUser,
+    repositories::audit_logs::AuditEntry,
+    state::AppState,
+    structs::{auth::AuthenticatedUser, members::AuthenticatedMember},
 };
 use axum::{
     body::Body,
     extract::{OriginalUri, Request, State},
+    http::Method,
     middleware::Next,
     response::Response,
 };
 
 pub async fn audit_log(State(state): State<AppState>, req: Request, next: Next) -> Response<Body> {
-    // auth middleware（外層）已驗證並塞入 AuthenticatedUser，直接讀，不重複 decode JWT
-    // audit log 的 user_email 欄現在存管理員顯示名（name）
-    let user_email = req
+    // auth middleware（外層）已驗證並塞入身分，直接讀，不重複 decode JWT。
+    // 同一個 middleware 服務兩種入口：`with_auth`（admin）與 `with_member_auth`（member）。
+    // admin 的 user_email 欄存顯示名（name）；member 沒有現成的名字（`authorize_member`
+    // 只 decode JWT、不查 DB），存 `member#{id}` —— 為了稽核在請求路徑上多打一次 DB 不划算。
+    let actor = req
         .extensions()
         .get::<AuthenticatedUser>()
-        .map(|u| u.name.clone());
+        .map(|u| ("admin", u.name.clone()))
+        .or_else(|| {
+            req.extensions()
+                .get::<AuthenticatedMember>()
+                .map(|m| ("member", format!("member#{}", m.member_id)))
+        });
+
+    // member 只記寫入：會員讀自己的資料是常態，全記等於用 180 天保留期的稽核表存瀏覽軌跡。
+    // admin 維持不分讀寫 —— 那邊「誰查了會員個資」本身就是要稽核的事。
+    let is_read = req.method() == Method::GET || req.method() == Method::HEAD;
+    let skip = is_read && matches!(actor, Some(("member", _)));
 
     let method = req.method().to_string();
     // audit 掛在 nest 內層，req.uri() 前綴已被剝掉；用 OriginalUri 取完整原始路徑
@@ -31,8 +46,9 @@ pub async fn audit_log(State(state): State<AppState>, req: Request, next: Next) 
 
     let response = next.run(req).await;
 
-    if let Some(user_email) = user_email {
+    if let Some((actor_type, user_email)) = actor.filter(|_| !skip) {
         let entry = AuditEntry {
+            actor_type,
             user_email,
             method,
             path,

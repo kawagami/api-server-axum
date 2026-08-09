@@ -1,6 +1,5 @@
 use crate::{
     errors::AppError,
-    middleware::auth,
     services::lotto_tickets as lotto_service,
     state::AppState,
     structs::{
@@ -15,19 +14,21 @@ use crate::{
 use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,
-    middleware,
     routing::{get, patch},
     Json, Router,
 };
 use uuid::Uuid;
 
+// 走 super::with_member_auth：寫入要進 admin_audit_logs（見 routes.rs 的說明）
 pub fn new(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/", get(list).post(register))
-        .route("/draws", get(draws))
-        .route("/notify", patch(set_notify))
-        .route("/{id}", get(detail).delete(delete))
-        .layer(middleware::from_fn_with_state(state, auth::authorize_member))
+    super::with_member_auth(
+        state,
+        Router::new()
+            .route("/", get(list).post(register))
+            .route("/draws", get(draws))
+            .route("/notify", patch(set_notify))
+            .route("/{id}", get(detail).delete(delete)),
+    )
 }
 
 async fn register(
