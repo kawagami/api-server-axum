@@ -51,16 +51,62 @@ pub async fn send_to(
         return Err(SendError::NotConfigured);
     };
 
-    match send_email(&username, &password, to, subject, body).await {
-        Ok(_) => {
-            tracing::info!("email sent: {} -> {}", subject, to);
-            Ok(())
-        }
-        Err(e) => {
-            tracing::error!("email fail [{}]: {}", subject, e);
-            Err(SendError::Failed)
+    // 總嘗試次數（含第一次）。理由同 `utils::reqwest::send_retrying`：這台機器對外連線
+    // 偶爾會在 connect 階段抖一下，而通知信失敗的代價是「使用者不知道自己中獎」。
+    const ATTEMPTS: u32 = 3;
+    const BACKOFF_MS: u64 = 300;
+
+    let mut attempt = 1;
+    loop {
+        match send_email(&username, &password, to, subject, body.clone()).await {
+            Ok(_) => {
+                tracing::info!("email sent: {} -> {}", subject, to);
+                return Ok(());
+            }
+            Err(e) => {
+                if attempt >= ATTEMPTS || !is_connection_failure(&e) {
+                    tracing::error!("email fail [{}]: {}", subject, e);
+                    return Err(SendError::Failed);
+                }
+                tracing::warn!(
+                    "寄信連線失敗（第 {}/{} 次），{}ms 後重試 [{}]: {}",
+                    attempt,
+                    ATTEMPTS,
+                    BACKOFF_MS * attempt as u64,
+                    subject,
+                    e
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    BACKOFF_MS * attempt as u64,
+                ))
+                .await;
+                attempt += 1;
+            }
         }
     }
+}
+
+/// 只有「**連線階段**」的失敗才重試。
+///
+/// 訊息一旦進了 SMTP 對話（對方回了狀態碼、或連線在 DATA 之後斷掉），重試就可能讓
+/// 同一封信寄兩次 —— 對中獎通知來說那比慢一輪更糟。判斷方式是往 source chain 找
+/// `io::Error`，只認那幾種「還沒接上」的 kind（`is_timeout` 也是這樣實作的）。
+fn is_connection_failure(err: &anyhow::Error) -> bool {
+    let mut source: Option<&(dyn std::error::Error + 'static)> = Some(err.as_ref());
+    while let Some(e) = source {
+        if let Some(io) = e.downcast_ref::<std::io::Error>() {
+            return matches!(
+                io.kind(),
+                std::io::ErrorKind::AddrNotAvailable      // 這次撞的就是這個（os error 99）
+                    | std::io::ErrorKind::ConnectionRefused
+                    | std::io::ErrorKind::NetworkUnreachable
+                    | std::io::ErrorKind::HostUnreachable
+                    | std::io::ErrorKind::TimedOut
+            );
+        }
+        source = e.source();
+    }
+    false
 }
 
 async fn send_email(

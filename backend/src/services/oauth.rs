@@ -4,6 +4,7 @@ use crate::{
     state::Settings,
     structs::auth::{Claims, RefreshClaims},
     structs::config::AppConfig,
+    utils::reqwest::send_retrying,
 };
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
@@ -285,12 +286,13 @@ async fn exchange_code_for_token(
         ("grant_type", "authorization_code"),
     ];
 
-    let res = client
-        .post(cfg.token_url)
-        .header("Accept", "application/json")
-        .form(&params)
-        .send()
-        .await?;
+    let res = send_retrying(
+        client
+            .post(cfg.token_url)
+            .header("Accept", "application/json")
+            .form(&params),
+    )
+    .await?;
 
     if !res.status().is_success() {
         return Err(AppError::SystemError(SystemError::Internal(
@@ -328,13 +330,14 @@ async fn fetch_google_user(client: &reqwest::Client, access_token: &str) -> Resu
         picture: Option<String>,
     }
 
-    let user: GoogleUser = client
-        .get("https://www.googleapis.com/oauth2/v3/userinfo")
-        .bearer_auth(access_token)
-        .send()
-        .await?
-        .json()
-        .await?;
+    let user: GoogleUser = send_retrying(
+        client
+            .get("https://www.googleapis.com/oauth2/v3/userinfo")
+            .bearer_auth(access_token),
+    )
+    .await?
+    .json()
+    .await?;
 
     Ok(OAuthUserInfo {
         provider_id: user.sub,
@@ -354,14 +357,15 @@ async fn fetch_github_user(client: &reqwest::Client, access_token: &str) -> Resu
         login: String,
     }
 
-    let user: GitHubUser = client
-        .get("https://api.github.com/user")
-        .bearer_auth(access_token)
-        .header("User-Agent", "template-axum")
-        .send()
-        .await?
-        .json()
-        .await?;
+    let user: GitHubUser = send_retrying(
+        client
+            .get("https://api.github.com/user")
+            .bearer_auth(access_token)
+            .header("User-Agent", "template-axum"),
+    )
+    .await?
+    .json()
+    .await?;
 
     let email = if user.email.is_some() {
         user.email
@@ -388,14 +392,15 @@ async fn fetch_github_primary_email(
         verified: bool,
     }
 
-    let emails: Vec<GitHubEmail> = client
-        .get("https://api.github.com/user/emails")
-        .bearer_auth(access_token)
-        .header("User-Agent", "template-axum")
-        .send()
-        .await?
-        .json()
-        .await?;
+    let emails: Vec<GitHubEmail> = send_retrying(
+        client
+            .get("https://api.github.com/user/emails")
+            .bearer_auth(access_token)
+            .header("User-Agent", "template-axum"),
+    )
+    .await?
+    .json()
+    .await?;
 
     Ok(emails.into_iter().find(|e| e.primary && e.verified).map(|e| e.email))
 }
@@ -411,13 +416,14 @@ async fn fetch_line_user(client: &reqwest::Client, access_token: &str) -> Result
         picture_url: Option<String>,
     }
 
-    let profile: LineProfile = client
-        .get("https://api.line.me/v2/profile")
-        .bearer_auth(access_token)
-        .send()
-        .await?
-        .json()
-        .await?;
+    let profile: LineProfile = send_retrying(
+        client
+            .get("https://api.line.me/v2/profile")
+            .bearer_auth(access_token),
+    )
+    .await?
+    .json()
+    .await?;
 
     Ok(OAuthUserInfo {
         provider_id: profile.user_id,

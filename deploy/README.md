@@ -118,6 +118,61 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 
 手動改 VPS 上的 nginx 設定時同理：動到 `nginx.conf` 就得 recreate，只動 `conf.d` 才能 reload 了事。
 
+## 主機 IPv6：必須整台關掉（2026-08-09）
+
+這台 VPS（以及任何同型的新機）**沒有可用的 IPv6，但 IPv6 stack 是開著的**：
+
+```
+ip -6 addr    → 只有 link-local fe80::，沒有任何全域位址
+ip -6 route   → 只有 ::1 與 fe80::/64，沒有 ::/0 預設路由
+```
+
+於是 glibc 與 Go 都判定「這台有 IPv6」，對外連線先試 AAAA 再撞牆。實際災情（14 天內）：
+
+| 時間 (UTC) | 誰 | 目的地 | 錯誤 |
+|---|---|---|---|
+| 08-05 23:30 | lettre | smtp.gmail.com | `EADDRNOTAVAIL` 政府標案通知信沒寄出 |
+| 08-06 00:57 | lettre | smtp.gmail.com | 同上，torrent 完成通知信沒寄出 |
+| 08-09 07:21 / 07:53 | reqwest | www.googleapis.com | 同上，member 用 Google 登入回 502 |
+| 08-09（手動） | **docker daemon** | auth.docker.io | `ENETUNREACH`，`docker pull` 失敗 |
+
+最後一列最關鍵：那是**宿主機自己**，證明問題不在任何容器裡。而部署腳本第一行就是
+`docker pull kawagami77/api-server:latest`（配 `set -e`），所以這也會讓部署紅燈。
+
+### 修法與**不可顛倒的順序**
+
+1. **先**把 `nginx/conf.d/*.conf` 的 `listen [::]` 全部拆掉並部署
+   （已於 2026-08-09 完成）。少了這步，第 2 步之後 nginx 會
+   `socket() [::]:80 failed (97: Address family not supported by protocol)` 起不來，**全站掛掉**。
+2. **再**在宿主機關閉 IPv6：
+
+```bash
+sudo tee /etc/sysctl.d/99-disable-ipv6.conf <<'EOF'
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+EOF
+sudo sysctl --system
+sudo systemctl restart docker   # daemon 的 IPv6 能力是行程啟動時探測一次，不重啟不會生效
+```
+
+> `systemctl restart docker` 會重啟所有容器，比照一次完整部署安排時間。
+
+### 排查時的兩個坑（都踩過）
+
+- **容器層級的 `sysctls: net.ipv6.conf.all.disable_ipv6=1` 解決不了。** 2026-08-09 試過，容器
+  帶著它在 07:51:34 重建，07:53:37 同一個錯誤照樣發生、訊息逐字相同。那兩行留在 compose 裡
+  只當衛生，不是解法。
+- **不要用 alpine 測 DNS 行為。** alpine 是 musl，沒有 IPv6 位址時會自己濾掉 AAAA；
+  backend 的 distroless/cc 是 **glibc**，不帶 `AI_ADDRCONFIG` 就照回 AAAA。
+  要測就用 `debian:bookworm-slim`，並且 `--network container:backend` 共用同一個 netns 與 DNS。
+
+### 應用層的防護（不取代上面）
+
+`utils/reqwest.rs::send_retrying` 與 `services/email.rs` 對**連線階段**的失敗重試 3 次
+（200/400ms、300/600ms 退避）。上面四次事件全是單發抖動，補完之後使用者不會再看到。
+刻意只重試「請求還沒送達對方」的失敗 —— 對方已回狀態碼、或信已進 SMTP 對話的一律不重試，
+免得同一封中獎通知寄兩次。
+
 ## 全新機器 bootstrap
 
 從零把整站架在一台新 VPS 上的流程。
@@ -125,6 +180,8 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 ### 0. 前提
 
 - 新 VPS：建使用者 + SSH 金鑰、裝 docker（含 compose plugin）與 rsync、使用者加入 `docker` 群組
+- **檢查 IPv6**：`ip -6 route | grep '^default'` 沒東西就照上一節整台關掉，否則對外連線
+  （OAuth / SMTP / `docker pull`）會間歇失敗
 - Cloudflare DNS：`kawa.homes`、`*.kawa.homes`、以及各子網域單獨那幾筆（`api` / `axum` / `media`）
   指向新機 IP；SSL/TLS 模式 **Full (Strict)**（憑證是 `kawa.homes` + `*.kawa.homes` wildcard，
   新增子網域不用重簽，但橘雲要單獨開一筆 record）

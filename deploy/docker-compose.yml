@@ -184,27 +184,27 @@ services:
     mem_limit: 320m
     container_name: backend
     restart: unless-stopped
-    # ⚠ 關掉容器內的 IPv6 —— 這是「對外連線間歇性失敗」的根治。
+    # 關掉容器內的 IPv6。
     #
-    # 這個容器**沒有全域 IPv6 位址**（`docker inspect backend` 的 GlobalIPv6Address 是空的），
-    # 但 eth0 仍有 link-local `fe80::`。glibc 因此認為「有 IPv6 來源」，RFC 6724 排序就把
-    # Google 那些網域的 AAAA 排在 A 前面 → 拿 link-local 去連全域 v6 位址 →
-    # `connect(): Cannot assign requested address (os error 99)`，秒失敗。
+    # ⚠ **這兩行本身不是解法，實測沒有修好任何東西** —— 2026-08-09 加上去、容器在
+    # 07:51:34 帶著它重建，07:53:37 同一個錯誤照樣發生，訊息逐字相同。記在這裡是為了
+    # 讓下一個人不要重走一遍。
     #
-    # 實際災情（2026-08-02～08-09 的 logs 表，同一個 errno 三筆、橫跨兩個函式庫）：
-    #   08-09 reqwest  → www.googleapis.com   member 用 Google 登入失敗（回 502）
-    #   08-06 lettre   → smtp.gmail.com       torrent 完成通知信沒寄出
-    #   08-05 lettre   → smtp.gmail.com       政府標案通知信沒寄出
-    # 間歇性是因為解析結果排序不是每次都一樣，重試通常就過 —— 所以很容易被當成偶發忽略。
+    # 真正的根因在**宿主機**：這台 VPS 從來沒有可用的 IPv6（`ip -6 addr` 只有 link-local
+    # `fe80::`、`ip -6 route` 沒有 `::/0`），但 IPv6 stack 開著，於是 glibc 與 Go 都以為
+    # 「有 IPv6」，對外連線先試 AAAA 再撞牆：
+    #   08-05 lettre   → smtp.gmail.com        政府標案通知信沒寄出（EADDRNOTAVAIL）
+    #   08-06 lettre   → smtp.gmail.com        torrent 完成通知信沒寄出（同上）
+    #   08-09 reqwest  → www.googleapis.com    member 用 Google 登入失敗，回 502（同上）
+    #   08-09 dockerd  → auth.docker.io        `docker pull` 失敗（ENETUNREACH）——
+    #                                          這行證明問題在宿主機，不在任何容器裡
+    # 部署腳本第一行就是 `docker pull`，所以這個問題也會讓部署紅燈。
     #
-    # 關掉之後連 link-local 都沒有，glibc 直接只給 A 記錄，reqwest 與 lettre 一起受惠
-    # （比逐個函式庫塞「只用 IPv4」的參數乾淨，lettre 也沒有那種參數）。
-    # backend 一律 bind 0.0.0.0、對內對外都走 v4，沒有任何東西需要 IPv6。
+    # ⇒ 宿主機要關 IPv6（`/etc/sysctl.d/99-disable-ipv6.conf`）。**關之前必須先拆掉
+    #   nginx 的 `listen [::]`**，否則 nginx 起不來、全站掛掉（見 nginx/conf.d/01-default-server.conf）。
     #
-    # 替代方案是掛一份 /etc/gai.conf 進去調 precedence，但那是**單一檔案 bind mount**，
-    # 會踩到 rsync 換 inode 的坑（見 .github/workflows/deploy.yml 的 nginx.conf 註解）。
-    # 驗證：部署後 `docker exec` 進不去（distroless 無 shell），改看 logs 表有沒有再出現
-    # `Cannot assign requested address`。要回退就刪掉這三行。
+    # 這兩行留著的理由只剩「這個 netns 的 IPv6 確實不可用，關掉是正確的衛生」。
+    # 宿主機關掉之後它們就是多餘的，但無害，也擋得住宿主機設定被還原的情況。
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1
       - net.ipv6.conf.default.disable_ipv6=1
