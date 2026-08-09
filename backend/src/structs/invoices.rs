@@ -69,17 +69,6 @@ pub struct PeriodDraw {
     pub additional: Vec<String>, // 增開六獎（3 碼，0~N 組）
 }
 
-/// 通知偏好切換
-#[derive(Deserialize)]
-pub struct NotifyPrefRequest {
-    pub enabled: bool,
-}
-
-#[derive(Serialize)]
-pub struct NotifyPrefResponse {
-    pub enabled: bool,
-}
-
 /// admin 手動補中獎號碼
 #[derive(Deserialize)]
 pub struct AdminLotteryNumbersRequest {

@@ -1,10 +1,9 @@
 use crate::extract::{Json, Path};
 use crate::{
     errors::AppError,
-    repositories::images::{self as images_repo, ImageRecord},
     services::images as images_service,
     state::AppState,
-    structs::{auth::AuthenticatedUser, roles::Perm},
+    structs::{auth::AuthenticatedUser, images::ImageRecord, roles::Perm},
 };
 use axum::{
     extract::{Extension, Multipart, State},
@@ -36,8 +35,7 @@ async fn delete_image(
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::ImageDelete)?;
-    auth_user.require_owner(images_repo::get_owner(state.get_pool(), id).await?)?;
-    images_service::delete_image(state.get_pool(), state.get_storage(), id).await?;
+    images_service::delete_image(state.get_pool(), state.get_storage(), &auth_user, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

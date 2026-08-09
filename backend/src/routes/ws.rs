@@ -2,7 +2,7 @@ use crate::extract::{Json, Query};
 use crate::{
     errors::{AppError, RequestError, SystemError},
     middleware::auth,
-    repositories::redis as redis_repo,
+    services::{stats as stats_service, ws as ws_service},
     state::{AppState, DisplayTrackedConnection, TrackedConnection},
     structs::{auth::AuthenticatedUser, roles::Perm},
 };
@@ -81,10 +81,7 @@ async fn ws_handler(
     // admin 身分改用一次性 ticket（POST /ws/ticket 換發，30 秒 TTL），
     // JWT 不再走 URL query，避免 token 進 access log
     let user_email = match query.ticket {
-        Some(ticket) => redis_repo::consume_ws_ticket(state.get_redis_pool(), &ticket)
-            .await
-            .ok()
-            .flatten(),
+        Some(ticket) => ws_service::consume_ticket(&state, &ticket).await,
         None => None,
     };
     // 與 middleware/rate_limit.rs 同一條規則（同一個函式）：只有確定流量都經 Cloudflare
@@ -101,11 +98,11 @@ async fn ws_handler(
     // 每日不重複到訪統計：以 WS 握手為採集點（天然濾掉不跑 JS 的 bot），
     // 去重元素 = ip|ua。best-effort，不阻塞連線。
     {
-        let redis_pool = state.get_redis_pool().clone();
+        let visit_state = state.clone();
         let ip = real_ip.clone();
         let ua = user_agent.clone();
         tokio::spawn(async move {
-            crate::repositories::visitors::record_visit(&redis_pool, &ip, &ua).await;
+            stats_service::record_visit(&visit_state, &ip, &ua).await;
         });
     }
 
@@ -380,8 +377,7 @@ async fn create_ws_ticket(
 ) -> Result<Json<serde_json::Value>, AppError> {
     auth_user.require_permission(Perm::WsRead)?;
 
-    let ticket = uuid::Uuid::new_v4().to_string();
-    redis_repo::set_ws_ticket(state.get_redis_pool(), &ticket, &auth_user.name).await?;
+    let ticket = ws_service::issue_ticket(&state, &auth_user.name).await?;
     Ok(Json(serde_json::json!({ "ticket": ticket })))
 }
 

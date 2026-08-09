@@ -1,19 +1,16 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::blog_comments as repo,
+    structs::auth::AuthenticatedUser,
     structs::pagination::Paginated,
-    structs::blog_comments::{BlogComment, NewComment}
+    structs::blog_comments::{BlogComment, NewComment},
+    utils::text::normalize_optional,
 };
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
 const CONTENT_MAX: usize = 5000;
 const NAME_MAX: usize = 100;
-
-/// 修剪字串,空字串視為 None(訪客名選填,可匿名)
-fn normalize_optional(s: Option<String>) -> Option<String> {
-    s.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
-}
 
 /// 驗證並建立一則留言。
 /// `member_id`:optional-auth 中介層帶入,有值 = 會員留言(忽略自填名),null = 訪客留言。
@@ -63,8 +60,11 @@ pub async fn list_by_blog(
     limit: i64,
     offset: i64,
 ) -> Result<Paginated<BlogComment>, AppError> {
-    let total = repo::count_by_blog(pool, blog_id).await?;
-    let data = repo::list_by_blog(pool, blog_id, limit, offset).await?;
+    // count 與 list 併發跑：序列 await 是白吃一倍延遲（範本同 services/logs.rs）
+    let (data, total) = tokio::try_join!(
+        repo::list_by_blog(pool, blog_id, limit, offset),
+        repo::count_by_blog(pool, blog_id),
+    )?;
     Ok(Paginated::new(data, total))
 }
 
@@ -74,11 +74,18 @@ pub async fn list_all(
     limit: i64,
     offset: i64,
 ) -> Result<Paginated<BlogComment>, AppError> {
-    let total = repo::count_all(pool).await?;
-    let data = repo::list_all(pool, limit, offset).await?;
+    let (data, total) = tokio::try_join!(repo::list_all(pool, limit, offset), repo::count_all(pool))?;
     Ok(Paginated::new(data, total))
 }
 
-pub async fn delete(pool: &Pool<Postgres>, id: i64) -> Result<(), AppError> {
+/// 刪一則留言。
+///
+/// **與 blog 本體同一套 owner 隔離**：一般管理員只能刪自己文章下的留言。少了這道，
+/// blog 本體嚴格隔離、留言卻不設限，等於留了一個側門 —— 所以檢查跟刪除綁在同一支。
+pub async fn delete(pool: &Pool<Postgres>, actor: &AuthenticatedUser, id: i64) -> Result<(), AppError> {
+    let author = repo::get_blog_author(pool, id)
+        .await?
+        .ok_or(RequestError::NotFound)?;
+    actor.require_owner(author)?;
     repo::delete(pool, id).await
 }

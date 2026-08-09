@@ -1,10 +1,10 @@
 use crate::extract::{Json, Query};
 use crate::{
     errors::AppError,
-    services::audit_logs::{get_audit_logs, AuditLog},
+    services::audit_logs::get_audit_logs,
     state::AppState,
     structs::{
-        audit_logs::AuditLogQuery,
+        audit_logs::{AuditLog, AuditLogQuery},
         auth::AuthenticatedUser,
         pagination::{PageQuery, Paginated},
         roles::Perm,

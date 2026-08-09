@@ -1,9 +1,9 @@
 use crate::extract::{Json, Query};
 use crate::{
     errors::AppError,
-    repositories::system_metrics::{self as metrics_repo, SystemMetric},
+    services::system_metrics as metrics_service,
     state::AppState,
-    structs::{auth::AuthenticatedUser, roles::Perm},
+    structs::{auth::AuthenticatedUser, roles::Perm, system_metrics::SystemMetric},
 };
 use axum::{
     extract::{Extension, State},
@@ -29,6 +29,5 @@ async fn list_metrics(
 ) -> Result<Json<Vec<SystemMetric>>, AppError> {
     auth_user.require_permission(Perm::MetricRead)?;
     let hours = query.hours.unwrap_or(24).clamp(1, 168);
-    let metrics = metrics_repo::get_recent(state.get_pool(), hours).await?;
-    Ok(Json(metrics))
+    Ok(Json(metrics_service::recent(state.get_pool(), hours).await?))
 }

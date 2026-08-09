@@ -4,11 +4,9 @@ use crate::{
     services::invoices as invoices_service,
     state::AppState,
     structs::{
-        invoices::{
-            DrawListQuery, Invoice, InvoiceListQuery, InvoiceRequest, NotifyPrefRequest,
-            NotifyPrefResponse, PeriodDraw,
-        },
+        invoices::{DrawListQuery, Invoice, InvoiceListQuery, InvoiceRequest, PeriodDraw},
         members::AuthenticatedMember,
+        notify::{NotifyPrefRequest, NotifyPrefResponse},
         pagination::Paginated,
     },
 };

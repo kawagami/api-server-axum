@@ -1,23 +1,7 @@
 use crate::structs::logs::LogQuery;
-use chrono::{DateTime, Utc};
-use serde::Serialize;
-use serde_json::Value;
+use crate::structs::logs::Log;
 use sqlx::{Pool, Postgres};
 
-#[derive(Serialize, sqlx::FromRow)]
-pub struct Log {
-    pub id: i64,
-    pub level: String,
-    pub message: String,
-    pub target: String,
-    pub file: Option<String>,
-    pub line: Option<i32>,
-    /// 對應 `x-request-id` / 錯誤 body 的 `request_id`，用來把一個請求的 log 串起來
-    pub request_id: Option<String>,
-    /// event 與 span 的其餘 field（`self` = 錯誤細節、`method`、`path`…），見 `logging.rs`
-    pub fields: Option<Value>,
-    pub created_at: DateTime<Utc>,
-}
 
 /// list 與 by_request 共用（欄位清單抄兩份就是下一個會長歪的地方）
 const LOG_COLUMNS: &str = "id, level, message, target, file, line, request_id, fields, created_at";

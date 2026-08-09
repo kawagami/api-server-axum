@@ -30,6 +30,16 @@ impl PageQuery {
     }
 }
 
+/// 共用的 `?status=` 篩選參數。
+///
+/// 與 `PageQuery` 同一種東西（跨資源共用的 query 參數），所以放同一個模組。
+/// 收斂前 `routes/stocks.rs` 與 `routes/torrents.rs` 各宣告一份逐字相同的私有版本。
+/// 值本身不在這裡驗 —— 各資源的合法狀態集不同，由 repository 的 WHERE 決定。
+#[derive(Deserialize)]
+pub struct StatusFilter {
+    pub status: Option<String>,
+}
+
 /// 分頁回應的共用形狀 `{ data, total }`。
 ///
 /// `total` 是**套用篩選後、未套 limit/offset 的總筆數**，前端靠它算頁碼。

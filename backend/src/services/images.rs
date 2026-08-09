@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, RequestError, SystemError},
     repositories::images as images_repo,
-    repositories::images::ImageRecord,
+    structs::{auth::AuthenticatedUser, images::ImageRecord},
     storage::Storage,
 };
 use axum::extract::Multipart;
@@ -90,7 +90,16 @@ pub async fn cleanup_unused_images(pool: &Pool<Postgres>, storage: &Storage) {
     }
 }
 
-pub async fn delete_image(pool: &Pool<Postgres>, storage: &Storage, id: i32) -> Result<(), AppError> {
+/// 刪圖。**擁有者檢查在這裡**（不是 route）：`require_owner` 對非擁有者回 404，
+/// 那是業務規則的一部分，跟「刪 DB 再刪檔」是同一個決策；留在 route 會讓每個
+/// 呼叫端各自記得先查一次 owner，漏掉沒有任何徵兆。
+pub async fn delete_image(
+    pool: &Pool<Postgres>,
+    storage: &Storage,
+    actor: &AuthenticatedUser,
+    id: i32,
+) -> Result<(), AppError> {
+    actor.require_owner(images_repo::get_owner(pool, id).await?)?;
     let storage_key = images_repo::delete_image_by_id(pool, id).await?;
     if let Err(e) = storage.delete(&storage_key).await {
         tracing::error!("storage delete failed for key {}: {}", storage_key, e);

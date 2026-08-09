@@ -4,11 +4,9 @@ use crate::{
     services::lotto_tickets as lotto_service,
     state::AppState,
     structs::{
-        lotto::{
-            Draw, DrawListQuery, NotifyPrefRequest, NotifyPrefResponse, Ticket, TicketBatchRequest,
-            TicketListQuery,
-        },
+        lotto::{Draw, DrawListQuery, Ticket, TicketBatchRequest, TicketListQuery},
         members::AuthenticatedMember,
+        notify::{NotifyPrefRequest, NotifyPrefResponse},
         pagination::Paginated,
     },
 };

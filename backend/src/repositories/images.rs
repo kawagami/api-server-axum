@@ -1,14 +1,7 @@
 use crate::errors::{AppError, RequestError};
-use serde::Serialize;
+use crate::structs::images::ImageRecord;
 use sqlx::{PgConnection, Pool, Postgres, Row};
 
-#[derive(Serialize)]
-pub struct ImageRecord {
-    pub id: i32,
-    pub storage_key: String,
-    pub url: String,
-    pub status: String,
-}
 
 /// `owner_id = None` → 不過濾（super_admin 看全部）；`Some(id)` → 只列該擁有者。
 pub async fn get_all_images(

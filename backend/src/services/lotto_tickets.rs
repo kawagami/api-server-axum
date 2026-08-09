@@ -1,5 +1,5 @@
 use crate::{
-    errors::{AppError, RequestError},
+    errors::{unprocessable, AppError},
     repositories::lotto as lotto_repo,
     services::lotto::{LOTTO649, SUPER638},
     structs::{
@@ -13,10 +13,6 @@ use crate::{
 use chrono::{Datelike, NaiveDate, Weekday};
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
-
-fn unprocessable(msg: &str) -> AppError {
-    RequestError::UnprocessableContent(msg.to_string()).into()
-}
 
 /// 各彩種的固定開獎日：大樂透週二/五、威力彩週一/四。
 ///
@@ -68,7 +64,7 @@ async fn validate_draw_date(
         return Ok(());
     }
     let days: Vec<&str> = allowed.iter().map(|d| weekday_label(*d)).collect();
-    Err(unprocessable(&format!(
+    Err(unprocessable(format!(
         "{} 的開獎日為每週{}，{} 不是開獎日",
         game_label(game),
         days.join("、"),

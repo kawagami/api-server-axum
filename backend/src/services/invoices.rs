@@ -1,5 +1,5 @@
 use crate::{
-    errors::{AppError, RequestError},
+    errors::{unprocessable, AppError},
     repositories::{invoices as invoices_repo, ledger as ledger_repo},
     services::invoice_lottery::{period_of_date, PeriodNumbers},
     structs::{
@@ -26,10 +26,6 @@ const SELLER_TAX_ID_MAX: usize = 16;
 fn invoice_number_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"^[A-Z]{2}\d{8}$").unwrap())
-}
-
-fn unprocessable(msg: &str) -> AppError {
-    RequestError::UnprocessableContent(msg.to_string()).into()
 }
 
 /// 取出並驗證「順便記一筆支出」需要的欄位；`record_as_expense=false` 時回 None。
@@ -71,7 +67,7 @@ fn resolve_period(req: &InvoiceRequest) -> Result<String, AppError> {
         return Err(unprocessable("period 格式須為 YYYYMM 且月份為期末偶數月，如 202608"));
     }
     if claimed != derived {
-        return Err(unprocessable(&format!(
+        return Err(unprocessable(format!(
             "invoice_date（{}）不屬於 period {claimed}",
             req.invoice_date
         )));

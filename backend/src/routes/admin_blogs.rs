@@ -8,8 +8,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    errors::{AppError, RequestError},
-    repositories::blogs as blogs_repo,
+    errors::AppError,
     services::blogs as blogs_service,
     state::AppState,
     structs::{
@@ -51,11 +50,7 @@ async fn put_blog(
     Json(blog): Json<PutBlog>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::BlogUpdate)?;
-    // 既有文章只能改自己的（super_admin 例外）；不存在＝新建，擁有者記為自己
-    if let Some(author) = blogs_repo::get_author(state.get_pool(), id).await? {
-        auth_user.require_owner(author)?;
-    }
-    let title = blogs_service::upsert_blog(state.get_pool(), id, blog, auth_user.id).await?;
+    let title = blogs_service::upsert_blog(state.get_pool(), &auth_user, id, blog).await?;
     state.broadcast(WsEvent::BlogCreated, serde_json::json!({ "id": id, "title": title }));
     Ok(StatusCode::NO_CONTENT)
 }
@@ -90,10 +85,6 @@ async fn delete_blog(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::BlogDelete)?;
-    let author = blogs_repo::get_author(state.get_pool(), id)
-        .await?
-        .ok_or(RequestError::NotFound)?;
-    auth_user.require_owner(author)?;
-    blogs_service::delete_blog_with_images(state.get_pool(), id).await?;
+    blogs_service::delete_blog_with_images(state.get_pool(), &auth_user, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

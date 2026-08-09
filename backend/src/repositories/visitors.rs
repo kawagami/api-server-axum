@@ -1,7 +1,7 @@
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
 use chrono::{Datelike, NaiveDate};
-use serde::Serialize;
+use crate::structs::stats::DailyVisitorStat;
 use sqlx::{Pool, Postgres};
 
 use super::redis::get_redis_conn;
@@ -96,11 +96,6 @@ pub async fn upsert_daily(
     Ok(())
 }
 
-#[derive(Serialize, sqlx::FromRow)]
-pub struct DailyVisitorStat {
-    pub date: NaiveDate,
-    pub unique_visitors: i64,
-}
 
 /// 歷史每日不重複到訪，近 limit 天，新到舊
 pub async fn history(

@@ -46,12 +46,6 @@ async fn delete_comment(
     Path(id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::CommentDelete)?;
-    // 與 blog 本體同一套 owner 隔離：一般管理員只能刪自己文章下的留言。
-    // 少了這道，blog 本體嚴格隔離、留言卻不設限，等於留了一個側門。
-    let author = crate::repositories::blog_comments::get_blog_author(state.get_pool(), id)
-        .await?
-        .ok_or(crate::errors::RequestError::NotFound)?;
-    auth_user.require_owner(author)?;
-    comments_service::delete(state.get_pool(), id).await?;
+    comments_service::delete(state.get_pool(), &auth_user, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

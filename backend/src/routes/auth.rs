@@ -186,9 +186,7 @@ async fn list_passkeys(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthenticatedUser>,
 ) -> Result<Json<Vec<PasskeyListItem>>, AppError> {
-    Ok(Json(
-        crate::repositories::passkeys::list_by_user_id(state.get_pool(), auth_user.id).await?,
-    ))
+    Ok(Json(webauthn_service::list_own(&state, auth_user.id).await?))
 }
 
 async fn delete_passkey(
@@ -196,10 +194,6 @@ async fn delete_passkey(
     Extension(auth_user): Extension<AuthenticatedUser>,
     Path(id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
-    let deleted =
-        crate::repositories::passkeys::delete_own(state.get_pool(), auth_user.id, id).await?;
-    if !deleted {
-        return Err(AppError::RequestError(crate::errors::RequestError::NotFound));
-    }
+    webauthn_service::delete_own(&state, auth_user.id, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

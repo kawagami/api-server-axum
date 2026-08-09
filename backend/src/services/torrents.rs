@@ -3,6 +3,8 @@ use crate::{
     repositories::torrents as torrents_repo,
     state::AppState,
     structs::{
+        auth::AuthenticatedUser,
+        pagination::Paginated,
         torrents::{
             DownloadLink, Torrent, TorrentDownloadClaims, TorrentFile, DOWNLOAD_TOKEN_PURPOSE,
             STATUS_COMPLETED,
@@ -532,8 +534,29 @@ async fn purge_by_info_hash(manager: &TorrentManager, info_hash: &str, delete_fi
     }
 }
 
+/// 分頁列出任務（super_admin 看全部，其餘只看自己的）
+pub async fn list(
+    state: &AppState,
+    actor: &AuthenticatedUser,
+    status: Option<String>,
+    limit: i64,
+    offset: i64,
+) -> Result<Paginated<Torrent>, AppError> {
+    torrents_repo::list(state.get_pool(), status, actor.owner_filter(), limit, offset).await
+}
+
+/// 每支「指定單一任務」的端點共用的擁有者檢查。
+///
+/// **放在 service 而不是 route**：`torrents` 的資料隔離規則（非擁有者一律 404、
+/// super_admin 全可）是業務規則，而 route 端有 4 支要重複同一行；漏掉一支不會有
+/// 任何徵兆，只會變成一個能讀別人任務的側門。
+async fn ensure_owner(state: &AppState, actor: &AuthenticatedUser, id: i32) -> Result<(), AppError> {
+    actor.require_owner(torrents_repo::get_owner(state.get_pool(), id).await?)
+}
+
 /// 重設 failed / completed 任務為 pending 重跑
-pub async fn reset_pending(state: &AppState, id: i32) -> Result<(), AppError> {
+pub async fn reset_pending(state: &AppState, actor: &AuthenticatedUser, id: i32) -> Result<(), AppError> {
+    ensure_owner(state, actor, id).await?;
     if !torrents_repo::reset_pending(state.get_pool(), id).await? {
         // id 不存在 → 404；存在但下載中 → 409
         torrents_repo::get_by_id(state.get_pool(), id).await?;
@@ -543,8 +566,16 @@ pub async fn reset_pending(state: &AppState, id: i32) -> Result<(), AppError> {
     Ok(())
 }
 
-/// 刪除任務：session 停掉 → DB 刪除 → 磁碟清理 → 補位
-pub async fn delete(state: &AppState, id: i32) -> Result<(), AppError> {
+/// 刪除任務（端點入口，帶擁有者檢查）
+pub async fn delete(state: &AppState, actor: &AuthenticatedUser, id: i32) -> Result<(), AppError> {
+    ensure_owner(state, actor, id).await?;
+    delete_by_id(state, id).await
+}
+
+/// 刪除任務：session 停掉 → DB 刪除 → 磁碟清理 → 補位。
+/// **不做擁有者檢查** —— 呼叫端要嘛已檢查（`delete`），要嘛沒有身分可檢查
+/// （`cleanup_expired` 是排程 job）。
+async fn delete_by_id(state: &AppState, id: i32) -> Result<(), AppError> {
     let manager = state.get_torrents();
     // 先抽走佔位格並中止 task —— 還卡在解析 metadata（尚無 handle）的任務也要刪得掉
     let slot = manager.active.lock().await.remove(&id);
@@ -568,7 +599,8 @@ pub async fn delete(state: &AppState, id: i32) -> Result<(), AppError> {
 }
 
 /// 任務詳情：DB row + 進行中任務附上即時進度
-pub async fn detail(state: &AppState, id: i32) -> Result<serde_json::Value, AppError> {
+pub async fn detail(state: &AppState, actor: &AuthenticatedUser, id: i32) -> Result<serde_json::Value, AppError> {
+    ensure_owner(state, actor, id).await?;
     let torrent = torrents_repo::get_by_id(state.get_pool(), id).await?;
     let mut value = serde_json::to_value(&torrent)?;
 
@@ -599,9 +631,11 @@ pub async fn detail(state: &AppState, id: i32) -> Result<serde_json::Value, AppE
 /// 產生所有檔案的短效簽名下載連結
 pub async fn create_download_links(
     state: &AppState,
+    actor: &AuthenticatedUser,
     id: i32,
-    issuer_id: i64,
 ) -> Result<Vec<DownloadLink>, AppError> {
+    ensure_owner(state, actor, id).await?;
+    let issuer_id = actor.id;
     let torrent = torrents_repo::get_by_id(state.get_pool(), id).await?;
     if torrent.status != STATUS_COMPLETED {
         return Err(RequestError::Conflict("任務尚未完成，無法下載".to_string()).into());
@@ -671,35 +705,14 @@ pub async fn resolve_download_file(
         .parse()
         .map_err(|_| AppError::AuthError(crate::errors::AuthError::InvalidToken))?;
 
-    // 即時重查發行者權限（Redis 快取，同 auth middleware）— 權限被拔掉，已發出的連結立即失效
-    let permissions = match crate::repositories::redis::get_user_permissions(
-        state.get_redis_pool(),
-        issuer_id,
-    )
-    .await?
-    {
-        Some(perms) => perms,
-        None => {
-            let perms = crate::repositories::roles::get_user_permission_strings_by_id(
-                state.get_pool(),
-                issuer_id,
-            )
-            .await?;
-            // 回寫快取失敗不影響本次授權（perms 已經拿到了），但要留痕：
-            // 靜默失敗的症狀是「每次簽名下載都多打一次 DB」，看不出原因
-            if let Err(e) = crate::repositories::redis::set_user_permissions(
-                state.get_redis_pool(),
-                issuer_id,
-                &perms,
-            )
-            .await
-            {
-                tracing::warn!("權限快取回寫失敗 user_id={}: {}", issuer_id, e);
-            }
-            perms
-        }
-    };
-    if !permissions
+    // 即時重查發行者身分（同 auth middleware 的載入點）— 權限被拔掉或帳號被刪，
+    // 已發出的連結立即失效
+    let identity =
+        crate::services::auth::load_identity(state.get_pool(), state.get_redis_pool(), issuer_id)
+            .await?
+            .ok_or(AppError::AuthError(crate::errors::AuthError::Forbidden))?;
+    if !identity
+        .permissions
         .iter()
         .any(|p| p == crate::structs::roles::Perm::TorrentRead.as_str())
     {
@@ -789,7 +802,7 @@ pub async fn cleanup_expired(state: &AppState) -> Result<(), AppError> {
             torrent.id,
             torrent.name.as_deref().unwrap_or("-")
         );
-        if let Err(e) = delete(state, torrent.id).await {
+        if let Err(e) = delete_by_id(state, torrent.id).await {
             tracing::error!("cleanup torrent {} failed: {e}", torrent.id);
         }
     }

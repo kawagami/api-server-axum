@@ -1,3 +1,4 @@
+use crate::structs::auth::CachedIdentity;
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
 use redis::{AsyncCommands, ErrorKind, RedisError};
@@ -38,9 +39,9 @@ pub async fn get_redis_conn(
 /// 登入 session 效期。與 access token 效期（1 小時）對齊：token 還能用的期間 session
 /// 就該存在，token 一過期 session 也不必留。登入 / refresh 都會續期。
 const LOGIN_TTL_SECS: u64 = 3600;
-/// 權限快取效期。過期只是回頭查一次 DB；改動要立刻生效走
-/// [`invalidate_user_permissions`]，不靠這個 TTL。
-const PERMISSIONS_TTL_SECS: u64 = 3600;
+/// 身分快取（顯示名 / super_admin / 權限）效期。過期只是回頭查一次 DB；改動要立刻生效走
+/// [`invalidate_user_identity`]，不靠這個 TTL。
+const IDENTITY_TTL_SECS: u64 = 3600;
 /// OAuth state 效期 = 使用者在第三方頁面停留的容忍上限。
 const OAUTH_STATE_TTL_SECS: u64 = 300;
 /// member refresh token 效期（30 天）。
@@ -80,36 +81,45 @@ pub async fn user_login_exists(
     conn.exists(login_key(user_id)).await
 }
 
-pub async fn set_user_permissions(
+// ---- 認證身分快取 ----
+//
+// 一把 key 裝齊 middleware 需要的三件事（顯示名 / super_admin / 權限）。format 字串
+// 只出現在 `identity_key`，理由同 login_key。前身是 `user:permissions:{id}`（只裝權限），
+// 詳見 `structs::auth::CachedIdentity` 的註解。
+
+fn identity_key(user_id: i64) -> String {
+    format!("user:identity:{}", user_id)
+}
+
+pub async fn set_user_identity(
     pool: &RedisPool<RedisConnectionManager>,
     user_id: i64,
-    permissions: &[String],
+    identity: &CachedIdentity,
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    let key = format!("user:permissions:{}", user_id);
-    let value = serde_json::to_string(permissions)
-        .map_err(crate::errors::AppError::from)?;
-    conn.set_ex::<_, _, ()>(key, value, PERMISSIONS_TTL_SECS).await?;
+    let value = serde_json::to_string(identity).map_err(crate::errors::AppError::from)?;
+    conn.set_ex::<_, _, ()>(identity_key(user_id), value, IDENTITY_TTL_SECS)
+        .await?;
     Ok(())
 }
 
-pub async fn get_user_permissions(
+/// 快取內容壞掉（換過形狀的舊值）視同 miss —— 呼叫端會回頭查 DB 並覆寫，
+/// 比回錯誤讓整個 `/admin/*` 掛掉好。
+pub async fn get_user_identity(
     pool: &RedisPool<RedisConnectionManager>,
     user_id: i64,
-) -> Result<Option<Vec<String>>, crate::errors::AppError> {
+) -> Result<Option<CachedIdentity>, crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    let key = format!("user:permissions:{}", user_id);
-    let value: Option<String> = conn.get(key).await?;
+    let value: Option<String> = conn.get(identity_key(user_id)).await?;
     Ok(value.and_then(|v| serde_json::from_str(&v).ok()))
 }
 
-pub async fn del_user_permissions(
+pub async fn del_user_identity(
     pool: &RedisPool<RedisConnectionManager>,
     user_id: i64,
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    let key = format!("user:permissions:{}", user_id);
-    conn.del::<_, ()>(key).await?;
+    conn.del::<_, ()>(identity_key(user_id)).await?;
     Ok(())
 }
 
@@ -153,22 +163,16 @@ pub async fn get_member_refresh_token(
     Ok(conn.get(key).await?)
 }
 
-/// 失效單一 user 的權限快取 — 失敗只記 warn，不阻斷主流程
-pub async fn invalidate_user_permissions(
-    pool: &RedisPool<RedisConnectionManager>,
-    user_id: i64,
-) {
-    if let Err(e) = del_user_permissions(pool, user_id).await {
-        tracing::warn!("Failed to invalidate permissions cache for {}: {}", user_id, e);
+/// 失效單一 user 的身分快取 — 失敗只記 warn，不阻斷主流程
+pub async fn invalidate_user_identity(pool: &RedisPool<RedisConnectionManager>, user_id: i64) {
+    if let Err(e) = del_user_identity(pool, user_id).await {
+        tracing::warn!("Failed to invalidate identity cache for {}: {}", user_id, e);
     }
 }
 
-pub async fn invalidate_permissions_for_ids(
-    pool: &RedisPool<RedisConnectionManager>,
-    ids: &[i64],
-) {
+pub async fn invalidate_identity_for_ids(pool: &RedisPool<RedisConnectionManager>, ids: &[i64]) {
     for id in ids {
-        invalidate_user_permissions(pool, *id).await;
+        invalidate_user_identity(pool, *id).await;
     }
 }
 
@@ -360,14 +364,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn user_permissions_json_roundtrip() {
+    async fn user_identity_json_roundtrip() {
         let Some(p) = pool().await else { return };
         let uid = 9_000_000 + (rand::random::<u32>() % 100_000) as i64;
-        let perms = vec!["blog:update".to_string(), "user:read".to_string()];
-        set_user_permissions(&p, uid, &perms).await.unwrap();
-        assert_eq!(get_user_permissions(&p, uid).await.unwrap(), Some(perms));
-        del_user_permissions(&p, uid).await.unwrap();
-        assert_eq!(get_user_permissions(&p, uid).await.unwrap(), None);
+        let identity = CachedIdentity {
+            name: "kawa".to_string(),
+            is_super_admin: true,
+            permissions: vec!["blog:update".to_string(), "user:read".to_string()],
+        };
+        set_user_identity(&p, uid, &identity).await.unwrap();
+        let got = get_user_identity(&p, uid).await.unwrap().expect("應命中");
+        assert_eq!(got.name, identity.name);
+        assert!(got.is_super_admin);
+        assert_eq!(got.permissions, identity.permissions);
+
+        del_user_identity(&p, uid).await.unwrap();
+        assert!(get_user_identity(&p, uid).await.unwrap().is_none());
+    }
+
+    /// 壞掉的快取值（換過形狀的舊 `user:permissions:` 內容）必須視同 miss，
+    /// 不能讓整個 /admin/* 因為一顆解不開的 key 全掛。
+    #[tokio::test]
+    async fn corrupt_identity_cache_reads_as_miss() {
+        let Some(p) = pool().await else { return };
+        let uid = 9_000_000 + (rand::random::<u32>() % 100_000) as i64;
+        let mut conn = get_redis_conn(&p).await.unwrap();
+        conn.set_ex::<_, _, ()>(identity_key(uid), r#"["blog:update"]"#, 60)
+            .await
+            .unwrap();
+        assert!(get_user_identity(&p, uid).await.unwrap().is_none());
+        del_user_identity(&p, uid).await.unwrap();
     }
 
     #[tokio::test]

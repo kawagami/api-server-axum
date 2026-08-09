@@ -1,5 +1,5 @@
 use crate::{
-    errors::{AppError, RequestError},
+    errors::{unprocessable, AppError},
     repositories::app_settings as repo,
     state::Settings,
     structs::{app_settings::AppSetting, features::Feature},
@@ -72,20 +72,16 @@ const SECRET_MASK: &str = "********";
 /// 全部主題清單 — 與前端 libs/site-theme.ts 的 SITE_THEMES 一致
 const SITE_THEMES: &[&str] = &["forest", "ocean", "sky", "sunset", "sakura", "grape", "mono"];
 
-fn unprocessable(msg: String) -> AppError {
-    RequestError::UnprocessableContent(msg).into()
-}
-
 /// theme_rotation 驗證：JSON 物件，key 剛好 "0".."6"，value 為 SITE_THEMES 之一（拒 auto）
 fn validate_theme_rotation(value: &str) -> Result<(), AppError> {
     let map: std::collections::HashMap<String, String> = serde_json::from_str(value)
-        .map_err(|_| unprocessable("theme_rotation 必須是合法 JSON 物件".into()))?;
+        .map_err(|_| unprocessable("theme_rotation 必須是合法 JSON 物件"))?;
 
     let expected: std::collections::HashSet<&str> =
         ["0", "1", "2", "3", "4", "5", "6"].into_iter().collect();
     let got: std::collections::HashSet<&str> = map.keys().map(String::as_str).collect();
     if got != expected {
-        return Err(unprocessable("theme_rotation 的 key 必須剛好為 \"0\"–\"6\"".into()));
+        return Err(unprocessable("theme_rotation 的 key 必須剛好為 \"0\"–\"6\""));
     }
 
     for v in map.values() {
@@ -104,15 +100,15 @@ fn validate_theme_rotation(value: &str) -> Result<(), AppError> {
 /// 新增卡片只需改前端、後端不用同步。
 fn validate_home_features(value: &str) -> Result<(), AppError> {
     let items: Vec<String> = serde_json::from_str(value)
-        .map_err(|_| unprocessable("home_features 必須是 JSON 字串陣列".into()))?;
+        .map_err(|_| unprocessable("home_features 必須是 JSON 字串陣列"))?;
 
     if items.len() > 50 {
-        return Err(unprocessable("home_features 最多 50 項".into()));
+        return Err(unprocessable("home_features 最多 50 項"));
     }
     let mut seen = std::collections::HashSet::new();
     for item in &items {
         if item.is_empty() || item.len() > 64 {
-            return Err(unprocessable("home_features 項目須為 1–64 字元的字串".into()));
+            return Err(unprocessable("home_features 項目須為 1–64 字元的字串"));
         }
         if !seen.insert(item.as_str()) {
             return Err(unprocessable(format!("home_features 有重複項目 {item}")));
@@ -129,7 +125,7 @@ fn validate_enabled_features(value: &str) -> Result<(), AppError> {
         return Ok(());
     }
     let items: Vec<String> = serde_json::from_str(value).map_err(|_| {
-        unprocessable("enabled_features 必須是 \"all\" 或 JSON 字串陣列".into())
+        unprocessable("enabled_features 必須是 \"all\" 或 JSON 字串陣列")
     })?;
 
     let mut seen = std::collections::HashSet::new();
@@ -148,7 +144,7 @@ fn validate_enabled_features(value: &str) -> Result<(), AppError> {
     // 依賴規則：portfolio 的市價/股名靠 stocks 的排程 job 餵資料
     if seen.contains(&Feature::Portfolio) && !seen.contains(&Feature::Stocks) {
         return Err(unprocessable(
-            "enabled_features 啟用 portfolio 時必須同時啟用 stocks".into(),
+            "enabled_features 啟用 portfolio 時必須同時啟用 stocks",
         ));
     }
     Ok(())
@@ -160,7 +156,7 @@ fn validate_enabled_features(value: &str) -> Result<(), AppError> {
 fn validate_webauthn_rp_id(value: &str) -> Result<(), AppError> {
     if value.is_empty() || value.contains('/') || value.contains(':') || value.contains(' ') {
         return Err(unprocessable(
-            "webauthn_rp_id 必須是裸網域（如 kawa.homes，不含 scheme / port / 路徑）".into(),
+            "webauthn_rp_id 必須是裸網域（如 kawa.homes，不含 scheme / port / 路徑）",
         ));
     }
     Ok(())
@@ -172,7 +168,7 @@ fn validate_webauthn_rp_origin(value: &str) -> Result<(), AppError> {
         .unwrap_or(false);
     if !ok {
         return Err(unprocessable(
-            "webauthn_rp_origin 必須是合法 http(s) URL（如 https://kawa.homes）".into(),
+            "webauthn_rp_origin 必須是合法 http(s) URL（如 https://kawa.homes）",
         ));
     }
     Ok(())
@@ -200,12 +196,12 @@ fn validate_int_range(key: &str, value: &str, min: u32, max: u32) -> Result<(), 
 fn validate_cors_allowed_origins(value: &str) -> Result<(), AppError> {
     let items: Vec<&str> = value.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
     if items.is_empty() {
-        return Err(unprocessable("cors_allowed_origins 不可為空".into()));
+        return Err(unprocessable("cors_allowed_origins 不可為空"));
     }
     for item in items {
         if item.contains('*') {
             return Err(unprocessable(
-                "cors_allowed_origins 不接受 *（會讓後端啟動時 panic）；請逐一列出來源".into(),
+                "cors_allowed_origins 不接受 *（會讓後端啟動時 panic）；請逐一列出來源",
             ));
         }
         let rest = item
@@ -409,7 +405,7 @@ pub async fn update_many(
     updates: &BTreeMap<String, String>,
 ) -> Result<Vec<AppSetting>, AppError> {
     if updates.is_empty() {
-        return Err(unprocessable("沒有要更新的設定".into()));
+        return Err(unprocessable("沒有要更新的設定"));
     }
     for (key, value) in updates {
         validate(key, value)?;

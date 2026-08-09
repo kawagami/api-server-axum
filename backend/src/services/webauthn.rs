@@ -3,13 +3,28 @@ use crate::{
     repositories::{passkeys, redis, users},
     services::auth as auth_service,
     state::AppState,
-    structs::webauthn::PasskeyLoginBeginResponse,
+    structs::webauthn::{PasskeyListItem, PasskeyLoginBeginResponse},
 };
 use webauthn_rs::prelude::{
     CreationChallengeResponse, CredentialID, DiscoverableAuthentication, DiscoverableKey, Passkey,
     PasskeyRegistration, PublicKeyCredential, RegisterPublicKeyCredential, Uuid, WebauthnError,
 };
 use webauthn_rs_proto::ResidentKeyRequirement;
+
+/// 管理頁列表：只列自己的 passkey（不回公鑰 / credential_id）。
+pub async fn list_own(state: &AppState, user_id: i64) -> Result<Vec<PasskeyListItem>, AppError> {
+    passkeys::list_by_user_id(state.get_pool(), user_id).await
+}
+
+/// 刪除自己的一把 passkey。**「只能刪自己的」由 SQL 的 `AND user_id = $2` 保證**，
+/// 刪不到（不存在或不是本人的）一律 404 —— 不區分兩者，避免用回應碼探測他人 passkey id。
+pub async fn delete_own(state: &AppState, user_id: i64, id: i64) -> Result<(), AppError> {
+    if passkeys::delete_own(state.get_pool(), user_id, id).await? {
+        Ok(())
+    } else {
+        Err(AppError::RequestError(RequestError::NotFound))
+    }
+}
 
 // 挑戰壽命：Conditional UI 掛在登入頁超過此時間才點 autofill 會失敗，前端 401 靜默重 begin 一次
 const CHALLENGE_TTL_SECS: u64 = 300;

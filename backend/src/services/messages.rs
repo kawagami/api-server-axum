@@ -2,18 +2,14 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::messages as repo,
     structs::pagination::Paginated,
-    structs::messages::{Message, NewMessage}
+    structs::messages::{Message, NewMessage},
+    utils::text::normalize_optional,
 };
 use sqlx::{Pool, Postgres};
 
 const CONTENT_MAX: usize = 5000;
 const NAME_MAX: usize = 100;
 const EMAIL_MAX: usize = 200;
-
-/// 修剪字串,空字串視為 None(name / email 選填,可匿名留言)
-fn normalize_optional(s: Option<String>) -> Option<String> {
-    s.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
-}
 
 /// 驗證並建立一則留言。content 必填非空、長度上限;name / email 選填但有長度上限,
 /// email 若有值做最基本格式檢查(含 `@`、無空白)。違規回 422。
@@ -55,8 +51,8 @@ pub async fn list(
     limit: i64,
     offset: i64,
 ) -> Result<Paginated<Message>, AppError> {
-    let total = repo::count(pool).await?;
-    let data = repo::list(pool, limit, offset).await?;
+    // count 與 list 併發跑：序列 await 是白吃一倍延遲（範本同 services/logs.rs）
+    let (data, total) = tokio::try_join!(repo::list(pool, limit, offset), repo::count(pool))?;
     Ok(Paginated::new(data, total))
 }
 

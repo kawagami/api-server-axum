@@ -50,17 +50,6 @@ pub struct TicketListQuery {
     pub per_page: Option<i64>,
 }
 
-/// 通知偏好切換
-#[derive(Deserialize)]
-pub struct NotifyPrefRequest {
-    pub enabled: bool,
-}
-
-#[derive(Serialize)]
-pub struct NotifyPrefResponse {
-    pub enabled: bool,
-}
-
 /// 開獎結果（DB 對應，亦作 API 回傳）
 #[derive(Clone, Serialize, FromRow)]
 pub struct Draw {

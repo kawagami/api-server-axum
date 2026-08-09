@@ -197,6 +197,15 @@ impl AppError {
     }
 }
 
+/// 422 的簡寫：驗證程式碼裡 `RequestError::UnprocessableContent(msg).into()` 出現頻率最高，
+/// 每個 service 各寫一份私有 helper 是重複的來源（收斂前 `services/{invoices,lotto_tickets,
+/// app_settings}.rs` 各一份，兩份吃 `&str`、一份吃 `String`，簽名還不一致）。
+///
+/// 吃 `impl Into<String>` 讓字面值與 `format!` 兩種呼叫端都不必在呼叫處補 `.into()`。
+pub fn unprocessable(msg: impl Into<String>) -> AppError {
+    AppError::RequestError(RequestError::UnprocessableContent(msg.into()))
+}
+
 /// 「沒帶票 / 票過期」這類日常 401 —— 記 debug。
 ///
 /// 反過來說，留在 WARN 的是**帶著身分卻被擋下**的那些：`Forbidden`（權限不足）、

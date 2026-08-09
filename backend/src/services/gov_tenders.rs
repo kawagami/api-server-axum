@@ -20,8 +20,11 @@ pub async fn list(
     limit: i64,
     offset: i64,
 ) -> Result<Paginated<GovTender>, AppError> {
-    let total = repo::count(pool, query).await?;
-    let data = repo::list(pool, query, limit, offset).await?;
+    // count 與 list 併發跑：序列 await 是白吃一倍延遲（範本同 services/logs.rs）
+    let (data, total) = tokio::try_join!(
+        repo::list(pool, query, limit, offset),
+        repo::count(pool, query),
+    )?;
     Ok(Paginated::new(data, total))
 }
 

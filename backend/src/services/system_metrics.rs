@@ -1,10 +1,19 @@
 //! VPS 系統指標採集:直接讀 /proc + libc::statvfs,不引外部 crate(container 內 /proc 由 kernel 掛載)。
 //! 容器未設 cgroup 上限時,這些值即等同整台 VPS。
 
-use crate::repositories::system_metrics::MetricSample;
+use crate::errors::AppError;
+use crate::repositories::system_metrics::{self as repo, MetricSample};
+use crate::structs::system_metrics::SystemMetric;
+use sqlx::{Pool, Postgres};
 use std::io;
 
 const DISK_PATH: &str = "/";
+
+/// 近 N 小時的指標（已依範圍分桶聚合，見 `repositories::system_metrics::get_recent`）。
+/// hours 的 clamp 在 route 做（那是 query 參數的驗證）。
+pub async fn recent(pool: &Pool<Postgres>, hours: i64) -> Result<Vec<SystemMetric>, AppError> {
+    Ok(repo::get_recent(pool, hours).await?)
+}
 
 /// /proc/stat 首行的累計 tick 數。單獨一筆沒有意義,要跟前一筆相減才得到區間使用率。
 #[derive(Clone, Copy, Debug)]

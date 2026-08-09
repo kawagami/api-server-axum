@@ -3,8 +3,14 @@ use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
 /// 台北時區偏移（UTC+8，無 DST）。
 ///
 /// 「今天」在這個專案裡一律以台北日為準：資料來源（TWSE / 台彩 / 財政部）都照台北營業日
-/// 發佈，統計的日界也是台北 00:00。而生產 image 沒有設 `TZ` —— `chrono::Local` 實際等於
-/// UTC，會讓台北 00:00–08:00 那八小時的「今天」算成昨天。
+/// 發佈，統計的日界也是台北 00:00。
+///
+/// **為什麼不用 `chrono::Local`**：它的結果取決於行程的 `TZ` 環境變數。生產 image 目前
+/// 有設（`Dockerfile` 的 `ENV TZ=Asia/Taipei`），但那條規則發生在部署層、不在版控的
+/// Rust 程式碼裡 —— 拿掉或換基底 image 少了 tzdata，`Local` 就悄悄退回 UTC，
+/// 台北 00:00–08:00 那八小時的「今天」全部算成昨天，而且沒有任何編譯期或啟動期徵兆。
+/// 明寫偏移量不依賴環境。（歷史：導入這幾支時 image 確實沒設 `TZ`，`Local` 當時等於 UTC，
+/// `services/portfolio.rs` ×3、`services/stocks.rs`、`jobs/fetch_buyback_periods.rs` 都中過。）
 ///
 /// **偏移量只在這裡出現一次**：不要再寫第二個 `FixedOffset::east_opt(8 * 3600)`，也不要在
 /// 任何地方用 `Local::now()` 當「今天」。

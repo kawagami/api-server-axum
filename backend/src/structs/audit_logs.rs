@@ -1,5 +1,21 @@
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+/// `admin_audit_logs` 表的一列，同時是 `GET /admin/audit_logs` 的回應型別。
+#[derive(Serialize, sqlx::FromRow)]
+pub struct AuditLog {
+    pub id: i64,
+    /// `admin` / `member` —— 兩種身分的 `user_email` 語意不同，見 `AuditEntry`
+    pub actor_type: String,
+    pub user_email: String,
+    pub method: String,
+    pub path: String,
+    pub query: Option<String>,
+    pub status_code: i16,
+    /// 對應 `logs.request_id`，可據此撈出該次請求的完整軌跡（舊資料為 NULL）
+    pub request_id: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
 
 /// `GET /admin/audit_logs` 的篩選參數。
 ///

@@ -1,6 +1,7 @@
 use crate::{
     errors::{AppError, AuthError},
-    repositories::{redis, roles as roles_repo, users as users_repo},
+    repositories::redis,
+    services::auth as auth_service,
     state::AppState,
     structs::{
         auth::{AuthenticatedUser, Claims},
@@ -24,30 +25,17 @@ pub async fn authorize_and_load(
     let token = extract_token(&req)?;
     let id = verify_admin_token(&state, token).await?;
 
-    let permissions = match redis::get_user_permissions(state.get_redis_pool(), id).await? {
-        Some(perms) => perms,
-        None => {
-            let perms =
-                roles_repo::get_user_permission_strings_by_id(state.get_pool(), id).await?;
-            // 回寫失敗不擋這次請求（權限已經拿到），但要留痕 —— 這條靜默失敗的症狀是
-            // 「每個 /admin/* 請求都多一次 roles JOIN」，在 log 上完全看不出原因
-            if let Err(e) = redis::set_user_permissions(state.get_redis_pool(), id, &perms).await {
-                tracing::warn!("權限快取回寫失敗 user_id={}: {}", id, e);
-            }
-            perms
-        }
-    };
-
-    // 取顯示名 + 是否 super_admin（帳號已刪 → 視為未授權）
-    let (name, is_super_admin) = users_repo::get_identity_by_id(state.get_pool(), id)
+    // 顯示名 / super_admin / 權限一次取齊（快取命中 = 零 DB）；
+    // None = 帳號已刪但 token/session 未過期 → 視為未授權
+    let identity = auth_service::load_identity(state.get_pool(), state.get_redis_pool(), id)
         .await?
         .ok_or(AppError::AuthError(AuthError::Unauthorized))?;
 
     req.extensions_mut().insert(AuthenticatedUser {
         id,
-        name,
-        permissions,
-        is_super_admin,
+        name: identity.name,
+        permissions: identity.permissions,
+        is_super_admin: identity.is_super_admin,
     });
 
     Ok(next.run(req).await)

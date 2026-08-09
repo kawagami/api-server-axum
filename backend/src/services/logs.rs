@@ -1,7 +1,7 @@
 use crate::{
     errors::AppError,
-    repositories::logs::{self as logs_repo, Log},
-    structs::{logs::LogQuery, pagination::Paginated},
+    repositories::logs as logs_repo,
+    structs::{logs::{Log, LogQuery}, pagination::Paginated},
 };
 use sqlx::{Pool, Postgres};
 

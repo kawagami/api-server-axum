@@ -1,12 +1,12 @@
 use crate::{
     errors::AppError,
     repositories::audit_logs,
-    structs::{audit_logs::AuditLogQuery, pagination::Paginated},
+    structs::{audit_logs::{AuditLog, AuditLogQuery}, pagination::Paginated},
 };
 use sqlx::{Pool, Postgres};
 use tokio::sync::mpsc;
 
-pub use crate::repositories::audit_logs::{AuditEntry, AuditLog};
+pub use crate::repositories::audit_logs::AuditEntry;
 
 /// 稽核批次寫入器（啟動時 spawn 一個）。攢批的節奏走 `batch_writer`，與
 /// `logging::log_writer` 共用同一份迴圈與常數。

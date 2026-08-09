@@ -1,7 +1,7 @@
 use crate::{
     errors::{AppError, AuthError, SystemError},
     repositories::{redis, roles as roles_repo, users},
-    structs::auth::Claims,
+    structs::auth::{CachedIdentity, Claims},
 };
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
@@ -15,6 +15,41 @@ use std::sync::LazyLock;
 // lazy 初始化發生在 spawn_blocking 執行緒，不佔 async worker。
 static DUMMY_HASH: LazyLock<String> =
     LazyLock::new(|| hash("dummy-password", DEFAULT_COST).expect("bcrypt dummy hash"));
+
+/// 認證身分（顯示名 / super_admin / 權限）的**唯一**載入點：Redis 命中 = 零 DB。
+///
+/// 回 `None` = 帳號已不存在（token / session 還沒過期，視同未授權）。
+///
+/// 兩個呼叫端：`middleware::auth::authorize_and_load`（每個 `/admin/*` 請求）與
+/// `services::torrents::resolve_download_file`（簽名連結即時重查發行者權限）。
+/// 收斂前兩邊各有一份逐字相同的 Redis→DB fallback，而 middleware 那份**還多打一次
+/// PG 拿 name / is_super_admin**，等於權限快取命中也省不掉 round-trip。
+pub async fn load_identity(
+    pool: &Pool<Postgres>,
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    user_id: i64,
+) -> Result<Option<CachedIdentity>, AppError> {
+    if let Some(cached) = redis::get_user_identity(redis_pool, user_id).await? {
+        return Ok(Some(cached));
+    }
+
+    // miss 才碰 DB，兩支查詢併發（沒有先後依賴）
+    let (identity, permissions) = tokio::try_join!(
+        users::get_identity_by_id(pool, user_id),
+        roles_repo::get_user_permission_strings_by_id(pool, user_id),
+    )?;
+    let Some((name, is_super_admin)) = identity else {
+        return Ok(None);
+    };
+
+    let identity = CachedIdentity { name, is_super_admin, permissions };
+    // 回寫失敗不擋這次請求（值已經拿到了），但要留痕 —— 這條靜默失敗的症狀是
+    // 「每個 /admin/* 請求都多兩次 DB 查詢」，在 log 上完全看不出原因
+    if let Err(e) = redis::set_user_identity(redis_pool, user_id, &identity).await {
+        tracing::warn!("身分快取回寫失敗 user_id={}: {}", user_id, e);
+    }
+    Ok(Some(identity))
+}
 
 pub async fn sign_in(
     pool: &Pool<Postgres>,
@@ -40,7 +75,7 @@ pub async fn sign_in(
 }
 
 /// 身分驗證通過後的共同收尾（密碼與 passkey 登入共用）：
-/// Redis 寫 login key + 快取 permissions + 簽發 JWT。
+/// Redis 寫 login key + 預熱身分快取 + 簽發 JWT。
 pub async fn complete_admin_login(
     pool: &Pool<Postgres>,
     redis_pool: &RedisPool<RedisConnectionManager>,
@@ -49,8 +84,12 @@ pub async fn complete_admin_login(
 ) -> Result<String, AppError> {
     redis::set_user_login(redis_pool, id).await?;
 
-    let permissions = roles_repo::get_user_permission_strings_by_id(pool, id).await?;
-    redis::set_user_permissions(redis_pool, id, &permissions).await?;
+    // 先失效再載入：登入是「重新確認這個人是誰」的時點，不該沿用上一輪的快取值。
+    // 載入順帶把快取寫回去，登入後的第一個請求就不必回頭查 DB。
+    redis::invalidate_user_identity(redis_pool, id).await;
+    load_identity(pool, redis_pool, id)
+        .await?
+        .ok_or(AppError::AuthError(AuthError::Unauthorized))?;
 
     encode_jwt(id, jwt_secret)
 }

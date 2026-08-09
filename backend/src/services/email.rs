@@ -4,6 +4,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
+use std::sync::{LazyLock, Mutex};
 
 /// 寄信沒送出去的兩種原因。
 ///
@@ -109,6 +110,45 @@ fn is_connection_failure(err: &anyhow::Error) -> bool {
     false
 }
 
+/// 已建好的 transport（帶 lettre 的連線池，見 Cargo.toml 的 `pool` feature）。
+///
+/// 每封信重建一個 transport＝每封信一次完整的 TCP + STARTTLS + AUTH 握手，而中獎/標案
+/// 通知都是「一個收件人一封」的迴圈；憑證沒變就重用同一個，池才留得住連線。
+///
+/// 用 `std::sync::Mutex` 而非 tokio 的：臨界區只有 clone 與 build，都是同步的，
+/// **不跨 `.await`**（`send` 拿到 clone 之後才 await，鎖早已釋放）。
+static MAILER: LazyLock<Mutex<Option<CachedMailer>>> = LazyLock::new(|| Mutex::new(None));
+
+struct CachedMailer {
+    username: String,
+    password: String,
+    transport: AsyncSmtpTransport<Tokio1Executor>,
+}
+
+/// 憑證與快取相同就重用，否則重建（`smtp_username` / `smtp_password` 是可熱更新的
+/// app_settings，改了必須立刻換掉手上這個，不能等重啟）。
+fn mailer_for(
+    username: &str,
+    password: &str,
+) -> anyhow::Result<AsyncSmtpTransport<Tokio1Executor>> {
+    let mut cached = MAILER.lock().map_err(|_| anyhow::anyhow!("mailer lock poisoned"))?;
+    if let Some(current) = cached.as_ref() {
+        if current.username == username && current.password == password {
+            return Ok(current.transport.clone());
+        }
+    }
+
+    let transport = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay("smtp.gmail.com")?
+        .credentials(Credentials::new(username.to_owned(), password.to_owned()))
+        .build();
+    *cached = Some(CachedMailer {
+        username: username.to_owned(),
+        password: password.to_owned(),
+        transport: transport.clone(),
+    });
+    Ok(transport)
+}
+
 async fn send_email(
     username: &str,
     password: &str,
@@ -123,12 +163,6 @@ async fn send_email(
         .header(ContentType::TEXT_PLAIN)
         .body(body)?;
 
-    let creds = Credentials::new(username.to_owned(), password.to_owned());
-
-    let mailer = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay("smtp.gmail.com")?
-        .credentials(creds)
-        .build();
-
-    mailer.send(email).await?;
+    mailer_for(username, password)?.send(email).await?;
     Ok(())
 }

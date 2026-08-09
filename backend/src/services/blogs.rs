@@ -1,6 +1,7 @@
 use crate::{
     errors::{AppError, RequestError},
     repositories::{blogs as blogs_repo, images as images_repo},
+    structs::auth::AuthenticatedUser,
     structs::blogs::{DbBlog, PutBlog, TagCount},
     structs::pagination::{PageQuery, Paginated}
 };
@@ -148,7 +149,25 @@ pub async fn delete_tag(pool: &Pool<Postgres>, owner: Option<i64>, tag: String) 
     blogs_repo::delete_tag(pool, owner, tag).await
 }
 
-pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_id: i64) -> Result<String, AppError> {
+/// 建立或更新一篇文章，回傳標題。
+///
+/// **擁有者檢查在這裡**：既有文章只能改自己的（super_admin 例外），
+/// 不存在＝新建、擁有者記為 actor。放在 service 是因為「誰能改這篇」跟寫入是同一個
+/// 決策，留在 route 就得靠每個呼叫端自己記得先查一次 author。
+pub async fn upsert_blog(
+    pool: &Pool<Postgres>,
+    actor: &AuthenticatedUser,
+    id: Uuid,
+    blog: PutBlog,
+) -> Result<String, AppError> {
+    if let Some(author) = blogs_repo::get_author(pool, id).await? {
+        actor.require_owner(author)?;
+    }
+    let author_id = actor.id;
+    upsert_blog_inner(pool, id, blog, author_id).await
+}
+
+async fn upsert_blog_inner(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_id: i64) -> Result<String, AppError> {
     let tocs = extract_toc_texts(&blog.markdown);
     let title = tocs.first().cloned().unwrap_or_default();
 
@@ -187,7 +206,20 @@ pub async fn upsert_blog(pool: &Pool<Postgres>, id: Uuid, blog: PutBlog, author_
     Ok(title)
 }
 
-pub async fn delete_blog_with_images(pool: &Pool<Postgres>, id: Uuid) -> Result<(), AppError> {
+/// 刪文（連同其圖片）。擁有者檢查同 `upsert_blog`；查不到作者＝文章不存在 → 404。
+pub async fn delete_blog_with_images(
+    pool: &Pool<Postgres>,
+    actor: &AuthenticatedUser,
+    id: Uuid,
+) -> Result<(), AppError> {
+    let author = blogs_repo::get_author(pool, id)
+        .await?
+        .ok_or(RequestError::NotFound)?;
+    actor.require_owner(author)?;
+    delete_blog_with_images_inner(pool, id).await
+}
+
+async fn delete_blog_with_images_inner(pool: &Pool<Postgres>, id: Uuid) -> Result<(), AppError> {
     let blog = blogs_repo::get_blog_by_id(pool, id).await?;
     let upload_urls = extract_image_urls(&blog.markdown);
 

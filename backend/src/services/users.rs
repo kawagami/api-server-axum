@@ -53,7 +53,7 @@ pub async fn delete_user(
     user_id: i64,
 ) -> Result<(), AppError> {
     users_repo::delete_user(pool, user_id).await?;
-    redis::invalidate_user_permissions(redis_pool, user_id).await;
+    redis::invalidate_user_identity(redis_pool, user_id).await;
     if let Err(e) = redis::del_user_login(redis_pool, user_id).await {
         tracing::warn!("Failed to invalidate login cache for user {}: {}", user_id, e);
     }
@@ -73,6 +73,6 @@ pub async fn set_user_roles(
 ) -> Result<(), AppError> {
     super::roles::ensure_assignable(pool, actor, &role_ids).await?;
     users_repo::set_user_roles(pool, user_id, &role_ids).await?;
-    redis::invalidate_user_permissions(redis_pool, user_id).await;
+    redis::invalidate_user_identity(redis_pool, user_id).await;
     Ok(())
 }

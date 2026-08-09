@@ -29,6 +29,22 @@ pub struct ChangePasswordData {
     pub new_password: String,
 }
 
+/// 認證用身分快取的內容（Redis `user:identity:{id}`）。
+///
+/// 原本只快取 `permissions`，`name` 與 `is_super_admin` 每個請求都打一次 PG
+/// （`users_repo::get_identity_by_id`）—— 於是「權限快取命中」也還是 1 次 DB round-trip，
+/// 而 `/admin/*` 的每個請求都會走這條。三個值的失效條件完全相同（`set_user_roles` /
+/// `set_role_permissions` / `delete_user` / `delete_role`），沒有理由分兩份存。
+///
+/// ⚠️ **`name` 能被快取的前提是 `users.name` 不可變**（全 repo 只有 password 有 UPDATE）。
+/// 哪天加了改名端點，那支必須呼叫 `redis::invalidate_user_identity`。
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CachedIdentity {
+    pub name: String,
+    pub is_super_admin: bool,
+    pub permissions: Vec<String>,
+}
+
 #[derive(Clone, Debug)]
 pub struct AuthenticatedUser {
     pub id: i64,

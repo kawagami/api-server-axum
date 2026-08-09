@@ -1,5 +1,22 @@
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// `logs` 表的一列，同時是 `GET /logs` 與 `GET /logs/request/{id}` 的回應型別。
+#[derive(Serialize, sqlx::FromRow)]
+pub struct Log {
+    pub id: i64,
+    pub level: String,
+    pub message: String,
+    pub target: String,
+    pub file: Option<String>,
+    pub line: Option<i32>,
+    /// 對應 `x-request-id` / 錯誤 body 的 `request_id`，用來把一個請求的 log 串起來
+    pub request_id: Option<String>,
+    /// event 與 span 的其餘 field（`self` = 錯誤細節、`method`、`path`…），見 `logging.rs`
+    pub fields: Option<Value>,
+    pub created_at: DateTime<Utc>,
+}
 
 /// `GET /logs` 的篩選參數。
 ///

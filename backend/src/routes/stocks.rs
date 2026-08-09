@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        pagination::{PageQuery, Paginated},
+        pagination::{PageQuery, Paginated, StatusFilter},
         roles::Perm,
         stocks::{
             Conditions, GetStockDayAll, StockBuybackMoreInfo, StockBuybackPeriod, StockChange,
@@ -19,7 +19,6 @@ use axum::{
     routing::{get, patch},
     Router
 };
-use serde::Deserialize;
 
 pub fn new(state: AppState) -> Router<AppState> {
     super::with_auth(
@@ -32,11 +31,6 @@ pub fn new(state: AppState) -> Router<AppState> {
             .route("/buyback_price_gaps", get(buyback_price_gaps))
             .route("/buyback_periods", get(buyback_periods)),
     )
-}
-
-#[derive(Deserialize)]
-struct StatusFilter {
-    status: Option<String>,
 }
 
 async fn list_stock_changes(

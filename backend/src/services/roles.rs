@@ -101,7 +101,7 @@ pub async fn set_role_permissions(
     ensure_no_amplification(actor, &granting, "設定角色權限")?;
     let ids = roles_repo::get_ids_by_role_id(pool, role_id).await?;
     roles_repo::set_role_permissions(pool, role_id, &body.permission_ids).await?;
-    redis::invalidate_permissions_for_ids(redis_pool, &ids).await;
+    redis::invalidate_identity_for_ids(redis_pool, &ids).await;
     Ok(())
 }
 
@@ -112,7 +112,7 @@ pub async fn delete_role(
 ) -> Result<(), AppError> {
     let ids = roles_repo::get_ids_by_role_id(pool, role_id).await?;
     roles_repo::delete_role(pool, role_id).await?;
-    redis::invalidate_permissions_for_ids(redis_pool, &ids).await;
+    redis::invalidate_identity_for_ids(redis_pool, &ids).await;
     Ok(())
 }
 

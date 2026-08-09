@@ -200,7 +200,26 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
                 // 讓瀏覽器端 JS 可讀到追蹤 id，方便回報問題時附上
                 .expose_headers([header::HeaderName::from_static("x-request-id")]),
         )
-        // 把 layer / Router 直接吐的錯誤（413、405）換成統一形狀 + 落 log。
+        // handler 上限：逾時放棄產生回應，回 408（body 由下面的 error_shape 正規化）。
+        //
+        // 沒有這層時，一個卡住的 handler（上游不回、DB 慢查詢、鎖等待）會一直佔著
+        // tokio worker 與那條 PG 連線；1 核 1G 上幾個就吃光。
+        //
+        // **60 秒是對齊 nginx 而不是隨手挑的**：`deploy/nginx/conf.d/api.kawa.homes.conf`
+        // 的 `location /` 吃預設 `proxy_read_timeout 60s`，也就是說超過 60 秒的請求
+        // client 早就收到 504 了，backend 再跑下去純粹是浪費。
+        //
+        // ⚠️ **不要調得更短**：api vhost 開了 `proxy_request_buffering off`，圖片上傳的
+        // client body 是邊傳邊進 handler 的，計時包含使用者的上傳時間 —— 10MB 走慢速
+        // 行動網路可以超過半分鐘，短逾時會把正常上傳打成 408。
+        //
+        // 對長連線無影響：計時只到「回應產生」為止，WS 的 101 與 torrent 下載的
+        // `ServeFile` 都是先回 header 再串流，串流時間不算在內。
+        .layer(tower_http::timeout::TimeoutLayer::with_status_code(
+            axum::http::StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(60),
+        ))
+        // 把 layer / Router 直接吐的錯誤（408、413、405）換成統一形狀 + 落 log。
         // 必須掛在 `RequestBodyLimitLayer` 與 Router **外層**（= 程式碼順序在其後）才看得到
         // 它們的回應，同時在 request_id middleware 內層，才拿得到 task-local 的追蹤 id。
         .layer(middleware::from_fn(

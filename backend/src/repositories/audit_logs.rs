@@ -1,22 +1,6 @@
-use crate::structs::audit_logs::AuditLogQuery;
-use chrono::{DateTime, Utc};
-use serde::Serialize;
+use crate::structs::audit_logs::{AuditLog, AuditLogQuery};
 use sqlx::{Pool, Postgres};
 
-#[derive(Serialize, sqlx::FromRow)]
-pub struct AuditLog {
-    pub id: i64,
-    /// `admin` / `member` —— 兩種身分的 `user_email` 語意不同，見 `AuditEntry`
-    pub actor_type: String,
-    pub user_email: String,
-    pub method: String,
-    pub path: String,
-    pub query: Option<String>,
-    pub status_code: i16,
-    /// 對應 `logs.request_id`，可據此撈出該次請求的完整軌跡（舊資料為 NULL）
-    pub request_id: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
 
 /// 待寫入的一筆稽核紀錄（由 audit middleware 產生，經 channel 交給批次寫入器）。
 pub struct AuditEntry {
