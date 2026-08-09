@@ -1,3 +1,7 @@
+// 這裡是錯誤 body 的產生點，用的是 axum::Json 的**回應**能力，
+// 不涉及 `crate::extract` 要修的 extractor rejection（那邊反過來依賴這裡，繞回來會循環）
+#![allow(clippy::disallowed_types)]
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -63,6 +67,16 @@ pub enum RequestError {
     /// 使用者拿到的是唯一一種沒有 request_id 的錯誤 body，回報問題時對不到 log。
     #[error("{0}")]
     TooManyRequests(String),
+
+    /// 請求**還沒到 handler** 就被拒的錯誤：extractor rejection（見 `extract.rs`）
+    /// 與 layer / Router 直接吐的回應（413、405，見 `middleware/error_shape.rs`）。
+    ///
+    /// **狀態碼沿用原本那個**，只把 body 換成全站統一形狀。逐一映射到既有 variant 的話，
+    /// 哪天多一種我們沒對到的拒絕原因，狀態碼就會被悄悄改掉 —— 帶著 status 走是唯一
+    /// 不會漂移的做法。
+    /// （5xx 在轉換函式那層就變成 `SystemError`，所以這個 variant 恆為 4xx。）
+    #[error("{message}")]
+    Rejection { status: StatusCode, message: String },
 }
 
 #[derive(Error, Debug)]
@@ -156,6 +170,7 @@ impl AppError {
                 RequestError::InsufficientStorage(_) => StatusCode::INSUFFICIENT_STORAGE,
                 RequestError::NotFound => StatusCode::NOT_FOUND,
                 RequestError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
+                RequestError::Rejection { status, .. } => *status,
             },
             Self::AuthError(err) => match err {
                 AuthError::MissingToken => StatusCode::UNAUTHORIZED,
@@ -256,6 +271,19 @@ impl IntoResponse for AppError {
 
         (self.status_code(), Json(error_response)).into_response()
     }
+}
+
+/// 讀取待正規化錯誤 body 的上限。錯誤 body 一律很短（`length limit exceeded` 那種），
+/// 這個上限只是防呆 —— 真有超過的就當空的，用狀態碼的標準說明頂上。
+pub const MAX_ERROR_BODY: usize = 8 * 1024;
+
+/// 把「不是 `AppError` 產生的」錯誤狀態＋文字轉成統一形狀（見 `middleware/error_shape.rs`
+/// 與 `extract.rs`）。5xx 轉成 `SystemError` —— 那是我們的 bug，要記 ERROR。
+pub fn normalize_error_response(status: StatusCode, message: String) -> AppError {
+    if status.is_server_error() {
+        return AppError::SystemError(SystemError::Internal(message));
+    }
+    RequestError::Rejection { status, message }.into()
 }
 
 /// handler panic 的回應（給 `CatchPanicLayer::custom` 用）。

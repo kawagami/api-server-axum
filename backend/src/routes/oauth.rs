@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path};
 use crate::{
     errors::AppError,
     services::oauth as oauth_service,
@@ -5,9 +6,9 @@ use crate::{
     structs::members::{ExchangeCodeRequest, RefreshRequest, TokenResponse},
 };
 use axum::{
-    extract::{Json, Path, State},
+    extract::{State},
     routing::{get, post},
-    Router,
+    Router
 };
 use serde::Serialize;
 

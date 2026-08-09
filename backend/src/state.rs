@@ -15,7 +15,7 @@ use tokio::sync::{mpsc, Mutex};
 
 use crate::games::registry::GameRegistry;
 use crate::repositories::audit_logs::AuditEntry;
-use crate::services::audit_logs::CHANNEL_CAPACITY as AUDIT_CHANNEL_CAPACITY;
+use crate::batch_writer::CHANNEL_CAPACITY as AUDIT_CHANNEL_CAPACITY;
 use crate::services::system_metrics::CpuTimes;
 use crate::services::torrents::TorrentManager;
 use crate::storage::Storage;

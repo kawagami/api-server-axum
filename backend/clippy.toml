@@ -1,0 +1,17 @@
+# `Json` / `Query` / `Path` 一律用 `crate::extract` 的版本。
+#
+# axum 原生 extractor 被拒絕時直接回一段純文字，完全不經過 `AppError::into_response`：
+# body 形狀與全站不一致、**沒有 request_id**、**不落 log**。而少填一個欄位這種 400/422
+# 正是使用者回報量最大的那類問題（細節見 `src/extract.rs`）。
+#
+# 用錯沒有任何執行期徵兆 —— 只能靠 lint 擋。CI 跑 `cargo clippy --all-targets -- -D warnings`，
+# 所以這幾條在 CI 是紅燈而不是提示。
+#
+# 例外只有 `src/extract.rs`（包裝層本身）與 `src/errors.rs`（組錯誤 body），
+# 兩處以模組層級 `#![allow(clippy::disallowed_types)]` 標註。
+disallowed-types = [
+    { path = "axum::Json", reason = "改用 crate::extract::Json" },
+    { path = "axum::extract::Json", reason = "改用 crate::extract::Json" },
+    { path = "axum::extract::Query", reason = "改用 crate::extract::Query" },
+    { path = "axum::extract::Path", reason = "改用 crate::extract::Path" },
+]

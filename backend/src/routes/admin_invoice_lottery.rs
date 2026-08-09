@@ -1,10 +1,11 @@
+use crate::extract::Json;
 use crate::{
     errors::AppError,
     services::invoices as invoices_service,
     state::AppState,
     structs::{auth::AuthenticatedUser, invoices::AdminLotteryNumbersRequest, roles::Perm},
 };
-use axum::{extract::{Extension, State}, routing::post, Json, Router};
+use axum::{extract::{Extension, State}, routing::post, Router};
 use serde_json::json;
 
 pub fn new(state: AppState) -> Router<AppState> {

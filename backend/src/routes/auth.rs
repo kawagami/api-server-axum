@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path};
 use crate::{
     errors::AppError,
     services::{auth as auth_service, webauthn as webauthn_service},
@@ -11,11 +12,11 @@ use crate::{
     },
 };
 use axum::{
-    extract::{ConnectInfo, Extension, Json, Path, State},
+    extract::{ConnectInfo, Extension, State},
     http::{HeaderMap, StatusCode},
     middleware,
     routing::{delete, get, post},
-    Router,
+    Router
 };
 use serde::Serialize;
 use std::net::SocketAddr;

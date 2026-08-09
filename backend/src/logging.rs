@@ -47,11 +47,14 @@ static DROPPED: AtomicU64 = AtomicU64::new(0);
 
 /// access log 的 target（`routes.rs` 的 `TraceLayer::on_response` 用）。
 ///
-/// 不放在 crate 名底下是為了能單獨開關：它的量是「每個請求一行」，跟其他 INFO 差一個
-/// 數量級，臨時要靜音時 `RUST_LOG=api_server_axum=info,http_access=off` 就好。
-/// ⚠ 代價是 `main.rs::default_log_filter()` **必須明確列出這個 target** —— EnvFilter
-/// 沒有 directive 命中的 target 一律當關閉，漏了就靜默失效。
-pub const ACCESS_TARGET: &str = "http_access";
+/// **刻意長在 crate 名底下**（`api_server_axum::access`）：EnvFilter 的 directive 是
+/// 前綴比對，所以 `api_server_axum=info` 自動涵蓋它，`default_log_filter()` 不必為它
+/// 多列一段；要單獨靜音仍然可以寫 `RUST_LOG=api_server_axum=info,api_server_axum::access=off`
+/// —— 它是每請求一行，量級跟其他 INFO 差一個數量級，留這個逃生門有意義。
+///
+/// ⚠ 2026-08-09 一度用過裸 target `http_access`，那要求 `default_log_filter()` 額外
+/// 列一段，而任何人手動設 `RUST_LOG` 漏了那段，access log 就**整條靜默消失**。同日改掉。
+pub const ACCESS_TARGET: &str = concat!(env!("CARGO_CRATE_NAME"), "::access");
 
 /// `log_db_level` 接受的值。**上限刻意停在 INFO**：再往下開 DEBUG 的話
 /// `errors.rs` 會把每筆 404 與過期 token 寫進 PG，一隻掃描器打一輪就灌爆 1 核 1G 那台
@@ -238,40 +241,22 @@ where
     }
 }
 
-const BATCH_SIZE: usize = 50;
-const FLUSH_INTERVAL_MS: u64 = 500;
-
-pub async fn log_writer(mut rx: mpsc::Receiver<LogEntry>, pool: Pool<Postgres>) {
-    let mut buf: Vec<LogEntry> = Vec::with_capacity(BATCH_SIZE);
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(FLUSH_INTERVAL_MS));
-
-    loop {
-        tokio::select! {
-            entry = rx.recv() => {
-                match entry {
-                    Some(e) => {
-                        buf.push(e);
-                        if buf.len() >= BATCH_SIZE {
-                            flush(&pool, &mut buf).await;
-                        }
-                    }
-                    None => {
-                        flush(&pool, &mut buf).await;
-                        return;
-                    }
-                }
-            }
-            _ = interval.tick() => {
-                if !buf.is_empty() {
-                    flush(&pool, &mut buf).await;
-                }
-                report_dropped();
-            }
-        }
-    }
+/// `logs` 表的批次寫入器（啟動時 spawn 一個）。攢批的節奏走 `batch_writer`，與
+/// `services::audit_logs::audit_writer` 共用同一份迴圈與常數。
+pub async fn log_writer(rx: mpsc::Receiver<LogEntry>, pool: Pool<Postgres>) {
+    crate::batch_writer::run(
+        rx,
+        move |batch| {
+            let pool = pool.clone();
+            async move { flush(&pool, batch).await }
+        },
+        // 丟棄數要在「佇列滿到 buf 都攢不出東西」時照樣印出來，所以掛在 interval 上
+        report_dropped,
+    )
+    .await
 }
 
-/// 把累積的丟棄數印進 stdout 並歸零。最多每 `FLUSH_INTERVAL_MS` 一行，不會自己變成洪水。
+/// 把累積的丟棄數印進 stdout 並歸零。最多每個 flush 間隔一行，不會自己變成洪水。
 fn report_dropped() {
     let n = DROPPED.swap(0, Ordering::Relaxed);
     if n > 0 {
@@ -279,7 +264,7 @@ fn report_dropped() {
     }
 }
 
-async fn flush(pool: &Pool<Postgres>, buf: &mut Vec<LogEntry>) {
+async fn flush(pool: &Pool<Postgres>, buf: Vec<LogEntry>) {
     let levels: Vec<&str> = buf.iter().map(|e| e.level.as_str()).collect();
     let messages: Vec<&str> = buf.iter().map(|e| e.message.as_str()).collect();
     let targets: Vec<&str> = buf.iter().map(|e| e.target.as_str()).collect();
@@ -313,6 +298,4 @@ async fn flush(pool: &Pool<Postgres>, buf: &mut Vec<LogEntry>) {
     if let Err(e) = result {
         eprintln!("log_writer: 落地 {} 筆 log 失敗: {e}", buf.len());
     }
-
-    buf.clear();
 }

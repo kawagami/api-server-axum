@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path, Query};
 use crate::{
     errors::AppError,
     middleware::auth,
@@ -11,10 +12,10 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, State},
     middleware,
     routing::get,
-    Json, Router,
+    Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {

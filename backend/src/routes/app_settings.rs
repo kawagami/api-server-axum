@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path};
 use crate::{
     errors::AppError,
     services::app_settings as settings_service,
@@ -9,9 +10,9 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Extension, Path, State},
+    extract::{Extension, State},
     routing::{get, patch},
-    Json, Router,
+    Router
 };
 use std::collections::BTreeMap;
 

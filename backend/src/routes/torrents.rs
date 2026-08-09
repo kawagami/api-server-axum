@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path, Query};
 use crate::{
     errors::AppError,
     services::torrents as torrents_service,
@@ -10,11 +11,11 @@ use crate::{
     }
 };
 use axum::{
-    extract::{Extension, Path, Query, Request, State},
+    extract::{Extension, Request, State},
     http::{header, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, patch, post},
-    Json, Router
+    Router
 };
 use serde::Deserialize;
 use tower::ServiceExt;

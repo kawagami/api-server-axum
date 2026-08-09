@@ -1,8 +1,9 @@
+use crate::extract::Json;
 use crate::errors::AppError;
 use crate::middleware::rate_limit;
 use crate::state::AppState;
 use crate::structs::roster::{RosterRequest, RosterResponse, StaffShift};
-use axum::{middleware, routing::post, Json, Router};
+use axum::{middleware, routing::post, Router};
 use std::collections::VecDeque;
 
 pub fn new(state: AppState) -> Router<AppState> {

@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path, Query};
 use crate::{
     errors::AppError,
     services::stocks as stocks_service,
@@ -13,10 +14,10 @@ use crate::{
     }
 };
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, State},
     http::StatusCode,
     routing::{get, patch},
-    Json, Router
+    Router
 };
 use serde::Deserialize;
 

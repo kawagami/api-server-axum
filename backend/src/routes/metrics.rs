@@ -1,3 +1,4 @@
+use crate::extract::{Json, Query};
 use crate::{
     errors::AppError,
     repositories::system_metrics::{self as metrics_repo, SystemMetric},
@@ -5,9 +6,9 @@ use crate::{
     structs::{auth::AuthenticatedUser, roles::Perm},
 };
 use axum::{
-    extract::{Extension, Query, State},
+    extract::{Extension, State},
     routing::get,
-    Json, Router,
+    Router
 };
 use serde::Deserialize;
 

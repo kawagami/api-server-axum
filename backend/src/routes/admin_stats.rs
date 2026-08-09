@@ -1,3 +1,4 @@
+use crate::extract::{Json, Query};
 use crate::{
     errors::AppError,
     repositories::visitors::{self, DailyVisitorStat},
@@ -5,9 +6,9 @@ use crate::{
     structs::{auth::AuthenticatedUser, roles::Perm},
 };
 use axum::{
-    extract::{Extension, Query, State},
+    extract::{Extension, State},
     routing::get,
-    Json, Router,
+    Router
 };
 use chrono::{Duration, NaiveDate};
 use serde::{Deserialize, Serialize};

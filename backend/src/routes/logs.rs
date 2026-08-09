@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path, Query};
 use crate::{
     errors::AppError,
     repositories::logs::Log,
@@ -11,9 +12,9 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, State},
     routing::get,
-    Json, Router,
+    Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {

@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path, Query};
 use crate::{
     errors::{AppError, AuthError},
     middleware::auth,
@@ -12,11 +13,11 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, State},
     http::StatusCode,
     middleware,
     routing::{get, post},
-    Json, Router,
+    Router
 };
 use uuid::Uuid;
 

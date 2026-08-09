@@ -31,6 +31,7 @@ mod users;
 mod vocab;
 mod ws;
 
+use crate::extract::Json;
 use crate::{
     errors::{AppError, RequestError},
     logging::LogEntry,
@@ -44,7 +45,7 @@ use axum::{
     middleware::{self, Next},
     response::IntoResponse,
     routing::get,
-    Json, Router,
+    Router
 };
 use std::{net::SocketAddr, time::Duration};
 use tokio::sync::mpsc;
@@ -199,6 +200,12 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
                 // 讓瀏覽器端 JS 可讀到追蹤 id，方便回報問題時附上
                 .expose_headers([header::HeaderName::from_static("x-request-id")]),
         )
+        // 把 layer / Router 直接吐的錯誤（413、405）換成統一形狀 + 落 log。
+        // 必須掛在 `RequestBodyLimitLayer` 與 Router **外層**（= 程式碼順序在其後）才看得到
+        // 它們的回應，同時在 request_id middleware 內層，才拿得到 task-local 的追蹤 id。
+        .layer(middleware::from_fn(
+            crate::middleware::error_shape::error_shape,
+        ))
         // handler panic → 500（帶 request_id）+ 一筆 ERROR。掛在 TraceLayer **內層**：
         // panic 被接住的當下 request span 仍然活著、request_id 的 task-local 也還在
         // scope 內，那筆 ERROR 才對得回這次請求。往外掛就兩個都拿不到。
@@ -242,10 +249,9 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
                 })
                 .on_response(
                     |res: &axum::http::Response<_>, latency: Duration, _: &tracing::Span| {
-                        // 專屬 target：access log 的量級跟其他 INFO 差一個數量級，
-                        // 要能單獨關掉（`RUST_LOG=...,http_access=off`）而不影響其餘。
-                        // ⚠ 這個 target 不在 crate 名底下，`default_log_filter()` 必須
-                        // 明確列它，否則 EnvFilter 會整條丟掉（沒有 directive 命中 = 關）。
+                        // 專屬 target `<crate>::access`：量級跟其他 INFO 差一個數量級，
+                        // 要能單獨關掉（`RUST_LOG=...,api_server_axum::access=off`）而不影響
+                        // 其餘。長在 crate 名底下才會被預設 filter 的前綴比對自動涵蓋。
                         tracing::info!(
                             target: crate::logging::ACCESS_TARGET,
                             status = res.status().as_u16(),

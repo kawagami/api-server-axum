@@ -1,8 +1,9 @@
+use crate::extract::{Json, Path, Query};
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, State},
     http::StatusCode,
     routing::{get, patch, put},
-    Json, Router
+    Router
 };
 use uuid::Uuid;
 

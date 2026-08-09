@@ -1,3 +1,5 @@
+mod batch_writer;
+mod extract;
 mod games;
 mod errors;
 mod jobs;
@@ -23,7 +25,8 @@ async fn main() {
     // （2026-08-08 之前就是這樣，那個逃生門只有 `export RUST_LOG=` 走得通）。
     dotenvy::dotenv().ok();
 
-    let (log_tx, log_rx) = mpsc::channel::<logging::LogEntry>(1000);
+    let (log_tx, log_rx) =
+        mpsc::channel::<logging::LogEntry>(batch_writer::CHANNEL_CAPACITY);
 
     tracing_subscriber::registry()
         .with(
@@ -79,19 +82,17 @@ async fn main() {
 ///   底下調** —— EnvFilter 掛在 registry 上是全域 filter，被它擋掉的 event 到不了
 ///   `DbLogLayer`。所以這裡是 info，那邊的上限才會是 INFO
 ///
-/// `http_access` 是 access log 的專屬 target（`logging::ACCESS_TARGET`），**必須明確列**：
-/// EnvFilter 對「沒有任何 directive 命中」的 target 一律當關閉，漏掉這段的話 access log
-/// 會靜默消失。分開列的好處是可以只把它關掉（`RUST_LOG=api_server_axum=info,http_access=off`）
-/// 而保留其餘 INFO —— 它是每請求一行，量級跟其他 INFO 差一個數量級。
+/// access log（`logging::ACCESS_TARGET` = `<crate>::access`）**不必在這裡另外列** ——
+/// EnvFilter 的 directive 是前綴比對，`{crate_name}=info` 已經涵蓋它。要單獨靜音就在
+/// `RUST_LOG` 後面補 `{crate_name}::access=off`。
 ///
 /// 本機 `cargo run`（debug build）維持全 debug，不必設任何 env。
 fn default_log_filter() -> String {
     let crate_name = env!("CARGO_CRATE_NAME");
-    let access = logging::ACCESS_TARGET;
     if cfg!(debug_assertions) {
-        format!("{crate_name}=debug,tower_http=debug,{access}=debug")
+        format!("{crate_name}=debug,tower_http=debug")
     } else {
-        format!("{crate_name}=info,tower_http=warn,{access}=info")
+        format!("{crate_name}=info,tower_http=warn")
     }
 }
 

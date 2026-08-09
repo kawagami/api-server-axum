@@ -1,3 +1,4 @@
+use crate::extract::Json;
 use crate::{
     errors::AppError,
     middleware::rate_limit,
@@ -5,7 +6,7 @@ use crate::{
     state::AppState,
     structs::messages::{Message, NewMessage},
 };
-use axum::{extract::State, http::StatusCode, middleware, routing::post, Json, Router};
+use axum::{extract::State, http::StatusCode, middleware, routing::post, Router};
 
 /// 公開端:訪客留言給站長(不需登入)。掛 per-IP rate limit 防灌水。
 pub fn new(state: AppState) -> Router<AppState> {

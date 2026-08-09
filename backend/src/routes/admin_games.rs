@@ -1,3 +1,4 @@
+use crate::extract::Json;
 use crate::{
     errors::AppError,
     games::registry::GameSummary,
@@ -7,7 +8,7 @@ use crate::{
 use axum::{
     extract::{Extension, State},
     routing::get,
-    Json, Router,
+    Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {

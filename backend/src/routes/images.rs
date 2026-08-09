@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path};
 use crate::{
     errors::AppError,
     repositories::images::{self as images_repo, ImageRecord},
@@ -6,10 +7,10 @@ use crate::{
     structs::{auth::AuthenticatedUser, roles::Perm},
 };
 use axum::{
-    extract::{Extension, Multipart, Path, State},
+    extract::{Extension, Multipart, State},
     http::StatusCode,
     routing::{delete, get},
-    Json, Router,
+    Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {

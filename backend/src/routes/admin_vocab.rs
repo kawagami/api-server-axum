@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path, Query};
 use crate::{
     errors::{AppError, RequestError},
     repositories::vocab as vocab_repo,
@@ -11,10 +12,10 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, State},
     http::StatusCode,
     routing::{get, put},
-    Json, Router,
+    Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {

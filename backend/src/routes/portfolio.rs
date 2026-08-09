@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path};
 use crate::{
     errors::AppError,
     services::portfolio as portfolio_service,
@@ -8,10 +9,10 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Extension, Path, State},
+    extract::{Extension, State},
     http::StatusCode,
     routing::get,
-    Json, Router,
+    Router
 };
 use uuid::Uuid;
 

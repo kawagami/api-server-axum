@@ -1,3 +1,4 @@
+use crate::extract::{Json, Path};
 use crate::{
     errors::{AppError, RequestError},
     services::users as users_service,
@@ -9,10 +10,10 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Extension, Path, State},
+    extract::{Extension, State},
     http::StatusCode,
     routing::get,
-    Json, Router,
+    Router
 };
 
 pub fn new(state: AppState) -> Router<AppState> {

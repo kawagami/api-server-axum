@@ -1,8 +1,9 @@
+use crate::extract::{Json, Query};
 use crate::errors::{AppError, RequestError, SystemError};
 use crate::middleware::rate_limit;
 use crate::structs::tools::{ConvertTextRequest, ConvertTextResponse, ConversionDirection};
 use crate::{state::AppState, structs::tools::Params};
-use axum::{extract::Query, middleware, routing::get, routing::post, Json, Router};
+use axum::{middleware, routing::get, routing::post, Router};
 use rand::{distr::Alphanumeric, Rng};
 use zhconv::{zhconv, Variant};
 
