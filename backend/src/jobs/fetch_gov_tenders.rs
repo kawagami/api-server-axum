@@ -65,6 +65,12 @@ async fn fetch_and_notify(state: &AppState) -> Result<(), AppError> {
     }
 
     let (subject, body) = service::compose_email(&pending);
-    email::send_notification(&settings, &subject, body).await;
+    if email::send_notification(&settings, &subject, body).await.is_err() {
+        // 寄失敗**不標** notified —— 標了就永遠不會再寄，那幾筆公告等於永久遺失。
+        // 2026-08-05 就是這樣掉了一筆（送出去的錯誤只留在 log 裡，資料照樣被標記）。
+        // 留在未通知，下一輪（每日 UTC 23:00）自然補寄，與「SMTP 未設定」同一種處置。
+        tracing::warn!("gov tender 通知寄送失敗，{} 筆維持未通知待下輪補寄", pending.len());
+        return Ok(());
+    }
     repo::mark_notified(pool, &ids).await
 }

@@ -462,7 +462,9 @@ async fn finish_completed(
             format_size(total_size)
         );
         tokio::spawn(async move {
-            crate::services::email::send_notification(&settings, &subject, body).await;
+            // 這封是**一次性**的：torrent 沒有「未通知」欄可以留著下輪補寄，寄失敗就是
+            // 失敗（`send_to` 已記 ERROR）。使用者仍看得到任務變 completed，只是少一封信。
+            let _ = crate::services::email::send_notification(&settings, &subject, body).await;
         });
     }
     // spawn 而非 await：斷開 watch_torrent ↔ sync_active 的遞迴，避免 future Send 自我參照

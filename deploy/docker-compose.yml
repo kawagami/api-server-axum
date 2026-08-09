@@ -184,6 +184,30 @@ services:
     mem_limit: 320m
     container_name: backend
     restart: unless-stopped
+    # ⚠ 關掉容器內的 IPv6 —— 這是「對外連線間歇性失敗」的根治。
+    #
+    # 這個容器**沒有全域 IPv6 位址**（`docker inspect backend` 的 GlobalIPv6Address 是空的），
+    # 但 eth0 仍有 link-local `fe80::`。glibc 因此認為「有 IPv6 來源」，RFC 6724 排序就把
+    # Google 那些網域的 AAAA 排在 A 前面 → 拿 link-local 去連全域 v6 位址 →
+    # `connect(): Cannot assign requested address (os error 99)`，秒失敗。
+    #
+    # 實際災情（2026-08-02～08-09 的 logs 表，同一個 errno 三筆、橫跨兩個函式庫）：
+    #   08-09 reqwest  → www.googleapis.com   member 用 Google 登入失敗（回 502）
+    #   08-06 lettre   → smtp.gmail.com       torrent 完成通知信沒寄出
+    #   08-05 lettre   → smtp.gmail.com       政府標案通知信沒寄出
+    # 間歇性是因為解析結果排序不是每次都一樣，重試通常就過 —— 所以很容易被當成偶發忽略。
+    #
+    # 關掉之後連 link-local 都沒有，glibc 直接只給 A 記錄，reqwest 與 lettre 一起受惠
+    # （比逐個函式庫塞「只用 IPv4」的參數乾淨，lettre 也沒有那種參數）。
+    # backend 一律 bind 0.0.0.0、對內對外都走 v4，沒有任何東西需要 IPv6。
+    #
+    # 替代方案是掛一份 /etc/gai.conf 進去調 precedence，但那是**單一檔案 bind mount**，
+    # 會踩到 rsync 換 inode 的坑（見 .github/workflows/deploy.yml 的 nginx.conf 註解）。
+    # 驗證：部署後 `docker exec` 進不去（distroless 無 shell），改看 logs 表有沒有再出現
+    # `Cannot assign requested address`。要回退就刪掉這三行。
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv6.conf.default.disable_ipv6=1
     working_dir: /app   # distroless image 無預設 workdir；UPLOAD_PATH 等相對路徑以 /app 為基準
     env_file:
       - /srv/kawa/env/kawa.env

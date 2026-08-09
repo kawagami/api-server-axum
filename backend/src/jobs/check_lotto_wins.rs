@@ -80,12 +80,22 @@ async fn check_and_notify(state: &AppState, pool: &Pool<Postgres>) -> Result<(),
         by_member.entry(w.member_id).or_default().push(w);
     }
 
+    // ⚠️ 只有**真的寄出去**的才標記 —— `mark_notified` 之後永遠不會再寄，寄失敗還標記
+    // 等於「系統知道你中獎、信沒送到、然後把這件事忘掉」。逐 member 判斷，某個收件人
+    // 失敗不影響其他人。
     let mut notified_ids = Vec::new();
+    let mut failed = 0;
     for (_member_id, rows) in by_member {
         let email = rows[0].email.clone();
         let (subject, body) = compose_email(&rows);
-        crate::services::email::send_to(&settings, &email, &subject, body).await;
-        notified_ids.extend(rows.iter().map(|r| r.id));
+        if crate::services::email::send_to(&settings, &email, &subject, body).await.is_ok() {
+            notified_ids.extend(rows.iter().map(|r| r.id));
+        } else {
+            failed += 1;
+        }
+    }
+    if failed > 0 {
+        tracing::warn!("大樂透中獎通知有 {} 位收件人寄送失敗，維持未通知待下輪補寄", failed);
     }
 
     lotto_repo::mark_notified(pool, &notified_ids).await?;

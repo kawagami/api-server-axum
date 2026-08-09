@@ -63,7 +63,9 @@ async fn notify_new_future_buybacks(state: &AppState) {
     let body = format!("新增 {} 筆未來庫藏股：\n\n{}", new_records.len(), lines.join("\n"));
 
     let settings = state.get_settings();
-    send_notification(&settings, "新庫藏股通知", body).await;
+    // 沒有「已通知」欄可標，所以寄失敗這裡也無從補寄（`send_to` 已記 ERROR）。
+    // 需要補寄的話得先給 `stock_buyback_periods` 加 notified 欄，比照 gov_tenders。
+    let _ = send_notification(&settings, "新庫藏股通知", body).await;
 }
 
 fn date_to_roc_string(date: NaiveDate) -> String {
