@@ -139,6 +139,12 @@ ip -6 route   → 只有 ::1 與 fe80::/64，沒有 ::/0 預設路由
 最後一列最關鍵：那是**宿主機自己**，證明問題不在任何容器裡。而部署腳本第一行就是
 `docker pull kawagami77/api-server:latest`（配 `set -e`），所以這也會讓部署紅燈。
 
+> ⚠️ **上表中間兩列的歸因後來被推翻。** 宿主機的 IPv6 已於 08-09 08:46 (UTC) 關閉，
+> 而 backend 的同型 connect 失敗在 16:14 又出現了一次 —— 關掉宿主機 IPv6 修好的是
+> **dockerd**（Go，啟動時探測一次）與 lettre，容器內 glibc 的 getaddrinfo 照樣回 AAAA。
+> reqwest 那兩列的真正成因見下面「對外連線偶發 connect 失敗」。這一節其餘內容仍然成立：
+> 宿主機 IPv6 該關，順序不可顛倒。
+
 ### 修法與**不可顛倒的順序**
 
 1. **先**把 `nginx/conf.d/*.conf` 的 `listen [::]` 全部拆掉並部署
@@ -169,9 +175,61 @@ sudo systemctl restart docker   # daemon 的 IPv6 能力是行程啟動時探測
 ### 應用層的防護（不取代上面）
 
 `utils/reqwest.rs::send_retrying` 與 `services/email.rs` 對**連線階段**的失敗重試 3 次
-（200/400ms、300/600ms 退避）。上面四次事件全是單發抖動，補完之後使用者不會再看到。
-刻意只重試「請求還沒送達對方」的失敗 —— 對方已回狀態碼、或信已進 SMTP 對話的一律不重試，
-免得同一封中獎通知寄兩次。
+（200/400ms、300/600ms 退避）。刻意只重試「請求還沒送達對方」的失敗 —— 對方已回狀態碼、
+或信已進 SMTP 對話的一律不重試，免得同一封中獎通知寄兩次。
+
+對 reqwest 那條路徑而言這不只是防護，而是**對症的解**，理由見下一節。
+
+## 對外連線偶發 connect 失敗：Docker 內嵌 DNS 冷快取（2026-08-10）
+
+症狀：**backend 容器重啟後的第一個對外請求**偶爾在 connect 階段失敗，
+`Cannot assign requested address (os error 99)`，重試一次就通。實際觀測（UTC）：
+
+| backend-ci 完成（≒容器重啟） | 失敗時間 | 間隔 |
+|---|---|---|
+| 08-09 06:49:08 | 07:21:31 | 32 分 |
+| 08-09 07:51:36 | 07:53:37 | **2 分** |
+| 08-09 16:12:24 | 16:14:11 | **2 分** |
+
+最後一筆在宿主機關閉 IPv6（08:46）之後 —— 所以這不是上一節那個問題。
+
+### 推導
+
+錯誤能浮出水面，代表**解析結果裡只有 AAAA、一筆 A 都沒有**。依據是
+hyper-util 0.1.20 `client/legacy/connect/http.rs`：
+
+```rust
+// ConnectingTcp::new —— 只有一種家族時不建 fallback
+if fallback_addrs.is_empty() {
+    return ConnectingTcp { preferred, fallback: None };
+}
+
+// ConnectingTcp::connect —— 有 fallback 時，preferred 一報錯就立刻換另一邊
+if result.is_err() { future.await } else { result }
+```
+
+也就是說 A 與 AAAA 同時存在時，v6 撞 `EADDRNOTAVAIL` 會**靜靜地**退回 v4 接上，
+呼叫端什麼都看不到（happy eyeballs 的 300ms 延遲只影響誰先開始，不影響失敗後的回退）。
+會硬失敗只剩「fallback 是空的」這一種可能。
+
+AAAA-only 的答案來自 **Docker 內嵌 DNS（127.0.0.11）**：它把 A 與 AAAA 拆成兩個上游查詢，
+掉一個就只回另一個。快取是 per-network 的，**容器剛重啟時是冷的**，第一次查最容易掉；
+查成功之後兩筆都進快取，後面就穩了。這解釋了為什麼失敗總是單發、總是在部署後不久。
+
+### 結論：不用再修
+
+`send_retrying` 重試時會**重新 resolve**，第二次拿到 A 就接上 —— 正好對症。
+08-09 16:14 那次實測即是如此：`logs` 表只有 1 筆 WARN、沒有 ERROR，使用者拿到 200。
+
+⚠️ **不要改成 `reqwest` 的 `local_address(0.0.0.0)`「只走 IPv4」。** 那確實會讓
+`split_by_preference` 濾掉所有 AAAA，但 AAAA-only 的答案在濾完之後是**空清單**，
+hyper 照樣回 `tcp connect error`。治不了這個症，還永久關掉 IPv6 的可能性。
+
+### 判讀提示
+
+`utils/reqwest.rs` 的重試 WARN 已經會印整條 source chain（`error_chain()`），
+所以下次再抖，`logs` 表那行就直接看得到 errno；在那之前只印最外層的
+`error sending request for url (…)`，什麼都推不出來。
 
 ## 全新機器 bootstrap
 

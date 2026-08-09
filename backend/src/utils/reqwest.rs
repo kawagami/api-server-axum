@@ -89,16 +89,18 @@ where
 
 /// 送出請求，對**連線階段**的暫時性失敗重試。
 ///
-/// 存在的理由（2026-08-09）：這台 VPS 的 IPv6 是半殘的（有 stack、有 link-local，沒有
-/// 全域位址也沒有 `::/0` 路由），於是對外連線偶爾會先試 AAAA 再撞
-/// `Cannot assign requested address`。7 天內 4 次，每次都是**單發**——
+/// 存在的理由（2026-08-09）：對外連線偶爾在 connect 階段撞
+/// `Cannot assign requested address`（AAAA 位址接不上），每次都是**單發**——
 /// 而使用者用 Google 登入的那條路徑一次失敗就直接回 502。
+///
+/// 為什麼「重試」剛好是對的解：hyper 的 happy eyeballs 只在**解析結果同時有 A 與 AAAA**
+/// 時才會 v6 失敗後退回 v4；答案只有 AAAA 時 fallback 是空的，第一個錯誤直接吐出來。
+/// 而那種 AAAA-only 的答案來自 Docker 內嵌 DNS 的冷快取（容器剛重啟、A 與 AAAA 兩個
+/// 上游查詢掉了一個），**下一次解析就正常** —— 所以重試會重新 resolve 並接上。
+/// 完整推導見 `deploy/README.md` 的「對外連線偶發 connect 失敗」。
 ///
 /// 重試只涵蓋 `is_connect()` / `is_timeout()`，也就是**請求還沒送達對方**的失敗。
 /// 對方已經收到並回了狀態碼的，一律原樣回傳 —— 那不是抖動，重試只會放大問題。
-///
-/// ⚠ 這是**症狀防護**，不是根因修復。根因是宿主機的 IPv6 設定，見
-/// `deploy/docker-compose.yml` 的 backend sysctls 註解。
 pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response, reqwest::Error> {
     /// 總嘗試次數（含第一次）
     const ATTEMPTS: u32 = 3;
@@ -125,7 +127,7 @@ pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response,
                     attempt,
                     ATTEMPTS,
                     BACKOFF_MS * attempt as u64,
-                    e
+                    error_chain(&e)
                 );
                 tokio::time::sleep(std::time::Duration::from_millis(
                     BACKOFF_MS * attempt as u64,
@@ -135,4 +137,23 @@ pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response,
             }
         }
     }
+}
+
+/// 把整條 source chain 串成一行。
+///
+/// `reqwest::Error` 的 Display 只有最外層 —— `error sending request for url (…)`，
+/// 唯一有用的 errno 全在底下。2026-08-09 追這個問題時，這行 WARN 什麼都看不出來，
+/// 答案是從 `errors.rs` 用 `{:?}` 印進 `fields.self` 的那筆 ERROR 才撈到的
+/// （`… <- tcp connect error <- Cannot assign requested address (os error 99)`）。
+/// 而重試成功的請求根本不會產生那筆 ERROR，等於整段線索消失。
+fn error_chain(err: &dyn std::error::Error) -> String {
+    use std::fmt::Write;
+
+    let mut out = err.to_string();
+    let mut source = err.source();
+    while let Some(cause) = source {
+        let _ = write!(out, " <- {cause}");
+        source = cause.source();
+    }
+    out
 }

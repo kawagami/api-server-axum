@@ -200,8 +200,15 @@ services:
     #                                          這行證明問題在宿主機，不在任何容器裡
     # 部署腳本第一行就是 `docker pull`，所以這個問題也會讓部署紅燈。
     #
-    # ⇒ 宿主機要關 IPv6（`/etc/sysctl.d/99-disable-ipv6.conf`）。**關之前必須先拆掉
-    #   nginx 的 `listen [::]`**，否則 nginx 起不來、全站掛掉（見 nginx/conf.d/01-default-server.conf）。
+    # ⇒ 宿主機要關 IPv6（`/etc/sysctl.d/99-disable-ipv6.conf`，已於 08-09 08:46 UTC 關）。
+    #   **關之前必須先拆掉 nginx 的 `listen [::]`**，否則 nginx 起不來、全站掛掉
+    #   （見 nginx/conf.d/01-default-server.conf）。
+    #
+    # ⚠ **上面 08-09 reqwest 那列的歸因，08-10 被推翻。** 宿主機關完 IPv6 之後，
+    #   backend 在 16:14 又中了一次同型失敗 —— 那條的真正成因是 Docker 內嵌 DNS 冷快取
+    #   回 AAAA-only（沒有 A 就沒有 happy eyeballs 可退），關 IPv6 修不到它。
+    #   由 `utils/reqwest.rs::send_retrying` 的重試（會重新 resolve）處理。
+    #   推導見 deploy/README.md 的「對外連線偶發 connect 失敗」。
     #
     # 這兩行留著的理由只剩「這個 netns 的 IPv6 確實不可用，關掉是正確的衛生」。
     # 宿主機關掉之後它們就是多餘的，但無害，也擋得住宿主機設定被還原的情況。
