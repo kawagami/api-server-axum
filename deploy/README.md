@@ -35,8 +35,11 @@
 - 其餘 key 掉了無感：權限快取（1h）、oauth state（5m）、ws ticket（30s）都會自動重算。
 
 所以 `docker compose restart valkey`、整機重開、image 更新都會踢人。哪天覺得代價太大，
-就掛 `/srv/kawa/valkey:/data` + `--appendonly yes`（同時建議補 `--maxmemory` / `volatile-lru`，
-目前 valkey 沒有記憶體上限）。
+就掛 `/srv/kawa/valkey:/data` + `--appendonly yes`。
+
+> `--maxmemory 128mb --maxmemory-policy volatile-lru` 與 `mem_limit: 160m` 已經在
+> `docker-compose.yml` 上了（本節一度寫「目前 valkey 沒有記憶體上限」，已過期）。
+> 2026-08-09 實測 RSS 只有 4.9M —— 上限離用量很遠，不是限制因素。
 
 ## 日誌 rotation
 
@@ -203,10 +206,20 @@ docker exec -it database psql -U kawa -d kawa -c "
 - 建使用者 + SSH 金鑰、裝 `docker`（含 compose plugin）+ `rsync`、使用者加入 `docker` 群組
 - **開 swap**（1 核 1G 尤其必要——曾整機無 swap 被 OOM 殺 backend）：
   ```bash
-  sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+  sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile
   sudo mkswap /swapfile && sudo swapon /swapfile
   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # 開機自動掛
+  sudo sysctl -w vm.swappiness=10 && \
+    echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swappiness.conf
+  free -h   # 驗證：SwapTotal 不能是 0
   ```
+  `swappiness=10` 讓它只在真的緊繃時才換出，平時不拖慢反應。尺寸從 2G 改成 1G：
+  現行這台磁碟 14.8/23.4 GB 且 torrent 還在寫，2G 太貪。
+
+  > ⚠️ **現行這台（first-laravel）從來沒做過這一步**，2026-08-09 實測 `SwapTotal: 0 kB`。
+  > `docker-compose.yml` 的資源上限註解一度寫「1 核 1G（+2G swap）」就是照著本節假設了
+  > 沒發生的事（已修正）。**這是換機 runbook 的步驟，不代表現行機器的狀態** ——
+  > 要確認實況一律跑 `free -h`，不要讀這份文件推論。
 - 建持久層根目錄（kawa 無 sudo 密碼也行，用容器以 root 建）：
   ```bash
   docker run --rm -v /srv:/srv alpine sh -c "mkdir -p /srv/kawa && chown -R $(id -u):$(id -g) /srv/kawa"
