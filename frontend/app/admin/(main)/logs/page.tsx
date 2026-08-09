@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { requirePermission } from "@/libs/admin-permissions";
 import { ListTableSkeleton } from "@/components/loading/table-skeleton";
 
-const SKELETON_HEADERS = ['ID', '層級', '訊息', '來源模組', '檔案', '時間'];
+const SKELETON_HEADERS = ['ID', '層級', '訊息', '來源模組', '檔案', '時間', '細節'];
 
 export const metadata: Metadata = {
     title: "系統日誌",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default async function LogsPage() {
     await requirePermission("log:read");
-    // LogsClient 讀 useSearchParams（?level=）當初始條件，需要 Suspense 邊界
+    // LogsClient 讀 useSearchParams（?level=&q=）當初始條件，需要 Suspense 邊界
     return (
         <Suspense fallback={<ListTableSkeleton headers={SKELETON_HEADERS} rows={10} />}>
             <LogsClient />
