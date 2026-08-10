@@ -117,12 +117,12 @@ export default function GovTendersClient() {
                         <AdminTable className="text-sm table-fixed">
                             <thead>
                                 <AdminHeadRow>
-                                    <AdminTh className="w-24 whitespace-nowrap">公告日</AdminTh>
-                                    <AdminTh className="w-24 whitespace-nowrap hidden sm:table-cell">類型</AdminTh>
+                                    <AdminTh className="col-date">公告日</AdminTh>
+                                    <AdminTh className="w-[9em] hidden sm:table-cell">類型</AdminTh>
                                     <AdminTh>標案名稱</AdminTh>
-                                    <AdminTh className="w-32 whitespace-nowrap">機關</AdminTh>
-                                    <AdminTh className="w-56 hidden lg:table-cell">廠商</AdminTh>
-                                    <AdminTh className="w-20 whitespace-nowrap">關鍵字</AdminTh>
+                                    <AdminTh className="w-[9em]">機關</AdminTh>
+                                    <AdminTh className="w-[15em] hidden lg:table-cell">廠商</AdminTh>
+                                    <AdminTh className="w-[6em]">關鍵字</AdminTh>
                                 </AdminHeadRow>
                             </thead>
                             <tbody>
@@ -136,7 +136,7 @@ export default function GovTendersClient() {
                                             <AdminTd className="whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
                                                 {t.date}
                                             </AdminTd>
-                                            <AdminTd className="whitespace-nowrap text-xs hidden sm:table-cell">
+                                            <AdminTd className="text-xs hidden sm:table-cell">
                                                 {t.tender_type}
                                             </AdminTd>
                                             <AdminTd className="wrap-break-word">
@@ -162,7 +162,7 @@ export default function GovTendersClient() {
                                             <AdminTd className="hidden lg:table-cell text-xs">
                                                 {t.companies.length > 0 ? t.companies.join('、') : '—'}
                                             </AdminTd>
-                                            <AdminTd className="whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
+                                            <AdminTd className="text-xs text-neutral-500 dark:text-neutral-400">
                                                 {t.keyword}
                                             </AdminTd>
                                         </AdminRow>

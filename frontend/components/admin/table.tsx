@@ -1,4 +1,11 @@
-const cellBorder = "border border-neutral-300 dark:border-neutral-700 px-4 py-2";
+/**
+ * `overflow-hidden` 是結構性保險，不是裝飾：cell 沒有它的話，`whitespace-nowrap` 的內容
+ * 一旦比欄寬長就會**溢出格子、疊到右邊那欄的文字上**（gov_tenders 的類型欄實際踩過）。
+ * 有了它，欄寬估錯最多變成裁切 —— 從「破版」降級成「小瑕疵」。
+ * cell 的水平 padding 有 16px、垂直 8px，比焦點框的 2px outline + 2px offset 寬，
+ * 所以格子內按鈕的焦點框不會被裁掉。
+ */
+const cellBorder = "border border-neutral-300 dark:border-neutral-700 px-4 py-2 overflow-hidden";
 
 /**
  * 後台表格的統一外觀（有格線）。全後台表格一律用這組，不要自己手寫 cell class，

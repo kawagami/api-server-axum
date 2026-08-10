@@ -210,12 +210,12 @@ export default function AuditLogsClient() {
                         <AdminTable className="text-sm table-fixed">
                             <thead>
                                 <AdminHeadRow>
-                                    <AdminTh className="w-32 md:w-44">時間</AdminTh>
-                                    <AdminTh className="w-40 hidden md:table-cell">操作者</AdminTh>
-                                    <AdminTh className="w-20">方法</AdminTh>
+                                    <AdminTh className="col-datetime">時間</AdminTh>
+                                    <AdminTh className="w-[13em] hidden md:table-cell">操作者</AdminTh>
+                                    <AdminTh className="col-badge">方法</AdminTh>
                                     <AdminTh>路徑</AdminTh>
-                                    <AdminTh className="w-56 hidden lg:table-cell">Query</AdminTh>
-                                    <AdminTh className="w-20">狀態</AdminTh>
+                                    <AdminTh className="w-[18em] hidden lg:table-cell">Query</AdminTh>
+                                    <AdminTh className="col-badge">狀態</AdminTh>
                                 </AdminHeadRow>
                             </thead>
                             <tbody>

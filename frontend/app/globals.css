@@ -137,6 +137,21 @@ html {
   box-shadow: 0 1px 0 rgb(var(--neutral-700));
 }
 
+/* ===== table-fixed 表格的欄寬：以「幾個字」宣告，不寫死 px =====
+   px 欄寬等於把字寬心算硬編進 class，換字型 / 改字級 / 換語系就得回來重算，
+   而算錯的代價是 nowrap 內容溢出蓋到隔壁欄（已踩過三次）。
+   這裡改用內容相對單位讓瀏覽器自己量：
+     ch = 該元素字型裡「0」的實寬（數字、拉丁字適用）
+     em = 字級（全形 CJK 一字約 1em）
+   box-sizing 是 border-box，所以要把 cell 的水平 padding（px-4 = 2rem）加回去。
+   只有「內容不該折行」的欄才需要精算（日期、代號、badge）；會折行的欄用 em 給個
+   合理行寬就好，猜小了只是多折一行、不會破版。 */
+.admin-shell .col-datetime { width: calc(20ch + 2rem); }  /* 2026/08/11 00:43:38 */
+.admin-shell .col-date     { width: calc(11ch + 2rem); }  /* 2026-07-31 */
+.admin-shell .col-id       { width: calc(7ch + 2rem); }   /* 遞增 id */
+/* badge 自己還有 px-2 的內距（約 2.4ch），所以最長的 DELETE(6ch) 要算到 ~8.4ch */
+.admin-shell .col-badge    { width: calc(10ch + 2rem); }
+
 /* ===== 密集表格（欄數多的數字表）=====
    AdminTable 的格子是 px-4，單欄就吃 32px 水平 padding。11 欄的行情表光 padding 就 352px，
    自然寬度剛好貼齊容器，垂直捲軸一出現（-15px）最後一欄就被切掉。

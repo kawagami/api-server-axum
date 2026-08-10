@@ -275,12 +275,12 @@ export default function LogsClient() {
                     <AdminTable className="text-sm table-fixed">
                         <thead>
                             <AdminHeadRow>
-                                <AdminTh className="w-16 hidden sm:table-cell">ID</AdminTh>
-                                <AdminTh className="w-20">層級</AdminTh>
+                                <AdminTh className="col-id hidden sm:table-cell">ID</AdminTh>
+                                <AdminTh className="col-badge">層級</AdminTh>
                                 <AdminTh>訊息</AdminTh>
-                                <AdminTh className="w-44 hidden lg:table-cell">來源模組</AdminTh>
-                                <AdminTh className="w-52 hidden xl:table-cell">檔案</AdminTh>
-                                <AdminTh className="w-32 md:w-44">時間</AdminTh>
+                                <AdminTh className="w-[14em] hidden lg:table-cell">來源模組</AdminTh>
+                                <AdminTh className="w-[17em] hidden xl:table-cell">檔案</AdminTh>
+                                <AdminTh className="col-datetime">時間</AdminTh>
                             </AdminHeadRow>
                         </thead>
                         <tbody>
