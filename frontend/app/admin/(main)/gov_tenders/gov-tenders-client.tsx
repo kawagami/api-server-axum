@@ -140,14 +140,17 @@ export default function GovTendersClient() {
                                                 {t.tender_type}
                                             </AdminTd>
                                             <AdminTd className="wrap-break-word">
+                                                {/* 標題會折行，所以連結**不能**用 inline-flex —— 那種盒子只以第一行
+                                                    參與行框的基線計算，其餘行會溢出行框、疊到下面的 category 上。
+                                                    純 inline 流 + inline-block 圖示，圖示自然跟在最後一行後面。 */}
                                                 <a
                                                     href={t.detail_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="inline-flex items-start gap-1 text-primary-700 dark:text-primary-300 hover:underline"
+                                                    className="text-primary-700 dark:text-primary-300 hover:underline"
                                                 >
                                                     {t.title}
-                                                    <ExternalLink className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                                    <ExternalLink className="ml-1 inline-block h-3.5 w-3.5 align-[-2px]" />
                                                 </a>
                                                 {t.category && (
                                                     <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{t.category}</div>

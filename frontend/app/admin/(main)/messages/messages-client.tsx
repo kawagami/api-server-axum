@@ -69,9 +69,11 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                                         </AdminTd>
                                         <AdminTd className="text-xs">
                                             <div className="text-neutral-800 dark:text-neutral-200">{m.name || '匿名'}</div>
+                                            {/* 不用 inline-flex：長 email 折行時那種盒子只有第一行參與行框，
+                                                其餘行會溢出疊到下面的元素（gov_tenders 標題就踩過） */}
                                             {m.email && (
-                                                <a href={`mailto:${m.email}`} className="inline-flex items-center gap-1 text-primary-700 dark:text-primary-300 hover:underline">
-                                                    <Mail className="w-3 h-3" />
+                                                <a href={`mailto:${m.email}`} className="text-primary-700 dark:text-primary-300 hover:underline">
+                                                    <Mail className="mr-1 inline-block h-3 w-3 align-[-1px]" />
                                                     {m.email}
                                                 </a>
                                             )}
