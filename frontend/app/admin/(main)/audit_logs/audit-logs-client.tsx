@@ -204,14 +204,17 @@ export default function AuditLogsClient() {
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                     <div className="admin-sticky-head overflow-auto max-h-[70svh]">
-                        <AdminTable className="text-sm">
+                        {/* table-fixed：auto layout 下路徑欄被 break 掉的字元拉到 1 字寬，
+                            而 Query 的長字串不可斷、反過來把寬度全吃走，連狀態欄都被推出右邊。
+                            固定配寬讓路徑吃剩餘空間，Query 截斷後靠 title 看全文。 */}
+                        <AdminTable className="text-sm table-fixed">
                             <thead>
                                 <AdminHeadRow>
                                     <AdminTh className="w-32 md:w-44">時間</AdminTh>
-                                    <AdminTh className="hidden md:table-cell">操作者</AdminTh>
+                                    <AdminTh className="w-40 hidden md:table-cell">操作者</AdminTh>
                                     <AdminTh className="w-20">方法</AdminTh>
                                     <AdminTh>路徑</AdminTh>
-                                    <AdminTh className="hidden lg:table-cell">Query</AdminTh>
+                                    <AdminTh className="w-56 hidden lg:table-cell">Query</AdminTh>
                                     <AdminTh className="w-20">狀態</AdminTh>
                                 </AdminHeadRow>
                             </thead>
@@ -226,7 +229,7 @@ export default function AuditLogsClient() {
                                             <AdminTd className="text-neutral-500 dark:text-neutral-400 text-xs whitespace-nowrap">
                                                 {formatDateTimeSeconds(log.created_at)}
                                             </AdminTd>
-                                            <AdminTd className="text-xs font-mono hidden md:table-cell">
+                                            <AdminTd className="text-xs font-mono truncate hidden md:table-cell" title={log.user_email}>
                                                 {/* 會員與管理員混在同一張表，身分要一眼分得出來 */}
                                                 {log.actor_type === 'member' && (
                                                     <span className="mr-1 px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
@@ -240,10 +243,13 @@ export default function AuditLogsClient() {
                                                     {log.method}
                                                 </span>
                                             </AdminTd>
-                                            <AdminTd className="font-mono text-xs break-all">
+                                            <AdminTd className="font-mono text-xs wrap-break-word" title={log.path}>
                                                 {log.path}
                                             </AdminTd>
-                                            <AdminTd className="text-neutral-500 dark:text-neutral-400 font-mono text-xs hidden lg:table-cell">
+                                            <AdminTd
+                                                title={log.query ?? undefined}
+                                                className="text-neutral-500 dark:text-neutral-400 font-mono text-xs truncate hidden lg:table-cell"
+                                            >
                                                 {log.query ?? '—'}
                                             </AdminTd>
                                             <AdminTd>

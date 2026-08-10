@@ -47,10 +47,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
             </form>
 
             <AdminTableContainer stickyHead>
-                <AdminTable className="text-sm">
+                {/* 11 欄的數字表：預設的 px-4 光 padding 就吃掉 352px，
+                    自然寬度貼齊容器、垂直捲軸一出現最後一欄就被切掉（見 globals.css） */}
+                <AdminTable className="text-sm admin-table-dense">
                     <thead>
                         <AdminHeadRow>
-                            <AdminTh>交易日期</AdminTh>
+                            <AdminTh className="whitespace-nowrap">交易日期</AdminTh>
                             <AdminTh>股票代號</AdminTh>
                             <AdminTh>股票名稱</AdminTh>
                             <AdminTh className="text-right">開盤</AdminTh>

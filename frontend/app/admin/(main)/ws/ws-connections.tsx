@@ -252,7 +252,9 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
                                                     <CopyButton value={conn.addr} label="連線位址" />
                                                 </span>
                                             </AdminTd>
-                                            <AdminTd className="text-sm break-all">
+                                            {/* wrap-break-word 而非 break-all：break-all 會讓這欄的
+                                                min-content 掉到 1 字寬，鄰欄一擠就把 email 拆成一行一字 */}
+                                            <AdminTd className="text-sm wrap-break-word">
                                                 {conn.user_email ?? <span className="text-neutral-400">匿名訪客</span>}
                                             </AdminTd>
                                             <AdminTd className="hidden sm:table-cell text-sm">

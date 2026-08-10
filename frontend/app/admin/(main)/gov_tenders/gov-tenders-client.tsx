@@ -111,15 +111,18 @@ export default function GovTendersClient() {
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                     <div className="admin-sticky-head overflow-auto max-h-[70svh]">
-                        <AdminTable className="text-sm">
+                        {/* table-fixed：原本只有標案名稱有 min-w / max-w，其餘四欄任 auto layout
+                            按 min-content 分配。視窗一窄（側欄收起、瀏覽器放大）表格就被撐過容器寬度，
+                            把關鍵字欄推出右邊。固定配寬讓標案名稱吃剩餘空間，其餘欄不再互搶。 */}
+                        <AdminTable className="text-sm table-fixed">
                             <thead>
                                 <AdminHeadRow>
-                                    <AdminTh className="whitespace-nowrap">公告日</AdminTh>
-                                    <AdminTh className="whitespace-nowrap hidden sm:table-cell">類型</AdminTh>
-                                    <AdminTh className="min-w-56">標案名稱</AdminTh>
-                                    <AdminTh className="whitespace-nowrap">機關</AdminTh>
-                                    <AdminTh className="hidden lg:table-cell">廠商</AdminTh>
-                                    <AdminTh className="whitespace-nowrap">關鍵字</AdminTh>
+                                    <AdminTh className="w-24 whitespace-nowrap">公告日</AdminTh>
+                                    <AdminTh className="w-24 whitespace-nowrap hidden sm:table-cell">類型</AdminTh>
+                                    <AdminTh>標案名稱</AdminTh>
+                                    <AdminTh className="w-32 whitespace-nowrap">機關</AdminTh>
+                                    <AdminTh className="w-56 hidden lg:table-cell">廠商</AdminTh>
+                                    <AdminTh className="w-20 whitespace-nowrap">關鍵字</AdminTh>
                                 </AdminHeadRow>
                             </thead>
                             <tbody>
@@ -136,7 +139,7 @@ export default function GovTendersClient() {
                                             <AdminTd className="whitespace-nowrap text-xs hidden sm:table-cell">
                                                 {t.tender_type}
                                             </AdminTd>
-                                            <AdminTd className="max-w-[18rem] sm:max-w-md">
+                                            <AdminTd className="wrap-break-word">
                                                 <a
                                                     href={t.detail_url}
                                                     target="_blank"

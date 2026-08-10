@@ -134,7 +134,9 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
 
                 <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                     <div className="admin-sticky-head overflow-auto max-h-[70svh]">
-                        <AdminTable className="text-sm">
+                        {/* 9 欄、其中 8 欄 whitespace-nowrap，加上釋義的 max-w-xs 就把容器塞滿，
+                            padding 減半換回 144px 的餘裕（見 globals.css 的 admin-table-dense） */}
+                        <AdminTable className="text-sm admin-table-dense">
                             <thead>
                                 <AdminHeadRow>
                                     <AdminTh className="whitespace-nowrap">語言</AdminTh>
