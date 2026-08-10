@@ -14,9 +14,12 @@
 用法:
     kawa-logs rid <request_id>        單一請求的完整軌跡(時間正序)——查線上問題的第一步
     kawa-logs errors [-H 6] [-n 20]   近 N 小時的 ERROR
-    kawa-logs logs [-q kw] [-l WARN,ERROR] [-t target] [--from ISO] [--to ISO] [-n 50] [-p 1]
+    kawa-logs logs [-q kw] [-l WARN,ERROR] [-t target] [--from T] [--to T] [-n 50] [-p 1]
     kawa-logs metrics [-H 24]         系統指標(桶內取峰值,非平均)
-    kawa-logs audit [--user x] [--path /admin] [--from ISO] [--to ISO] [-n 50]
+    kawa-logs audit [--user x] [--path /admin] [--from T] [--to T] [-n 50]
+
+    `--from` / `--to` 吃 `2026-08-01` 或 `2026-08-01T12:00:00Z`;只給日期會自動補成
+    當天 00:00:00 / 23:59:59(UTC)——後端只收 RFC3339,裸日期會被退 400。
 
 輸出:stdout 一行一筆 JSON;統計與提示走 stderr,所以 `| head`、`| jq` 都乾淨。
     -f text 改成人類可讀的單行摘要。
@@ -43,6 +46,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import date, datetime, time, timezone
 
 CONFIG = os.path.expanduser("~/.config/kawa/config")
 TOKEN_CACHE = os.path.expanduser("~/.cache/kawa/token")
@@ -58,6 +62,34 @@ USER_AGENT = "kawa-logs/1.0"
 def die(msg):
     print(f"kawa-logs: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+def iso_bound(value, *, end_of_day=False):
+    """把 `--from` / `--to` 正規化成後端要的 RFC3339。
+
+    後端 `LogQuery` / `AuditLogQuery` 的 from、to 都是 `DateTime<Utc>`,只給
+    `2026-08-01` 會被 chrono 退成 400 `Failed to deserialize query string:
+    from: premature end of input`(而且那筆 400 自己會寫進 logs 表變噪音)。
+    所以只有日期時自動補時間:下界補 00:00:00、上界補 23:59:59(直覺是「含當天」);
+    沒帶時區的一律當 UTC。
+    """
+    if not value:
+        return None
+    text = value.strip().replace("Z", "+00:00").replace("z", "+00:00")
+    try:
+        if len(text) == 10:
+            moment = datetime.combine(
+                date.fromisoformat(text),
+                time(23, 59, 59) if end_of_day else time(0, 0, 0),
+                timezone.utc,
+            )
+        else:
+            moment = datetime.fromisoformat(text)
+            if moment.tzinfo is None:
+                moment = moment.replace(tzinfo=timezone.utc)
+    except ValueError:
+        die(f"看不懂的時間 {value!r} —— 給 2026-08-01 或 2026-08-01T12:00:00Z")
+    return moment.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def load_config():
@@ -203,8 +235,8 @@ def main():
     p.add_argument("-q", "--query", help="message 與 fields 模糊比對")
     p.add_argument("-l", "--level", help="逗號分隔多值,如 WARN,ERROR")
     p.add_argument("-t", "--target", help="tracing target 模糊比對")
-    p.add_argument("--from", dest="from_", help="ISO 時間下界")
-    p.add_argument("--to", help="ISO 時間上界")
+    p.add_argument("--from", dest="from_", help="時間下界,2026-08-01 或 2026-08-01T12:00:00Z")
+    p.add_argument("--to", help="時間上界,只給日期含當天整日")
     p.add_argument("-n", "--limit", type=int, default=50)
     p.add_argument("-p", "--page", type=int, default=1)
 
@@ -237,7 +269,7 @@ def main():
     elif args.cmd == "logs":
         rows, total = unwrap(api_get(conf, "/logs", {
             "q": args.query, "level": args.level, "target": args.target,
-            "from": args.from_, "to": args.to,
+            "from": iso_bound(args.from_), "to": iso_bound(args.to, end_of_day=True),
             "per_page": args.limit, "page": args.page,
         }))
         emit(rows, total, args.format)
@@ -249,7 +281,8 @@ def main():
     elif args.cmd == "audit":
         rows, total = unwrap(api_get(conf, "/admin/audit_logs", {
             "user_email": args.user, "path": args.path,
-            "from": args.from_, "to": args.to, "per_page": args.limit,
+            "from": iso_bound(args.from_), "to": iso_bound(args.to, end_of_day=True),
+            "per_page": args.limit,
         }))
         emit(rows, total, args.format)
 
