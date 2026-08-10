@@ -63,8 +63,8 @@ async function StockContent({ status, page }: { status: string | undefined; page
                     </dd>
                 </div>
             </dl>
-            <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
-                <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+            <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
+                <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
                     <StockTable data={data} />
                 </div>
             </div>
@@ -116,7 +116,7 @@ export default async function List({ searchParams }: { searchParams: Promise<{ s
     const page = Math.max(1, Number(pageStr ?? 1) || 1);
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
             <PageHeader title="股票異動列表" />
             <div className="flex gap-2 overflow-x-auto">
                 {STATUS_TABS.map(({ value, label }) => (

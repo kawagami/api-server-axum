@@ -13,9 +13,9 @@ export default async function Page() {
     const data = await getStockBuybackPeriods();
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
             <PageHeader title="庫藏股計畫清單" description={`共 ${data.length} 筆`} />
-            <AdminTableContainer stickyHead>
+            <AdminTableContainer stickyHead fill>
                 <AdminTable className="text-sm">
                     <thead>
                         <AdminHeadRow>

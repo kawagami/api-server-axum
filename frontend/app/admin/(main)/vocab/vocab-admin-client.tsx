@@ -70,8 +70,8 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
     const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
-        <div className="w-full">
-            <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <PageHeader title="單字題庫" description={`共 ${total} 字`} />
 
                 <ErrorBanner message={failed ? LOAD_FAILED : null} />
@@ -132,8 +132,8 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                     </div>
                 </div>
 
-                <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+                <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                    <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
                         {/* 9 欄、其中 8 欄 whitespace-nowrap，加上釋義的 max-w-xs 就把容器塞滿，
                             padding 減半換回 144px 的餘裕（見 globals.css 的 admin-table-dense） */}
                         <AdminTable className="text-sm admin-table-dense">
@@ -202,7 +202,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
 
                 {hasMore && (
                     <button onClick={loadMore} disabled={isPending}
-                        className="self-center px-6 py-2 text-sm font-medium rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors">
+                        className="shrink-0 self-center px-6 py-2 text-sm font-medium rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors">
                         {isPending ? '載入中…' : '載入更多'}
                     </button>
                 )}

@@ -40,13 +40,13 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
     const colSpan = canDelete ? 4 : 3;
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
             <PageHeader title="訪客留言" description="訪客從前台聯絡表單送來的訊息" />
 
             <ErrorBanner message={failed ? LOAD_FAILED : deleteError} />
 
-            <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+            <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
                     <AdminTable className="text-sm">
                         <thead>
                             <AdminHeadRow>
@@ -100,7 +100,7 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
             </div>
 
             {hasMore && (
-                <div className="flex justify-center pb-4">
+                <div className="flex shrink-0 justify-center">
                     <button
                         onClick={loadMore}
                         disabled={isPending}

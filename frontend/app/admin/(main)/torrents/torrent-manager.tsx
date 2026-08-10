@@ -123,13 +123,13 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
     const hasNext = offset + perPage < total;
 
     return (
-        <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
             <StorageBars storage={storage} />
             <AddTorrentForm onAdded={refresh} />
             <ErrorBanner message={actionError} />
 
-            <div className="bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
-                <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+            <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
+                <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
                 <AdminTable>
                     <thead>
                         <AdminHeadRow>

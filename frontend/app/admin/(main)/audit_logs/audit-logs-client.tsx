@@ -111,8 +111,8 @@ export default function AuditLogsClient() {
     const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
-        <div className="w-full">
-            <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <PageHeader title="操作紀錄" description="後台 API 的寫入與讀取紀錄，以及會員的寫入操作" />
 
                 {/* Filter bar */}
@@ -202,8 +202,8 @@ export default function AuditLogsClient() {
 
                 <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
-                <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+                <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                    <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
                         {/* table-fixed：auto layout 下路徑欄被 break 掉的字元拉到 1 字寬，
                             而 Query 的長字串不可斷、反過來把寬度全吃走，連狀態欄都被推出右邊。
                             固定配寬讓路徑吃剩餘空間，Query 截斷後靠 title 看全文。 */}
@@ -266,7 +266,7 @@ export default function AuditLogsClient() {
                 </div>
 
                 {hasMore && (
-                    <div className="flex justify-center pb-4">
+                    <div className="flex shrink-0 justify-center">
                         <button
                             onClick={handleLoadMore}
                             disabled={isPending}

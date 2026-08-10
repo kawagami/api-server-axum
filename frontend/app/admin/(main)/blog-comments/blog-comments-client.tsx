@@ -41,13 +41,13 @@ export default function BlogCommentsClient({ canDelete }: { canDelete: boolean }
     const colSpan = canDelete ? 5 : 4;
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
             <PageHeader title="文章留言" description="訪客與會員在文章下的留言" />
 
             <ErrorBanner message={failed ? LOAD_FAILED : deleteError} />
 
-            <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+            <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
                     <AdminTable className="text-sm">
                         <thead>
                             <AdminHeadRow>
@@ -113,7 +113,7 @@ export default function BlogCommentsClient({ canDelete }: { canDelete: boolean }
             </div>
 
             {hasMore && (
-                <div className="flex justify-center pb-4">
+                <div className="flex shrink-0 justify-center">
                     <button
                         onClick={loadMore}
                         disabled={isPending}

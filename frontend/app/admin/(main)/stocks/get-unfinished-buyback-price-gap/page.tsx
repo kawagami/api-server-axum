@@ -37,12 +37,12 @@ export default async function Page() {
     const avgDiffPercent = info.length > 0 ? totalDiffPercent / info.length : 0;
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
             <PageHeader
                 title="執行中的庫藏股"
                 description={`共 ${info.length} 筆・價差總和 ${totalDiffPercent.toFixed(2)}%・平均 ${avgDiffPercent.toFixed(2)}%`}
             />
-            <AdminTableContainer stickyHead>
+            <AdminTableContainer stickyHead fill>
                 <AdminTable className="text-sm">
                     <thead>
                         <AdminHeadRow>

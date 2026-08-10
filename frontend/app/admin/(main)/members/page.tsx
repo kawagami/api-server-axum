@@ -15,9 +15,9 @@ export default async function MembersPage() {
     const { data: members, total } = await getMembers();
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
             <PageHeader title="會員列表" description={`共 ${total} 位會員`} />
-            <AdminTableContainer stickyHead>
+            <AdminTableContainer stickyHead fill>
                 <AdminTable>
                     <thead>
                         <AdminHeadRow>

@@ -48,8 +48,8 @@ export default function GovTendersClient() {
     const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
-        <div className="w-full">
-            <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <PageHeader title="政府標案" description="由排程每日抓取政府電子採購網，前台唯讀" />
 
                 {/* Filter bar */}
@@ -109,8 +109,8 @@ export default function GovTendersClient() {
 
                 <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
-                <div className={`bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="admin-sticky-head overflow-auto max-h-[70svh]">
+                <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                    <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
                         {/* table-fixed：原本只有標案名稱有 min-w / max-w，其餘四欄任 auto layout
                             按 min-content 分配。視窗一窄（側欄收起、瀏覽器放大）表格就被撐過容器寬度，
                             把關鍵字欄推出右邊。固定配寬讓標案名稱吃剩餘空間，其餘欄不再互搶。 */}
@@ -171,7 +171,7 @@ export default function GovTendersClient() {
                 </div>
 
                 {hasMore && (
-                    <div className="flex justify-center pb-4">
+                    <div className="flex shrink-0 justify-center">
                         <button
                             onClick={loadMore}
                             disabled={isPending}

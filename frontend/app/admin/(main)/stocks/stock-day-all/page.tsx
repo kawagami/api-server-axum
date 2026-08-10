@@ -21,7 +21,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
     const { data, total } = await getStockDayAll({ trade_date, stock_code, page, perPage });
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
             <PageHeader title="全市場行情" description={`共 ${total} 筆，本頁 ${data.length} 筆`} />
 
             <form method="get" className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
@@ -46,7 +46,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                 </button>
             </form>
 
-            <AdminTableContainer stickyHead>
+            <AdminTableContainer stickyHead fill>
                 {/* 11 欄的數字表：預設的 px-4 光 padding 就吃掉 352px，
                     自然寬度貼齊容器、垂直捲軸一出現最後一欄就被切掉（見 globals.css） */}
                 <AdminTable className="text-sm admin-table-dense">

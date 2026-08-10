@@ -49,7 +49,7 @@ export default async function TorrentsPage({ searchParams }: { searchParams: Pro
     const page = Math.max(1, Number(pageStr ?? 1) || 1);
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
             <PageHeader title="Torrent 下載" />
             <div className="flex gap-2 flex-wrap">
                 {STATUS_TABS.map((s) => {
