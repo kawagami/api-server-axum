@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { requirePermission } from "@/libs/admin-permissions";
 import { ListTableSkeleton } from "@/components/loading/table-skeleton";
 
-const SKELETON_HEADERS = ['ID', '層級', '訊息', '來源模組', '檔案', '時間', '細節'];
+const SKELETON_HEADERS = ['ID', '層級', '訊息', '來源模組', '檔案', '時間'];
 
 export const metadata: Metadata = {
     title: "系統日誌",

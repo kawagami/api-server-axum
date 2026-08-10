@@ -192,266 +192,262 @@ export default function LogsClient() {
     const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
-        <div className="w-full">
-            <div className="flex flex-col gap-4">
-                <PageHeader
-                    title="系統日誌"
-                    description="後端結構化日誌；展開可看錯誤細節與同一請求的完整軌跡"
-                    actions={
-                        <button
-                            onClick={toggleAutoRefresh}
-                            aria-pressed={autoRefresh}
-                            className={`${CHIP} ${autoRefresh ? CHIP_ON : CHIP_OFF}`}
-                        >
-                            自動刷新{autoRefresh ? '中' : ''}
-                        </button>
-                    }
-                />
-
-                {/* 篩選一律收在這張灰底卡片裡（與 audit_logs / gov_tenders 同一套版型），
-                    PageHeader 的動作區只放「自動刷新」這種與查詢條件無關的開關 */}
-                <div className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
-                    <div className="flex flex-col gap-1">
-                        <span className="text-xs text-neutral-500 dark:text-neutral-400">層級</span>
-                        <div className="flex flex-wrap gap-1">
-                            {LEVEL_FILTERS.map(({ value, label }) => (
-                                <button
-                                    key={value || 'ALL'}
-                                    onClick={() => handleFilterChange(value)}
-                                    disabled={isPending}
-                                    aria-pressed={level === value}
-                                    className={`${CHIP} ${level === value ? CHIP_ON : CHIP_OFF}`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 搜尋 message 與 fields —— 錯誤細節在 fields.self，只搜 message 找不到有用的東西 */}
-                    <div className="flex flex-col gap-1 grow min-w-60">
-                        <label className="text-xs text-neutral-500 dark:text-neutral-400">
-                            關鍵字（同時比對訊息與錯誤細節）
-                        </label>
-                        <input
-                            type="text"
-                            value={q}
-                            onChange={e => setQ(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                            placeholder="例：Cannot assign requested address"
-                            className={`${inputClass} w-full`}
-                        />
-                    </div>
+        // 高度鏈：layout 的 h-full flex 欄 → 這裡 flex-1 → 表格區 flex-1 → AdminTableContainer fill。
+        // 任一層漏掉 min-h-0 就會被內容撐開，外層的 overflow-auto 又會長出第二條捲軸。
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
+            {/* 統計併進 description 而不是自己佔一列：整頁剛好塞滿一屏，多一列就會把表格擠掉一列高度 */}
+            <PageHeader
+                title="系統日誌"
+                description={`共 ${total} 筆，已載入 ${logs.length} 筆${
+                    groups.length !== logs.length ? `（合併重複後 ${groups.length} 列）` : ''
+                }`}
+                actions={
                     <button
-                        onClick={handleSearch}
-                        disabled={isPending}
-                        className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors"
+                        onClick={toggleAutoRefresh}
+                        aria-pressed={autoRefresh}
+                        title={`每 ${REFRESH_MS / 1000} 秒重抓第 1 頁`}
+                        className={`${CHIP} ${autoRefresh ? CHIP_ON : CHIP_OFF}`}
                     >
-                        搜尋
+                        自動刷新{autoRefresh ? '中' : ''}
                     </button>
-                    {(q || appliedQ) && (
-                        <button
-                            onClick={handleClear}
-                            disabled={isPending}
-                            className={`${CHIP} ${CHIP_OFF}`}
-                        >
-                            清除
-                        </button>
-                    )}
-                </div>
+                }
+            />
 
-                <ErrorBanner message={failed ? LOAD_FAILED : null} />
-
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400">
-                    <span>
-                        共 {total} 筆，已載入 {logs.length} 筆
-                        {groups.length !== logs.length && `（合併重複後 ${groups.length} 列）`}
-                    </span>
-                    {autoRefresh && <span>每 {REFRESH_MS / 1000} 秒自動重抓第 1 頁</span>}
-                </div>
-
-                <div className={`transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <AdminTableContainer stickyHead>
-                        {/* table-fixed：全後台只有這張表用。auto layout 下訊息欄的 min-content
-                            會被 break 掉的字元拉到 1 字寬，而來源模組／檔案的長 token 不可斷、
-                            反過來把寬度全吃走 —— 最該讀的欄位變最窄。固定配寬讓訊息吃剩下全部。 */}
-                        <AdminTable className="text-sm table-fixed">
-                            <thead>
-                                <AdminHeadRow>
-                                    <AdminTh className="w-16 hidden sm:table-cell">ID</AdminTh>
-                                    <AdminTh className="w-20">層級</AdminTh>
-                                    <AdminTh>訊息</AdminTh>
-                                    <AdminTh className="w-44 hidden lg:table-cell">來源模組</AdminTh>
-                                    <AdminTh className="w-52 hidden xl:table-cell">檔案</AdminTh>
-                                    <AdminTh className="w-32 md:w-44">時間</AdminTh>
-                                </AdminHeadRow>
-                            </thead>
-                            <tbody>
-                                {groups.length === 0 ? (
-                                    <AdminEmptyRow colSpan={COLUMNS}>
-                                        {isPending ? '載入中…' : '目前沒有日誌'}
-                                    </AdminEmptyRow>
-                                ) : (
-                                    groups.map(({ head: log, rows }) => {
-                                        const fields = log.fields ?? {};
-                                        const hasDetail =
-                                            Object.keys(fields).length > 0 ||
-                                            !!log.request_id ||
-                                            rows.length > 1 ||
-                                            log.message.length > LONG_MESSAGE;
-                                        const isExpanded = expanded.has(log.id);
-                                        const Chevron = isExpanded ? ChevronDown : ChevronRight;
-                                        return (
-                                            <Fragment key={log.id}>
-                                                <AdminRow tone={LEVEL_ROW_BG[log.level]}>
-                                                    <AdminTd className="text-neutral-500 dark:text-neutral-500 font-mono align-top hidden sm:table-cell">{log.id}</AdminTd>
-                                                    <AdminTd className="align-top">
-                                                        <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${LEVEL_BADGE[log.level]}`}>
-                                                            {log.level}
-                                                        </span>
-                                                    </AdminTd>
-                                                    <AdminTd className="align-top">
-                                                        {/* chevron 與訊息同一顆 button：整段可點、鍵盤可用，
-                                                            焦點框吃全站那條 focus-visible 規則，不必自己補 */}
-                                                        {hasDetail ? (
-                                                            <button
-                                                                onClick={() => toggleExpand(log.id)}
-                                                                aria-expanded={isExpanded}
-                                                                className="flex w-full items-start gap-1.5 text-left"
-                                                            >
-                                                                <Chevron className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
-                                                                {/* line-clamp 需要 display:-webkit-box，直接掛在 <td> 上會把
-                                                                    cell 從 table-cell 拔掉、整個表格排版壞掉，所以一定要有內層元素 */}
-                                                                <span className={`grow min-w-0 font-mono wrap-break-word ${isExpanded ? '' : 'line-clamp-2'}`}>
-                                                                    {log.message}
-                                                                </span>
-                                                                {rows.length > 1 && (
-                                                                    <span
-                                                                        title={rows.map(r => formatDateTimeSeconds(r.created_at)).join('\n')}
-                                                                        className="shrink-0 px-1.5 py-0.5 rounded-sm text-xs font-medium bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
-                                                                    >
-                                                                        ×{rows.length}
-                                                                    </span>
-                                                                )}
-                                                            </button>
-                                                        ) : (
-                                                            <div className="flex items-start gap-1.5">
-                                                                <span className="w-3.5 shrink-0" aria-hidden="true" />
-                                                                <span className="grow min-w-0 font-mono wrap-break-word line-clamp-2">{log.message}</span>
-                                                            </div>
-                                                        )}
-                                                    </AdminTd>
-                                                    <AdminTd
-                                                        title={log.target}
-                                                        className="text-neutral-600 dark:text-neutral-400 font-mono text-xs align-top truncate hidden lg:table-cell"
-                                                    >
-                                                        {log.target}
-                                                    </AdminTd>
-                                                    <AdminTd
-                                                        title={`${log.file}:${log.line}`}
-                                                        className="text-neutral-600 dark:text-neutral-400 font-mono text-xs align-top truncate hidden xl:table-cell"
-                                                    >
-                                                        {log.file}:{log.line}
-                                                    </AdminTd>
-                                                    <AdminTd className="text-neutral-500 dark:text-neutral-400 text-xs align-top whitespace-nowrap">
-                                                        {formatDateTimeSeconds(log.created_at)}
-                                                    </AdminTd>
-                                                </AdminRow>
-
-                                                {isExpanded && (
-                                                    <tr>
-                                                        <td
-                                                            colSpan={COLUMNS}
-                                                            className="border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/40 px-4 py-3"
-                                                        >
-                                                            <div className="flex flex-col gap-3">
-                                                                <div className="flex flex-col gap-1">
-                                                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">完整訊息</span>
-                                                                    <pre className="font-mono text-xs whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200">
-                                                                        {log.message}
-                                                                    </pre>
-                                                                </div>
-
-                                                                {log.request_id && (
-                                                                    <div className="flex flex-wrap items-center gap-2">
-                                                                        <span className="text-xs text-neutral-500 dark:text-neutral-400">request_id</span>
-                                                                        <code className="font-mono text-xs break-all">{log.request_id}</code>
-                                                                        <button
-                                                                            onClick={() => showTrace(log.request_id!)}
-                                                                            disabled={tracePendingId === log.request_id}
-                                                                            className="px-2 py-0.5 rounded-sm text-xs font-medium bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 transition-colors"
-                                                                        >
-                                                                            {tracePendingId === log.request_id ? '載入中…' : '整條軌跡'}
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-
-                                                                {sortedFields(fields).map(([key, value]) => (
-                                                                    <div key={key} className="flex flex-col gap-1">
-                                                                        <span className="text-xs text-neutral-500 dark:text-neutral-400">{key}</span>
-                                                                        <pre className="font-mono text-xs whitespace-pre-wrap break-all text-neutral-800 dark:text-neutral-200">
-                                                                            {value}
-                                                                        </pre>
-                                                                    </div>
-                                                                ))}
-
-                                                                {rows.length > 1 && (
-                                                                    <div className="flex flex-col gap-1 border-t border-neutral-300 dark:border-neutral-700 pt-3">
-                                                                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                                                                            合併的 {rows.length} 筆（上方 fields 取最新那筆）
-                                                                        </span>
-                                                                        {rows.map(row => (
-                                                                            <div key={row.id} className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                                                                                <span className="text-neutral-500 dark:text-neutral-500">#{row.id}</span>
-                                                                                <span className="text-neutral-500 dark:text-neutral-400">
-                                                                                    {formatDateTimeSeconds(row.created_at)}
-                                                                                </span>
-                                                                                {row.request_id && (
-                                                                                    <>
-                                                                                        <code className="break-all">{row.request_id}</code>
-                                                                                        <button
-                                                                                            onClick={() => showTrace(row.request_id!)}
-                                                                                            disabled={tracePendingId === row.request_id}
-                                                                                            className="px-1.5 py-0.5 rounded-sm font-medium bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors"
-                                                                                        >
-                                                                                            {tracePendingId === row.request_id ? '載入中…' : '軌跡'}
-                                                                                        </button>
-                                                                                    </>
-                                                                                )}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </Fragment>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </AdminTable>
-                    </AdminTableContainer>
-                </div>
-
-                {hasMore && (
-                    <div className="flex flex-col items-center gap-1 pb-4">
-                        <button
-                            onClick={handleLoadMore}
-                            disabled={isPending || autoRefresh}
-                            className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded-sm hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
-                        >
-                            {isPending ? '載入中…' : '載入更多'}
-                        </button>
-                        {autoRefresh && (
-                            <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                                自動刷新會重抓第 1 頁，關閉後才能往下載入
-                            </span>
-                        )}
+            {/* 篩選一律收在這張灰底卡片裡（與 audit_logs / gov_tenders 同一套版型），
+                PageHeader 的動作區只放「自動刷新」這種與查詢條件無關的開關 */}
+            <div className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
+                <div className="flex flex-col gap-1">
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400">層級</span>
+                    <div className="flex flex-wrap gap-1">
+                        {LEVEL_FILTERS.map(({ value, label }) => (
+                            <button
+                                key={value || 'ALL'}
+                                onClick={() => handleFilterChange(value)}
+                                disabled={isPending}
+                                aria-pressed={level === value}
+                                className={`${CHIP} ${level === value ? CHIP_ON : CHIP_OFF}`}
+                            >
+                                {label}
+                            </button>
+                        ))}
                     </div>
+                </div>
+
+                {/* 搜尋 message 與 fields —— 錯誤細節在 fields.self，只搜 message 找不到有用的東西 */}
+                <div className="flex flex-col gap-1 grow min-w-60">
+                    <label className="text-xs text-neutral-500 dark:text-neutral-400">
+                        關鍵字（同時比對訊息與錯誤細節）
+                    </label>
+                    <input
+                        type="text"
+                        value={q}
+                        onChange={e => setQ(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                        placeholder="例：Cannot assign requested address"
+                        className={`${inputClass} w-full`}
+                    />
+                </div>
+                <button
+                    onClick={handleSearch}
+                    disabled={isPending}
+                    className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors"
+                >
+                    搜尋
+                </button>
+                {(q || appliedQ) && (
+                    <button
+                        onClick={handleClear}
+                        disabled={isPending}
+                        className={`${CHIP} ${CHIP_OFF}`}
+                    >
+                        清除
+                    </button>
                 )}
             </div>
+
+            <ErrorBanner message={failed ? LOAD_FAILED : null} />
+
+            <div className={`flex min-h-0 flex-1 flex-col transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                <AdminTableContainer stickyHead fill>
+                    {/* table-fixed：全後台只有這張表用。auto layout 下訊息欄的 min-content
+                        會被 break 掉的字元拉到 1 字寬，而來源模組／檔案的長 token 不可斷、
+                        反過來把寬度全吃走 —— 最該讀的欄位變最窄。固定配寬讓訊息吃剩下全部。 */}
+                    <AdminTable className="text-sm table-fixed">
+                        <thead>
+                            <AdminHeadRow>
+                                <AdminTh className="w-16 hidden sm:table-cell">ID</AdminTh>
+                                <AdminTh className="w-20">層級</AdminTh>
+                                <AdminTh>訊息</AdminTh>
+                                <AdminTh className="w-44 hidden lg:table-cell">來源模組</AdminTh>
+                                <AdminTh className="w-52 hidden xl:table-cell">檔案</AdminTh>
+                                <AdminTh className="w-32 md:w-44">時間</AdminTh>
+                            </AdminHeadRow>
+                        </thead>
+                        <tbody>
+                            {groups.length === 0 ? (
+                                <AdminEmptyRow colSpan={COLUMNS}>
+                                    {isPending ? '載入中…' : '目前沒有日誌'}
+                                </AdminEmptyRow>
+                            ) : (
+                                groups.map(({ head: log, rows }) => {
+                                    const fields = log.fields ?? {};
+                                    const hasDetail =
+                                        Object.keys(fields).length > 0 ||
+                                        !!log.request_id ||
+                                        rows.length > 1 ||
+                                        log.message.length > LONG_MESSAGE;
+                                    const isExpanded = expanded.has(log.id);
+                                    const Chevron = isExpanded ? ChevronDown : ChevronRight;
+                                    return (
+                                        <Fragment key={log.id}>
+                                            <AdminRow tone={LEVEL_ROW_BG[log.level]}>
+                                                <AdminTd className="text-neutral-500 dark:text-neutral-500 font-mono align-top hidden sm:table-cell">{log.id}</AdminTd>
+                                                <AdminTd className="align-top">
+                                                    <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${LEVEL_BADGE[log.level]}`}>
+                                                        {log.level}
+                                                    </span>
+                                                </AdminTd>
+                                                <AdminTd className="align-top">
+                                                    {/* chevron 與訊息同一顆 button：整段可點、鍵盤可用，
+                                                        焦點框吃全站那條 focus-visible 規則，不必自己補 */}
+                                                    {hasDetail ? (
+                                                        <button
+                                                            onClick={() => toggleExpand(log.id)}
+                                                            aria-expanded={isExpanded}
+                                                            className="flex w-full items-start gap-1.5 text-left"
+                                                        >
+                                                            <Chevron className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                                                            {/* line-clamp 需要 display:-webkit-box，直接掛在 <td> 上會把
+                                                                cell 從 table-cell 拔掉、整個表格排版壞掉，所以一定要有內層元素 */}
+                                                            <span className={`grow min-w-0 font-mono wrap-break-word ${isExpanded ? '' : 'line-clamp-2'}`}>
+                                                                {log.message}
+                                                            </span>
+                                                            {rows.length > 1 && (
+                                                                <span
+                                                                    title={rows.map(r => formatDateTimeSeconds(r.created_at)).join('\n')}
+                                                                    className="shrink-0 px-1.5 py-0.5 rounded-sm text-xs font-medium bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
+                                                                >
+                                                                    ×{rows.length}
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-start gap-1.5">
+                                                            <span className="w-3.5 shrink-0" aria-hidden="true" />
+                                                            <span className="grow min-w-0 font-mono wrap-break-word line-clamp-2">{log.message}</span>
+                                                        </div>
+                                                    )}
+                                                </AdminTd>
+                                                <AdminTd
+                                                    title={log.target}
+                                                    className="text-neutral-600 dark:text-neutral-400 font-mono text-xs align-top truncate hidden lg:table-cell"
+                                                >
+                                                    {log.target}
+                                                </AdminTd>
+                                                <AdminTd
+                                                    title={`${log.file}:${log.line}`}
+                                                    className="text-neutral-600 dark:text-neutral-400 font-mono text-xs align-top truncate hidden xl:table-cell"
+                                                >
+                                                    {log.file}:{log.line}
+                                                </AdminTd>
+                                                <AdminTd className="text-neutral-500 dark:text-neutral-400 text-xs align-top whitespace-nowrap">
+                                                    {formatDateTimeSeconds(log.created_at)}
+                                                </AdminTd>
+                                            </AdminRow>
+
+                                            {isExpanded && (
+                                                <tr>
+                                                    <td
+                                                        colSpan={COLUMNS}
+                                                        className="border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/40 px-4 py-3"
+                                                    >
+                                                        <div className="flex flex-col gap-3">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-xs text-neutral-500 dark:text-neutral-400">完整訊息</span>
+                                                                <pre className="font-mono text-xs whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200">
+                                                                    {log.message}
+                                                                </pre>
+                                                            </div>
+
+                                                            {log.request_id && (
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">request_id</span>
+                                                                    <code className="font-mono text-xs break-all">{log.request_id}</code>
+                                                                    <button
+                                                                        onClick={() => showTrace(log.request_id!)}
+                                                                        disabled={tracePendingId === log.request_id}
+                                                                        className="px-2 py-0.5 rounded-sm text-xs font-medium bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 transition-colors"
+                                                                    >
+                                                                        {tracePendingId === log.request_id ? '載入中…' : '整條軌跡'}
+                                                                    </button>
+                                                                </div>
+                                                            )}
+
+                                                            {sortedFields(fields).map(([key, value]) => (
+                                                                <div key={key} className="flex flex-col gap-1">
+                                                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">{key}</span>
+                                                                    <pre className="font-mono text-xs whitespace-pre-wrap break-all text-neutral-800 dark:text-neutral-200">
+                                                                        {value}
+                                                                    </pre>
+                                                                </div>
+                                                            ))}
+
+                                                            {rows.length > 1 && (
+                                                                <div className="flex flex-col gap-1 border-t border-neutral-300 dark:border-neutral-700 pt-3">
+                                                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                                                        合併的 {rows.length} 筆（上方 fields 取最新那筆）
+                                                                    </span>
+                                                                    {rows.map(row => (
+                                                                        <div key={row.id} className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                                                                            <span className="text-neutral-500 dark:text-neutral-500">#{row.id}</span>
+                                                                            <span className="text-neutral-500 dark:text-neutral-400">
+                                                                                {formatDateTimeSeconds(row.created_at)}
+                                                                            </span>
+                                                                            {row.request_id && (
+                                                                                <>
+                                                                                    <code className="break-all">{row.request_id}</code>
+                                                                                    <button
+                                                                                        onClick={() => showTrace(row.request_id!)}
+                                                                                        disabled={tracePendingId === row.request_id}
+                                                                                        className="px-1.5 py-0.5 rounded-sm font-medium bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors"
+                                                                                    >
+                                                                                        {tracePendingId === row.request_id ? '載入中…' : '軌跡'}
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </AdminTable>
+                </AdminTableContainer>
+            </div>
+
+            {hasMore && (
+                <div className="flex shrink-0 flex-col items-center gap-1">
+                    <button
+                        onClick={handleLoadMore}
+                        disabled={isPending || autoRefresh}
+                        className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded-sm hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
+                    >
+                        {isPending ? '載入中…' : '載入更多'}
+                    </button>
+                    {autoRefresh && (
+                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                            自動刷新會重抓第 1 頁，關閉後才能往下載入
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* 軌跡改用 drawer：塞在展開列裡會變成「表格→列→面板→軌跡」四層縮排，
                 而且長軌跡會把表格撐爆。行為（Esc / 背景捲動鎖 / 焦點鎖）全交給 useDialog */}
