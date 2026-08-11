@@ -231,6 +231,38 @@ hyper 照樣回 `tcp connect error`。治不了這個症，還永久關掉 IPv6 
 所以下次再抖，`logs` 表那行就直接看得到 errno；在那之前只印最外層的
 `error sending request for url (…)`，什麼都推不出來。
 
+## 對外連線第三種：解析整個失敗（`EAI_NONAME`，2026-08-11）
+
+與上一節**不同的錯誤**，別套上一節的結論：
+
+```
+dns error
+  <- failed to lookup address information: Name or service not known
+```
+
+上一節是「解析回了 AAAA、接不上」；這個是 **A/AAAA 一筆都沒拿到**，連線根本沒開始。
+
+觀測（UTC，全部打 `www.twse.com.tw`，全部單發）：
+
+| 時間 | 誰 | 後果 |
+|---|---|---|
+| 08-03 20:00:30 | `FetchStockDayAll` | WARN attempt 1/3，1 小時後第 2 次成功 |
+| 08-05 20:00:00 | 同上 | 同上 |
+| 08-10 20:00:00 | 同上 | 同上 |
+| 08-11 00:00:00 | `ConsumePendingStockChange`（stock_no=6257） | ERROR，該筆留在 pending，下一分鐘重跑 |
+
+**不是冷快取**：backend 最後一次重建是 08-09 16:40 UTC，上表後兩筆距它 27～31 小時。
+（08-10 16:06–17:20 那六次 CI 是 frontend-ci，不動 backend 容器。）
+同期 `googleapis` / `gmail` / 採購網 / 台彩**零筆** —— 只有 twse 這個網域中。
+
+成因未定，可能是上游 DNS 或內嵌 DNS 轉發的抖動。**沒有再往下追**，理由是形狀與上一節一致
+（單發、重新 resolve 就通），而 08-11 已把 `send_retrying` 補到 `get_raw_html_string` /
+`get_json_data`（＝ TWSE 全部路徑）與 `services/lotto.rs`、`services/gov_tenders.rs`，
+現在第一次抖就在 200ms 後重解析，而不是等 job 層退避 3600 秒。
+
+⚠️ **若之後 `logs` 表開始出現 `對外請求暫時性失敗（第 2/3 次）`**，代表重試已經吃不下，
+那時才值得往宿主機 `/etc/resolv.conf` 與內嵌 DNS 的上游查。目前只出現過第 1 次。
+
 ## 全新機器 bootstrap
 
 從零把整站架在一台新 VPS 上的流程。

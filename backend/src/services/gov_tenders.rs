@@ -2,7 +2,8 @@ use crate::{
     errors::AppError,
     repositories::gov_tenders as repo,
     structs::pagination::Paginated,
-    structs::gov_tenders::{GovTender, GovTenderListQuery, NewGovTender}
+    structs::gov_tenders::{GovTender, GovTenderListQuery, NewGovTender},
+    utils::reqwest::send_retrying
 };
 use chrono::NaiveDate;
 use reqwest::Client;
@@ -38,13 +39,14 @@ pub async fn fetch_by_keyword(
     client: &Client,
     keyword: &str,
 ) -> Result<Vec<NewGovTender>, AppError> {
-    let text = client
-        .get(SEARCH_URL)
-        .query(&[("query", keyword), ("page", "1")])
-        .send()
-        .await?
-        .text()
-        .await?;
+    let text = send_retrying(
+        client
+            .get(SEARCH_URL)
+            .query(&[("query", keyword), ("page", "1")]),
+    )
+    .await?
+    .text()
+    .await?;
     parse_records(&text, keyword)
 }
 

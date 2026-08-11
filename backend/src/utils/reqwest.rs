@@ -36,9 +36,15 @@ pub async fn get_raw_html_string(
     headers: Option<HashMap<String, String>>,
     form_data_pairs: Option<Vec<(&str, &str)>>,
 ) -> Result<String, AppError> {
-    let response = build_request(request_client, method, url, headers, form_data_pairs, None)
-        .send()
-        .await?;
+    let response = send_retrying(build_request(
+        request_client,
+        method,
+        url,
+        headers,
+        form_data_pairs,
+        None,
+    ))
+    .await?;
 
     if !response.status().is_success() {
         return Err(RequestError::InvalidContent(format!(
@@ -64,15 +70,14 @@ pub async fn get_json_data<T>(
 where
     T: DeserializeOwned,
 {
-    let response = build_request(
+    let response = send_retrying(build_request(
         request_client,
         method,
         url,
         headers,
         form_data_pairs,
         json_body,
-    )
-    .send()
+    ))
     .await?;
 
     if !response.status().is_success() {
@@ -99,8 +104,18 @@ where
 /// 上游查詢掉了一個），**下一次解析就正常** —— 所以重試會重新 resolve 並接上。
 /// 完整推導見 `deploy/README.md` 的「對外連線偶發 connect 失敗」。
 ///
+/// 第二種抖動（2026-08-11）：**解析本身失敗**，`dns error <- failed to lookup address
+/// information: Name or service not known`（`EAI_NONAME`）。與上面那個不同 —— 那個是拿到
+/// AAAA 接不上，這個是 A/AAAA 一筆都沒拿到，且發生在 backend 容器已跑 27 小時之後，
+/// 不是冷快取。近兩週只中 `www.twse.com.tw`（08-03 / 08-05 / 08-10 / 08-11 各一次單發）。
+/// 成因未定，但「單發、重新 resolve 就通」的形狀與上面一致，重試同樣是對症的。
+///
 /// 重試只涵蓋 `is_connect()` / `is_timeout()`，也就是**請求還沒送達對方**的失敗。
 /// 對方已經收到並回了狀態碼的，一律原樣回傳 —— 那不是抖動，重試只會放大問題。
+///
+/// 呼叫端：`get_raw_html_string` / `get_json_data`（本檔，2026-08-11 起 —— 於是 TWSE、
+/// lotto、gov_tenders 這些排程抓取全部涵蓋）與 `services/oauth.rs`。
+/// **新的對外呼叫一律走這兩支或本函式，不要自己 `.send()`。**
 pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response, reqwest::Error> {
     /// 總嘗試次數（含第一次）
     const ATTEMPTS: u32 = 3;
@@ -110,7 +125,7 @@ pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response,
     let mut attempt = 1;
     loop {
         // body 不可重放（串流）時沒有重試的餘地，直接送一次。
-        // 目前所有呼叫端都是 form / 無 body，走不到這條。
+        // 目前所有呼叫端都是 form / json / 無 body（都在記憶體裡），走不到這條。
         let Some(cloned) = builder.try_clone() else {
             return builder.send().await;
         };

@@ -4,7 +4,7 @@
 //! 回傳命中的**最高**獎別（None = 未中）。號碼來源（台彩 API）由 `fetch_draws`
 //! 取得，解析交給純函式 `parse_draws`。
 
-use crate::{errors::AppError, structs::lotto::Draw};
+use crate::{errors::AppError, structs::lotto::Draw, utils::reqwest::send_retrying};
 use chrono::NaiveDate;
 use reqwest::Client;
 use serde::Deserialize;
@@ -199,7 +199,7 @@ pub async fn fetch_draws(client: &Client, game: &str, month: &str) -> Result<Vec
         _ => return Ok(vec![]),
     };
     let url = format!("{API_BASE}/{path}?month={month}&pageSize=31");
-    let body = client.get(&url).send().await?.text().await?;
+    let body = send_retrying(client.get(&url)).await?.text().await?;
     parse_draws(game, &body)
 }
 
