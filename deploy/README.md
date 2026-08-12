@@ -192,8 +192,10 @@ sudo systemctl restart docker   # daemon 的 IPv6 能力是行程啟動時探測
 
 ### 應用層的防護（不取代上面）
 
-`utils/reqwest.rs::send_retrying` 與 `services/email.rs` 對**連線階段**的失敗重試 3 次
-（200/400ms、300/600ms 退避）。刻意只重試「請求還沒送達對方」的失敗 —— 對方已回狀態碼、
+`utils/reqwest.rs::send_retrying` 與 `services/email.rs` 對**連線階段**的失敗重試。
+兩邊的預算**已經不一樣了**（08-12 起，別再寫成同一組數字）：reqwest **4 次 / 指數
+250-500-1000ms**（合計 1.75 秒，理由見「三種失敗的共同根因與修法」）、email 仍是
+**3 次 / 線性 300-600ms**。刻意只重試「請求還沒送達對方」的失敗 —— 對方已回狀態碼、
 或信已進 SMTP 對話的一律不重試，免得同一封中獎通知寄兩次。
 
 對 reqwest 那條路徑而言這不只是防護，而是**對症的解**，理由見下一節。
@@ -234,10 +236,14 @@ AAAA-only 的答案來自 **Docker 內嵌 DNS（127.0.0.11）**：它把 A 與 A
 掉一個就只回另一個。快取是 per-network 的，**容器剛重啟時是冷的**，第一次查最容易掉；
 查成功之後兩筆都進快取，後面就穩了。這解釋了為什麼失敗總是單發、總是在部署後不久。
 
-### 結論：不用再修
+### 結論：不用再修（**這個標題在 08-12 過期了**）
 
 `send_retrying` 重試時會**重新 resolve**，第二次拿到 A 就接上 —— 正好對症。
 08-09 16:14 那次實測即是如此：`logs` 表只有 1 筆 WARN、沒有 ERROR，使用者拿到 200。
+
+⚠️ 「不用再修」只對**這一節那個成因**成立。08-12 之後仍動了三處（重試預算、`dns_opt`、
+部署腳本 `docker pull` 重試），因為抖動的**代價**與**可見度**還有問題 —— 見
+「三種失敗的共同根因與修法」。讀到這個標題不要當成「這條線已經結案」。
 
 ⚠️ **不要改成 `reqwest` 的 `local_address(0.0.0.0)`「只走 IPv4」。** 那確實會讓
 `split_by_preference` 濾掉所有 AAAA，但 AAAA-only 的答案在濾完之後是**空清單**，
@@ -276,11 +282,13 @@ dns error
 成因未定，可能是上游 DNS 或內嵌 DNS 轉發的抖動。**沒有再往下追**，理由是形狀與上一節一致
 （單發、重新 resolve 就通），而 08-11 已把 `send_retrying` 補到 `get_raw_html_string` /
 `get_json_data`（＝ TWSE 全部路徑）與 `services/lotto.rs`、`services/gov_tenders.rs`，
-現在第一次抖就在 200ms 後重解析，而不是等 job 層退避 3600 秒。
+現在第一次抖就在 250ms 後重解析（08-12 前是 200ms），而不是等 job 層退避 3600 秒。
 
-⚠️ **若之後 `logs` 表開始出現 `對外請求暫時性失敗（第 2/3 次）`**，代表重試已經吃不下，
+⚠️ **若之後 `logs` 表開始出現「重試到最後一次」的 WARN**，代表重試已經吃不下，
 那時才值得往宿主機 `/etc/resolv.conf` 與內嵌 DNS 的上游查。~~目前只出現過第 1 次。~~
-**08-12 兌現了**（第 2/3 次共 4 筆），處理見下一節。
+**08-12 兌現了**（當時的訊息是「第 2/3 次」共 4 筆），處理見下一節。
+⚠️ 預算已於 08-12 改成 4 次，**現在要盯的字串是「第 3/4 次」** —— 舊的「第 2/3 次」
+不會再出現，拿它當監控條件會永遠是零。
 
 ## 三種失敗的共同根因與修法（2026-08-12）
 
@@ -310,7 +318,7 @@ job（每分鐘的 `CollectSystemMetrics` / `ConsumePendingStockChange` /
 掉一個就只回另一個（→ AAAA-only，`os error 99`）、都掉就整個失敗（→ `EAI_NONAME`）、
 回了但沒有可用 family（→ `EAI_NODATA`）。冷快取只是「最容易掉的時機」之一，不是唯一。
 
-### 為什麼會掉：內嵌 DNS 有一半的上游是死的（08-13 查到）
+### 一條看起來像根因、但推不動的線索：內嵌 DNS 的 v6 上游（08-13）
 
 `journalctl -u docker` 每建一個容器就印一次這兩行：
 
@@ -322,11 +330,17 @@ IPv6 enabled; Adding default IPv6 external servers:
 ```
 
 宿主機 `/etc/resolv.conf` 只有 localhost（systemd-resolved），所以 dockerd 退回內建預設，
-**而它連 IPv6 那兩台一起加**。這台沒有可用 IPv6 → **四台上游有兩台永遠打不通**。
-內嵌 DNS 每次往外轉發都有機會挑到死的那半邊，這就是「掉一問」的機制本身。
+**而它連 IPv6 那兩台一起加**。這台沒有可用 IPv6 → 四台上游有兩台永遠打不通。
 
-⚠️ **「兩台死上游」是事實（log 原文在上），但「它造成了那些失敗」還沒有直接證據** ——
-別把這段當成已證實的因果。候選修法與**先驗證再改**的理由見下面「候選修法：尚未套用」。
+⚠️ **一度把這寫成「每次轉發都有一半機率挑到死的上游」＝根因。那個推論不成立**（08-13 自我推翻，
+留在這裡免得下一個人重走）：看 log 的**順序** —— v4 兩台是 `Using default external servers`，
+v6 兩台是後面 `Adding default IPv6 external servers`，**append 在清單尾端**。libnetwork 的
+resolver 是依序轉發、成功就停，所以那兩台 v6 只有在 8.8.8.8 與 8.8.4.4 都失敗時才會被碰到
+—— 是永遠用不到的 fallback，不是每次都在抽的籤。
+
+⇒ 「有兩台死上游」是**事實**（log 原文在上，值得知道），但它**解釋不了**那些失敗。
+真正還沒解釋的仍是「內嵌 DNS 對 127.0.0.11 那一問為什麼會掉」。
+對應的候選修法見下面「候選修法：查完認定沒用」。
 
 ### 兩處改動
 
@@ -340,7 +354,11 @@ IPv6 enabled; Adding default IPv6 external servers:
 2. **`utils/reqwest.rs::send_retrying` 的重試預算 3 次 / 600ms → 4 次 / 1.75 秒**（指數 250/500/1000ms）
    —— 原本三次全在 600ms 內用完，抖動撐過 600ms 就整批失敗、掉到 job 層退避
    **1800 秒（gov_tenders）／ 3600 秒（TWSE）**。08-11 23:00 那筆正是如此（1.1 秒用完三次）。
-   多等 1.75 秒換掉半小時，而呼叫端全是排程 job、沒有使用者在等。
+   多等 1.75 秒換掉半小時。
+   ⚠️ **這裡原本寫「呼叫端全是排程 job、沒有使用者在等」，是錯的**（08-13 修正）：
+   `services/oauth.rs` 有 5 支走 `send_retrying`，全在 member 登入路徑上。抖動時退避疊加
+   （Google 序列 2 支 → 最壞多 3.5 秒、GitHub 3 支 → 5.25 秒），仍在 60 秒 request timeout
+   內，但這個交換**不是零代價**。要再放寬預算前先確認登入路徑吃得下。
 
 3. **部署腳本 `docker pull` 重試 3 次**（08-13，`backend.yml` / `frontend.yml` 各一處）——
    dockerd 那腿 v6 失敗沒有根治手段（見「主機 IPv6」節的第二個 ⚠️），裸的一發 + `set -e`
@@ -351,14 +369,19 @@ IPv6 enabled; Adding default IPv6 external servers:
    在同一台機器、同一分鐘**成功**，`backend-ci` 的**失敗** —— 同時、同主機、不同結果，
    即「每次撥號的硬幣」，重試對症。
 
-### 候選修法：尚未套用（08-13）
+### 候選修法：查完認定沒用（08-13）
 
-**`dns: [8.8.8.8, 1.1.1.1]`**（給 backend 指定 v4-only 上游，拿掉那兩台打不通的 v6）。
-**刻意先不套用**，兩個理由：
+**`dns: [8.8.8.8, 1.1.1.1]`**（給 backend 指定 v4-only 上游）。寫好了又**撤掉**，因為
+它要修的那個機制上一節已經自我推翻 —— v6 上游 append 在清單尾端、正常路徑碰不到，
+拿掉它們不會改變任何事。**不要因為「反正無害」再把它加回來**：無害不是理由，
+它會讓下一個人以為死上游那條線索已經處理過了。
 
-1. 它與已經上線的 `dns_opt` 打**同一個假設**，一起上線就分不出哪個有效。
-2. 「兩台死上游造成那些失敗」目前是推測。先量測再改 —— 開一次性 glibc 容器接同一個網路，
-   壓一輪並發解析看能不能重現（唯讀、不動任何容器，可在改 `dns_opt` 前後各跑一次比較）：
+若之後真要指定 `dns:`，先知道兩件事：`dns:` 設定的是內嵌 DNS **往外轉發**用的伺服器，
+**不會繞過 127.0.0.11**（user-defined network 裡容器的 `resolv.conf` 永遠指向內嵌 DNS，
+`database` / `valkey` 仍由它回答）；而且它與 `dns_opt` 打同一個症狀，一起上線就分不出哪個有效。
+
+**還沒做、也還有價值的是量測** —— 開一次性 glibc 容器接同一個網路，壓一輪並發解析看
+能不能重現（唯讀、不動任何容器）：
 
 ```bash
 docker network ls          # 先確認網路名
@@ -374,8 +397,10 @@ docker run --rm --network kawa_default debian:12-slim sh -c '
 ⚠️ **不要用 `docker exec valkey` 代替**：alpine 是 musl，resolver 行為與 backend 的 glibc 不同，
 量到的結果不能代表 backend。
 
-若要套用，`dns:` 設定的是內嵌 DNS **往外轉發**用的伺服器，**不會繞過 127.0.0.11** ——
-user-defined network 裡容器的 `resolv.conf` 永遠指向內嵌 DNS，`database` / `valkey` 仍由它回答。
+**要 A/B 就同一輪跑兩次**：上面那個 `docker run` **不帶 `dns_opt`**（那是設在 backend service
+上的，per-container），所以它量到的是**沒有** `single-request-reopen` 的對照組。加上
+`--dns-opt single-request-reopen --dns-opt timeout:2 --dns-opt attempts:3` 再跑一次，
+兩邊 FAIL 筆數的差就是 `dns_opt` 的實際效果 —— 不必等一兩週看 `logs` 表筆數。
 
 ### 還沒做（下一階段）
 

@@ -228,8 +228,12 @@ services:
     #   blocking threadpool）。成本是每次「建新連線」多一個 RTT，對象是同 netns 的
     #   127.0.0.11，且 reqwest / sqlx / bb8 都有連線池，穩態幾乎不再解析。
     #   ⇒ 對承載量沒有影響；這台的上限在 1 核、PG pool 20 條、mem_limit，不在 DNS。
-    # - timeout:2 attempts:3：glibc 預設是每個 nameserver 5 秒、2 輪。掉包時的最壞停頓
-    #   從約 5 秒降到 2 秒，總重試輪數還多一輪。**這是往降延遲的方向走，不是保守化。**
+    # - timeout:2 attempts:3：容器的 resolv.conf 只有 127.0.0.11 一台 nameserver，
+    #   所以這是「對它重試 3 輪、每輪等 2 秒」。glibc 預設是 5 秒 × 2 輪＝最壞約 10 秒，
+    #   現在單一問句最壞 6 秒。
+    #   ⚠ 但 `single-request-reopen` 讓 A 與 AAAA 變成兩個獨立問句，各自可能用完自己的
+    #   重試額度 → **最壞總停頓從約 10 秒變成約 12 秒**（並行時兩問共用同一輪等待）。
+    #   一般情況是快的（少一次掉包就少一輪 5 秒等待），但別寫成「純粹降延遲」。
     #
     # 只對 glibc 有效 —— 基底是 distroless/cc-debian12（glibc），成立。
     # 效果驗證：`logs` 表的 `對外請求暫時性失敗` 應該變少；若「第 3/4 次」開始出現，
@@ -238,6 +242,10 @@ services:
       - single-request-reopen
       - timeout:2
       - attempts:3
+    # ⚠ 這裡**刻意沒有 `dns:`**（曾經寫過 `dns: [8.8.8.8, 1.1.1.1]` 又撤掉，2026-08-13）。
+    #   動機是 dockerd log 顯示內嵌 DNS 的四台上游有兩台是打不通的 IPv6，但那條推論
+    #   自己站不住：v6 那兩台是 append 在清單**尾端**的 fallback，正常路徑碰不到。
+    #   完整推翻過程見 `deploy/README.md`「候選修法：查完認定沒用」。**別因為「反正無害」加回來。**
     working_dir: /app   # distroless image 無預設 workdir；UPLOAD_PATH 等相對路徑以 /app 為基準
     env_file:
       - /srv/kawa/env/kawa.env

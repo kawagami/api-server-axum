@@ -118,11 +118,14 @@ jobs:
             set -e   # 少了它，任何一步失敗都會被後面的指令蓋掉，job 照樣綠燈
             cd ~/kawa-deploy
             # docker pull 重試 3 次（2026-08-13）。
-            # dockerd 自己解析 auth.docker.io 時**必然有一腿撞 IPv6**：它是 Go，不套用
+            # dockerd 解析 registry 相關網域時**必然有一腿撞 IPv6**：它是 Go，不套用
             # glibc 的 AI_ADDRCONFIG，DNS 回的 AAAA 照樣拿到照樣撥，而這台沒有 v6 來源位址
-            # → `cannot assign requested address`。平時靠 v4 那腿救回來，偶爾整個 dial 失敗
-            # （08-12 16:11 UTC 部署紅燈就是這個，journalctl 只有 v6 那腿的錯誤）。
+            # → `cannot assign requested address`。平時靠 v4 那腿救回來，偶爾整個 dial 失敗。
+            # 中過的網域至少兩個（別以為只有某一個）：`auth.docker.io`（08-12 16:11，
+            # 那次部署紅燈）與 `registry-1.docker.io`（08-12 16:34，被本重試接住）。
             # 裸的一發 + set -e = 一次抖動就整個部署紅燈，而重新 resolve 通常就通。
+            # 實證：16:34 那次 log 裡第 1 次 dial v6 失敗、第 2 次 `Downloaded newer image`
+            # —— 同腳本同分鐘不同結果，確認是「每次撥號的硬幣」而不是設定壞掉。
             # ⚠ 這是止血不是根治：關宿主機 IPv6 也修不到（只把 errno 從 EADDRNOTAVAIL
             #   換成 ENETUNREACH），AAAA 不會從 Go 的 resolver 眼前消失。
             for i in 1 2 3; do
