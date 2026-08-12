@@ -100,7 +100,13 @@ jobs:
           script: |
             set -e   # 少了它，任何一步失敗都會被後面的指令蓋掉，job 照樣綠燈
             cd ~/kawa-deploy
-            docker pull kawagami77/my-next-blog:latest
+            # 同 backend.yml：dockerd 解析 registry 時必然有一腿撞 IPv6（Go 不套 AI_ADDRCONFIG），
+            # 裸的一發會讓一次 DNS 抖動變成部署紅燈。理由與陷阱見 backend.yml 同一段註解。
+            for i in 1 2 3; do
+              docker pull kawagami77/my-next-blog:latest && break
+              [ "$i" = 3 ] && exit 1
+              sleep $((i * 5))
+            done
             docker compose up -d --remove-orphans
             # 同 backend.yml：frontend recreate 後 IP 可能變，nginx 需 reload 才會重新解析
             # upstream 名稱，否則會一直打舊 IP → 502。

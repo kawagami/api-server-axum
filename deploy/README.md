@@ -145,6 +145,24 @@ ip -6 route   → 只有 ::1 與 fe80::/64，沒有 ::/0 預設路由
 > reqwest 那兩列的真正成因見下面「對外連線偶發 connect 失敗」。這一節其餘內容仍然成立：
 > 宿主機 IPv6 該關，順序不可顛倒。
 
+> ⚠️ **最後一列（dockerd / `docker pull`）的歸因也在 08-12 被推翻。** 同一個錯誤在
+> 16:11 (UTC) 讓部署紅燈，而當時宿主機 IPv6 仍是關著的、且 07-27 以來沒重開機過：
+>
+> ```
+> ip -6 addr show scope global   → 空
+> ip -6 route show default       → 空
+> sysctl net.ipv6.conf.{all,default}.disable_ipv6 → 均為 1（drop-in 檔完好）
+> getent ahostsv6 auth.docker.io → 空
+> journalctl -u docker           → dial tcp [2606:4700:4403::ac40:904e]:443:
+>                                   connect: cannot assign requested address
+> ```
+>
+> `getent` 空而 dockerd 拿得到 AAAA，是**兩條解析路徑**的差異：glibc `getaddrinfo` 套用
+> **`AI_ADDRCONFIG`**（本機沒 v6 位址就濾掉 AAAA），**Go 的 resolver 不套**。
+> ⇒ 這台上 `docker pull` **每次都有一腿撞 v6 失敗**，平時靠 v4 那腿救回來；關 IPv6 只會把
+> errno 從 `EADDRNOTAVAIL` 換成 `ENETUNREACH`，AAAA 不會從 Go 眼前消失。
+> **這條沒有乾淨的根治手段**，處理方式是部署腳本重試（見下面那節）。
+
 ### 修法與**不可顛倒的順序**
 
 1. **先**把 `nginx/conf.d/*.conf` 的 `listen [::]` 全部拆掉並部署
@@ -292,6 +310,24 @@ job（每分鐘的 `CollectSystemMetrics` / `ConsumePendingStockChange` /
 掉一個就只回另一個（→ AAAA-only，`os error 99`）、都掉就整個失敗（→ `EAI_NONAME`）、
 回了但沒有可用 family（→ `EAI_NODATA`）。冷快取只是「最容易掉的時機」之一，不是唯一。
 
+### 為什麼會掉：內嵌 DNS 有一半的上游是死的（08-13 查到）
+
+`journalctl -u docker` 每建一個容器就印一次這兩行：
+
+```
+No non-localhost DNS nameservers are left in resolv.conf.
+  Using default external servers: [nameserver 8.8.8.8 nameserver 8.8.4.4]
+IPv6 enabled; Adding default IPv6 external servers:
+  [nameserver 2001:4860:4860::8888 nameserver 2001:4860:4860::8844]
+```
+
+宿主機 `/etc/resolv.conf` 只有 localhost（systemd-resolved），所以 dockerd 退回內建預設，
+**而它連 IPv6 那兩台一起加**。這台沒有可用 IPv6 → **四台上游有兩台永遠打不通**。
+內嵌 DNS 每次往外轉發都有機會挑到死的那半邊，這就是「掉一問」的機制本身。
+
+⚠️ **「兩台死上游」是事實（log 原文在上），但「它造成了那些失敗」還沒有直接證據** ——
+別把這段當成已證實的因果。候選修法與**先驗證再改**的理由見下面「候選修法：尚未套用」。
+
 ### 兩處改動
 
 1. **`docker-compose.yml` backend 加 `dns_opt: [single-request-reopen, timeout:2, attempts:3]`**
@@ -306,10 +342,45 @@ job（每分鐘的 `CollectSystemMetrics` / `ConsumePendingStockChange` /
    **1800 秒（gov_tenders）／ 3600 秒（TWSE）**。08-11 23:00 那筆正是如此（1.1 秒用完三次）。
    多等 1.75 秒換掉半小時，而呼叫端全是排程 job、沒有使用者在等。
 
+3. **部署腳本 `docker pull` 重試 3 次**（08-13，`backend.yml` / `frontend.yml` 各一處）——
+   dockerd 那腿 v6 失敗沒有根治手段（見「主機 IPv6」節的第二個 ⚠️），裸的一發 + `set -e`
+   等於把一次 DNS 抖動變成部署紅燈。退避 5 / 10 秒，三次都失敗才紅燈。
+   `[ "$i" = 3 ] && exit 1` 在 `set -e` 下的行為已用 bash 與 dash 各實測過（0/1/2 次失敗
+   都會繼續往下走，3 次才 exit 1）。
+   **這一項的證據最硬**：`6830e11` 那批 CI（16:08:35Z）裡 `frontend-ci` 的 `docker pull`
+   在同一台機器、同一分鐘**成功**，`backend-ci` 的**失敗** —— 同時、同主機、不同結果，
+   即「每次撥號的硬幣」，重試對症。
+
+### 候選修法：尚未套用（08-13）
+
+**`dns: [8.8.8.8, 1.1.1.1]`**（給 backend 指定 v4-only 上游，拿掉那兩台打不通的 v6）。
+**刻意先不套用**，兩個理由：
+
+1. 它與已經上線的 `dns_opt` 打**同一個假設**，一起上線就分不出哪個有效。
+2. 「兩台死上游造成那些失敗」目前是推測。先量測再改 —— 開一次性 glibc 容器接同一個網路，
+   壓一輪並發解析看能不能重現（唯讀、不動任何容器，可在改 `dns_opt` 前後各跑一次比較）：
+
+```bash
+docker network ls          # 先確認網路名
+docker run --rm --network kawa_default debian:12-slim sh -c '
+  i=0; while [ $i -lt 40 ]; do
+    for h in www.twse.com.tw api.taiwanlottery.com pcc-api.openfun.app oauth2.googleapis.com; do
+      getent hosts $h >/dev/null || echo "FAIL $h"
+    done &
+    i=$((i+1))
+  done; wait; echo done'
+```
+
+⚠️ **不要用 `docker exec valkey` 代替**：alpine 是 musl，resolver 行為與 backend 的 glibc 不同，
+量到的結果不能代表 backend。
+
+若要套用，`dns:` 設定的是內嵌 DNS **往外轉發**用的伺服器，**不會繞過 127.0.0.11** ——
+user-defined network 裡容器的 `resolv.conf` 永遠指向內嵌 DNS，`database` / `valkey` 仍由它回答。
+
 ### 還沒做（下一階段）
 
 `reqwest` 的 `hickory-dns` feature：純 Rust resolver，自帶快取、不吃 glibc 那套行為，
-DNS 流量比現在更少。先觀察上面兩處的效果一兩週再決定。
+DNS 流量比現在更少。先觀察前面那些的效果一兩週再決定。
 ⚠️ 換之前要確認容器內名字（`database` / `valkey`）的解析仍走 127.0.0.11。
 
 ## 全新機器 bootstrap
