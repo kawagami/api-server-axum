@@ -110,6 +110,14 @@ where
 /// 不是冷快取。近兩週只中 `www.twse.com.tw`（08-03 / 08-05 / 08-10 / 08-11 各一次單發）。
 /// 成因未定，但「單發、重新 resolve 就通」的形狀與上面一致，重試同樣是對症的。
 ///
+/// 重試預算 3 次 / 600ms → **4 次 / 1.75 秒**（2026-08-12）：原本三次全在 600ms 內打完，
+/// 抖動只要撐過 600ms 就整批失敗，然後掉到 job 層的退避 —— `run_with_retries` 是
+/// **1800 秒（gov_tenders）／3600 秒（TWSE）**。08-11 23:00 那次就是這樣：三次連 EADDRNOTAVAIL
+/// 在 1.1 秒內用完，整個 `fetch_gov_tenders` 退避半小時。多等 1.75 秒換掉半小時，
+/// 而且對外抓取全在排程 job 裡（沒有使用者在等），這個交換沒有代價。
+/// 退避改指數（250/500/1000ms）而非線性，是為了讓最後一次落在離第一次夠遠的位置。
+/// 同日的另一半修法在 `deploy/docker-compose.yml` 的 `dns_opt`（減少抖動發生率本身）。
+///
 /// 重試只涵蓋 `is_connect()` / `is_timeout()`，也就是**請求還沒送達對方**的失敗。
 /// 對方已經收到並回了狀態碼的，一律原樣回傳 —— 那不是抖動，重試只會放大問題。
 ///
@@ -118,9 +126,9 @@ where
 /// **新的對外呼叫一律走這兩支或本函式，不要自己 `.send()`。**
 pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response, reqwest::Error> {
     /// 總嘗試次數（含第一次）
-    const ATTEMPTS: u32 = 3;
-    /// 每次退避的基數，實際等待是 base × 第幾次（200ms / 400ms）
-    const BACKOFF_MS: u64 = 200;
+    const ATTEMPTS: u32 = 4;
+    /// 退避基數，實際等待是 base × 2^(第幾次-1)（250ms / 500ms / 1000ms，合計 1.75 秒）
+    const BACKOFF_MS: u64 = 250;
 
     let mut attempt = 1;
     loop {
@@ -137,17 +145,15 @@ pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response,
                 if attempt >= ATTEMPTS || !transient {
                     return Err(e);
                 }
+                let backoff_ms = BACKOFF_MS << (attempt - 1);
                 tracing::warn!(
                     "對外請求暫時性失敗（第 {}/{} 次），{}ms 後重試: {}",
                     attempt,
                     ATTEMPTS,
-                    BACKOFF_MS * attempt as u64,
+                    backoff_ms,
                     error_chain(&e)
                 );
-                tokio::time::sleep(std::time::Duration::from_millis(
-                    BACKOFF_MS * attempt as u64,
-                ))
-                .await;
+                tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
                 attempt += 1;
             }
         }

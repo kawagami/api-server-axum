@@ -261,7 +261,56 @@ dns error
 現在第一次抖就在 200ms 後重解析，而不是等 job 層退避 3600 秒。
 
 ⚠️ **若之後 `logs` 表開始出現 `對外請求暫時性失敗（第 2/3 次）`**，代表重試已經吃不下，
-那時才值得往宿主機 `/etc/resolv.conf` 與內嵌 DNS 的上游查。目前只出現過第 1 次。
+那時才值得往宿主機 `/etc/resolv.conf` 與內嵌 DNS 的上游查。~~目前只出現過第 1 次。~~
+**08-12 兌現了**（第 2/3 次共 4 筆），處理見下一節。
+
+## 三種失敗的共同根因與修法（2026-08-12）
+
+上面三節是三種 errno，但 08-12 把 08-05 起的紀錄攤開看，形狀是同一件事。
+
+### 統計
+
+`scripts/kawa-logs logs -q "對外請求暫時性失敗" --from 2026-08-05`：
+
+| | 筆數 |
+|---|---|
+| 重試 WARN | 9（≒5 次抖動事件，每次記 2 筆） |
+| job 層 `服務連接失敗` | 5，**全部下一輪重試成功** |
+| ERROR（24h） | 0 |
+
+errno 分佈：`os error 99` ×4、`Name or service not known` ×2、
+`No address associated with hostname` ×2。網域分散（台彩 / twse / 採購網 / googleapis），
+**不再只有 twse**，所以上一節「只有 twse 中」那句已過期。
+
+### 關鍵觀察：全部落在 cron tick 的 `:00.x`
+
+`23:00:00.3` / `20:00:00.4` / `17:00:00.8` / `07:00:00` / `08:00:00`。同一秒觸發的不只一支
+job（每分鐘的 `CollectSystemMetrics` / `ConsumePendingStockChange` /
+`FetchHistoricalClosingPrices` 三支，加上該點的日排程），**並行的 getaddrinfo 撞在一起**。
+
+這把三種 errno 收成一個根因：內嵌 DNS 把一次解析拆成 A 與 AAAA 兩個上游查詢，
+掉一個就只回另一個（→ AAAA-only，`os error 99`）、都掉就整個失敗（→ `EAI_NONAME`）、
+回了但沒有可用 family（→ `EAI_NODATA`）。冷快取只是「最容易掉的時機」之一，不是唯一。
+
+### 兩處改動
+
+1. **`docker-compose.yml` backend 加 `dns_opt: [single-request-reopen, timeout:2, attempts:3]`**
+   —— glibc 預設把 A/AAAA 塞同一個 UDP socket 平行送，改成序列 + 換 socket。
+   ⚠️ 序列化只在**單一 getaddrinfo 內部**，不同連線的解析照樣並行、也不佔 async worker
+   （hyper 的 `GaiResolver` 走 tokio blocking pool）；成本是建新連線時多一個 RTT，
+   對象是同 netns 的 127.0.0.11，而各連線池讓穩態幾乎不再解析。**對承載量無影響。**
+   `timeout:2 attempts:3` 比 glibc 預設（5 秒 ×2 輪）更快放棄，是降延遲方向。
+   只對 glibc 有效 —— 基底 distroless/cc-debian12 成立。
+2. **`utils/reqwest.rs::send_retrying` 的重試預算 3 次 / 600ms → 4 次 / 1.75 秒**（指數 250/500/1000ms）
+   —— 原本三次全在 600ms 內用完，抖動撐過 600ms 就整批失敗、掉到 job 層退避
+   **1800 秒（gov_tenders）／ 3600 秒（TWSE）**。08-11 23:00 那筆正是如此（1.1 秒用完三次）。
+   多等 1.75 秒換掉半小時，而呼叫端全是排程 job、沒有使用者在等。
+
+### 還沒做（下一階段）
+
+`reqwest` 的 `hickory-dns` feature：純 Rust resolver，自帶快取、不吃 glibc 那套行為，
+DNS 流量比現在更少。先觀察上面兩處的效果一兩週再決定。
+⚠️ 換之前要確認容器內名字（`database` / `valkey`）的解析仍走 127.0.0.11。
 
 ## 全新機器 bootstrap
 

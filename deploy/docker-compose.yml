@@ -215,6 +215,29 @@ services:
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1
       - net.ipv6.conf.default.disable_ipv6=1
+    # glibc resolver 選項（寫進容器的 /etc/resolv.conf 的 `options` 行）。
+    # 針對的是上面那三種對外 connect 失敗的**共同根因**：Docker 內嵌 DNS（127.0.0.11）
+    # 把一次 getaddrinfo 拆成 A 與 AAAA 兩個上游查詢，掉一個就只回另一個（或都不回）。
+    # 2026-08-12 的統計：08-05 起 9 筆重試 WARN（≒5 次抖動），**全部落在 cron tick 的
+    # `:00.x`** —— 同一秒有多支 job 觸發，並行的 getaddrinfo 撞在一起最容易掉。
+    #
+    # - single-request-reopen：glibc 預設把 A 與 AAAA 塞**同一個 UDP socket 平行送**，
+    #   這正是會掉的地方。改成送 A → 收 → 換新 socket 送 AAAA。
+    #   ⚠ 序列化的範圍**只有單一 getaddrinfo 內部那兩問**，不是跨呼叫的鎖：不同連線
+    #   各自的解析照樣並行，也不佔 async worker（hyper 的 GaiResolver 走 tokio 的
+    #   blocking threadpool）。成本是每次「建新連線」多一個 RTT，對象是同 netns 的
+    #   127.0.0.11，且 reqwest / sqlx / bb8 都有連線池，穩態幾乎不再解析。
+    #   ⇒ 對承載量沒有影響；這台的上限在 1 核、PG pool 20 條、mem_limit，不在 DNS。
+    # - timeout:2 attempts:3：glibc 預設是每個 nameserver 5 秒、2 輪。掉包時的最壞停頓
+    #   從約 5 秒降到 2 秒，總重試輪數還多一輪。**這是往降延遲的方向走，不是保守化。**
+    #
+    # 只對 glibc 有效 —— 基底是 distroless/cc-debian12（glibc），成立。
+    # 效果驗證：`logs` 表的 `對外請求暫時性失敗` 應該變少；若「第 3/4 次」開始出現，
+    # 代表序列化沒吃下這個抖動，那時才往宿主機 /etc/resolv.conf 與內嵌 DNS 上游查。
+    dns_opt:
+      - single-request-reopen
+      - timeout:2
+      - attempts:3
     working_dir: /app   # distroless image 無預設 workdir；UPLOAD_PATH 等相對路徑以 /app 為基準
     env_file:
       - /srv/kawa/env/kawa.env
