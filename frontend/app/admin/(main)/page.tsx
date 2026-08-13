@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { FileText, Users, Image as ImageIcon, Radio, Gamepad2, type LucideIcon } from "lucide-react";
+import { FileText, Users, MessageSquare, Radio, Mail, type LucideIcon } from "lucide-react";
 import PageHeader from "@/components/admin/page-header";
 import { getBlogs } from "@/api/blogs";
 import { getMembers } from "@/api/members";
-import { getImages } from "@/api/images";
+import { getAllBlogComments } from "@/api/blog-comments";
+import { getContactMessages } from "@/api/contact";
 import { getWsConnections } from "@/api/ws";
-import { getGamesOverview } from "@/api/games";
 import { adminNavGroups, filterNavByPermissions } from "@/components/admin/nav";
 import { getMyPermissions } from "@/libs/admin-permissions";
 import { getPublicSettings } from "@/api/settings";
@@ -57,34 +57,23 @@ function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
 }
 
 export default async function AdminDashboardPage() {
-    const [permissions, publicSettings, blogs, members, images, wsConns, games] = await Promise.all([
+    const [permissions, publicSettings, blogs, members, blogComments, contactMessages, wsConns] = await Promise.all([
         getMyPermissions(),
         getPublicSettings(),
         safe(getBlogs({ per_page: 1 })),
         safe(getMembers()),
-        safe(getImages()),
+        safe(getAllBlogComments(1, 1)),
+        safe(getContactMessages(1, 1)),
         safe(getWsConnections()),
-        safe(getGamesOverview()),
     ]);
     const enabledFeatures = resolveEnabledFeatures(publicSettings.enabled_features);
 
-    const unusedImages = images?.filter((i) => i.status === "unused").length ?? 0;
-    const playersInGame = games?.reduce((sum, g) => sum + g.players_in_game, 0) ?? null;
-
     const stats: Stat[] = [
         { label: "文章", value: blogs?.total ?? null, href: "/admin/blogs", icon: FileText, permission: "blog:read", feature: "blog" },
+        { label: "文章留言", value: blogComments?.total ?? null, href: "/admin/blog-comments", icon: MessageSquare, permission: "comment:read", feature: "blog" },
+        { label: "訪客留言", value: contactMessages?.total ?? null, href: "/admin/messages", icon: Mail, permission: "message:read", feature: "message" },
         { label: "會員", value: members?.total ?? null, href: "/admin/members", icon: Users, permission: "member:read" },
-        {
-            label: "圖片",
-            value: images?.length ?? null,
-            hint: unusedImages > 0 ? `${unusedImages} 張待清除` : undefined,
-            href: "/admin/images",
-            icon: ImageIcon,
-            permission: "image:read",
-            feature: "blog",
-        },
         { label: "線上連線", value: wsConns?.length ?? null, href: "/admin/ws", icon: Radio, permission: "ws:read" },
-        { label: "對局中人數", value: playersInGame, href: "/admin/games", icon: Gamepad2, permission: "game:read", feature: "games" },
     ].filter((s) => permissions.includes(s.permission) && isFeatureEnabled(enabledFeatures, s.feature));
 
     const navGroups = filterNavByPermissions(adminNavGroups, permissions, enabledFeatures);
@@ -127,7 +116,7 @@ export default async function AdminDashboardPage() {
             </section>
 
             <p className="text-xs text-neutral-400 dark:text-neutral-500">
-                統計為載入當下快照；對局中人數為記憶體即時值，伺服器重啟後歸零。
+                統計為載入當下快照；線上連線為記憶體即時值，伺服器重啟後歸零。
             </p>
         </div>
     );
