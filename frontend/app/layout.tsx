@@ -6,18 +6,28 @@ import { resolveActiveTheme, normalizeRotation } from "@/libs/site-theme";
 import { resolveDefaultColorMode } from "@/libs/color-mode";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { SITE_NAME } from "@/libs/seo";
 
-export const metadata: Metadata = {
-    metadataBase: new URL("https://kawa.homes"),
-    // template 讓各頁只填自己的短標題，站名統一由這裡接（後台 app/admin/layout.tsx 有自己的 template）
-    title: { template: `%s｜${SITE_NAME}`, default: SITE_NAME },
-    description: "個人部落格與工具整合平台：文章、線上小工具、對戰遊戲與會員功能。",
-};
+// 沒自帶 description 的頁面會繼承這裡的預設值，寫死中文等於三語系都吃到中文描述，
+// 故走 generateMetadata 從 messages 取（Home.metaDescription 是站台描述的單一來源）。
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations('Home');
+    return {
+        metadataBase: new URL("https://kawa.homes"),
+        // template 讓各頁只填自己的短標題，站名統一由這裡接（後台 app/admin/layout.tsx 有自己的 template）
+        title: { template: `%s｜${SITE_NAME}`, default: SITE_NAME },
+        description: t('metaDescription'),
+    };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-    const [cookieStore, publicSettings, locale] = await Promise.all([cookies(), getPublicSettings(), getLocale()]);
+    const [cookieStore, publicSettings, locale, tWs] = await Promise.all([
+        cookies(),
+        getPublicSettings(),
+        getLocale(),
+        getTranslations('Ws'),
+    ]);
     // 全站風格：site_theme 是具體主題 → 固定；是 'auto' → 依 theme_rotation + 當天星期（Asia/Taipei）輪播
     // layout 因 cookies() 為動態渲染、每 request 重算，跨午夜自動換主題不受 60s settings cache 影響
     const siteTheme = resolveActiveTheme(publicSettings.site_theme, normalizeRotation(publicSettings.theme_rotation));
@@ -40,7 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 )}
             </head>
             <body className="bg-linear-to-b from-primary-50 to-neutral-100 text-neutral-800 dark:from-primary-950 dark:to-neutral-900 dark:text-neutral-100">
-                <WsProvider hasSession={hasSession} wsUrl={process.env.WS_URL ?? ''}>
+                <WsProvider hasSession={hasSession} wsUrl={process.env.WS_URL ?? ''} lostLabel={tWs('disconnected')}>
                     <ThemeBackground theme={siteTheme} />
                     {children}
                 </WsProvider>

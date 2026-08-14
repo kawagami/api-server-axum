@@ -141,6 +141,7 @@
     "loadMore": "加载更多",
     "errorSave": "保存失败",
     "errorAmount": "金额必须大于 0",
+    "errorInvalid": "数据不正确，请检查后重试",
     "scanInvoice": "扫发票",
     "scanTitle": "扫描电子发票",
     "cameraError": "无法开启相机，请确认权限",
@@ -151,6 +152,22 @@
     "import": "导入",
     "rescan": "重新扫描",
     "fromInvoice": "由发票导入"
+  },
+  "LedgerCategories": {
+    "food": "餐饮",
+    "transport": "交通",
+    "housing": "居住",
+    "utilities": "水电燃气",
+    "daily": "日用",
+    "entertainment": "娱乐",
+    "medical": "医疗",
+    "education": "教育",
+    "social": "人情",
+    "other": "其他",
+    "salary": "薪资",
+    "bonus": "奖金",
+    "investment": "投资",
+    "part_time": "兼职"
   },
   "Profile": {
     "title": "个人资料",
@@ -277,7 +294,8 @@
     "stockCompleted": "股票完成 ✓",
     "stockFailed": "股票失败 ✗",
     "stockNo": "股票代号：{no}",
-    "adminMessage": "管理员消息"
+    "adminMessage": "管理员消息",
+    "disconnected": "连接中断，正在重新连接…若持续未恢复请刷新页面"
   },
   "Games": {
     "metalSlugTitle": "越南大战（试作）",
@@ -679,6 +697,7 @@
     "expenseNeedsAmount": "记为支出需填写金额",
     "alreadyRegistered": "这张发票已经登录过了",
     "errorSave": "保存失败",
+    "errorInvalid": "发票数据不正确，请确认号码与日期",
     "registered": "登录成功！开奖后系统会自动为你比对中奖",
     "registerAnother": "再登录一张",
     "viewMyInvoices": "看我的发票",
@@ -768,6 +787,7 @@
     "register": "登录",
     "registerCount": "登录（{count} 注）",
     "errorSave": "登录失败，请确认号码是否正确",
+    "errorInvalid": "选号或开奖日不正确，请确认后重试",
     "registered": "登录成功，共 {count} 注！开奖后系统会自动为你对奖",
     "registerAnother": "再登录",
     "viewMyTickets": "看我的彩券",

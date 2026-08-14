@@ -8,6 +8,8 @@ import { postInvoice } from "@/api/invoices";
 import { parseInvoiceQr } from "@/libs/invoice-qr";
 import { parseInvoiceBarcode } from "@/libs/invoice-barcode";
 import InvoiceScanner from "@/components/invoices/invoice-scanner";
+import { apiErrorStatus } from "@/libs/api-error";
+import useLedgerCategoryLabel from "@/hooks/useLedgerCategoryLabel";
 import type { LedgerCategories, InvoiceInput, InvoiceSource } from "@/types";
 
 interface Props {
@@ -21,6 +23,7 @@ const INVOICE_RE = /^[A-Z]{2}\d{8}$/;
 
 export default function InvoiceRegisterClient({ categories }: Props) {
     const t = useTranslations('Invoices');
+    const categoryLabel = useLedgerCategoryLabel();
     const expenseOptions = categories.expense ?? [];
     const defaultCategory = expenseOptions.some(o => o.value === 'other') ? 'other' : (expenseOptions[0]?.value ?? '');
 
@@ -126,9 +129,11 @@ export default function InvoiceRegisterClient({ categories }: Props) {
             await postInvoice(input);
             setDone(true);
         } catch (err) {
-            const e2 = err as Error & { status?: number; errorData?: { message?: string } };
-            if (e2.status === 409) setError(t('alreadyRegistered'));
-            else setError(e2.errorData?.message || t('errorSave'));
+            // 後端訊息是寫死的繁中，印出來等於 en / zh-CN 使用者看到中文；改用 status 分流翻譯
+            const status = apiErrorStatus(err);
+            if (status === 409) setError(t('alreadyRegistered'));
+            else if (status === 422) setError(t('errorInvalid'));
+            else setError(t('errorSave'));
         } finally {
             setSaving(false);
         }
@@ -233,7 +238,7 @@ export default function InvoiceRegisterClient({ categories }: Props) {
                                 <div className="flex flex-col gap-1">
                                     <label className="text-sm font-medium">{t('category')}</label>
                                     <select value={category} onChange={e => setCategory(e.target.value)} className={inputClass}>
-                                        {expenseOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                        {expenseOptions.map(o => <option key={o.value} value={o.value}>{categoryLabel(o.value, o.label)}</option>)}
                                     </select>
                                 </div>
                                 <div className="flex flex-col gap-1">

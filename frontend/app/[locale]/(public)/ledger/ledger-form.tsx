@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { apiErrorStatus } from "@/libs/api-error";
+import useLedgerCategoryLabel from "@/hooks/useLedgerCategoryLabel";
 import type { LedgerEntry, LedgerInput, LedgerKind, LedgerCategories } from "@/types";
 
 interface Props {
@@ -20,6 +22,7 @@ const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark
 
 export default function LedgerForm({ categories, initial, onSave, onCancel }: Props) {
     const t = useTranslations('Ledger');
+    const categoryLabel = useLedgerCategoryLabel();
     const [kind, setKind] = useState<LedgerKind>(initial?.kind ?? 'expense');
     const [amount, setAmount] = useState(initial?.amount ?? '');
     const [category, setCategory] = useState(initial?.category ?? '');
@@ -55,8 +58,8 @@ export default function LedgerForm({ categories, initial, onSave, onCancel }: Pr
                 occurred_at: occurredAt,
             });
         } catch (e) {
-            const msg = (e as { errorData?: { message?: string } }).errorData?.message;
-            setError(msg || t('errorSave'));
+            // 後端訊息是寫死的繁中，印出來等於 en / zh-CN 使用者看到中文；改用 status 分流翻譯
+            setError(apiErrorStatus(e) === 422 ? t('errorInvalid') : t('errorSave'));
         } finally {
             setSaving(false);
         }
@@ -108,7 +111,7 @@ export default function LedgerForm({ categories, initial, onSave, onCancel }: Pr
                     >
                         <option value="" disabled>{t('selectCategory')}</option>
                         {options.map(o => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
+                            <option key={o.value} value={o.value}>{categoryLabel(o.value, o.label)}</option>
                         ))}
                     </select>
                 </div>

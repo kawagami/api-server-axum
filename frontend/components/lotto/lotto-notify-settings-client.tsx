@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, Bell } from "lucide-react";
 import { setLottoNotify } from "@/api/lotto";
+import { apiErrorStatus } from "@/libs/api-error";
 
 interface Props {
     hasEmail: boolean;
@@ -27,9 +28,9 @@ export default function LottoNotifySettingsClient({ hasEmail, email, initialEnab
             const res = await setLottoNotify(next);
             setEnabled(res.enabled);
         } catch (err) {
-            const e2 = err as Error & { status?: number; errorData?: { message?: string } };
-            if (e2.status === 422) setError(t('notifyNeedsEmail'));
-            else setError(e2.errorData?.message || t('errorSave'));
+            // 後端訊息是寫死的繁中，印出來等於 en / zh-CN 使用者看到中文；改用 status 分流翻譯
+            if (apiErrorStatus(err) === 422) setError(t('notifyNeedsEmail'));
+            else setError(t('errorSave'));
         } finally {
             setSaving(false);
         }

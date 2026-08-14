@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2, Loader2, X, ScanLine, Receipt } from "lucide-react";
 import { getLedger, getLedgerSummary, postLedger, putLedger, deleteLedger } from "@/api/ledger";
 import usePagedList from "@/hooks/usePagedList";
+import useLedgerCategoryLabel from "@/hooks/useLedgerCategoryLabel";
 import LedgerForm from "./ledger-form";
 import InvoiceImportModal from "./invoice-import-modal";
 import { CategoryPie, MonthlyBars } from "./ledger-charts";
@@ -68,10 +69,11 @@ export default function LedgerClient({ categories, initialPage, initialSummary }
     const loading = isPending && action === 'reload';
     const loadingMore = isPending && action === 'more';
 
-    // value→label 查表（清單與圓餅圖共用）
+    // value→label 查表（清單與圓餅圖共用）；翻譯優先，後端繁中 label 只當 fallback
+    const categoryLabel = useLedgerCategoryLabel();
     const labelOf = useCallback((kind: LedgerKind, value: string) => {
-        return categories[kind]?.find(o => o.value === value)?.label ?? value;
-    }, [categories]);
+        return categoryLabel(value, categories[kind]?.find(o => o.value === value)?.label);
+    }, [categories, categoryLabel]);
 
     const reload = useCallback(() => {
         setAction('reload');
@@ -169,7 +171,7 @@ export default function LedgerClient({ categories, initialPage, initialSummary }
                     >
                         <option value="">{t('all')}</option>
                         {filterCategoryOptions.map(o => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
+                            <option key={o.value} value={o.value}>{categoryLabel(o.value, o.label)}</option>
                         ))}
                     </select>
                 </div>

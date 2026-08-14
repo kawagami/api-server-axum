@@ -28,7 +28,7 @@ const RECONNECT_MAX_MS = 30000;
 // 連續重連失敗超過此次數（約 75s）才顯示「請重新整理」提示，背景仍持續嘗試
 const RECONNECT_FAIL_THRESHOLD = 5;
 
-export function WsProvider({ children, hasSession, wsUrl }: { children: React.ReactNode; hasSession: boolean; wsUrl: string }) {
+export function WsProvider({ children, hasSession, wsUrl, lostLabel }: { children: React.ReactNode; hasSession: boolean; wsUrl: string; lostLabel: string }) {
     const listenersRef = useRef<Map<string, Set<Listener>>>(new Map());
     const reconnectHandlersRef = useRef<Set<ReconnectHandler>>(new Set());
     const wsRef = useRef<WebSocket | null>(null);
@@ -160,21 +160,21 @@ export function WsProvider({ children, hasSession, wsUrl }: { children: React.Re
     return (
         <WsContext.Provider value={value}>
             {children}
-            {lostConnection && <WsLostBanner />}
+            {lostConnection && <WsLostBanner label={lostLabel} />}
         </WsContext.Provider>
     );
 }
 
 // 連線長時間中斷提示（背景仍持續重連，恢復後自動消失）。
-// WsProvider 掛在 root layout（NextIntlClientProvider 之外），無法用 useTranslations，
-// 文案固定走預設語系 zh-TW。
-function WsLostBanner() {
+// WsProvider 掛在 root layout（NextIntlClientProvider 之外），拿不到 useTranslations，
+// 故文案由 root layout 的 getTranslations 算好後以 prop 餵進來（同 ThemeButton 的 labels）。
+function WsLostBanner({ label }: { label: string }) {
     return (
         <div
             role="status"
             className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-600 px-4 py-2 text-sm text-white shadow-lg"
         >
-            連線中斷，重新連線中…若持續未恢復請重新整理頁面
+            {label}
         </div>
     );
 }

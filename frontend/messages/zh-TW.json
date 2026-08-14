@@ -141,6 +141,7 @@
     "loadMore": "載入更多",
     "errorSave": "儲存失敗",
     "errorAmount": "金額必須大於 0",
+    "errorInvalid": "資料不正確，請檢查後再試",
     "scanInvoice": "掃發票",
     "scanTitle": "掃描電子發票",
     "cameraError": "無法開啟相機，請確認權限",
@@ -151,6 +152,22 @@
     "import": "匯入",
     "rescan": "重新掃描",
     "fromInvoice": "由發票匯入"
+  },
+  "LedgerCategories": {
+    "food": "餐飲",
+    "transport": "交通",
+    "housing": "居住",
+    "utilities": "水電瓦斯",
+    "daily": "日用",
+    "entertainment": "娛樂",
+    "medical": "醫療",
+    "education": "教育",
+    "social": "人情",
+    "other": "其他",
+    "salary": "薪資",
+    "bonus": "獎金",
+    "investment": "投資",
+    "part_time": "兼職"
   },
   "Profile": {
     "title": "個人資料",
@@ -277,7 +294,8 @@
     "stockCompleted": "股票完成 ✓",
     "stockFailed": "股票失敗 ✗",
     "stockNo": "股票代號：{no}",
-    "adminMessage": "管理員訊息"
+    "adminMessage": "管理員訊息",
+    "disconnected": "連線中斷，重新連線中…若持續未恢復請重新整理頁面"
   },
   "Games": {
     "metalSlugTitle": "越南大戰（試作）",
@@ -679,6 +697,7 @@
     "expenseNeedsAmount": "記為支出需填寫金額",
     "alreadyRegistered": "這張發票已經登錄過了",
     "errorSave": "儲存失敗",
+    "errorInvalid": "發票資料不正確，請確認號碼與日期",
     "registered": "登錄成功！開獎後系統會自動為你比對中獎",
     "registerAnother": "再登錄一張",
     "viewMyInvoices": "看我的發票",
@@ -768,6 +787,7 @@
     "register": "登錄",
     "registerCount": "登錄（{count} 注）",
     "errorSave": "登錄失敗，請確認號碼是否正確",
+    "errorInvalid": "選號或開獎日不正確，請確認後再試",
     "registered": "登錄成功，共 {count} 注！開獎後系統會自動為你對獎",
     "registerAnother": "再登錄",
     "viewMyTickets": "看我的彩券",

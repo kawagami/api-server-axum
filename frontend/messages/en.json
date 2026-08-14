@@ -141,6 +141,7 @@
     "loadMore": "Load More",
     "errorSave": "Failed to save",
     "errorAmount": "Amount must be greater than 0",
+    "errorInvalid": "Invalid data, please check and try again",
     "scanInvoice": "Scan Invoice",
     "scanTitle": "Scan e-Invoice",
     "cameraError": "Cannot open camera, please check permissions",
@@ -151,6 +152,22 @@
     "import": "Import",
     "rescan": "Rescan",
     "fromInvoice": "Imported from invoice"
+  },
+  "LedgerCategories": {
+    "food": "Food",
+    "transport": "Transport",
+    "housing": "Housing",
+    "utilities": "Utilities",
+    "daily": "Daily goods",
+    "entertainment": "Entertainment",
+    "medical": "Medical",
+    "education": "Education",
+    "social": "Gifts & social",
+    "other": "Other",
+    "salary": "Salary",
+    "bonus": "Bonus",
+    "investment": "Investment",
+    "part_time": "Part-time"
   },
   "Profile": {
     "title": "Profile",
@@ -277,7 +294,8 @@
     "stockCompleted": "Stock completed ✓",
     "stockFailed": "Stock failed ✗",
     "stockNo": "Stock code: {no}",
-    "adminMessage": "Admin message"
+    "adminMessage": "Admin message",
+    "disconnected": "Connection lost, reconnecting… If it does not recover, please refresh the page"
   },
   "Games": {
     "metalSlugTitle": "Metal Slug (WIP)",
@@ -679,6 +697,7 @@
     "expenseNeedsAmount": "An amount is required to record as an expense",
     "alreadyRegistered": "This invoice has already been registered",
     "errorSave": "Failed to save",
+    "errorInvalid": "Invalid invoice data, please check the number and date",
     "registered": "Registered! Winnings will be checked automatically after each draw",
     "registerAnother": "Register another",
     "viewMyInvoices": "View my invoices",
@@ -768,6 +787,7 @@
     "register": "Register",
     "registerCount": "Register ({count} lines)",
     "errorSave": "Registration failed, please check your numbers",
+    "errorInvalid": "Invalid numbers or draw date, please check and try again",
     "registered": "Registered {count} lines! We'll check them automatically after the draw",
     "registerAnother": "Register more",
     "viewMyTickets": "View my tickets",

@@ -10,6 +10,7 @@ import { parseLottoOcr } from "@/libs/lotto-ocr";
 import NumberGrid from "@/components/lotto/number-grid";
 import Balls from "@/components/lotto/balls";
 import LottoOcrScanner from "@/components/lotto/lotto-ocr-scanner";
+import { apiErrorStatus } from "@/libs/api-error";
 import type { LottoGame, LottoNote, LottoInput } from "@/types";
 
 type Mode = 'manual' | 'ocr';
@@ -125,8 +126,8 @@ export default function LottoRegisterClient() {
             setNotes([]);
             clearCurrent();
         } catch (err) {
-            const e2 = err as Error & { status?: number; errorData?: { message?: string } };
-            setError(e2.errorData?.message || t('errorSave'));
+            // 後端訊息是寫死的繁中，印出來等於 en / zh-CN 使用者看到中文；改用 status 分流翻譯
+            setError(apiErrorStatus(err) === 422 ? t('errorInvalid') : t('errorSave'));
         } finally {
             setSaving(false);
         }
