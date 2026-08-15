@@ -55,7 +55,7 @@ jobs:
           components: clippy
       -
         name: Cache cargo
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@258712b0b7b1ddf8bddc9fc3b0faca682b2736c3 # v2
         with:
           workspaces: backend
           # PR 不回存快取（post 步驟要 20~30s，而 PR 的 target dir 對 master 沒用）；
