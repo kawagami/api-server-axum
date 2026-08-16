@@ -55,7 +55,10 @@ jobs:
           components: clippy
       -
         name: Cache cargo
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        # 釘 release tag 的 commit，不是 main HEAD —— 舊 pin e18b4977 是未發版的 main commit，
+        # dependabot 認不出對應 tag 就改追 branch HEAD，會把沒發版、沒 release note 的
+        # commit 送進 PR（#31 就是拿 v2.9.2 之後第 3 個未發版 commit）。釘 tag commit 才追得到版。
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: backend
           # PR 不回存快取（post 步驟要 20~30s，而 PR 的 target dir 對 master 沒用）；
