@@ -12,8 +12,22 @@ const nextConfig = {
     // 2026-07-25 實際踩過：/_next/image?w=64 回傳的位元組數與原圖完全相同。
     // 驗證方式：對同一張圖用不同 w 打 /_next/image，size 必須隨 w 變化。
     // glob 用 linux* 同時涵蓋 glibc（本機 linux-x64）與 musl（Docker 的 linuxmusl-x64）。
+    // @swc/helpers 的 esm/ 同樣追蹤不到（next 16.3.1 起，2026-08-16 踩過，全站 521/522）。
+    // SWC 編譯產物在 runtime 會 require '@swc/helpers/esm/_interop_require_default.js'，
+    // 但 tracing 只抄得到 cjs/ —— 產出裡那個套件只剩 cjs/ 與 package.json。
+    // 症狀是 standalone server 一啟動就 MODULE_NOT_FOUND 崩潰迴圈，
+    // 連帶 nginx 解析不到 frontend upstream 也起不來（host not found in upstream）。
+    // ⚠ `next build` 過**不代表**這裡沒問題：build 不會啟動 standalone server。
+    // 驗證方式：把 .next/standalone 複製到專案外的目錄（避免 node 往上找到 frontend/node_modules
+    // 而掩蓋掉缺件）再 `node server.js`，起得來才算過。
     outputFileTracingIncludes: {
-        '/**': ['./node_modules/.pnpm/@img+sharp-libvips-linux*/**/*'],
+        '/**': [
+            './node_modules/.pnpm/@img+sharp-libvips-linux*/**/*',
+            // 只指到 esm/，不要用 `@swc+helpers*/**/*` —— 那會掃到同層的
+            // node_modules/tslib（指向目錄的 symlink），Turbopack 當檔案讀會 panic：
+            // `reading file ".../@swc+helpers@0.5.23/node_modules/tslib" — Is a directory`
+            './node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*',
+        ],
     },
     async redirects() {
         return [
