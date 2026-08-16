@@ -10,15 +10,18 @@
 
 | 路由 | 說明 |
 |------|------|
-| `/{locale}` | 首頁，文章列表 |
-| `/{locale}/blogs/[id]` | 文章內容（Markdown 渲染） |
-| `/{locale}/hackmd-notes` | HackMD 筆記整合，支援標籤篩選 |
+| `/{locale}` | 首頁，功能卡片（顯示與排序由後端 `home_features` 控制） |
+| `/{locale}/blogs` | 文章列表（標籤篩選、分頁） |
+| `/{locale}/blogs/[id]` | 文章內容（Markdown 渲染 + TOC + 留言） |
+| `/{locale}/blogs/author/[name]` | 依作者篩選文章 |
+| `/{locale}/tools` | 工具 hub（清單來源 `libs/site-nav.ts` 的 `TOOLS`） |
 | `/{locale}/tools/alarm` | 鬧鐘工具 |
 | `/{locale}/tools/hourly-chime` | 整點報時（Web Speech API TTS） |
 | `/{locale}/tools/convert-text` | 文字轉換工具 |
 | `/{locale}/tools/countdown` | 倒數計時工具 |
 | `/{locale}/tools/new-password` | 密碼產生工具 |
 | `/{locale}/tools/roster` | 排班功能 |
+| `/{locale}/games` | 遊戲 hub（清單來源 `libs/site-nav.ts` 的 `GAMES`） |
 | `/{locale}/games/chess` | 線上象棋，即時連線對戰（大廳開桌 / 快速配對，server 權威裁判） |
 | `/{locale}/games/western-chess` | 線上西洋棋，即時連線對戰（易位／過路兵／升變，共用大廳框架） |
 | `/{locale}/games/gomoku` | 線上五子棋，即時連線對戰（共用大廳框架） |
@@ -27,7 +30,7 @@
 | `/{locale}/games/avalon` | 線上阿瓦隆，5–10 人社交推理（私有角色／投票／任務／刺殺／房內聊天） |
 | `/{locale}/games/farm` | 農場經營，2–4 人 worker-placement（完全資訊，每動作後整盤廣播） |
 | `/{locale}/games/metal-slug` | 越南大戰，Bevy wasm 動作遊戲 |
-| `/{locale}/ws` | WebSocket 即時訊息 |
+| `/{locale}/vocab` · `/{locale}/vocab-ja` | 單字闖關（英文 / 日文），生存模式 + 排行榜 |
 | `/{locale}/dashboard` | 個人儀表板（需登入） |
 | `/{locale}/dashboard/notifications` | 通知列表（需登入） |
 | `/{locale}/portfolio` | 投資組合追蹤，記錄持股並查看每日漲跌盈虧（需登入） |
@@ -36,8 +39,9 @@
 | `/{locale}/lotto` | 大樂透／威力彩選號登錄＋自動對獎，手動選號或拍照 OCR 辨識（即時相機／拍照）、我的彩券／中獎、開獎結果、中獎 email 通知設定（需登入） |
 | `/{locale}/profile` | 個人資料（需登入） |
 | `/{locale}/about` | 關於頁面 |
-| `/{locale}/login` | OAuth 登入（Google；GitHub / LINE 規劃中） |
-| `/admin/*` | 後台管理（需登入，無 locale prefix）：文章、圖片、股票、會員、角色、使用者、WS、對局總覽、Torrents、日誌／稽核日誌、設定 |
+| `/{locale}/contact` | 聯絡表單 |
+| `/{locale}/login` | OAuth 登入（Google；GitHub / LINE 前端仍標「規劃中」，後端已支援） |
+| `/admin/*` | 後台管理（需登入，無 locale prefix）：文章／文章留言、圖片、股票（5 個子頁）、會員、角色、使用者、WS、對局總覽、Torrents、單字題庫、標案、留言、日誌／稽核日誌／系統指標、到訪統計、passkey、設定、平台設定 |
 
 ---
 
@@ -47,8 +51,8 @@
 - **UI**：React 19 + Tailwind CSS + lucide-react；主題系統 runtime 切換（7 套主題 + auto 每日輪播，admin 設定全站生效，CSS variables）
 - **i18n**：next-intl v4，支援 zh-TW / zh-CN / en
 - **Markdown**：react-markdown（rehype-highlight 程式碼高亮、rehype-slug 標題錨點 + 自動目錄 TOC）
-- **圖片**：next/image（自動 WebP 轉換、lazy loading、縮圖），本地儲存（`/uploads/*`）
-- **認證**：JWT（`jose`），middleware 保護 `/admin/*` 與 `/{locale}/dashboard|profile|settings|portfolio|ledger|invoices|lotto`
+- **圖片**：next/image（自動 WebP 轉換、lazy loading、縮圖）；公開網域 `media.kawa.homes`（nginx 直出 VPS 上的 `/srv/kawa/uploads`），`remotePatterns` 只放行這一個 host
+- **認證**：JWT（`jose`），`proxy.ts`（Next 16 起 middleware 改名）保護 `/admin/*` 與 `/{locale}/dashboard|profile|settings|portfolio|ledger|invoices|lotto`
 - **OCR**：`tesseract.js`（動態載入、數字白名單），彩券選號拍照／即時相機辨識輔助
 - **後端 API**：`https://api.kawa.homes`（Rust Axum；舊名 `axum.kawa.homes` 仍為有效 alias）
 - **WebSocket**：`wss://api.kawa.homes`
