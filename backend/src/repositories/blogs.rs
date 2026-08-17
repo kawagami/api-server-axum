@@ -1,6 +1,6 @@
 use crate::{
     errors::AppError,
-    structs::blogs::{DbBlog, TagCount},
+    structs::blogs::{AdminBlogListItem, AdminBlogSort, DbBlog, TagCount},
 };
 use sqlx::{PgConnection, Pool, Postgres};
 
@@ -11,8 +11,12 @@ const PUBLIC_FILTER: &str = "($1::text IS NULL OR b.tags @> ARRAY[$1])
               AND ($2::text IS NULL OR u.name = $2)
               AND ($3::text IS NULL OR b.markdown ILIKE '%' || $3 || '%')";
 
-/// 後台列表（依擁有者過濾）的篩選條件（$1）。被 `list_for_owner` 與 `count_for_owner` 共用。
-const OWNER_FILTER: &str = "($1::bigint IS NULL OR author_id = $1)";
+/// 後台列表的篩選條件（$1..$3）。被 `list_for_owner` 與 `count_for_owner` 共用 ——
+/// **兩邊 bind 順序必須一致**（理由同 `PUBLIC_FILTER`：條件寫兩份就是 `total` 與 `data` 對不上的來源）。
+/// 沒有 users JOIN，故不帶 alias。
+const OWNER_FILTER: &str = "($1::bigint IS NULL OR author_id = $1)
+              AND ($2::text IS NULL OR tags @> ARRAY[$2])
+              AND ($3::text IS NULL OR markdown ILIKE '%' || $3 || '%')";
 
 pub async fn get_blogs_with_pagination(
     pool: &Pool<Postgres>,
@@ -59,22 +63,32 @@ pub async fn get_author(
 }
 
 /// 後台管理列表（依擁有者過濾）。`owner_id = None` → super_admin 看全部。公開列表不走這支。
+///
+/// 回 `AdminBlogListItem` 而非 `DbBlog`：清單不需要 `markdown`，一頁 50 篇的全文
+/// 沒有任何呼叫端會用（見該型別的註解）。
 pub async fn list_for_owner(
     pool: &Pool<Postgres>,
     owner_id: Option<i64>,
+    tag: Option<&str>,
+    q: Option<&str>,
+    sort: AdminBlogSort,
     limit: i64,
     offset: i64,
-) -> Result<Vec<DbBlog>, AppError> {
+) -> Result<Vec<AdminBlogListItem>, AppError> {
+    // ORDER BY 不可 bind，只能內插；來源是封閉列舉（`AdminBlogSort::order_by`），非 query 字串
+    let order_by = sort.order_by();
     sqlx::query_as(&format!(
         r#"
-            SELECT id, markdown, tocs, tags, created_at, updated_at
+            SELECT id, tocs, tags, created_at, updated_at
             FROM blogs
             WHERE {OWNER_FILTER}
-            ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
+            ORDER BY {order_by}
+            LIMIT $4 OFFSET $5
             "#
     ))
     .bind(owner_id)
+    .bind(tag)
+    .bind(q)
     .bind(limit)
     .bind(offset)
     .fetch_all(pool)
@@ -82,9 +96,16 @@ pub async fn list_for_owner(
     .map_err(AppError::from)
 }
 
-pub async fn count_for_owner(pool: &Pool<Postgres>, owner_id: Option<i64>) -> Result<i64, AppError> {
+pub async fn count_for_owner(
+    pool: &Pool<Postgres>,
+    owner_id: Option<i64>,
+    tag: Option<&str>,
+    q: Option<&str>,
+) -> Result<i64, AppError> {
     sqlx::query_scalar(&format!("SELECT COUNT(*) FROM blogs WHERE {OWNER_FILTER}"))
         .bind(owner_id)
+        .bind(tag)
+        .bind(q)
         .fetch_one(pool)
         .await
         .map_err(AppError::from)

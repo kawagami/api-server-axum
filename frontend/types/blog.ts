@@ -16,6 +16,19 @@ export interface TagCount {
   count: number;
 }
 
+// 後台列表的一列（`GET /admin/blogs`）。**沒有 markdown** ——
+// 清單只顯示 tocs[0] / tags / 時間，帶全文等於把整站文章內容塞進 SSR payload
+// （後端 structs/blogs.rs 的 AdminBlogListItem）
+export interface AdminBlogListItem {
+  id: string;
+  tocs: string[];
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type AdminBlogPaginatedResponse = PaginatedResponse<AdminBlogListItem>;
+
 // 後端 2026-08-03 起回 `Paginated<T>`（`{ data, total }`）；原本另有 page / per_page，
 // 但那兩欄只是把 request 參數回抄給 client，全站無人讀，已隨後端一起移除
 export type BlogPaginatedResponse = PaginatedResponse<Blog>;

@@ -1,92 +1,31 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ButtonHTMLAttributes } from "react";
-import { Loader2 } from "lucide-react";
+import { useTransition } from "react";
+import { Loader2, Plus } from "lucide-react";
 import { v4 as uuidv4 } from 'uuid';
-import Toast, { useToast } from "@/components/toast";
-import { deleteBlog } from "@/api/blogs";
 
-interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-    loading: boolean;
-}
-
-function LoadingButton({ loading, children, className = '', ...props }: LoadingButtonProps) {
-    return (
-        <button disabled={loading} className={className} {...props}>
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {children}
-        </button>
-    );
-}
-
-export function CreateButton() {
+/**
+ * 新增文章：前端先產 uuid，直接進編輯器（該 id 要到第一次存檔才會有 DB 紀錄）。
+ *
+ * 這裡刻意留成 button + router.push 而不是 `<Link>`：href 每次 render 都會是不同的 uuid，
+ * 對「複製連結」「開新分頁」沒有意義（既有的編輯連結才需要那些，見清單的標題欄）。
+ *
+ * 編輯 / 刪除的按鈕已不在此檔 —— 標題本身就是編輯連結、刪除走清單的確認框，
+ * 兩者都需要那一列的資料（標題），住在 blogs-client 裡。
+ */
+export function CreateButton({ label = "新增文章" }: { label?: string }) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
     return (
-        <LoadingButton
-            loading={isPending}
+        <button
+            disabled={isPending}
             onClick={() => startTransition(() => router.push(`/admin/blogs/${uuidv4()}`))}
-            className={`px-6 py-2 bg-primary-500 text-white font-semibold rounded-lg shadow-md flex items-center gap-2 ${isPending ? "opacity-60 cursor-not-allowed" : "hover:bg-primary-600"}`}
+            className={`px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg shadow-md flex items-center gap-1.5 transition-colors ${isPending ? "opacity-60 cursor-not-allowed" : "hover:bg-primary-700"}`}
         >
-            新增 Blog
-        </LoadingButton>
-    );
-}
-
-export function EditButton({ uuid }: { uuid: string }) {
-    const router = useRouter();
-    const [isPending, startTransition] = useTransition();
-
-    return (
-        <LoadingButton
-            loading={isPending}
-            onClick={() => startTransition(() => router.push(`/admin/blogs/${uuid}`))}
-            className={`ml-2 px-4 py-2 bg-green-500 text-white font-medium rounded-lg flex items-center gap-2 transition duration-200 ${isPending ? "opacity-60 cursor-not-allowed" : "hover:bg-green-600"}`}
-        >
-            編輯
-        </LoadingButton>
-    );
-}
-
-export function DeleteButton({ uuid }: { uuid: string }) {
-    const router = useRouter();
-    const [isDeleting, setIsDeleting] = useState(false);
-    // 這顆按鈕在清單列的行內動作列裡（flex space-x-2），塞不進 ErrorBanner 這種塊狀元素，
-    // 故一次性失敗提示走 Toast（不用 window.alert）。頁面層級的失敗仍用 ErrorBanner。
-    const { toast, showToast } = useToast();
-
-    const handleDelete = async () => {
-        if (isDeleting) return;
-        const confirmed = confirm("確定要刪除這篇 blog 嗎？");
-        if (!confirmed) return;
-
-        setIsDeleting(true);
-        try {
-            await deleteBlog(uuid);
-            router.refresh();
-        } catch (err) {
-            if ((err as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw err;
-            showToast("error", "刪除失敗，請稍後再試");
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    return (
-        <>
-            <LoadingButton
-                loading={isDeleting}
-                onClick={handleDelete}
-                className={`ml-2 px-4 py-2 font-medium rounded-lg text-white flex items-center gap-1 transition duration-200 ${isDeleting
-                    ? "bg-neutral-400 cursor-not-allowed"
-                    : "bg-red-500 hover:bg-red-600"
-                    }`}
-            >
-                {isDeleting ? "刪除中..." : "刪除"}
-            </LoadingButton>
-            <Toast toast={toast} />
-        </>
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {label}
+        </button>
     );
 }

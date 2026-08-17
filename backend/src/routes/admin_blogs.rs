@@ -13,7 +13,10 @@ use crate::{
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
-        blogs::{DbBlog, DeleteTagQuery, PutBlog, RenameTagRequest, TagMutationResponse},
+        blogs::{
+            AdminBlogFilter, AdminBlogListItem, DeleteTagQuery, PutBlog, RenameTagRequest,
+            TagMutationResponse,
+        },
         pagination::{PageQuery, Paginated},
         roles::Perm,
         ws::WsEvent
@@ -32,14 +35,17 @@ pub fn new(state: AppState) -> Router<AppState> {
 }
 
 /// 後台管理列表：一般 admin 只列自己的文章，super_admin 看全部（公開站台的 GET /blogs/ 不受影響）。
+/// `?tag=&q=&sort=` 見 `AdminBlogFilter`；擁有者不吃 query，一律由 session 決定。
 async fn list_blogs(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<Paginated<DbBlog>>, AppError> {
+    Query(filter): Query<AdminBlogFilter>,
+) -> Result<Json<Paginated<AdminBlogListItem>>, AppError> {
     auth_user.require_permission(Perm::BlogRead)?;
     Ok(Json(
-        blogs_service::get_admin_blogs(state.get_pool(), auth_user.owner_filter(), &page).await?,
+        blogs_service::get_admin_blogs(state.get_pool(), auth_user.owner_filter(), &page, filter)
+            .await?,
     ))
 }
 

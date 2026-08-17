@@ -3,7 +3,7 @@
 import { updateTag } from "next/cache";
 import { fetchApi } from "@/libs/fetchApi";
 import adminRequest from "@/libs/adminRequest";
-import type { Blog, BlogInput, BlogPaginatedResponse, TagCount } from "@/types";
+import type { AdminBlogPaginatedResponse, Blog, BlogInput, BlogPaginatedResponse, TagCount } from "@/types";
 
 interface GetBlogsParams {
     page?: number;
@@ -32,10 +32,25 @@ export async function getBlogs({ page = 1, per_page = 10, tag, author, q, sort }
     return fetchApi(`${process.env.API_URL}/blogs?${params}`, { next: { revalidate: 60, tags: ['blogs'] } });
 }
 
-// 後台管理列表：一般 admin 只拿自己的文章、super_admin 全拿（走 adminRequest 認證，不快取跨使用者）
-export async function getAdminBlogs({ page = 1, per_page = 200 }: { page?: number; per_page?: number } = {}): Promise<BlogPaginatedResponse> {
+interface GetAdminBlogsParams {
+    page?: number;
+    per_page?: number;
+    tag?: string | null;
+    /** 關鍵字搜尋（比對文章內容） */
+    q?: string | null;
+    /** 排序：oldest = 建立時間舊到新；updated = 更新時間新到舊；其餘 = 建立時間新到舊 */
+    sort?: string | null;
+}
+
+// 後台管理列表：一般 admin 只拿自己的文章、super_admin 全拿（走 adminRequest 認證，不快取跨使用者）。
+// 回的列不含 markdown（見 AdminBlogListItem）；擁有者由 session 決定，不吃 author 參數。
+export async function getAdminBlogs({ page = 1, per_page = 50, tag, q, sort }: GetAdminBlogsParams = {}): Promise<AdminBlogPaginatedResponse> {
     const params = new URLSearchParams({ page: String(page), per_page: String(per_page) });
-    return adminRequest<BlogPaginatedResponse>({ url: `${process.env.API_URL}/admin/blogs?${params}` });
+    if (tag) params.set('tag', tag);
+    if (q) params.set('q', q);
+    if (sort) params.set('sort', sort);
+    const res = await adminRequest<AdminBlogPaginatedResponse>({ url: `${process.env.API_URL}/admin/blogs?${params}` });
+    return res ?? { data: [], total: 0 };
 }
 
 export async function getBlog(id: string): Promise<Blog> {

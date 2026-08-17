@@ -38,7 +38,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/admin/permissions` | 權限清單 |
 | `/admin/settings` | Runtime 設定（讀取 / 更新） |
 | `/admin/audit_logs` | 操作稽核紀錄 |
-| `/admin/blogs` | 部落格修改 / 刪除 |
+| `/admin/blogs` | 部落格列表（分頁 + `?tag=&q=&sort=`）/ 修改 / 刪除 / tag 改名合併 |
 | `/admin/images` | 圖片上傳 / 刪除 / 清單 |
 | `/admin/stocks` | 股票資料查詢、pending change 管理 |
 | `/admin/torrents` | torrent 下載任務（新增 / 列表 / 簽名下載連結 / 刪除） |

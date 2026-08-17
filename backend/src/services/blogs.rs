@@ -2,7 +2,7 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::{blogs as blogs_repo, images as images_repo},
     structs::auth::AuthenticatedUser,
-    structs::blogs::{DbBlog, PutBlog, TagCount},
+    structs::blogs::{AdminBlogFilter, AdminBlogListItem, AdminBlogSort, DbBlog, PutBlog, TagCount},
     structs::pagination::{PageQuery, Paginated}
 };
 use regex::Regex;
@@ -105,11 +105,16 @@ pub async fn get_admin_blogs(
     pool: &Pool<Postgres>,
     owner_id: Option<i64>,
     page: &PageQuery,
-) -> Result<Paginated<DbBlog>, AppError> {
+    filter: AdminBlogFilter,
+) -> Result<Paginated<AdminBlogListItem>, AppError> {
     let (per_page, offset) = page.to_limit_offset(50);
+    // 空白字串視同無過濾（前端的空欄位會照送），排序走白名單列舉
+    let tag = filter.tag.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let q = filter.q.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let sort = AdminBlogSort::from_query(filter.sort.as_deref());
     let (total, data) = tokio::try_join!(
-        blogs_repo::count_for_owner(pool, owner_id),
-        blogs_repo::list_for_owner(pool, owner_id, per_page, offset),
+        blogs_repo::count_for_owner(pool, owner_id, tag, q),
+        blogs_repo::list_for_owner(pool, owner_id, tag, q, sort, per_page, offset),
     )?;
     Ok(Paginated::new(data, total))
 }
