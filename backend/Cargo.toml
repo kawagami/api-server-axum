@@ -49,7 +49,6 @@ thiserror = "2"
 anyhow = "1.0"
 regex = "1"
 form_urlencoded = "1.2.1"
-scraper = "0.27.0"
 rust_decimal = { version = "1", features = ["serde"] }
 axum-extra = { version = "0.12.6", features = ["typed-header"] }
 zhconv = "0.4.1"

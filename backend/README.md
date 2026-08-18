@@ -105,7 +105,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 - `tower` — ServiceExt::oneshot（檔案下載走 ServeFile，內建 Range）
 - `bcrypt` — 密碼 hash
 - `lettre` — SMTP email 通知
-- `scraper` — 庫藏股 HTML 解析
+- `regex` — 民國日期 / 中獎號碼 feed / 庫藏股 HTML 解析（後者原用 `scraper`，2026-08-19 改 regex，省 28 個 crate）
 - `librqbit 8` — 內嵌 BitTorrent session（rustls）
 - `image 0.25` + `webp 0.3` — 圖片上傳 decode 驗證 + lossy WebP 轉檔（libwebp）
 - `webauthn-rs 0.5`（+ `webauthn-rs-proto`）— admin passkey 登入；硬依賴 OpenSSL ≥3.0，故 openssl crate 開 `vendored`

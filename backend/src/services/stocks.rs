@@ -16,31 +16,84 @@ use crate::{
     utils::reqwest::get_raw_html_string
 };
 use chrono::{Duration, NaiveDate};
+use regex::Regex;
 use reqwest::Client;
 use rust_decimal::Decimal;
-use scraper::{Html, Selector};
 use sqlx::{Pool, Postgres};
+use std::sync::OnceLock;
 
+/// `parse_buyback_stock_raw_html` 用到的 4 條 regex，編譯一次。
+struct BuybackRegexes {
+    row: Regex,
+    class: Regex,
+    cell: Regex,
+    tag: Regex,
+}
+
+fn buyback_res() -> &'static BuybackRegexes {
+    static RES: OnceLock<BuybackRegexes> = OnceLock::new();
+    RES.get_or_init(|| BuybackRegexes {
+        row: Regex::new(r"(?is)<tr\b([^>]*)>(.*?)</tr>").unwrap(),
+        class: Regex::new(r#"(?is)\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#).unwrap(),
+        cell: Regex::new(r"(?is)<td\b[^>]*>(.*?)</td>").unwrap(),
+        tag: Regex::new(r"(?s)<[^>]*>").unwrap(),
+    })
+}
+
+/// 取 cell 的純文字：剝標籤 → 還原實體 → trim（等價於 HTML parser 的 `text()` 串接後 trim）。
+/// `&nbsp;`(U+00A0) 算 Unicode 空白，故 `trim` 會連它一起去掉。
+fn buyback_cell_text(raw: &str) -> String {
+    let stripped = buyback_res().tag.replace_all(raw, "");
+    let decoded = if stripped.contains('&') {
+        stripped
+            .replace("&nbsp;", "\u{a0}")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            // &amp; 最後換，否則 `&amp;lt;` 會被二次解讀成 `<`
+            .replace("&amp;", "&")
+    } else {
+        stripped.into_owned()
+    };
+    decoded.trim().to_string()
+}
+
+/// 解析上市公司買回股份彙總表 HTML，取代號與起迄日（第 1 / 9 / 10 個 `<td>`）。
+///
+/// 刻意用 regex 而不是 HTML parser：需要的只是「class 為 odd/even 的 `<tr>` 取三個
+/// 固定位置的 `<td>` 文字」，為此拉整套 html5ever（`scraper` 獨占 22 個 crate）
+/// 在 1 核 1G 的機器上不划算。上游改版時兩種寫法都一樣要改。
+///
+/// ⚠️ **class 比對不能寫死 `class="odd"`**：實際 HTML 是
+/// `<tr class= 'even' align='center'>` —— `class=` 後有空白、單引號、後面還有別的屬性。
+/// 值也按 token 比（`class='odd tr-line'` 要算），與 CSS 選擇器語意一致。
 pub fn parse_buyback_stock_raw_html(html: String) -> Vec<BuybackRecord> {
-    let document = Html::parse_document(&html);
-    let row_selector = Selector::parse("tr.odd, tr.even").unwrap();
-    let cell_selector = Selector::parse("td").unwrap();
+    let res = buyback_res();
 
-    document
-        .select(&row_selector)
+    res.row
+        .captures_iter(&html)
+        .filter(|row| {
+            // class 屬性按空白切 token 比對，濾掉 tblHead 等其他列
+            res.class
+                .captures(&row[1])
+                .and_then(|c| {
+                    c.get(1).or_else(|| c.get(2)).or_else(|| c.get(3)).map(|m| m.as_str().to_string())
+                })
+                .is_some_and(|v| v.split_whitespace().any(|t| t == "odd" || t == "even"))
+        })
         .filter_map(|row| {
-            let cells: Vec<_> = row.select(&cell_selector).collect();
+            let cells: Vec<String> = res
+                .cell
+                .captures_iter(&row[2])
+                .map(|c| buyback_cell_text(&c[1]))
+                .collect();
 
             if cells.len() < 11 {
                 return None;
             }
 
-            let get_cell_text = |index: usize| -> String {
-                cells
-                    .get(index)
-                    .map(|cell| cell.text().collect::<String>().trim().to_string())
-                    .unwrap_or_default()
-            };
+            let get_cell_text = |index: usize| -> String { cells.get(index).cloned().unwrap_or_default() };
 
             let stock_no = get_cell_text(1);
             let start_raw = get_cell_text(9);
@@ -385,6 +438,82 @@ pub async fn get_closing_price_pair_stats(
 mod tests {
     use super::*;
 
+    /// 取自 mopsov 真實回應（欄位縮成 11 個以外原樣：`class=` 後有空白、單引號、
+    /// 巢狀 `<input>`、`&nbsp;` 空 cell）。中文字換成 ASCII，其餘不動。
+    const BUYBACK_HTML: &str = r#"<html><body>
+<table class='hasBorder'>
+<tr class='tblHead'><td>項次</td><td>代號</td><td>名稱</td><td>董事會決議日</td><td>次別</td>
+<td>資本額</td><td>預定股數</td><td>下限</td><td>上限</td><td>起</td><td>迄</td></tr>
+<tr class= 'odd' align='center'>
+<td align='center'>2</td>
+<td align='center'>3708</td>
+<td align='center' nowrap>NAME-A</td><td align='center'>115/02/25</td>
+<td align='center'>3</td>
+<td align='right'>      8,499,367,621</td>
+<td align='right'>          5,500,000</td>
+<td align='right'>         84.00</td>
+<td align='right'>        173.00</td>
+<td align='center'>115/02/26</td>
+<td align='center'>115/04/24</td>
+<td align='center'>Y</td>
+<td>
+<input type='button' value='BTN' onclick='document.fm_t35sc09.co_id.value = "3708";ajax1(this.form,"table01");'/>
+</td>
+<td align='right'>&nbsp;</td>
+</tr>
+<tr class= 'even' align='center'>
+<td>3</td><td>2101</td><td>NAME-B</td><td>115/02/23</td><td>1</td>
+<td>1,986,654,505</td><td>2,200,000</td><td>27.00</td><td>45.00</td>
+<td>115/02/23</td><td>115/04/22</td><td>Y</td>
+</tr>
+</table></body></html>"#;
+
+    #[test]
+    fn parses_buyback_rows() {
+        let records = parse_buyback_stock_raw_html(BUYBACK_HTML.to_string());
+        assert_eq!(records.len(), 2, "tblHead 那列不該被算進來");
+
+        assert_eq!(records[0].stock_no, "3708");
+        assert_eq!(records[0].start_date, NaiveDate::from_ymd_opt(2026, 2, 26).unwrap());
+        assert_eq!(records[0].end_date, NaiveDate::from_ymd_opt(2026, 4, 24).unwrap());
+        assert_eq!(records[1].stock_no, "2101");
+        assert_eq!(records[1].start_date, NaiveDate::from_ymd_opt(2026, 2, 23).unwrap());
+    }
+
+    #[test]
+    fn skips_rows_with_unparsable_dates() {
+        // 欄位數夠但日期壞掉 → 跳過該列，不整批失敗
+        let html = BUYBACK_HTML.replace("115/02/26", "-");
+        let records = parse_buyback_stock_raw_html(html);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].stock_no, "2101");
+    }
+
+    #[test]
+    fn skips_rows_with_too_few_cells() {
+        let html = "<table><tr class='odd'><td>1</td><td>2330</td><td>115/01/01</td></tr></table>";
+        assert!(parse_buyback_stock_raw_html(html.to_string()).is_empty());
+    }
+
+    #[test]
+    fn cell_text_strips_tags_and_entities() {
+        assert_eq!(buyback_cell_text("<input value='x'/>\n"), "");
+        assert_eq!(buyback_cell_text("&nbsp;"), "");
+        assert_eq!(buyback_cell_text("  a &amp; b  "), "a & b");
+        // &amp; 先於其他實體還原會把 &amp;lt; 誤解成 <
+        assert_eq!(buyback_cell_text("&amp;lt;"), "&lt;");
+    }
+
+    #[test]
+    fn class_matching_is_token_based() {
+        // class 有多個 token 時仍要命中（等價於 CSS 的 tr.odd）
+        let html = BUYBACK_HTML.replace("class= 'odd'", "class=\"tr-line odd\"");
+        assert_eq!(parse_buyback_stock_raw_html(html).len(), 2);
+        // 不該把 oddball 這種前綴當成 odd
+        let html = BUYBACK_HTML.replace("class= 'odd'", "class='oddball'");
+        assert_eq!(parse_buyback_stock_raw_html(html).len(), 1);
+    }
+
     const SAMPLE: &str = "日期,證券代號,證券名稱,成交股數,成交金額,開盤價,最高價,最低價,收盤價,漲跌價差,成交筆數\n\
 \"1150625\",\"00400A\",\"主動國泰動能高息\",\"47542815\",\"714458519\",\"15.12\",\"15.14\",\"14.90\",\"15.00\",\"0.0800\",\"7627\"\n\
 \"1150625\",\"2330\",\"台積電\",\"1,234,567\",\"9,876,543,210\",\"1000.00\",\"1010.00\",\"995.00\",\"1005.00\",\"-5.0000\",\"50000\"\n";
@@ -428,3 +557,4 @@ mod tests {
         assert_eq!(fields, vec!["a", "1,234", "b"]);
     }
 }
+
