@@ -20,7 +20,7 @@ use axum::{
     Router
 };
 use axum_extra::{headers, TypedHeader};
-use futures_util::{sink::SinkExt, stream::StreamExt};
+use futures::{sink::SinkExt, stream::StreamExt};
 use std::{net::SocketAddr, ops::ControlFlow, sync::Arc, time::SystemTime};
 use tokio::{
     sync::Mutex,

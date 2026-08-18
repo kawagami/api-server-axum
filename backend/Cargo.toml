@@ -32,7 +32,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4.34", features = ["serde"] }
 futures = "0.3.30"
-reqwest = { version = "0.12", default-features = false, features = ["multipart", "json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 # v10 起改用 trait 抽象 crypto backend，必須自己挑一個，否則沒有 provider 可用。
 # 挑 aws_lc_rs：aws-lc-sys 早已被 librqbit 的 sha1-ring 拉進來編（cmake 也已在 Dockerfile），
 # 等於零新增 C 依賴；rust_crypto 反而會多帶 p256/p384/ed25519-dalek/rsa 等 16 個用不到的 crate。
@@ -51,16 +51,11 @@ regex = "1"
 form_urlencoded = "1.2.1"
 scraper = "0.27.0"
 rust_decimal = { version = "1", features = ["serde"] }
-futures-util = { version = "0.3", default-features = false, features = [
-    "sink",
-    "std",
-] }
 axum-extra = { version = "0.12.6", features = ["typed-header"] }
-tokio-util = { version = "0.7.18", features = ["io"] }
 zhconv = "0.4.1"
 # `pool`：讓 AsyncSmtpTransport 保留連線重用。沒有它時每封信都是一次完整的
 # TCP + STARTTLS + AUTH 握手 —— 中獎通知是「一個 member 一封」的迴圈，握手成本會乘上人數。
-# 只多拉 futures-util（本專案已直接依賴），無新增 crate。搭配 services/email.rs 的
+# 只多拉 futures-util（axum / bb8 / futures 已各自拉進來），無新增 crate。搭配 services/email.rs 的
 # transport 快取才有效：transport 每次重建等於連線池每次重建，等於沒有池。
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder", "hostname", "pool"] }
 libc = "0.2"
