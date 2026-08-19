@@ -17,6 +17,7 @@ pub mod messages;
 pub mod oauth;
 pub mod portfolio;
 pub mod roles;
+pub mod roster;
 pub mod stats;
 pub mod stocks;
 pub mod system_metrics;

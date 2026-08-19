@@ -20,7 +20,7 @@
 | `/{locale}/tools/convert-text` | 文字轉換工具 |
 | `/{locale}/tools/countdown` | 倒數計時工具 |
 | `/{locale}/tools/new-password` | 密碼產生工具 |
-| `/{locale}/tools/roster` | 排班功能 |
+| `/{locale}/tools/roster` | 排班功能（貼名單一次多筆、每日人力／連上上限、起始日期與週末標色、按人／按日視圖、點格子手動改班、統計、CSV 匯出／複製；參數存 localStorage）|
 | `/{locale}/games` | 遊戲 hub（清單來源 `libs/site-nav.ts` 的 `GAMES`） |
 | `/{locale}/games/chess` | 線上象棋，即時連線對戰（大廳開桌 / 快速配對，server 權威裁判） |
 | `/{locale}/games/western-chess` | 線上西洋棋，即時連線對戰（易位／過路兵／升變，共用大廳框架） |

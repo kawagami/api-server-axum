@@ -19,7 +19,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 - 記帳（member 收支記錄 CRUD，固定分類，收支結餘 / 分類加總 / 每月趨勢統計）
 - 發票登錄 + 統一發票自動對獎（member 登錄發票，排程每期抓財政部中獎號碼比對，中獎寄 email 通知，opt-in）
 - 樂透登錄 + 大樂透 / 威力彩自動對獎（member 批次登錄選號，排程每日抓台彩開獎號碼比對，中獎寄 email 通知，opt-in）
-- 排班（roster）
+- 排班（roster，環狀 pattern：每日各班人力是輸入而非副作用，工時／班別均衡，晚班不接隔日早班，連續上班天數上限；人力不足時仍排得出來但回警告碼）
 - 單字闖關（member 生存模式，英文 / 日文，週期排行榜）
 - 政府採購網標案追蹤（依關鍵字每日抓取，新公告 email 通知）
 - 站內留言板
@@ -60,7 +60,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/blogs` | 部落格查詢（列表 / tags / 單篇，公開） |
 | `/messages` | 站內留言 |
 | `/ws` | WebSocket 連線、線上清單（`/ws/connections`）、點對點訊息（`/ws/messages`）、一次性連線票（`/ws/ticket`）、對戰遊戲配對/對戰（象棋/五子棋/暗棋/西洋棋/圍棋/阿瓦隆/農場經營） |
-| `/roster` | 排班 |
+| `/roster` | 排班計算（公開無認證，套 tools 的 rate limit；回班表 + 實際採用的每日人力 `plan` + 機器可讀 `warnings`）|
 | `/logs` | 應用日誌查詢（列表 + 單一 request 完整軌跡，需 `log:read`） |
 | `/metrics` | 系統指標時間序列（需 `metric:read`，`?hours=` clamp 1–168） |
 | `/uploads/*` | 本機靜態檔案 |

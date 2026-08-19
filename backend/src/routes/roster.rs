@@ -1,15 +1,15 @@
-use crate::extract::Json;
 use crate::errors::AppError;
+use crate::extract::Json;
 use crate::middleware::rate_limit;
+use crate::services::roster::{build_roster, resolve_plan};
 use crate::state::AppState;
-use crate::structs::roster::{RosterRequest, RosterResponse, StaffShift};
+use crate::structs::roster::{RosterRequest, RosterResponse};
 use axum::{middleware, routing::post, Router};
-use std::collections::VecDeque;
 
 pub fn new(state: AppState) -> Router<AppState> {
     // 用 post 考量參數資料量可能很大。
     // 沿用 tools 的 bucket（20 req/60s）：同屬公開未認證的計算工具，語意一致，
-    // 也不必為此再多一組常數。限流擋的是量，單發成本由 RosterRequest::validate 擋。
+    // 也不必為此再多一組常數。限流擋的是量,單發成本由 RosterRequest::validate 擋。
     Router::new()
         .route("/", post(calculate_roster))
         .layer(middleware::from_fn_with_state(
@@ -18,6 +18,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         ))
 }
 
+/// 排班演算法本身在 `services::roster`（純函式、附測試）。這裡只做驗證與組回應。
 pub async fn calculate_roster(
     Json(payload): Json<RosterRequest>,
 ) -> Result<Json<RosterResponse>, AppError> {
@@ -26,47 +27,68 @@ pub async fn calculate_roster(
         .validate()
         .map_err(crate::errors::RequestError::UnprocessableContent)?;
 
-    let names = payload.names;
-    let days = payload.days as usize;
-    let rule = payload.rule;
+    let plan = resolve_plan(&payload);
+    let (data, warnings) = build_roster(&payload.names, payload.days, plan);
 
-    // 1. 定義基礎班別循環
-    // 根據規則調整班別比例
-    let base_pattern = match rule.as_str() {
-        "morning_heavy" => vec!["早班", "早班", "晚班", "休"],
-        "night_heavy" => vec!["晚班", "晚班", "早班", "休"],
-        _ => vec!["早班", "晚班", "休"], // 預設平均分配 (fairness)
-    };
-
-    let mut roster_result = Vec::new();
-
-    // 2. 為每位員工生成班表
-    for (idx, name) in names.into_iter().enumerate() {
-        let mut shifts = Vec::new();
-
-        // 為了不讓所有人排到一樣的班，我們根據員工 index 給予不同的起始偏移
-        // 例如：A 從「早」開始，B 從「晚」開始，C 從「休」開始
-        let offset = idx % base_pattern.len();
-        let mut pattern_queue: VecDeque<&str> = base_pattern.iter().copied().collect();
-        pattern_queue.rotate_left(offset);
-
-        // 3. 填充指定天數的班表
-        for d in 0..days {
-            // 取得當前循環中的班別
-            let shift = pattern_queue[d % pattern_queue.len()];
-            shifts.push(shift.to_string());
-        }
-
-        roster_result.push(StaffShift {
-            id: idx + 1,
-            name,
-            shifts,
-        });
-    }
-
-    // 4. 回傳結果
     Ok(Json(RosterResponse {
         status: "success".to_string(),
-        data: roster_result,
+        data,
+        plan,
+        warnings,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::structs::roster::RosterRule;
+
+    fn payload(people: usize, days: u32) -> RosterRequest {
+        RosterRequest {
+            names: (0..people).map(|i| format!("p{i}")).collect(),
+            days,
+            rule: RosterRule::Fairness,
+            morning_slots: None,
+            night_slots: None,
+            max_consecutive: None,
+        }
+    }
+
+    /// 回應形狀是前端契約（`frontend/api/tools.ts` 的 `RosterResponse`）
+    #[tokio::test]
+    async fn returns_expected_json_shape() {
+        let Json(response) = calculate_roster(Json(payload(6, 3))).await.unwrap();
+        let value = serde_json::to_value(response).unwrap();
+        assert_eq!(value["status"], "success");
+        assert_eq!(value["data"][0]["id"], 1);
+        assert_eq!(value["data"][0]["name"], "p0");
+        assert_eq!(value["data"][0]["shifts"].as_array().unwrap().len(), 3);
+        assert_eq!(value["plan"]["morning_slots"], 2);
+        assert_eq!(value["plan"]["night_slots"], 2);
+        assert_eq!(value["plan"]["rest_slots"], 2);
+        assert_eq!(value["plan"]["max_consecutive"], 5);
+        assert_eq!(value["warnings"].as_array().unwrap().len(), 0);
+    }
+
+    /// 警告碼的字面是契約：前端 `tools/roster/page.tsx` 的 `WARNING_KEYS` 靠它查 i18n
+    #[tokio::test]
+    async fn warning_codes_are_stable_snake_case() {
+        let Json(response) = calculate_roster(Json(payload(2, 7))).await.unwrap();
+        let value = serde_json::to_value(response).unwrap();
+        let codes: Vec<&str> = value["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c.as_str().unwrap())
+            .collect();
+        assert!(codes.contains(&"understaffed"), "{codes:?}");
+        assert!(codes.contains(&"night_to_morning"), "{codes:?}");
+        assert!(codes.contains(&"max_consecutive_exceeded"), "{codes:?}");
+    }
+
+    #[tokio::test]
+    async fn invalid_payload_is_rejected() {
+        assert!(calculate_roster(Json(payload(1, 0))).await.is_err());
+        assert!(calculate_roster(Json(payload(0, 7))).await.is_err());
+    }
 }
