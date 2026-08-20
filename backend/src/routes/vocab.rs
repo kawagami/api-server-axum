@@ -8,7 +8,7 @@ use crate::{
         members::AuthenticatedMember,
         vocab::{
             AnswerRequest, AnswerResponse, Language, LeaderboardPeriod, LeaderboardResponse,
-            MistakeEntry, StartRunRequest, StartRunResponse, VocabMe,
+            MistakeListQuery, MistakesResponse, StartRunRequest, StartRunResponse, VocabMe,
         },
     },
 };
@@ -41,7 +41,7 @@ fn caller(member: Option<Extension<AuthenticatedMember>>) -> Option<i64> {
     member.map(|Extension(m)| m.member_id)
 }
 
-/// me / mistakes 的題庫語言 query(?language=ja),缺省 en
+/// me 的題庫語言 query(?language=ja),缺省 en
 #[derive(serde::Deserialize, Default)]
 struct LangQuery {
     #[serde(default)]
@@ -107,10 +107,10 @@ async fn leaderboard(
 async fn mistakes(
     member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
-    Query(q): Query<LangQuery>,
-) -> Result<Json<Vec<MistakeEntry>>, AppError> {
+    Query(q): Query<MistakeListQuery>,
+) -> Result<Json<MistakesResponse>, AppError> {
     let mid = caller(member).ok_or(AppError::AuthError(AuthError::Unauthorized))?;
-    Ok(Json(vocab_service::mistakes(&state, mid, q.language).await?))
+    Ok(Json(vocab_service::mistakes(&state, mid, &q).await?))
 }
 
 async fn me(

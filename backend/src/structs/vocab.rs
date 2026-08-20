@@ -268,6 +268,81 @@ pub struct MistakeEntry {
     pub last_seen_at: DateTime<Utc>,
 }
 
+/// 錯題本一頁上限;錯題本會隨學習無界成長,端點必須有上限
+pub const MISTAKES_MAX_LIMIT: i64 = 100;
+pub const MISTAKES_DEFAULT_LIMIT: i64 = 50;
+
+/// 錯題本排序
+#[derive(Deserialize, Clone, Copy, PartialEq, Default, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum MistakeSort {
+    /// 未掌握優先、錯最多優先(預設)
+    #[default]
+    Wrong,
+    /// 最近答過優先
+    Recent,
+    /// 難度高優先
+    Difficulty,
+    /// 表記字母序
+    Word,
+}
+
+impl MistakeSort {
+    /// ORDER BY 片段。回固定字串,不含使用者輸入,可安全內插。
+    pub fn order_by(self) -> &'static str {
+        match self {
+            MistakeSort::Wrong => {
+                "(s.correct_count >= s.wrong_count), s.wrong_count DESC, s.last_seen_at DESC"
+            }
+            MistakeSort::Recent => "s.last_seen_at DESC, s.wrong_count DESC",
+            MistakeSort::Difficulty => "w.difficulty DESC, s.wrong_count DESC, w.word",
+            MistakeSort::Word => "w.word, s.wrong_count DESC",
+        }
+    }
+}
+
+/// GET /member/vocab/mistakes 的 query
+#[derive(Deserialize, Default)]
+pub struct MistakeListQuery {
+    #[serde(default)]
+    pub language: Language,
+    /// 表記 / 讀音 / 釋義模糊搜尋
+    pub q: Option<String>,
+    #[serde(default)]
+    pub sort: MistakeSort,
+    /// 只看未掌握(答錯 > 答對)
+    #[serde(default)]
+    pub unmastered: bool,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+impl MistakeListQuery {
+    /// 空字串搜尋等於沒搜尋(前端清空輸入框會送 `q=`)
+    pub fn search(&self) -> Option<&str> {
+        self.q.as_deref().map(str::trim).filter(|s| !s.is_empty())
+    }
+    pub fn limit(&self) -> i64 {
+        self.limit
+            .unwrap_or(MISTAKES_DEFAULT_LIMIT)
+            .clamp(1, MISTAKES_MAX_LIMIT)
+    }
+    pub fn offset(&self) -> i64 {
+        self.offset.unwrap_or(0).max(0)
+    }
+}
+
+/// GET /member/vocab/mistakes 回傳
+///
+/// `total` 跟著搜尋/篩選條件走(分頁用),`reviewable` 一律是全部未掌握字數
+/// —— 複習按鈕的數字不能被錯題本的搜尋條件影響。
+#[derive(Serialize)]
+pub struct MistakesResponse {
+    pub items: Vec<MistakeEntry>,
+    pub total: i64,
+    pub reviewable: i64,
+}
+
 // ---------- 後台題庫管理 ----------
 
 /// 後台題庫列表一列(含全會員答題統計,揪出高錯誤率的爛字用)
@@ -324,13 +399,14 @@ pub struct BestRun {
     pub exp_gained: i64,
 }
 
-/// 排行榜週期(台北時間;weekly = 本週一起、monthly = 本月 1 日起)
+/// 排行榜週期(台北時間;weekly = 本週一起、monthly = 本月 1 日起、all = 不限期間)
 #[derive(Deserialize, Clone, Copy, PartialEq, Default, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum LeaderboardPeriod {
     #[default]
     Weekly,
     Monthly,
+    All,
 }
 
 /// 排行榜一列(top N;name/avatar 取自 members,公開顯示)
@@ -371,6 +447,10 @@ pub struct VocabMe {
     pub bests: Vec<BestRun>,
     pub total_runs: i64,
     pub words_learned: i64,
+    /// 連續遊玩天數(台北時間;今天還沒玩但昨天玩了仍算延續)
+    pub streak_days: i32,
+    /// 今天(台北時間)是否已玩過 —— 前端提示「今天還沒玩,連續紀錄會斷」用
+    pub played_today: bool,
 }
 
 #[cfg(test)]

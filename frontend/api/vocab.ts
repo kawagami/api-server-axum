@@ -1,7 +1,7 @@
 "use server";
 
 import memberRequest from "@/libs/memberRequest";
-import type { VocabAnswer, VocabAnswerInput, VocabLanguage, VocabLeaderboard, VocabLeaderboardPeriod, VocabMe, VocabMistake, VocabRunMode, VocabStartRun } from "@/types";
+import type { VocabAnswer, VocabAnswerInput, VocabLanguage, VocabLeaderboard, VocabLeaderboardPeriod, VocabMe, VocabMistakeSort, VocabMistakesPage, VocabRunMode, VocabStartRun } from "@/types";
 
 export async function getVocabMe(language: VocabLanguage = 'en'): Promise<VocabMe> {
     return memberRequest<VocabMe>({
@@ -9,9 +9,28 @@ export async function getVocabMe(language: VocabLanguage = 'en'): Promise<VocabM
     });
 }
 
-export async function getVocabMistakes(language: VocabLanguage = 'en'): Promise<VocabMistake[]> {
-    return memberRequest<VocabMistake[]>({
-        url: `${process.env.API_URL}/member/vocab/mistakes?language=${language}`,
+export interface VocabMistakeQuery {
+    language?: VocabLanguage;
+    /** 表記 / 讀音 / 釋義模糊搜尋 */
+    q?: string;
+    sort?: VocabMistakeSort;
+    /** 只看未掌握(答錯 > 答對) */
+    unmastered?: boolean;
+    /** 後端上限 100 */
+    limit?: number;
+    offset?: number;
+}
+
+/** 錯題本一頁;後端強制分頁(上限 100),不要期待一次拿完 */
+export async function getVocabMistakes(query: VocabMistakeQuery = {}): Promise<VocabMistakesPage> {
+    const params = new URLSearchParams({ language: query.language ?? 'en' });
+    if (query.q?.trim()) params.set('q', query.q.trim());
+    if (query.sort) params.set('sort', query.sort);
+    if (query.unmastered) params.set('unmastered', 'true');
+    if (query.limit != null) params.set('limit', String(query.limit));
+    if (query.offset) params.set('offset', String(query.offset));
+    return memberRequest<VocabMistakesPage>({
+        url: `${process.env.API_URL}/member/vocab/mistakes?${params}`,
     });
 }
 

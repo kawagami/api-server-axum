@@ -5,11 +5,12 @@ use crate::{
     state::AppState,
     structs::vocab::{
         AdminWordListQuery, AdminWordListResponse, AnswerRequest, AnswerResponse, CurrentQuestion,
-        Language, LeaderboardPeriod, LeaderboardResponse, MistakeEntry, QuestionDto, QuestionKind,
-        RunMode, RunResult, RunState, StartRunResponse, UpdateWordRequest, VocabMe, Word,
+        Language, LeaderboardPeriod, LeaderboardResponse, MistakeListQuery, MistakesResponse,
+        QuestionDto, QuestionKind, RunMode, RunResult, RunState, StartRunResponse,
+        UpdateWordRequest, VocabMe, Word,
     },
 };
-use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc};
 use rand::Rng;
 use uuid::Uuid;
 
@@ -679,9 +680,15 @@ pub async fn answer(
 pub async fn mistakes(
     state: &AppState,
     member_id: i64,
-    language: Language,
-) -> Result<Vec<MistakeEntry>, AppError> {
-    vocab_repo::mistakes(state.get_pool(), member_id, language.as_str()).await
+    q: &MistakeListQuery,
+) -> Result<MistakesResponse, AppError> {
+    let items = vocab_repo::mistakes(state.get_pool(), member_id, q).await?;
+    let (total, reviewable) = vocab_repo::mistake_counts(state.get_pool(), member_id, q).await?;
+    Ok(MistakesResponse {
+        items,
+        total,
+        reviewable,
+    })
 }
 
 /// 排行榜 top N 名額
@@ -696,6 +703,8 @@ fn period_start(now: DateTime<Utc>, period: LeaderboardPeriod) -> DateTime<Utc> 
             today - Duration::days(i64::from(today.weekday().num_days_from_monday()))
         }
         LeaderboardPeriod::Monthly => today.with_day(1).expect("每月必有 1 日"),
+        // 總榜:早於任何一局的起點即可(vocab 功能 2026-07 才上線)
+        LeaderboardPeriod::All => NaiveDate::from_ymd_opt(1970, 1, 1).expect("1970-01-01 合法"),
     };
     tz.from_local_datetime(&start.and_hms_opt(0, 0, 0).expect("00:00:00 合法"))
         .single()
@@ -719,6 +728,35 @@ pub async fn leaderboard(
     Ok(LeaderboardResponse { top, me })
 }
 
+/// 連續天數往回看幾天就好 —— 再長的紀錄對「連續」沒有意義,查詢也不該無界
+const STREAK_LOOKBACK_DAYS: i32 = 400;
+
+/// 從「有玩過的台北日」清單算連續天數(純函式,可測)
+///
+/// `days` 需為去重且新到舊排序。今天還沒玩但昨天玩了 → 連續紀錄仍算延續
+/// (今天內補打即可保住),中間斷一天以上就歸零。
+pub fn streak_from_days(days: &[NaiveDate], today: NaiveDate) -> i32 {
+    let Some(&latest) = days.first() else {
+        return 0;
+    };
+    // 最後一次遊玩早於昨天 → 連續已斷
+    let gap = (today - latest).num_days();
+    if gap > 1 {
+        return 0;
+    }
+    let mut streak = 1;
+    let mut cursor = latest;
+    for &day in &days[1..] {
+        if (cursor - day).num_days() == 1 {
+            streak += 1;
+            cursor = day;
+        } else {
+            break;
+        }
+    }
+    streak
+}
+
 pub async fn me(
     state: &AppState,
     member_id: i64,
@@ -730,6 +768,9 @@ pub async fn me(
     let bests = vocab_repo::bests(state.get_pool(), member_id, lang).await?;
     let (total_runs, words_learned) =
         vocab_repo::member_stats(state.get_pool(), member_id, lang).await?;
+    let days =
+        vocab_repo::played_days(state.get_pool(), member_id, lang, STREAK_LOOKBACK_DAYS).await?;
+    let today = crate::utils::date::taipei_today();
 
     Ok(VocabMe {
         exp,
@@ -739,6 +780,8 @@ pub async fn me(
         bests,
         total_runs,
         words_learned,
+        streak_days: streak_from_days(&days, today),
+        played_today: days.first() == Some(&today),
     })
 }
 
@@ -878,6 +921,50 @@ mod tests {
         assert_eq!(
             period_start(now, LeaderboardPeriod::Monthly),
             Utc.with_ymd_and_hms(2026, 6, 30, 16, 0, 0).unwrap()
+        );
+    }
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    #[test]
+    fn streak_counts_consecutive_days_back_from_today() {
+        let today = d(2026, 8, 21);
+        let days = vec![d(2026, 8, 21), d(2026, 8, 20), d(2026, 8, 19)];
+        assert_eq!(streak_from_days(&days, today), 3);
+    }
+
+    /// 今天還沒玩、昨天玩了 —— 連續紀錄還活著,不能顯示 0 逼使用者以為斷了
+    #[test]
+    fn streak_survives_a_day_not_yet_played() {
+        let today = d(2026, 8, 21);
+        let days = vec![d(2026, 8, 20), d(2026, 8, 19)];
+        assert_eq!(streak_from_days(&days, today), 2);
+    }
+
+    #[test]
+    fn streak_breaks_on_gap() {
+        let today = d(2026, 8, 21);
+        // 前天之後就沒玩 → 已斷
+        assert_eq!(streak_from_days(&[d(2026, 8, 19)], today), 0);
+        // 中間缺 08-19 → 只算回到 08-20
+        let days = vec![d(2026, 8, 21), d(2026, 8, 20), d(2026, 8, 18)];
+        assert_eq!(streak_from_days(&days, today), 2);
+    }
+
+    #[test]
+    fn streak_of_no_history_is_zero() {
+        assert_eq!(streak_from_days(&[], d(2026, 8, 21)), 0);
+    }
+
+    /// 總榜起點必須早於任何一局,否則總榜會漏資料
+    #[test]
+    fn period_start_all_predates_everything() {
+        let now = Utc.with_ymd_and_hms(2026, 7, 11, 4, 0, 0).unwrap();
+        assert!(
+            period_start(now, LeaderboardPeriod::All)
+                < Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()
         );
     }
 

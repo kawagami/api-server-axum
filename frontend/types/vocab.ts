@@ -44,6 +44,16 @@ export interface VocabRunResult {
     graduated?: number; // 複習模式:本局畢業(答對追上答錯)的字數
 }
 
+/// 錯題本排序(後端 MistakeSort)
+export type VocabMistakeSort = 'wrong' | 'recent' | 'difficulty' | 'word';
+
+/// GET /member/vocab/mistakes 一頁;total 跟著搜尋條件走,reviewable 一律是全部未掌握字數
+export interface VocabMistakesPage {
+    items: VocabMistake[];
+    total: number;
+    reviewable: number;
+}
+
 export interface VocabMistake {
     word: string;
     part_of_speech: string;
@@ -86,10 +96,12 @@ export interface VocabMe {
     bests: VocabBestRun[];  // 各計分模式的最佳紀錄
     total_runs: number;
     words_learned: number;
+    streak_days: number;  // 連續遊玩天數(台北時間)
+    played_today: boolean; // 今天是否已玩過
 }
 
-// 排行榜週期(台北時間;weekly = 本週一起、monthly = 本月 1 日起)
-export type VocabLeaderboardPeriod = 'weekly' | 'monthly';
+// 排行榜週期(台北時間;weekly = 本週一起、monthly = 本月 1 日起、all = 總榜)
+export type VocabLeaderboardPeriod = 'weekly' | 'monthly' | 'all';
 
 export interface VocabLeaderboardRow {
     rank: number;
