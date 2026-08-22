@@ -3,7 +3,7 @@ use crate::{
     repositories::{
         portfolio as portfolio_repo,
         redis as redis_repo,
-        stocks::{find_ex_rights_checked, get_ex_rights_by_range, get_stock_closing_prices_by_date_range, get_stock_name_by_code, upsert_ex_rights, upsert_ex_rights_checked, upsert_stock_closing_prices},
+        stocks::{find_ex_rights_checked, get_ex_rights_by_range, get_stock_closing_prices_by_date_range, get_stock_names_by_codes, upsert_ex_rights, upsert_ex_rights_checked, upsert_stock_closing_prices},
     },
     structs::{
         portfolio::{HistoryRecord, PortfolioEntry, PortfolioRequest, PortfolioSummaryEntry},
@@ -14,7 +14,7 @@ use crate::{
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
 use chrono::{Datelike, Months, NaiveDate};
-use futures::future::try_join_all;
+use futures::stream::{self, StreamExt, TryStreamExt};
 use reqwest::Client;
 use sqlx::{Pool, Postgres};
 use std::sync::{
@@ -37,6 +37,16 @@ use super::twse::{self, TwseResponse};
 const MAX_UPSTREAM_FETCHES: usize = 6;
 /// 單次請求花在上游的時間上限。
 const UPSTREAM_TIME_BUDGET: Duration = Duration::from_secs(8);
+
+/// `get_summary` 同時處理幾筆持股。
+///
+/// **不能無上限**：每筆持股要跑兩個查詢（收盤價、除權息），持股 20 檔的無界 fan-out
+/// 就是瞬間 40 個查詢搶那幾條 PG 連線，`acquire_timeout(3s)` 一到整個請求 5xx ——
+/// 而且這只是一個 member 按一次 summary。上游那面本來就有 `UpstreamBudget` 擋著，
+/// 這裡擋的是 DB 那面。
+///
+/// 排序不受影響：`buffered` 是「併發執行、依序產出」，回傳順序仍是持股清單的順序。
+const SUMMARY_CONCURRENCY: usize = 4;
 
 /// 互動端點對上游（TWSE）的抓取預算。
 ///
@@ -147,16 +157,28 @@ pub async fn get_summary(
     // 一份預算給整個 summary（多筆持股共用），不是每筆一份
     let budget = UpstreamBudget::new();
 
-    let result = try_join_all(entries.into_iter().map(|entry| {
+    // 股名一次查完（原本每筆持股各一發）。去重：同一檔可以有多筆持股。
+    // 查不到股名不是錯誤（新上市 / 還沒抓到行情），失敗一律當成空 map 往下走。
+    let mut codes: Vec<String> = entries.iter().map(|e| e.stock_code.clone()).collect();
+    codes.sort();
+    codes.dedup();
+    let names = get_stock_names_by_codes(pool, &codes)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!("批次取股名失敗，summary 照回但無股名: {:?}", e);
+            std::collections::HashMap::new()
+        });
+
+    let result: Vec<PortfolioSummaryEntry> = stream::iter(entries.into_iter().map(|entry| {
         let pool = pool.clone();
         let redis_pool = redis_pool.clone();
         let client = client.clone();
         let budget = budget.clone();
+        let stock_name = names.get(&entry.stock_code).cloned();
         async move {
-            let (closes, ex_events, stock_name) = tokio::try_join!(
+            let (closes, ex_events) = tokio::try_join!(
                 fetch_all_closing_prices(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today, &budget),
                 fetch_ex_events(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today, &budget),
-                async { Ok::<_, AppError>(get_stock_name_by_code(&pool, &entry.stock_code).await.unwrap_or(None)) },
             )?;
 
             let (current_price, current_value, pnl, pnl_pct) =
@@ -175,6 +197,8 @@ pub async fn get_summary(
             })
         }
     }))
+    .buffered(SUMMARY_CONCURRENCY)
+    .try_collect()
     .await?;
 
     Ok(result)

@@ -2,6 +2,7 @@ use crate::{errors::AppError, structs::stocks::{StockDayAll, StockDayAllInsertRo
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use sqlx::{Pool, Postgres, QueryBuilder};
+use std::collections::HashMap;
 
 /// list 與 count 共用的 WHERE —— 兩邊漂移會讓 total 與實際筆數對不上
 fn push_day_all_filter(
@@ -67,6 +68,34 @@ pub async fn get_stock_name_by_code(
     .fetch_optional(pool)
     .await?;
     Ok(row.map(|(name,)| name))
+}
+
+/// 一次取多檔的最新股名。
+///
+/// 存在的理由是 `services::portfolio::get_summary`：原本每檔持股各發一次
+/// `get_stock_name_by_code`，N 檔就是 N 個查詢跟同一次請求的其他查詢搶 PG 連線。
+/// `DISTINCT ON` 走的是既有的 `(stock_code, trade_date DESC)` 索引，一次搞定。
+///
+/// 回傳的 map **只含查得到的 code**（沒行情資料的檔就是缺鍵，呼叫端當 None 處理）。
+pub async fn get_stock_names_by_codes(
+    pool: &Pool<Postgres>,
+    codes: &[String],
+) -> Result<HashMap<String, String>, AppError> {
+    if codes.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT DISTINCT ON (stock_code) stock_code, stock_name
+         FROM stock_day_all
+         WHERE stock_code = ANY($1)
+         ORDER BY stock_code, trade_date DESC",
+    )
+    .bind(codes)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().collect())
 }
 
 pub async fn insert_stock_day_all_batch(
