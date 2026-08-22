@@ -58,16 +58,9 @@ pub async fn convert_text(
 
     // zhconv 是同步 CPU 工作，直接跑會佔住 async worker（1 核機上就是全站一起等）。
     // 慣例同 services/auth.rs 的 bcrypt 與 services/images.rs 的 process_image。
-    let text = req.text;
-    let (original_text, converted_text) = tokio::task::spawn_blocking(move || {
-        let converted = zhconv(&text, variant);
-        (text, converted)
-    })
-    .await
-    .map_err(|e| SystemError::Internal(format!("簡繁轉換執行失敗: {e}")))?;
+    let converted_text = tokio::task::spawn_blocking(move || zhconv(&req.text, variant))
+        .await
+        .map_err(|e| SystemError::Internal(format!("簡繁轉換執行失敗: {e}")))?;
 
-    Ok(Json(ConvertTextResponse {
-        original_text,
-        converted_text,
-    }))
+    Ok(Json(ConvertTextResponse { converted_text }))
 }

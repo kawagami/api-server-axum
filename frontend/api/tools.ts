@@ -2,6 +2,7 @@
 
 import { fetchApi } from "@/libs/fetchApi";
 import { clientIpHeaders } from "@/libs/client-ip";
+import type { ConversionDirection } from "@/libs/convert-text";
 import type { RosterEntry, RosterPlan, RosterRule, RosterWarning } from "@/libs/roster";
 
 export async function getNewPassword(count = 1, length = 8): Promise<string[]> {
@@ -11,7 +12,8 @@ export async function getNewPassword(count = 1, length = 8): Promise<string[]> {
     );
 }
 
-export async function postConvertText(text: string, direction: "t2s" | "s2t"): Promise<{ original_text: string; converted_text: string }> {
+/** 後端只回 `converted_text`（原文是呼叫端自己傳的，回傳只會讓 response 體積翻倍） */
+export async function postConvertText(text: string, direction: ConversionDirection): Promise<{ converted_text: string }> {
     return fetchApi(`${process.env.API_URL}/tools/convert_text`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await clientIpHeaders()) },
