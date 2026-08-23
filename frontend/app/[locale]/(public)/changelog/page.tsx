@@ -84,7 +84,7 @@ export default async function Changelog({ params }: { params: Promise<{ locale: 
                                                 {t(`types.${entry.type}`)}
                                             </span>
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-neutral-800 dark:text-neutral-100 break-words">
+                                                <p className="text-neutral-800 dark:text-neutral-100 wrap-break-word">
                                                     {entry.breaking && (
                                                         <span className="mr-1 font-semibold text-red-600 dark:text-red-400">
                                                             {t("breaking")}
