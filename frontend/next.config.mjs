@@ -30,11 +30,19 @@ const nextConfig = {
         ],
     },
     async redirects() {
+        // 2026-08-23：倒數計時 / 鬧鐘 / 整點報時三頁併成 /tools/timers，舊網址一律 301
+        const mergedIntoTimers = ['/tools/countdown', '/tools/alarm', '/tools/hourly-chime'];
         return [
             { source: '/convert-text', destination: '/tools/convert-text', permanent: true },
-            { source: '/countdown', destination: '/tools/countdown', permanent: true },
+            { source: '/countdown', destination: '/tools/timers', permanent: true },
             { source: '/new-password', destination: '/tools/new-password', permanent: true },
             { source: '/roster', destination: '/tools/roster', permanent: true },
+            ...mergedIntoTimers.flatMap((source) => [
+                { source, destination: '/tools/timers', permanent: true },
+                // 站上實際網址都帶 locale prefix（routing 的 localePrefix: 'always'），
+                // 而 next.config 的 redirects 跑在 next-intl middleware 之前，所以要自己列一份帶 prefix 的。
+                { source: `/:locale(zh-TW|zh-CN|en)${source}`, destination: '/:locale/tools/timers', permanent: true },
+            ]),
         ];
     },
     images: {

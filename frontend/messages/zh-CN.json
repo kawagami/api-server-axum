@@ -44,10 +44,8 @@
     "backToHome": "返回首页",
     "toolNewPassword": "新密码",
     "toolConvertText": "文字转换",
-    "toolCountdown": "倒计时",
+    "toolTimers": "计时工具",
     "toolRoster": "排班",
-    "toolAlarm": "闹钟",
-    "toolHourlyChime": "整点报时",
     "gameChess": "在线象棋",
     "gameWesternChess": "在线国际象棋",
     "gameGomoku": "在线五子棋",
@@ -878,10 +876,8 @@
     "items": {
       "newPassword": "批量生成随机密码，组数与长度可自定义。",
       "convertText": "简体与繁体中文文字互相转换。",
-      "countdown": "自定义时间倒数，结束时提示音提醒。",
-      "roster": "输入人员与天数，自动排出公平班表。",
-      "alarm": "设定指定时刻的闹钟提醒。",
-      "hourlyChime": "每逢整点播放提示音报时。"
+      "timers": "倒计时、闹钟、整点报时三合一，可同时使用。",
+      "roster": "输入人员与天数，自动排出公平班表。"
     }
   },
   "GamesHub": {
@@ -1001,6 +997,10 @@
     "guestLocalRuns": "局数",
     "guestLocalBest": "最佳答对",
     "guestLocalExp": "累计 EXP"
+  },
+  "Timers": {
+    "title": "计时工具",
+    "intro": "倒计时、闹钟、整点报时同页并存，可以同时开着。"
   },
   "Alarm": {
     "title": "闹钟",

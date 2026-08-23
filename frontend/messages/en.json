@@ -44,10 +44,8 @@
     "backToHome": "Back to home",
     "toolNewPassword": "New Password",
     "toolConvertText": "Convert Text",
-    "toolCountdown": "Countdown",
+    "toolTimers": "Timers",
     "toolRoster": "Roster",
-    "toolAlarm": "Alarm",
-    "toolHourlyChime": "Hourly Chime",
     "gameChess": "Online Xiangqi",
     "gameWesternChess": "Online Chess",
     "gameGomoku": "Online Gomoku",
@@ -878,10 +876,8 @@
     "items": {
       "newPassword": "Generate random passwords in batches, with adjustable count and length.",
       "convertText": "Convert text between Simplified and Traditional Chinese.",
-      "countdown": "Count down a custom duration with a sound alert at the end.",
-      "roster": "Enter staff and days to auto-generate a fair shift roster.",
-      "alarm": "Set alarms that ring at a specific time.",
-      "hourlyChime": "Play a chime at the top of every hour."
+      "timers": "Countdown, alarm and hourly chime in one place — run them all at once.",
+      "roster": "Enter staff and days to auto-generate a fair shift roster."
     }
   },
   "GamesHub": {
@@ -1001,6 +997,10 @@
     "guestLocalRuns": "Runs",
     "guestLocalBest": "Best correct",
     "guestLocalExp": "Total EXP"
+  },
+  "Timers": {
+    "title": "Timers",
+    "intro": "Countdown, alarm and hourly chime on one page — all three can run at the same time."
   },
   "Alarm": {
     "title": "Alarm",

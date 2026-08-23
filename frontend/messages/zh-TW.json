@@ -44,10 +44,8 @@
     "backToHome": "返回首頁",
     "toolNewPassword": "新密碼",
     "toolConvertText": "文字轉換",
-    "toolCountdown": "倒數計時",
+    "toolTimers": "計時工具",
     "toolRoster": "排班",
-    "toolAlarm": "鬧鐘",
-    "toolHourlyChime": "整點報時",
     "gameChess": "線上象棋",
     "gameWesternChess": "線上西洋棋",
     "gameGomoku": "線上五子棋",
@@ -878,10 +876,8 @@
     "items": {
       "newPassword": "批次產生隨機密碼，組數與長度可自訂。",
       "convertText": "簡體與繁體中文文字互相轉換。",
-      "countdown": "自訂時間倒數，結束時提示音提醒。",
-      "roster": "輸入人員與天數，自動排出公平班表。",
-      "alarm": "設定指定時刻的鬧鐘提醒。",
-      "hourlyChime": "每逢整點播放提示音報時。"
+      "timers": "倒數計時、鬧鐘、整點報時三合一，可同時使用。",
+      "roster": "輸入人員與天數，自動排出公平班表。"
     }
   },
   "GamesHub": {
@@ -1001,6 +997,10 @@
     "guestLocalRuns": "局數",
     "guestLocalBest": "最佳答對",
     "guestLocalExp": "累計 EXP"
+  },
+  "Timers": {
+    "title": "計時工具",
+    "intro": "倒數計時、鬧鐘、整點報時同頁並存，可以同時開著。"
   },
   "Alarm": {
     "title": "鬧鐘",

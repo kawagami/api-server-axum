@@ -3,8 +3,6 @@ import {
     CaseSensitive,
     TimerReset,
     CalendarDays,
-    AlarmClock,
-    BellRing,
     Swords,
     Crown,
     Grid3x3,
@@ -37,10 +35,8 @@ export interface SiteNavItem {
 export const TOOLS: readonly SiteNavItem[] = [
     { key: "newPassword", href: "/tools/new-password", labelKey: "toolNewPassword", icon: KeyRound, feature: "tools" },
     { key: "convertText", href: "/tools/convert-text", labelKey: "toolConvertText", icon: CaseSensitive, feature: "tools" },
-    { key: "countdown", href: "/tools/countdown", labelKey: "toolCountdown", icon: TimerReset, feature: "tools" },
+    { key: "timers", href: "/tools/timers", labelKey: "toolTimers", icon: TimerReset, feature: "tools" },
     { key: "roster", href: "/tools/roster", labelKey: "toolRoster", icon: CalendarDays, feature: "roster" },
-    { key: "alarm", href: "/tools/alarm", labelKey: "toolAlarm", icon: AlarmClock, feature: "tools" },
-    { key: "hourlyChime", href: "/tools/hourly-chime", labelKey: "toolHourlyChime", icon: BellRing, feature: "tools" },
 ] as const;
 
 export const GAMES: readonly SiteNavItem[] = [
