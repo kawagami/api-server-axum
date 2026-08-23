@@ -280,10 +280,28 @@
     ],
     "linksHeading": "連結",
     "github": "GitHub 原始碼",
+    "changelog": "更新紀錄",
     "contact": "留言給我",
     "home": "回首頁看看有什麼",
     "metaTitle": "關於本站",
     "metaDescription": "kawa 的個人小站介紹：技術棧、設計原則與聯絡方式。"
+  },
+  "Changelog": {
+    "title": "更新紀錄",
+    "subtitle": "這個站最近改了什麼。內容直接來自 repo 的 commit,不另外手寫。",
+    "empty": "暫時拿不到更新紀錄,晚點再回來看看。",
+    "breaking": "重大變更",
+    "footnote": "只列出功能、修正、效能、重構與安全性相關的變更;升版與文件整理等雜項不顯示。每小時更新一次。",
+    "viewAll": "看完整 commit 紀錄",
+    "types": {
+      "feat": "新功能",
+      "fix": "修正",
+      "perf": "效能",
+      "refactor": "重構",
+      "security": "安全性"
+    },
+    "metaTitle": "更新紀錄",
+    "metaDescription": "Kawa's Homes 的更新紀錄:新功能、修正、效能與安全性變更,直接來自 repo commit。"
   },
   "Ws": {
     "feedTitle": "即時通知",

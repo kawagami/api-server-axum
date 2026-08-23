@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { routing } from "@/i18n/routing";
 import { getBlogs } from "@/api/blogs";
 import { getPublicSettings } from "@/api/settings";
+import { getChangelogRepo } from "@/api/github";
 import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
 import { TOOLS, GAMES } from "@/libs/site-nav";
 
@@ -47,6 +48,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ].filter(({ feature }) => isFeatureEnabled(enabled, feature));
 
     const entries = staticPaths.flatMap(({ path, priority }) => entry(path, priority));
+
+    // /changelog 的開關是 GITHUB_REPO（不是 enabled_features），沒設 repo 時整頁 404
+    if (await getChangelogRepo()) entries.push(...entry("/changelog", 0.5));
 
     // 文章清單：API 掛掉時只是少了動態項目，不該讓整份 sitemap（與 build）失敗
     if (isFeatureEnabled(enabled, "blog")) {

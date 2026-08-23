@@ -3,12 +3,13 @@ import { getTranslations } from "next-intl/server";
 import { localeAlternates } from "@/libs/seo";
 import NextLink from "next/link";
 import { Link } from "@/i18n/navigation";
-import { ArrowRight, MessageSquare } from "lucide-react";
+import { ArrowRight, MessageSquare, History } from "lucide-react";
 import KawaLogo from "@/components/kawa-logo";
 import PageShell from "@/components/page-shell";
 import PageTitle from "@/components/page-title";
 import GithubMark from "@/components/github-mark";
 import { getPublicSettings } from "@/api/settings";
+import { getChangelogRepo } from "@/api/github";
 import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -29,9 +30,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 export default async function About() {
-    const [t, settings] = await Promise.all([
+    const [t, settings, changelogRepo] = await Promise.all([
         getTranslations("About"),
         getPublicSettings(),
+        getChangelogRepo(),
     ]);
     const enabled = resolveEnabledFeatures(settings.enabled_features);
     const showContact = isFeatureEnabled(enabled, "message");
@@ -100,6 +102,15 @@ export default async function About() {
                         <GithubMark className="w-5 h-5 text-neutral-900 dark:text-white" />
                         {t("github")}
                     </NextLink>
+                    {changelogRepo && (
+                        <Link
+                            href="/changelog"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-neutral-800 shadow-md text-neutral-700 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-400 hover:shadow-lg transition-all"
+                        >
+                            <History className="w-5 h-5" />
+                            {t("changelog")}
+                        </Link>
+                    )}
                     {showContact && (
                         <Link
                             href="/contact"

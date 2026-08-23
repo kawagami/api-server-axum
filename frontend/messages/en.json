@@ -280,10 +280,28 @@
     ],
     "linksHeading": "Links",
     "github": "Source on GitHub",
+    "changelog": "Changelog",
     "contact": "Leave a message",
     "home": "Back home to explore",
     "metaTitle": "About",
     "metaDescription": "About kawa's personal site: stack, principles and contact."
+  },
+  "Changelog": {
+    "title": "Changelog",
+    "subtitle": "What changed on this site recently — pulled straight from the repo's commits, not written by hand.",
+    "empty": "Changelog is unavailable right now. Please check back later.",
+    "breaking": "Breaking",
+    "footnote": "Only features, fixes, performance, refactors and security changes are listed; dependency bumps and docs housekeeping are hidden. Refreshed hourly.",
+    "viewAll": "View full commit history",
+    "types": {
+      "feat": "Feature",
+      "fix": "Fix",
+      "perf": "Performance",
+      "refactor": "Refactor",
+      "security": "Security"
+    },
+    "metaTitle": "Changelog",
+    "metaDescription": "Changelog for Kawa's Homes: features, fixes, performance and security changes, straight from the repo commits."
   },
   "Ws": {
     "feedTitle": "Live notifications",
