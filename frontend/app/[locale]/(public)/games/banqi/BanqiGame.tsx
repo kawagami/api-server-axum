@@ -54,6 +54,12 @@ export default function BanqiGame() {
                 setLastCells([d.from, d.to]);
             }
         },
+        formatMove: (data) => {
+            const d = data as FlipMade | MoveMade;
+            return d.action === 'flip'
+                ? `↑${d.at[0] + 1},${d.at[1] + 1}`
+                : `${d.from[0] + 1},${d.from[1] + 1}→${d.to[0] + 1},${d.to[1] + 1}`;
+        },
     });
 
     const interactive = room.phase === 'playing' && room.turn === room.myColor && !room.pending;
@@ -73,6 +79,8 @@ export default function BanqiGame() {
                     myColor={myBanqiColor}
                     lastCells={lastCells}
                     interactive={interactive}
+                    hints={room.hints}
+                    boardLabel={t('title')}
                     onMove={room.actions.sendMove}
                 />
             }

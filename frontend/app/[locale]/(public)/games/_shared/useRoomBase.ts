@@ -35,12 +35,16 @@ export function useRoomBase(opts: RoomBaseOptions): RoomBase {
         const types = [...Object.keys(optsRef.current.handlers), 'error'];
         const entries = types.map(type => {
             const guarded = (data: unknown, msg: WsMessage) => {
-                if (msg.game !== game) return;
                 if (type === 'error') {
+                    // **連線層級的 error 不帶 game**（收訊超量的 rate_limited 走 `envelope`
+                    // 而非 `game_envelope`）。那種錯誤對哪個遊戲頁都成立，不能被 game 分流濾掉；
+                    // 帶 game 的一律只給對應遊戲。
+                    if (msg.game !== undefined && msg.game !== game) return;
                     const { knownErrors, genericErrorKey = 'err_generic' } = optsRef.current;
                     const r = (data as { reason: string }).reason;
                     setNotice(knownErrors.has(r) ? `err_${r}` : genericErrorKey);
                 } else {
+                    if (msg.game !== game) return;
                     optsRef.current.handlers[type]?.(data);
                 }
             };

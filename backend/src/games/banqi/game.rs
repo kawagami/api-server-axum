@@ -93,6 +93,52 @@ impl GameEngine for BanqiGame {
         Ok(Applied { move_data, extra: Vec::new() })
     }
 
+    /// `{ flips: [[col,row]…], moves: { "col,row": [[col,row]…] } }`。
+    ///
+    /// 暗棋引擎沒有「枚舉合法步」的入口（只有 `apply_action` 這個驗證＋套用），
+    /// 所以走法用**在複本上試走**取得 —— 規則仍然只有引擎那一份，不在這裡複刻位階/炮架。
+    /// 盤面只有 4×8，一輪最多 16 子 × 32 格 = 512 次試走，成本可忽略。
+    fn hints(&self) -> Option<Value> {
+        let side = self.0.turn;
+        // 尚未首翻定色時，只有翻子是合法的
+        let color = engine::color_of(&self.0, side);
+
+        let mut flips = Vec::new();
+        let mut moves = serde_json::Map::new();
+        for row in 0..4i8 {
+            for col in 0..8i8 {
+                match self.0.board[row as usize][col as usize] {
+                    engine::Cell::Hidden(_) => flips.push(json!([col, row])),
+                    engine::Cell::Up(p) if Some(p.color) == color => {
+                        let mut targets = Vec::new();
+                        for tr in 0..4i8 {
+                            for tc in 0..8i8 {
+                                if (tc, tr) == (col, row) {
+                                    continue;
+                                }
+                                let mut probe = self.0.clone();
+                                if engine::apply_action(
+                                    &mut probe,
+                                    side,
+                                    Action::Move { from: (col, row), to: (tc, tr) },
+                                )
+                                .is_ok()
+                                {
+                                    targets.push(json!([tc, tr]));
+                                }
+                            }
+                        }
+                        if !targets.is_empty() {
+                            moves.insert(format!("{col},{row}"), Value::Array(targets));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Some(json!({ "flips": flips, "moves": Value::Object(moves) }))
+    }
+
     fn status(&self) -> GameStatus {
         match engine::status(&self.0) {
             Outcome::Continue => GameStatus::Ongoing,

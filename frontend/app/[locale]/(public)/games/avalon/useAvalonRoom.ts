@@ -18,6 +18,8 @@ const KNOWN_ERR = new Set([
     'not_in_room', 'not_host', 'cannot_start', 'not_in_game', 'not_leader', 'bad_team',
     'bad_team_size', 'wrong_phase', 'bad_vote', 'bad_card', 'not_on_team', 'good_must_succeed',
     'bad_target', 'not_assassin', 'too_many_special_evil', 'bad_player_count',
+    // 房間數上限（common/room.rs MAX_ROOMS）、連線收訊超量、games 功能被關閉
+    'too_many_rooms', 'rate_limited', 'feature_disabled',
 ]);
 
 export interface UseAvalonRoom {

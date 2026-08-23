@@ -26,6 +26,10 @@ export default function GomokuGame() {
             setBoard(prev => placeStone(prev, at, by));
             setLastMove(at);
         },
+        formatMove: (data) => {
+            const { at } = data as GMoveMade;
+            return `${at[0] + 1},${at[1] + 1}`;
+        },
     });
 
     const myColor = room.myColor as GColor;
@@ -47,6 +51,8 @@ export default function GomokuGame() {
                     board={board}
                     lastMove={lastMove}
                     interactive={interactive}
+                    myColor={myColor}
+                    boardLabel={t('title')}
                     onMove={room.actions.sendMove}
                 />
             }

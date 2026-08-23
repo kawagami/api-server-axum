@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from 'react';
 import { sound } from '../_shared/sound';
+import { useBoardCursor } from '../_shared/useBoardCursor';
+import { isTouchPointer } from '../_shared/pointer';
 import { key, SIZE, type Cell, type GBoard } from './gomoku-logic';
 
 const CELL = 36;
@@ -18,19 +21,39 @@ function xy(col: number, row: number): [number, number] {
 }
 
 export function GomokuBoard({
-    board, lastMove, interactive, onMove,
+    board, lastMove, interactive, myColor, boardLabel, onMove,
 }: {
     board: GBoard;
     lastMove: Cell | null;
     interactive: boolean;
+    myColor: 'black' | 'white';
+    boardLabel: string;
     onMove: (data: { at: Cell }) => void;
 }) {
-    const onPoint = (c: number, r: number) => {
-        sound.warmup();
+    // 觸控先預覽再確認：手指的命中面積比格子大，直接落子的誤觸率很高，而落子不可撤回
+    const [confirm, setConfirm] = useState<Cell | null>(null);
+
+    const play = (c: number, r: number, touch: boolean) => {
         if (!interactive) return;
         if (board.has(key(c, r))) return; // 已有子
+        if (touch && !(confirm && confirm[0] === c && confirm[1] === r)) {
+            setConfirm([c, r]);
+            return;
+        }
+        setConfirm(null);
         onMove({ at: [c, r] });
     };
+
+    const { cellProps } = useBoardCursor({
+        cols: SIZE,
+        rows: SIZE,
+        enabled: interactive,
+        onActivate: (c, r) => play(c, r, false),
+        ariaLabel: (c, r) => {
+            const stone = board.get(key(c, r));
+            return `${c + 1},${r + 1}${stone ? (stone === 'black' ? ' ●' : ' ○') : ''}`;
+        },
+    });
 
     const lines: React.ReactNode[] = [];
     for (let i = 0; i < SIZE; i++) {
@@ -44,7 +67,8 @@ export function GomokuBoard({
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-            className="max-h-full max-w-full select-none rounded-lg bg-amber-50 dark:bg-neutral-900 shadow-sm" role="img">
+            className="max-h-full max-w-full touch-manipulation select-none rounded-lg bg-amber-50 dark:bg-neutral-900 shadow-sm"
+            role="group" aria-label={boardLabel}>
             <g className="stroke-neutral-400 dark:stroke-neutral-600" strokeWidth={1.2} fill="none">{lines}</g>
 
             {/* 星位 */}
@@ -71,14 +95,33 @@ export function GomokuBoard({
                 );
             })}
 
-            {/* 點擊命中層（空點，置頂） */}
-            {interactive && Array.from({ length: SIZE * SIZE }, (_, idx) => {
+            {/* 待確認的落點（觸控）：半透明預覽子 + 提示環，再點一次同一點才送出 */}
+            {confirm && !board.has(key(confirm[0], confirm[1])) && (() => {
+                const [x, y] = xy(confirm[0], confirm[1]);
+                return (
+                    <g pointerEvents="none">
+                        <circle cx={x} cy={y} r={R} opacity={0.45}
+                            className={myColor === 'black' ? 'fill-neutral-900' : 'fill-neutral-50 stroke-neutral-400'} />
+                        <circle cx={x} cy={y} r={R + 4} className="fill-none stroke-amber-400" strokeWidth={2.5} />
+                    </g>
+                );
+            })()}
+
+            {/* 命中層（空點）：鍵盤可聚焦 + 指標按下 */}
+            {Array.from({ length: SIZE * SIZE }, (_, idx) => {
                 const c = idx % SIZE;
                 const r = Math.floor(idx / SIZE);
-                if (board.has(key(c, r))) return null;
+                // **有子的點也要留命中元素**：它同時是鍵盤游標的落腳處，
+                // 跳過的話方向鍵移到有子的點就 focus 不過去，游標與焦點分家、之後的方向鍵全失效。
+                // 落子本身仍由 play() 擋掉（已有子直接 return）。
                 const [x, y] = xy(c, r);
                 return <circle key={`hit${idx}`} cx={x} cy={y} r={CELL / 2 - 1}
-                    fill="transparent" className="cursor-pointer" onClick={() => onPoint(c, r)} />;
+                    fill="transparent"
+                    className={interactive && !board.has(key(c, r))
+                        ? 'cursor-pointer focus:outline-2 focus:outline-primary-500'
+                        : 'focus:outline-2 focus:outline-primary-500'}
+                    onPointerDown={(e) => { sound.warmup(); play(c, r, isTouchPointer(e)); }}
+                    {...cellProps(c, r)} />;
             })}
         </svg>
     );

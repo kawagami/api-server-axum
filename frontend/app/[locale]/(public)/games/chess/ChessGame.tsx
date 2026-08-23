@@ -40,6 +40,10 @@ export default function ChessGame() {
             setCheckSide(null);
         },
         onCheck: (data) => setCheckSide((data as { side: Side }).side),
+        formatMove: (data) => {
+            const { from, to } = data as MoveMade;
+            return `${from[0] + 1},${from[1] + 1}→${to[0] + 1},${to[1] + 1}`;
+        },
     });
 
     const myColor = room.myColor as Side;
@@ -64,6 +68,8 @@ export default function ChessGame() {
                     lastMove={lastMove}
                     checkSide={checkSide}
                     interactive={interactive}
+                    hints={room.hints}
+                    boardLabel={t('title')}
                     onMove={room.actions.sendMove}
                 />
             }

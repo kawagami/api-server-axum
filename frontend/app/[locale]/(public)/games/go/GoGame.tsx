@@ -31,6 +31,10 @@ export default function GoGame() {
             setBoard(prev => applyPlay(prev, d.at!, d.by, captured));
             setLastMove(d.at);
         },
+        formatMove: (data) => {
+            const d = data as GoMoveMade;
+            return d.pass || !d.at ? '—' : `${d.at[0] + 1},${d.at[1] + 1}`;
+        },
     });
 
     const myColor = room.myColor as GColor;
@@ -59,6 +63,9 @@ export default function GoGame() {
                     board={board}
                     lastMove={lastMove}
                     interactive={interactive}
+                    myColor={myColor}
+                    hints={room.hints}
+                    boardLabel={t('title')}
                     onMove={room.actions.sendMove}
                 />
             }

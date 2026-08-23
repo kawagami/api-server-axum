@@ -8,6 +8,13 @@ import { Lobby } from './Lobby';
 import { sound } from './sound';
 import type { UseGameRoom } from './useGameRoom';
 
+function fmtDuration(ms: number): string {
+    const total = Math.round(ms / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 // 對局外框（時鐘 + 盤位 + 控制 + 結束遮罩），大廳系列委派 Lobby。
 // 文案走 GameLobby namespace；各遊戲提供 title / 側標籤 / dot 配色 / reason 文字 / 盤面節點。
 export function GameFrame({
@@ -26,7 +33,7 @@ export function GameFrame({
 }) {
     const t = useTranslations('GameLobby');
     const [muted, setMuted] = useState(false);
-    const { phase, myColor, turn, clock, result, shake, actions } = room;
+    const { phase, myColor, turn, clock, clockAt, result, shake, moveError, actions } = room;
 
     if (phase === 'connecting' || phase === 'lobby' || phase === 'queued' || phase === 'hosting') {
         return (
@@ -63,10 +70,10 @@ export function GameFrame({
             {/* 對手時鐘（上） */}
             <div className="w-full flex-none">
                 <Clock
-                    key={`opp-${clock[oppColor]}`}
                     label={t('opponent')}
                     dotClass={sideDotClass(oppColor)}
                     baseMs={clock[oppColor]}
+                    baseAt={clockAt}
                     running={phase === 'playing' && turn !== myColor}
                 />
             </div>
@@ -79,6 +86,15 @@ export function GameFrame({
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg bg-neutral-900/80 px-6 text-center backdrop-blur-xs">
                         <p className="text-2xl font-bold text-neutral-50">{resultTitle}</p>
                         <p className="text-sm text-neutral-300">{reasonLabel(result.reason)}</p>
+                        <p className="text-xs text-neutral-400">
+                            {t('movesCount', { count: room.moveCount })}
+                            {room.durationMs !== null && ` · ${t('duration', { time: fmtDuration(room.durationMs) })}`}
+                        </p>
+                        {room.moveLog.length > 0 && (
+                            <p className="max-w-full truncate font-mono text-xs text-neutral-400">
+                                {t('lastMoves')}：{room.moveLog.join('  ')}
+                            </p>
+                        )}
                         <button
                             onClick={actions.backToLobby}
                             className="mt-2 flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
@@ -93,10 +109,10 @@ export function GameFrame({
             <div className="flex w-full flex-none items-center gap-3">
                 <div className="flex-1">
                     <Clock
-                        key={`me-${clock[myColor]}`}
                         label={`${t('you')}（${sideLabel(myColor)}）`}
                         dotClass={sideDotClass(myColor)}
                         baseMs={clock[myColor]}
+                        baseAt={clockAt}
                         running={myTurn}
                     />
                 </div>
@@ -119,8 +135,10 @@ export function GameFrame({
             </div>
 
             {/* 狀態提示 */}
-            <p className="flex-none text-sm text-neutral-500 dark:text-neutral-400">
-                {phase === 'playing' && (myTurn ? t('yourTurn') : t('opponentTurn'))}
+            <p aria-live="polite" className="flex-none text-sm text-neutral-500 dark:text-neutral-400">
+                {moveError
+                    ? <span className="font-medium text-red-500">{t(moveError)}</span>
+                    : phase === 'playing' && (myTurn ? t('yourTurn') : t('opponentTurn'))}
                 {extraStatus}
             </p>
         </div>

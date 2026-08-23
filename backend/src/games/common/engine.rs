@@ -62,4 +62,15 @@ pub trait GameEngine: Send + Sync + Sized + 'static {
     fn try_move(&mut self, mover: Side, data: Option<&Value>) -> Result<Applied, String>;
 
     fn status(&self) -> GameStatus;
+
+    /// 給「當前輪到走的那一方」的合法步提示（唯讀）。`None` = 該遊戲不提供。
+    ///
+    /// **這不是權威**：權威只有 `try_move`，前端拿它畫提示而已 —— 但提示必須由 server 出，
+    /// 否則前端就得複刻棋規（那是這個框架一開始就拒絕的事，規則兩份必然漂移）。
+    /// 形狀各遊戲自定（象棋/西洋棋/暗棋 = `{ moves: { "c,r": [[c,r]…] } }`、
+    /// 圍棋 = `{ forbidden: [[c,r]…] }`），由對應的前端盤面元件解讀。
+    /// 五子棋不實作：合法點 = 所有空點，前端自己就知道。
+    fn hints(&self) -> Option<Value> {
+        None
+    }
 }

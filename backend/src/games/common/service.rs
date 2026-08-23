@@ -12,6 +12,15 @@ use super::engine::{GameEngine, GameStatus, Side};
 use super::hub::{Game, GameHub, HubInner, Table, TableState};
 use crate::state::AppState;
 
+/// 單一遊戲的桌數上限（等待中 + 對戰中）。
+///
+/// 一條連線只能佔一張桌（`is_committed`），所以桌數的天花板本來是「連線數」——
+/// 而連線數的天花板是 per-IP 上限 × IP 數，也就是**沒有天花板**。1 核 1G 上每張桌
+/// 都在 `tables` map 裡帶著一份引擎狀態，且每次建桌 / 進桌都要對整個大廳訂閱集
+/// 廣播一份 `lobby_update`（O(桌數 × 大廳連線數) 的序列化）。
+/// 200 遠高於這個站實際同時的桌數（後台 `/admin/games` 的即時數字是個位數）。
+const MAX_TABLES: usize = 200;
+
 /// 收到的 WS 文字訊息分派。回傳 true 表示已處理（呼叫端不再 echo）。
 pub async fn handle<E: GameEngine>(
     hub: &GameHub<E>,
@@ -37,6 +46,18 @@ pub async fn handle<E: GameEngine>(
 
 fn msg<E: GameEngine>(typ: &str, data: Value) -> String {
     crate::structs::ws::game_envelope(E::NAME, typ, data)
+}
+
+/// 把合法步提示推給當前輪到的那一方（只有他需要）。對局已結束或該遊戲不提供則不送。
+fn push_hints<E: GameEngine>(game: &Game<E>, outbox: &mut Vec<(SocketAddr, String)>) {
+    if game.ended {
+        return;
+    }
+    let Some(hints) = game.engine.hints() else {
+        return;
+    };
+    let seat = game.seats[game.engine.turn().index()];
+    outbox.push((seat, msg::<E>("hints", hints)));
 }
 
 fn clock_json<E: GameEngine>(game: &Game<E>) -> Value {
@@ -99,6 +120,10 @@ async fn create_table<E: GameEngine>(
         let mut h = hub.lock().await;
         if h.is_committed(who) {
             flush(state, vec![(who, msg::<E>("error", json!({ "reason": "already_committed" })))]);
+            return;
+        }
+        if h.tables.len() >= MAX_TABLES {
+            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "too_many_tables" })))]);
             return;
         }
         let id = h.next_id;
@@ -194,6 +219,10 @@ async fn join_queue<E: GameEngine>(hub: &GameHub<E>, state: &AppState, who: Sock
         if h.is_committed(who) {
             return;
         }
+        if h.tables.len() >= MAX_TABLES {
+            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "too_many_tables" })))]);
+            return;
+        }
         h.queue.push_back(who);
         if h.queue.len() >= 2 {
             let a = h.queue.pop_front().unwrap();
@@ -257,6 +286,11 @@ fn open_game<E: GameEngine>(
             ),
         ));
     }
+    // 先手需要的提示（match_found 之後、同一批送出 → 抵達順序有保證）
+    if let Some(TableState::Playing(g)) = hub.tables.get(&table_id).map(|t| &t.state) {
+        push_hints::<E>(g, outbox);
+    }
+
     push_lobby_update(hub, outbox);
 }
 
@@ -331,8 +365,18 @@ async fn handle_move<E: GameEngine>(
             outbox.push((seats[1], em));
         }
 
+        // 下一手的提示先算好（此時還借得到 game；下面的 end_game 要 &mut h）
+        let next_hints = game
+            .engine
+            .hints()
+            .map(|h| (seats[game.engine.turn().index()], msg::<E>("hints", h)));
+
         match game.engine.status() {
-            GameStatus::Ongoing => {}
+            GameStatus::Ongoing => {
+                if let Some(pair) = next_hints {
+                    outbox.push(pair);
+                }
+            }
             GameStatus::Win { winner, reason } => {
                 end_game(&mut h, table_id, Some(winner), reason, &mut outbox);
             }

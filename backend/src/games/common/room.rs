@@ -39,6 +39,10 @@ pub trait RoomKind: Send + Sized + 'static {
     fn extend_room_snapshot(_options: &Self::Options, _obj: &mut Map<String, Value>) {}
 }
 
+/// 單一 N 人遊戲的房間數上限。理由同 `common/service.rs` 的 `MAX_TABLES`，
+/// 但 N 人房一間佔的資源更多（每間帶一份對局狀態 + 最多 10 個座位），故收得更緊。
+const MAX_ROOMS: usize = 100;
+
 pub type RoomHub<K> = Arc<Mutex<RoomHubInner<K>>>;
 
 pub struct RoomHubInner<K: RoomKind> {
@@ -225,6 +229,10 @@ pub async fn create_room<K: RoomKind>(hub: &RoomHub<K>, state: &AppState, who: S
         let mut h = hub.lock().await;
         if h.is_committed(who) {
             err1::<K>(state, who, "already_committed");
+            return;
+        }
+        if h.rooms.len() >= MAX_ROOMS {
+            err1::<K>(state, who, "too_many_rooms");
             return;
         }
         let id = h.next_id;

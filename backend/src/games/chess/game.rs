@@ -1,6 +1,6 @@
 //! 象棋接上共用對戰框架：`impl GameEngine for ChessGame`。純引擎在 `engine`/`types`。
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use super::engine;
 use super::types::{GameState, Move, Side as ChSide, Square, Status};
@@ -74,6 +74,30 @@ impl GameEngine for ChessGame {
             move_data: json!({ "from": sq_json(from), "to": sq_json(to) }),
             extra,
         })
+    }
+
+    /// `{ moves: { "col,row": [[col,row]…] } }` —— 只列輪到的一方、且真的有走法的子。
+    /// 走法枚舉直接呼叫引擎的 `legal_moves`（含送將過濾），所以提示與判定同一份規則。
+    fn hints(&self) -> Option<Value> {
+        let mut moves = Map::new();
+        for row in 0..10i8 {
+            for col in 0..9i8 {
+                match self.0.board[row as usize][col as usize] {
+                    Some(p) if p.side == self.0.turn => {
+                        let targets: Vec<Value> =
+                            engine::legal_moves(&self.0, Square::new(col, row))
+                                .into_iter()
+                                .map(sq_json)
+                                .collect();
+                        if !targets.is_empty() {
+                            moves.insert(format!("{col},{row}"), Value::Array(targets));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Some(json!({ "moves": Value::Object(moves) }))
     }
 
     fn status(&self) -> GameStatus {

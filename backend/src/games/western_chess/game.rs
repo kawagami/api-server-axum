@@ -127,6 +127,23 @@ impl GameEngine for WesternChessGame {
         Ok(Applied { move_data: Value::Object(md), extra })
     }
 
+    /// `{ moves: { "col,row": [[col,row]…] } }`。同一個 (from,to) 的多個升變目標
+    /// 在提示裡只算一格（升變選擇由前端在落子時另外問）。
+    fn hints(&self) -> Option<Value> {
+        let mut moves: serde_json::Map<String, Value> = serde_json::Map::new();
+        for mv in engine::legal_moves(&self.0) {
+            let key = format!("{},{}", mv.from.0, mv.from.1);
+            let entry = moves.entry(key).or_insert_with(|| Value::Array(Vec::new()));
+            if let Value::Array(list) = entry {
+                let to = json!([mv.to.0, mv.to.1]);
+                if !list.contains(&to) {
+                    list.push(to);
+                }
+            }
+        }
+        Some(json!({ "moves": Value::Object(moves) }))
+    }
+
     fn status(&self) -> GameStatus {
         match engine::status(&self.0) {
             engine::Outcome::Continue => GameStatus::Ongoing,

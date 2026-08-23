@@ -17,3 +17,15 @@ export interface MoveMadeBase { turn: string; clock: Record<string, number>; }
 export interface GameOverData { winner: string | null; reason: string; }
 export interface IllegalMoveData { reason: string; }
 export interface ErrorData { reason: string; }
+
+// hints：server 推的合法步提示（唯讀，**非權威** —— 判定仍只在後端 try_move）。
+// 只送給當前輪到的一方，形狀依遊戲不同：
+//   象棋 / 西洋棋 / 暗棋 → moves（key = "col,row" 的來源格）；暗棋另有 flips（可翻的格）
+//   圍棋 → forbidden（空點裡不能下的：自殺 / 劫）
+//   五子棋不送（合法點 = 所有空點，前端自己知道）
+export type HintCell = [number, number];
+export interface HintsData {
+    moves?: Record<string, HintCell[]>;
+    flips?: HintCell[];
+    forbidden?: HintCell[];
+}

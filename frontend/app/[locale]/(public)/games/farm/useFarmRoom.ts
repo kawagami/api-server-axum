@@ -16,6 +16,8 @@ const KNOWN_ERR = new Set([
     'max_house', 'bad_pasture',
     'already_committed', 'bad_room_id', 'room_not_found', 'room_full', 'already_started',
     'not_in_room', 'not_host', 'cannot_start',
+    // 房間數上限（common/room.rs MAX_ROOMS）、連線收訊超量、games 功能被關閉
+    'too_many_rooms', 'rate_limited', 'feature_disabled',
 ]);
 
 export interface UseFarmRoom {

@@ -15,7 +15,7 @@ use axum::{
     },
     http::HeaderMap,
     middleware,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{any, get, post},
     Router
 };
@@ -36,6 +36,11 @@ const PING_INTERVAL_SECONDS: u64 = 30;
 /// `connections` map（後台連線列表看得到）、遊戲桌位上（對手在等一個永遠不會來的走步）。
 /// 瀏覽器的 WS 實作會自動回 Pong，所以收不到 Pong 就是真的沒人在了。
 const PONG_TIMEOUT_SECONDS: u64 = PING_INTERVAL_SECONDS * 2 + 15;
+
+/// 額度用盡後還能容忍多少則被丟棄的訊息才收線。
+/// 正常客戶端不會到這裡（丟第一則時就已回一則 `rate_limited` error），
+/// 會到的只有跑迴圈灌訊息的腳本 —— 那條連線留著只是白佔記憶體。
+const MAX_DROPPED_MESSAGES: u32 = 200;
 
 #[derive(serde::Deserialize)]
 struct WsQuery {
@@ -72,7 +77,7 @@ async fn ws_handler(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Query(query): Query<WsQuery>,
     req_headers: HeaderMap,
-) -> impl IntoResponse {
+) -> Response {
     let user_agent = if let Some(TypedHeader(user_agent)) = user_agent {
         user_agent.to_string()
     } else {
@@ -95,6 +100,26 @@ async fn ws_handler(
     // 新連線走 user_joined（只推 admin），這行只是本機開發時的方便，不該進生產 stdout。
     tracing::debug!("{real_ip} connected ({}) email={:?}", user_agent, user_email);
 
+    // 匿名連線的 per-IP 上限。**握手前就擋**：被擋的連線不進 `connections`、不記到訪、
+    // 不會在任何遊戲 hub 佔桌／佔房，也不會有 socket task 與 ping task。
+    // admin（ticket 身分）不受限 —— 後台本來就會開好幾個分頁，且那條路徑已要求 `ws:read`。
+    if user_email.is_none() {
+        let existing = ws_service::ip_connection_count(&state, &real_ip).await;
+        if existing >= ws_service::MAX_CONNECTIONS_PER_IP {
+            // 與 middleware/rate_limit.rs 同理：限流觸發是安全訊號，必須留下紀錄，
+            // 否則只有對方收到 429、我方零紀錄。
+            tracing::warn!(
+                "WS 連線數超限：ip={real_ip} 已有 {existing} 條，上限 {}，拒絕握手",
+                ws_service::MAX_CONNECTIONS_PER_IP
+            );
+            return (
+                axum::http::StatusCode::TOO_MANY_REQUESTS,
+                "too many websocket connections",
+            )
+                .into_response();
+        }
+    }
+
     // 每日不重複到訪統計：以 WS 握手為採集點（天然濾掉不跑 JS 的 bot），
     // 去重元素 = ip|ua。best-effort，不阻塞連線。
     {
@@ -107,6 +132,7 @@ async fn ws_handler(
     }
 
     ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email, real_ip, user_agent))
+        .into_response()
 }
 
 async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_email: Option<String>, real_ip: String, user_agent: String) {
@@ -150,6 +176,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     let mut recv_task = tokio::spawn(async move {
         let mut cnt = 0;
         let mut receiver = receiver;
+        // 單條連線的收訊額度（純區域狀態，無鎖）。超量的訊息直接丟掉不解析 ——
+        // 收線是最後手段：前端 ws-context 會自動重連，一超量就關等於送對方一個重連迴圈。
+        let mut budget = ws_service::MessageBudget::new();
+        let mut dropped = 0u32;
         while let Some(msg_result) = receiver.next().await {
             match msg_result {
                 Ok(msg) => {
@@ -157,6 +187,26 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
                     // 存活證明只認 Pong（其餘訊息可能來自沒在讀我們 ping 的客戶端）
                     if matches!(msg, Message::Pong(_)) {
                         *recv_last_pong.lock().unwrap() = Instant::now();
+                    }
+                    // 只有應用層訊息計費；Ping/Pong/Close 是控制帧，不佔額度。
+                    if matches!(msg, Message::Text(_) | Message::Binary(_)) && !budget.try_consume()
+                    {
+                        dropped += 1;
+                        if dropped == 1 {
+                            tracing::warn!("{who} 收訊超量，開始丟棄訊息");
+                            recv_state_clone.send_to(
+                                who,
+                                crate::structs::ws::envelope(
+                                    "error",
+                                    serde_json::json!({ "reason": "rate_limited" }),
+                                ),
+                            );
+                        }
+                        if dropped >= MAX_DROPPED_MESSAGES {
+                            tracing::warn!("{who} 持續灌訊息（已丟 {dropped} 則），收線");
+                            break;
+                        }
+                        continue;
                     }
                     if process_message(msg, who, &recv_state_clone).await.is_break() {
                         break;

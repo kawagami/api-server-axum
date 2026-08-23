@@ -31,6 +31,11 @@ export default function WesternChessGame() {
             setCheckSide(null);
         },
         onCheck: (data) => setCheckSide((data as { side: WColor }).side),
+        formatMove: (data) => {
+            const d = data as WMoveMade;
+            const sq = ([c, r]: Cell) => `${'abcdefgh'[c]}${r + 1}`;
+            return `${sq(d.from)}→${sq(d.to)}${d.promo ? `=${d.promo}` : ''}`;
+        },
     });
 
     const myColor = room.myColor as WColor;
@@ -55,6 +60,8 @@ export default function WesternChessGame() {
                     lastMove={lastMove}
                     checkSide={checkSide}
                     interactive={interactive}
+                    hints={room.hints}
+                    boardLabel={t('title')}
                     onMove={room.actions.sendMove}
                 />
             }

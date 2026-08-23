@@ -66,6 +66,24 @@ impl GameEngine for GoGame {
         })
     }
 
+    /// `{ forbidden: [[col,row]…] }` —— **空點裡不能下的那些**（自殺 / 劫）。
+    /// 不送「可下點」是因為那幾乎是整盤空點（19×19 一張 3KB 的清單，每手兩份），
+    /// 而「空不空」前端自己看得出來，唯一需要 server 判的就是這兩條規則。
+    fn hints(&self) -> Option<Value> {
+        let mut forbidden = Vec::new();
+        for r in 0..engine::SIZE {
+            for c in 0..engine::SIZE {
+                if self.0.board[r as usize][c as usize].is_some() {
+                    continue;
+                }
+                if engine::is_legal(&self.0, c, r).is_err() {
+                    forbidden.push(json!([c, r]));
+                }
+            }
+        }
+        Some(json!({ "forbidden": forbidden }))
+    }
+
     fn status(&self) -> GameStatus {
         match engine::status(&self.0) {
             Outcome::Continue => GameStatus::Ongoing,
