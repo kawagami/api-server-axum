@@ -14,6 +14,10 @@
 # clippy 過、既有測試全過，卻在真的簽 JWT 時才 panic（那條路徑上是全站認證）。
 # 現在有 `services/auth.rs` 的 jwt_crypto_provider 測試守著這一格，
 # 但同類陷阱（跨大版改 feature 語意）還會出現在別的 crate，major PR 一律自己驗過再合。
+#
+# ⚠ 第二種靜默失敗:**群組 PR 開出來不代表成員到齊**（dependabot 對某個包報錯時，
+# 它照樣把其餘的送進 PR，少的那個看起來就像「沒新版」）。實例與檢查方式見下面
+# npm 那段 `prod-minor-patch` 的註解。
 
 version: 2
 updates:
@@ -53,6 +57,27 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
       # 生產依賴分開，方便逐一評估（next / react / sharp 這類要看 release note）
+      #
+      # ⚠ **群組 PR 開出來，不代表群組成員到齊。** 少一個成員長得跟「那個包沒新版」
+      # 一模一樣 —— 沒有紅燈、沒有警告、PR 標題照樣寫 3 updates。
+      #
+      # 2026-08-24 的實例:`next` 在這個群組裡，但 dependabot 對它報
+      #   | next | unknown_error | null |
+      # 於是 #37 只帶了 lucide-react / next-intl / uuid 三個，而 **next 16.3.2 早在
+      # 08-21 就發了**（#37 是 08-22 開的，時間上本來就該包進去）。同一個錯誤前一次
+      # 被「PR 照樣開出來」蓋掉，第二次才因為沒別的事可做而把整個 update job 判紅。
+      #
+      # 確認過**不是**相依衝突:本機 `corepack pnpm up next@^16.3.2` 一次乾淨過，
+      # 沒有任何 peer 問題。是它的 npm updater 自己掛，這個 repo 解得開。
+      #
+      # ⇒ **看到這個群組的 PR 時，先在 frontend/ 跑一次:**
+      #       corepack pnpm outdated
+      #   它列出「所有」落後的包，所以不只擋 next 這一格 —— 任何被 dependabot 靜默跳過
+      #   的成員都會現形。輸出空的才代表群組真的到齊了。
+      #   單包點名用 `corepack pnpm view <pkg> version`（本機沒有 jq，別寫 curl+jq 的招）。
+      #   要補 next 就跟 eslint-config-next **一起**升，免得版本歪掉。
+      #   ⚠ 一律用 `corepack pnpm` 而不是裸 pnpm:package.json 的 packageManager 釘 10.x，
+      #   版本不同會寫出 CI `--frozen-lockfile` 讀不了的 lock。
       prod-minor-patch:
         dependency-type: production
         update-types: ["minor", "patch"]
