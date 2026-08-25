@@ -13,10 +13,13 @@
 ├── backend/            # Rust / Axum API 伺服器
 ├── frontend/           # Next.js 前台 + 後台
 ├── deploy/             # VPS 部署編排(compose / nginx / certbot),詳見 deploy/README.md
-└── .github/workflows/
-    ├── backend.yml     # 後端 CI:paths 過濾 backend/**、context ./backend
-    ├── frontend.yml    # 前端 CI:paths 過濾 frontend/**、context ./frontend
-    └── deploy.yml      # 編排 CI:paths 過濾 deploy/**,rsync 設定到 VPS 並套用
+├── scripts/            # 維運 / 資料匯入腳本(kawa-logs 查 production log、單字題庫匯入)
+└── .github/
+    ├── dependabot.yml  # cargo / npm / actions 依賴更新 PR
+    └── workflows/
+        ├── backend.yml   # 後端 CI:paths 過濾 backend/**、context ./backend
+        ├── frontend.yml  # 前端 CI:paths 過濾 frontend/**、context ./frontend
+        └── deploy.yml    # 編排 CI:paths 過濾 deploy/**,rsync 設定到 VPS 並套用
 ```
 
 各子專案的細節見各自目錄下的說明;本 README 只講整體與整合。
@@ -36,10 +39,11 @@
 - **後台管理**:RBAC 權限(user/role/permission)、passkey 登入(WebAuthn)、稽核紀錄、站台設定熱更新、主題切換、instance 功能開關
 - **會員系統**:OAuth 登入(Google / GitHub / LINE)、投資組合、記帳、統一發票登錄對獎、大樂透/威力彩選號對獎
 - **單字闖關**:英文 / 日文生存模式、學習進度、週期排行榜
-- **對戰遊戲平台**(WebSocket):象棋、五子棋、暗棋、西洋棋、圍棋、阿瓦隆、農場經營
+- **對戰遊戲平台**(WebSocket):象棋、五子棋、暗棋、西洋棋、圍棋、阿瓦隆、農場經營;另有單機 wasm 的越南大戰(Bevy)
 - **股票**:庫藏股追蹤、收盤價統計、每日行情
 - **觀測**:應用日誌、系統指標時間序列、操作稽核、不重複到訪統計(後台 `/admin/logs`、`/admin/metrics`)
-- **工具**:Torrent 下載、政府採購網標案追蹤、站內留言板
+- **工具**:排班(環狀 pattern 演算法,公開無認證)、計時三合一、文字繁簡轉換、密碼產生、Torrent 下載、政府採購網標案追蹤、站內留言板
+- **更新紀錄**:`/{locale}/changelog` 直接讀 GitHub commits(不經後端)
 
 ## 三個部分如何串接
 

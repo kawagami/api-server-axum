@@ -63,7 +63,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/roster` | 排班計算（公開無認證，套 tools 的 rate limit；回班表 + 實際採用的每日人力 `plan` + 機器可讀 `warnings`）|
 | `/logs` | 應用日誌查詢（列表 + 單一 request 完整軌跡，需 `log:read`） |
 | `/metrics` | 系統指標時間序列（需 `metric:read`，`?hours=` clamp 1–168） |
-| `/uploads/*` | 本機靜態檔案 |
+| `/uploads/*` | 本機靜態檔案（**生產打不到**：`media.kawa.homes` 由 nginx 直出磁碟，api vhost 的 `/uploads/` 已 301 過去；這條留給本機開發） |
 | `/tools` | 工具 |
 | `/health` | 存活探針，回 `200 {"status":"ok"}`（無認證、不查 DB / Redis，給外部 uptime 監控用） |
 
@@ -99,14 +99,14 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 - `sqlx 0.8` — async PostgreSQL + 自動 migration
 - `bb8` + `bb8-redis` — Redis 連線池
 - `tokio-cron-scheduler` — cron job
-- `jsonwebtoken 9` — JWT
+- `jsonwebtoken 11` — JWT（`default-features = false` + `aws_lc_rs` backend，只簽驗 HS256）
 - `reqwest 0.12` — 對外 HTTP 請求
-- `tower-http` — CORS、timeout、trace、body limit（10 MB）
+- `tower-http 0.7` — CORS、timeout、trace、body limit（10 MB）、catch-panic
 - `tower` — ServiceExt::oneshot（檔案下載走 ServeFile，內建 Range）
 - `bcrypt` — 密碼 hash
 - `lettre` — SMTP email 通知
 - `regex` — 民國日期 / 中獎號碼 feed / 庫藏股 HTML 解析（後者原用 `scraper`，2026-08-19 改 regex，省 28 個 crate）
-- `librqbit 8` — 內嵌 BitTorrent session（rustls）
+- `librqbit 9` — 內嵌 BitTorrent session（rustls）
 - `image 0.25` + `webp 0.3` — 圖片上傳 decode 驗證 + lossy WebP 轉檔（libwebp）
 - `webauthn-rs 0.5`（+ `webauthn-rs-proto`）— admin passkey 登入；硬依賴 OpenSSL ≥3.0，故 openssl crate 開 `vendored`
 - `wana_kana 5` — 日文讀音正規化（羅馬字 / 平假名 / 片假名互轉）

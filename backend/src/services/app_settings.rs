@@ -187,7 +187,7 @@ fn validate_int_range(key: &str, value: &str, min: u32, max: u32) -> Result<(), 
 ///
 /// 為什麼一定要擋 `*`：`routes.rs` 啟動時把這個值餵給 tower-http 的
 /// `AllowOrigin::list`，而那個建構子**遇到 `*` 會 panic**
-/// （tower-http-0.6 的 cors/allow_origin.rs）。CORS 只在啟動時讀，所以改成 `*`
+/// （tower-http 0.7 的 cors/allow_origin.rs）。CORS 只在啟動時讀，所以改成 `*`
 /// 當下不會報錯，但**下一次部署或重啟就會 panic**，配上 compose 的
 /// `restart: unless-stopped` 變成無限重啟迴圈，只能直接改 DB 才救得回來。
 ///
