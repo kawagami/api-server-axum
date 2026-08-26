@@ -55,8 +55,11 @@ export default function BlogSearchBar({ q, sort }: Props) {
         <div className={`flex flex-col sm:flex-row gap-2 items-stretch sm:items-center ${isPending ? 'opacity-50 pointer-events-none' : ''}`}>
             <form onSubmit={submitSearch} className="relative flex-1 min-w-0">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+                {/* maxLength 對齊後端 services::blogs::MAX_SEARCH_LEN（100 字）——
+                    後端超長會回 422，這裡先擋住讓使用者不必送出才知道 */}
                 <input
                     type="search"
+                    maxLength={100}
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     placeholder={t('searchPlaceholder')}

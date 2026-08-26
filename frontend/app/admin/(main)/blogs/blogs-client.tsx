@@ -124,9 +124,11 @@ export default function BlogsClient({
                     <label htmlFor="blog-q" className="text-xs text-neutral-500 dark:text-neutral-400">
                         關鍵字（標題與內文）
                     </label>
+                    {/* maxLength 對齊後端 services::blogs::MAX_SEARCH_LEN（100 字） */}
                     <input
                         id="blog-q"
                         type="text"
+                        maxLength={100}
                         value={filters.q}
                         onChange={e => setFilters(f => ({ ...f, q: e.target.value }))}
                         onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleSearch()}

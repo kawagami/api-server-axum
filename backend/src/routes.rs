@@ -73,6 +73,32 @@ pub(super) fn with_feature(
     ))
 }
 
+/// 公開且**完全無個人化**的 GET 回應用的快取標頭。
+///
+/// 沒有這個標頭時，任何直接打 `api.kawa.homes` 的請求都會一路到 PG —— 前端 SSR 那條有
+/// Next Data Cache（`frontend/api/blogs.ts` 的 `revalidate`）擋著，但那是走內網
+/// `http://backend:3000`、根本不經 nginx，對「有人拿 origin IP 直接洪水打公開 API」
+/// 這個情境一點幫助都沒有。搭配 `deploy/nginx/nginx.conf` 的 `api_cache`，重複的匿名
+/// GET 會停在 nginx，不再消耗 PG 連線池（20 條）。
+///
+/// - `max-age=30`：瀏覽器端，短到使用者幾乎不會察覺
+/// - `s-maxage=60`：共用快取（nginx / CF）—— 與 `frontend/api/blogs.ts` 的
+///   `revalidate: 60` 對齊，是本站既有的新鮮度預期
+///
+/// ⚠️ **這一層不會被 `updateTag('blogs')` 失效**。後台存檔後，Next 那層立刻更新，但
+/// nginx / 瀏覽器這層最久要等 60 秒。刻意選 60（而非 blog 詳情原本的 `revalidate: 300`）
+/// 就是為了把這個新鮮度回退壓在一分鐘內。要立刻看到改動請 hard reload。
+///
+/// ⚠️ **只掛在沒有任何 per-user 差異的端點上**。留言列表刻意不掛：訪客送出留言後會馬上
+/// 重讀那份列表（`frontend/api/blog-comments.ts` 是 `cache: "no-store"`），
+/// 快取住等於「我剛留的言不見了」。
+pub(super) fn public_cache() -> [(header::HeaderName, HeaderValue); 1] {
+    [(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=30, s-maxage=60"),
+    )]
+}
+
 pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<AppState> {
     // audit 掛在 auth 內層：auth 先跑塞入 AuthenticatedUser，audit 直接讀 extension，不重複 decode JWT
     router

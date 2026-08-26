@@ -105,6 +105,61 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 
 **結論：瓶頸不在 origin（只佔 3%），而是 CF 免費方案把本站的網域丟到新加坡而非台灣節點。** 腳本會自動比對本站與 `cloudflare.com` 的 `cf-ray` 節點代碼並標出差異 —— 那個 baseline 代表「這條線路本來碰得到的最近節點」。
 
+## blog 搜尋限流（`search` zone，2026-08-27）
+
+`?q=` 的搜尋是全站最貴的公開查詢：列表端點的 `count` 那一半無法靠 LIMIT 提早結束，一個命中大量文章的常見詞 ≈ **60ms 的 PG CPU**（2026-08-27 實測，2000 篇 / 3MB 表）。general 的 30r/s 放進來就是單核吃滿。
+
+`nginx.conf` 的 `search` zone（20r/m，burst 5）用一個 map 當 key：**沒有 `?q=` 時 key 是空字串，limit_req 對空 key 不計數**，所以同一條指令只對搜尋生效，一般瀏覽完全不受影響。
+
+兩個 vhost 都要掛,少一個等於沒掛:
+
+- `api.kawa.homes` 的 `location /blogs` —— 直接打 API 的
+- `kawa.homes` 的 `location /` —— **blog 搜尋頁是 SSR**,`kawa.homes/zh-TW/blogs?q=` 由 Next 在伺服器端打 `http://backend:3000`,那條走內網、不經 api vhost
+
+同一個 IP 共用一份額度(不論從哪個入口進來),這是刻意的 —— 貴的是後面那個查詢,不是入口。
+
+驗證(2026-08-27 實測結果):
+
+```
+一般列表 x15   → 全 200        （不受 search zone 影響）
+搜尋     x12   → 6 個 200 後轉 429（burst 5 + 1 個 rate token）
+```
+
+## 公開 API 快取（`api_cache`，2026-08-27）
+
+nginx 對 `api.kawa.homes/blogs` 開了 proxy_cache（zone 與 map 定義在 `nginx/conf.d/02-proxy.conf`，套用在 `nginx/conf.d/api.kawa.homes.conf` 的 `location /blogs`）。
+
+**為什麼只有這一條路徑**:前端 SSR 讀 blog 已經有 Next Data Cache（`frontend/api/blogs.ts` 的 `revalidate`），但那條打的是內網 `http://backend:3000`、**不經 nginx**。這層快取要擋的是另一個情境:有人拿 origin IP 直接洪水打公開 API —— 那時 PG（384m、1 核共用、pool 20 條）沒有任何緩衝。
+
+規則(全部在設定檔裡有註解):
+
+- **能不能快取由 backend 決定**:只有帶 `Cache-Control`（`backend/src/routes.rs` 的 `public_cache()`,`s-maxage=60`）的回應會被存。所以 `GET /blogs/{id}/comments` 自動不會被快取,不必在 nginx 維護排除清單。
+- 帶 `Authorization` 或任何 `Cookie` → 完全繞過(不讀也不寫)。
+- 帶 `?q=` → 繞過,避免任意關鍵字把 LRU 沖掉(搜尋改由上面的 `search` limit_req zone 擋量)。
+- **絕不在 server 層開**:同個 vhost 上有 `GET /tools/new_password`,全域開快取會讓所有人拿到同一組密碼。
+
+⚠️ 這一層**不會被 `updateTag('blogs')` 失效**。後台存檔後 Next 那層立刻更新,nginx / 瀏覽器最久等 60 秒。
+
+⚠️ 快取只吃得到「重複的匿名 GET」。要製造 miss 很容易(換 `?q=`、換 `Origin` —— 後端 CORS 送 `Vary: origin`,nginx 照 Vary 分變體)。**這層擋的是流量放大與正常尖峰,不是有針對性的攻擊**;後者的正解是防火牆只放行 CF 網段(尚未做)。
+
+### 驗證(這類設定失效時是靜默的 —— 只會一直 MISS,沒有錯誤)
+
+`location /blogs` 會回 `X-Cache-Status`,直接看它就好:
+
+```bash
+curl -sI https://api.kawa.homes/blogs | grep -i x-cache-status   # 第二次應為 HIT
+curl -sI 'https://api.kawa.homes/blogs?q=x' | grep -i x-cache-status        # 應為 BYPASS
+curl -sI https://api.kawa.homes/blogs -H 'Cookie: a=b' | grep -i x-cache-status  # 應為 BYPASS
+```
+
+沒有 `X-Cache-Status` 這個 header ＝ 請求根本沒進到那個 location。一直 MISS ＝ backend 沒送 `Cache-Control`,或快取目錄不可寫（`docker exec nginx ls -ld /var/cache/nginx/api`,並看 `docker logs nginx` 有沒有 `Permission denied`）。
+
+> ⚠️ 這兩節（`search` zone 與 `api_cache`）**同時動了 `nginx.conf` 與 `conf.d/`**，所以
+> **必須 recreate nginx，不能只 reload** —— `limit_req_zone search` / `proxy_cache_path`
+> 都在 `nginx.conf` 裡，只 reload 的話容器吃到的是舊檔，會報 `zero size shared memory
+> zone "search"`（看起來像語法錯，其實是設定檔沒更新）。理由見下一節。
+> CI 的 `deploy.yml` 本來就會 `--force-recreate` nginx，走 CI 不必額外處理。
+
 ### ⚠ nginx.conf 是單檔 bind mount —— 改它必須 recreate 容器
 
 `docker-compose.yml` 把 `./nginx/nginx.conf` 以**單一檔案**掛進容器，而單檔 bind mount 綁的是 **inode**。rsync 的預設行為是「寫暫存檔再 rename」，會換掉 inode，**執行中的容器因此看不到新的 `nginx.conf`**。相對地 `./nginx/conf.d` 是**目錄**掛載，目錄內的檔案變動會正常反映。

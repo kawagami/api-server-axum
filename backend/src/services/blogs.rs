@@ -75,6 +75,34 @@ pub fn extract_toc_texts(markdown: &str) -> Vec<String> {
         .collect()
 }
 
+/// 搜尋關鍵字的長度上限（**字元數**，不是 bytes —— 中文一字 3 bytes，用 len() 會誤殺）。
+///
+/// ⚠️ **這個上限不是效能防線,別把它當成防線。** 加它的時候假設「ILIKE 成本 ∝ 關鍵字長度」,
+/// 2026-08-27 實測(2000 篇 / 3MB 表)推翻了那個假設：4000 字的 pattern（1.3ms）並沒有比
+/// 100 字（2.4ms）貴 —— 長 pattern 在每個位置都能提早拒絕,反而更快。
+///
+/// 真正貴的是**命中大量文章的常見詞**：`%後端%` 要 27ms,而列表端點的 `count` 那一半
+/// 無法靠 LIMIT 提早結束,一個請求 count + list 併發兩份 ≈ 60ms 的 PG CPU。
+/// 那件事由兩層擋,都不在這裡：
+/// - `deploy/nginx/nginx.conf` 的 `search` zone（帶 `?q=` 才計數，20r/m）—— 主要防線
+/// - `blogs.markdown` 的 pg_trgm GIN 索引（migration 20260827000000）—— 讓選擇性高的
+///   關鍵字從 2.3ms 降到 0.13ms，但對「全中」的詞無效
+///
+/// 留這個上限的理由退回到最樸素的那個：**別讓無界的使用者輸入一路走進 SQL 與 log**。
+/// 100 字對真實搜尋綽綽有餘（實際輸入多為 2–10 字），成本是零。
+pub const MAX_SEARCH_LEN: usize = 100;
+
+/// 關鍵字長度檢查。公開與後台兩條列表共用 —— 後台雖需認證，但成本模型相同，沒有理由放寬。
+fn validate_search(q: Option<&str>) -> Result<(), AppError> {
+    match q {
+        Some(q) if q.chars().count() > MAX_SEARCH_LEN => Err(RequestError::UnprocessableContent(
+            format!("搜尋關鍵字上限為 {MAX_SEARCH_LEN} 字"),
+        )
+        .into()),
+        _ => Ok(()),
+    }
+}
+
 pub async fn get_blogs(
     pool: &Pool<Postgres>,
     page: &PageQuery,
@@ -88,6 +116,7 @@ pub async fn get_blogs(
     let author_ref = author.as_deref();
     // 關鍵字空白視同無過濾；排序只認 oldest，其餘一律 newest
     let q_ref = q.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    validate_search(q_ref)?;
     let ascending = sort.as_deref() == Some("oldest");
     let (total, data) = tokio::try_join!(
         blogs_repo::count_blogs(pool, tag_ref, author_ref, q_ref),
@@ -111,6 +140,7 @@ pub async fn get_admin_blogs(
     // 空白字串視同無過濾（前端的空欄位會照送），排序走白名單列舉
     let tag = filter.tag.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let q = filter.q.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    validate_search(q)?;
     let sort = AdminBlogSort::from_query(filter.sort.as_deref());
     let (total, data) = tokio::try_join!(
         blogs_repo::count_for_owner(pool, owner_id, tag, q),
@@ -250,7 +280,7 @@ async fn delete_blog_with_images_inner(pool: &Pool<Postgres>, id: Uuid) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_toc_texts, normalize_tags};
+    use super::{extract_toc_texts, normalize_tags, validate_search, MAX_SEARCH_LEN};
 
     fn v(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -306,5 +336,29 @@ mod tests {
     #[test]
     fn no_headings_yields_empty_title() {
         assert!(extract_toc_texts("只有內文，沒有任何標題").is_empty());
+    }
+
+    #[test]
+    fn search_accepts_none_and_short_keywords() {
+        assert!(validate_search(None).is_ok());
+        assert!(validate_search(Some("rust")).is_ok());
+        assert!(validate_search(Some("繁體中文關鍵字")).is_ok());
+    }
+
+    /// 界線本身：剛好 100 字放行、101 字擋下
+    #[test]
+    fn search_length_is_capped_at_the_boundary() {
+        let ok = "字".repeat(MAX_SEARCH_LEN);
+        let too_long = "字".repeat(MAX_SEARCH_LEN + 1);
+        assert!(validate_search(Some(&ok)).is_ok());
+        assert!(validate_search(Some(&too_long)).is_err());
+    }
+
+    /// 上限算的是字元不是 bytes —— 用 `len()` 的話 34 個中文字（102 bytes）就會被誤殺
+    #[test]
+    fn search_length_counts_chars_not_bytes() {
+        let cjk = "字".repeat(MAX_SEARCH_LEN);
+        assert!(cjk.len() > MAX_SEARCH_LEN, "前提：中文一字多於 1 byte");
+        assert!(validate_search(Some(&cjk)).is_ok());
     }
 }

@@ -57,7 +57,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/member/vocab` | 單字闖關開局 / 答題 / 個人統計 / 週期排行榜（en / ja） |
 | `/admin/invoice_lottery_numbers` | 手動補統一發票中獎號碼（需 `invoice_lottery:write`，自動抓取失敗時的後備） |
 | `/settings/public` | 公開設定（白名單，如 `site_theme`，無認證） |
-| `/blogs` | 部落格查詢（列表 / tags / 單篇，公開） |
+| `/blogs` | 部落格查詢（列表 / tags / 單篇，公開；列表/單篇/tags 帶 `Cache-Control: s-maxage=60`，`?q=` 關鍵字上限 100 字） |
 | `/messages` | 站內留言 |
 | `/ws` | WebSocket 連線、線上清單（`/ws/connections`）、點對點訊息（`/ws/messages`）、一次性連線票（`/ws/ticket`）、對戰遊戲配對/對戰（象棋/五子棋/暗棋/西洋棋/圍棋/阿瓦隆/農場經營） |
 | `/roster` | 排班計算（公開無認證，套 tools 的 rate limit；回班表 + 實際採用的每日人力 `plan` + 機器可讀 `warnings`）|
@@ -68,6 +68,16 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/health` | 存活探針，回 `200 {"status":"ok"}`（無認證、不查 DB / Redis，給外部 uptime 監控用） |
 
 分頁端點統一 `?page=1&per_page=N`（per_page 上限 200）；POST 建立資源回 `201`，更新／刪除無內容回 `204`。
+
+關鍵字搜尋（`/blogs?q=`、`/admin/blogs?q=`）上限 **100 字元**（非 bytes），超過回 `422`。這個上限只是「別讓無界輸入走進 SQL 與 log」，**不是效能防線** —— 2026-08-27 實測長 pattern 並不比短的貴。
+
+搜尋真正的成本在「命中大量文章的常見詞」：`count` 那一半無法靠 LIMIT 提早結束，一個請求 ≈ 60ms PG CPU。三層分工：
+
+| 層 | 管什麼 |
+|---|---|
+| nginx `search` limit_req zone（帶 `?q=` 才計數，20r/m；api 與前端兩個 vhost 都掛） | 擋量，**主要防線** |
+| `blogs.markdown` 的 pg_trgm GIN 索引 | 正常搜尋的速度（選擇性高的詞 2.3ms→0.13ms；三字以下與「全中」的詞吃不到） |
+| `MAX_SEARCH_LEN` | 輸入有界 |
 
 根路徑 `/` 沒有路由，打了回 `404` —— 這是正常的，要探測服務是否活著請打 `/health`。
 所有 404（含未知路徑、功能開關關閉）與其他錯誤共用同一個 JSON 形狀

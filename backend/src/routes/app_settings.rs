@@ -11,6 +11,7 @@ use crate::{
 };
 use axum::{
     extract::{Extension, State},
+    response::IntoResponse,
     routing::{get, patch},
     Router
 };
@@ -30,8 +31,13 @@ pub fn public() -> Router<AppState> {
     Router::new().route("/public", get(public_settings))
 }
 
-async fn public_settings(State(state): State<AppState>) -> Json<BTreeMap<String, serde_json::Value>> {
-    Json(settings_service::get_public(&state.get_settings()))
+/// 全站訪客拿到的是同一份白名單設定，沒有任何 per-user 差異，故可掛公開快取標頭。
+/// 後台改主題後最久 60 秒才會在這一層更新（前端另有 `api/settings.ts` 的 revalidate 60）。
+async fn public_settings(State(state): State<AppState>) -> impl IntoResponse {
+    (
+        super::public_cache(),
+        Json(settings_service::get_public(&state.get_settings())),
+    )
 }
 
 async fn list_settings(

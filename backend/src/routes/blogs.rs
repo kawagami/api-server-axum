@@ -3,6 +3,7 @@ use axum::{
     extract::{Extension, State},
     http::StatusCode,
     middleware,
+    response::IntoResponse,
     routing::{get, post},
     Router
 };
@@ -14,7 +15,7 @@ use crate::{
     services::blog_comments as comments_service,
     services::blogs as blogs_service,
     structs::blog_comments::{BlogComment, NewComment},
-    structs::blogs::{BlogFilter, DbBlog, TagCount},
+    structs::blogs::BlogFilter,
     structs::members::AuthenticatedMember,
     structs::pagination::{PageQuery, Paginated},
     state::AppState
@@ -42,11 +43,13 @@ pub fn new(state: AppState) -> Router<AppState> {
         .merge(comment_post)
 }
 
+/// 回 `impl IntoResponse` 而非 `Json<_>`：要附 `Cache-Control`（見 `super::public_cache`），
+/// 而 tuple 的完整型別寫出來只是噪音。
 async fn list_blogs(
     Query(page): Query<PageQuery>,
     Query(filter): Query<BlogFilter>,
     State(state): State<AppState>,
-) -> Result<Json<Paginated<DbBlog>>, AppError> {
+) -> Result<impl IntoResponse, AppError> {
     let blogs = blogs_service::get_blogs(
         state.get_pool(),
         &page,
@@ -56,29 +59,29 @@ async fn list_blogs(
         filter.sort,
     )
     .await?;
-    Ok(Json(blogs))
+    Ok((super::public_cache(), Json(blogs)))
 }
 
 async fn tags(
     State(state): State<AppState>,
-) -> Result<Json<Vec<String>>, AppError> {
+) -> Result<impl IntoResponse, AppError> {
     let tags = blogs_service::get_tags(state.get_pool()).await?;
-    Ok(Json(tags))
+    Ok((super::public_cache(), Json(tags)))
 }
 
 async fn tag_counts(
     State(state): State<AppState>,
-) -> Result<Json<Vec<TagCount>>, AppError> {
+) -> Result<impl IntoResponse, AppError> {
     let tags = blogs_service::get_tag_counts(state.get_pool()).await?;
-    Ok(Json(tags))
+    Ok((super::public_cache(), Json(tags)))
 }
 
 async fn blog_detail(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-) -> Result<Json<DbBlog>, AppError> {
+) -> Result<impl IntoResponse, AppError> {
     let blog = blogs_service::get_blog(state.get_pool(), id).await?;
-    Ok(Json(blog))
+    Ok((super::public_cache(), Json(blog)))
 }
 
 /// 單篇 blog 的公開留言列表(舊到新)
