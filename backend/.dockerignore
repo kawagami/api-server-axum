@@ -1,0 +1,21 @@
+# Dockerfile 沒有 `COPY . .`，所以這裡不影響 image 內容，只是不要把不需要的東西
+# 塞進 build context（context = ./backend，見 .github/workflows/backend.yml）。
+#
+# target/ 是重點：本機有 16G，不排除的話每次 docker build 都先把它整包傳給 daemon。
+# CI 上 checkout 沒有 target 所以感覺不出來，本機或重新 clone 後就會撞到。
+target/
+
+# 執行期產物 / volume 掛載點
+uploads/
+torrents/
+
+# 誤建的空目錄（前端路徑被 mkdir 在這裡，非版控內容）
+app/
+
+# 秘密。沒有任何 COPY 會帶它進 image，但沒必要進 context
+.env
+
+# 自己與說明文件
+Dockerfile
+.dockerignore
+CLAUDE.md
