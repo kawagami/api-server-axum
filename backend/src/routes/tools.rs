@@ -1,35 +1,18 @@
-use crate::extract::{Json, Query};
+use crate::extract::Json;
 use crate::errors::{AppError, RequestError, SystemError};
 use crate::middleware::rate_limit;
 use crate::structs::tools::{ConvertTextRequest, ConvertTextResponse, ConversionDirection};
-use crate::{state::AppState, structs::tools::Params};
-use axum::{middleware, routing::get, routing::post, Router};
-use rand::{distr::Alphanumeric, Rng};
+use crate::state::AppState;
+use axum::{middleware, routing::post, Router};
 use zhconv::{zhconv, Variant};
 
 pub fn new(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/new_password", get(new_password))
         .route("/convert_text", post(convert_text))
         .layer(middleware::from_fn_with_state(
             state,
             rate_limit::tools_rate_limit,
         ))
-}
-
-pub async fn new_password(Query(params): Query<Params>) -> Result<Json<Vec<String>>, AppError> {
-    let mut rng = rand::rng();
-
-    // 生成指定數量的隨機字串
-    let result = (0..params.count)
-        .map(|_| {
-            (0..params.length)
-                .map(|_| rng.sample(Alphanumeric) as char)
-                .collect()
-        })
-        .collect();
-
-    Ok(Json(result))
 }
 
 /// 轉換輸入的長度上限。全域 body 上限是 10MB（routes.rs 的 RequestBodyLimitLayer），

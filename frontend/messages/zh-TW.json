@@ -1123,16 +1123,38 @@
   },
   "NewPassword": {
     "title": "密碼產生器",
+    "localOnlyNote": "密碼在你的瀏覽器產生，不會送到伺服器。",
+    "optionsHeading": "產生選項",
     "countLabel": "組數",
     "lengthLabel": "長度",
-    "generate": "產生密碼",
-    "generating": "產生中…",
+    "charsetLabel": "字元組成",
+    "charset": {
+      "lowercase": "小寫 a-z",
+      "uppercase": "大寫 A-Z",
+      "digits": "數字 0-9",
+      "symbols": "符號"
+    },
+    "excludeAmbiguous": "排除易混淆字元",
+    "excludeAmbiguousHint": "0 O 1 l I |",
+    "noCharsetSelected": "請至少選一種字元組成",
+    "strengthLabel": "強度",
+    "strength": {
+      "weak": "弱",
+      "fair": "普通",
+      "good": "良好",
+      "strong": "很強"
+    },
+    "entropy": "約 {bits} bits",
+    "regenerate": "重新產生",
     "resultLabel": "產生結果",
     "empty": "尚未產生密碼",
     "copy": "複製",
+    "copyOne": "複製第 {index} 組密碼",
+    "copied": "已複製",
+    "copyAll": "全部複製",
     "copySuccess": "密碼已複製",
-    "copyFail": "複製失敗",
-    "error": "產生失敗，請稍後再試"
+    "copyAllSuccess": "已複製 {count} 組密碼",
+    "copyFail": "複製失敗"
   },
   "Roster": {
     "title": "自動排班",

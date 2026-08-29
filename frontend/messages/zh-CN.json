@@ -1123,16 +1123,38 @@
   },
   "NewPassword": {
     "title": "密码生成器",
+    "localOnlyNote": "密码在你的浏览器生成，不会送到服务器。",
+    "optionsHeading": "生成选项",
     "countLabel": "组数",
     "lengthLabel": "长度",
-    "generate": "生成密码",
-    "generating": "生成中…",
+    "charsetLabel": "字符组成",
+    "charset": {
+      "lowercase": "小写 a-z",
+      "uppercase": "大写 A-Z",
+      "digits": "数字 0-9",
+      "symbols": "符号"
+    },
+    "excludeAmbiguous": "排除易混淆字符",
+    "excludeAmbiguousHint": "0 O 1 l I |",
+    "noCharsetSelected": "请至少选一种字符组成",
+    "strengthLabel": "强度",
+    "strength": {
+      "weak": "弱",
+      "fair": "一般",
+      "good": "良好",
+      "strong": "很强"
+    },
+    "entropy": "约 {bits} bits",
+    "regenerate": "重新生成",
     "resultLabel": "生成结果",
     "empty": "尚未生成密码",
     "copy": "复制",
+    "copyOne": "复制第 {index} 组密码",
+    "copied": "已复制",
+    "copyAll": "全部复制",
     "copySuccess": "密码已复制",
-    "copyFail": "复制失败",
-    "error": "生成失败，请稍后再试"
+    "copyAllSuccess": "已复制 {count} 组密码",
+    "copyFail": "复制失败"
   },
   "Roster": {
     "title": "自动排班",

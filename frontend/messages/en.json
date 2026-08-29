@@ -1123,16 +1123,38 @@
   },
   "NewPassword": {
     "title": "Password generator",
+    "localOnlyNote": "Passwords are generated in your browser and never sent to a server.",
+    "optionsHeading": "Generator options",
     "countLabel": "Count",
     "lengthLabel": "Length",
-    "generate": "Generate",
-    "generating": "Generating…",
-    "resultLabel": "Generated passwords",
+    "charsetLabel": "Character set",
+    "charset": {
+      "lowercase": "Lowercase a-z",
+      "uppercase": "Uppercase A-Z",
+      "digits": "Digits 0-9",
+      "symbols": "Symbols"
+    },
+    "excludeAmbiguous": "Exclude ambiguous characters",
+    "excludeAmbiguousHint": "0 O 1 l I |",
+    "noCharsetSelected": "Pick at least one character set",
+    "strengthLabel": "Strength",
+    "strength": {
+      "weak": "Weak",
+      "fair": "Fair",
+      "good": "Good",
+      "strong": "Strong"
+    },
+    "entropy": "~{bits} bits",
+    "regenerate": "Regenerate",
+    "resultLabel": "Results",
     "empty": "No passwords yet",
     "copy": "Copy",
+    "copyOne": "Copy password {index}",
+    "copied": "Copied",
+    "copyAll": "Copy all",
     "copySuccess": "Password copied",
-    "copyFail": "Copy failed",
-    "error": "Failed to generate — please try again"
+    "copyAllSuccess": "Copied {count} passwords",
+    "copyFail": "Copy failed"
   },
   "Roster": {
     "title": "Shift scheduler",

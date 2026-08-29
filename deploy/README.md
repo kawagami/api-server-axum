@@ -136,7 +136,7 @@ nginx 對 `api.kawa.homes/blogs` 開了 proxy_cache（zone 與 map 定義在 `ng
 - **能不能快取由 backend 決定**:只有帶 `Cache-Control`（`backend/src/routes.rs` 的 `public_cache()`,`s-maxage=60`）的回應會被存。所以 `GET /blogs/{id}/comments` 自動不會被快取,不必在 nginx 維護排除清單。
 - 帶 `Authorization` 或任何 `Cookie` → 完全繞過(不讀也不寫)。
 - 帶 `?q=` → 繞過,避免任意關鍵字把 LRU 沖掉(搜尋改由上面的 `search` limit_req zone 擋量)。
-- **絕不在 server 層開**:同個 vhost 上有 `GET /tools/new_password`,全域開快取會讓所有人拿到同一組密碼。
+- **絕不在 server 層開**:這個 vhost 絕大多數是動態端點,開在 server 層等於「預設全部可快取」,日後新端點忘了帶 `Cache-Control` 就會被靜默共用出去。最極端的案例是已移除的 `GET /tools/new_password`(全域快取＝所有人拿到同一組密碼;該功能已改由瀏覽器端產生)——端點會來會去,規則不隨它消失。
 
 ⚠️ 這一層**不會被 `updateTag('blogs')` 失效**。後台存檔後 Next 那層立刻更新,nginx / 瀏覽器最久等 60 秒。
 
