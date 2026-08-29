@@ -6,6 +6,7 @@ import { getAdminVocabWords, updateAdminVocabWord } from "@/api/admin-vocab";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
+import AdminTableContainer from "@/components/admin/admin-table-container";
 import usePagedList from "@/hooks/usePagedList";
 import useFilterUrl from "@/hooks/useFilterUrl";
 import type { AdminVocabWord, UpdateVocabWordInput } from "@/types";
@@ -132,8 +133,8 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                     </div>
                 </div>
 
-                <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
+                <div className={`flex min-h-0 flex-1 flex-col transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                    <AdminTableContainer stickyHead fill>
                         {/* 9 欄、其中 8 欄 whitespace-nowrap，加上釋義的 max-w-xs 就把容器塞滿，
                             padding 減半換回 144px 的餘裕（見 globals.css 的 admin-table-dense） */}
                         <AdminTable className="text-sm admin-table-dense">
@@ -197,7 +198,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                                 )}
                             </tbody>
                         </AdminTable>
-                    </div>
+                    </AdminTableContainer>
                 </div>
 
                 {hasMore && (

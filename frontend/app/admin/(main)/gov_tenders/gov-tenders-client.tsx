@@ -6,6 +6,7 @@ import { getGovTenders, getGovTenderTypes } from "@/api/gov-tenders";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
+import AdminTableContainer from "@/components/admin/admin-table-container";
 import usePagedList from "@/hooks/usePagedList";
 import useFilterUrl from "@/hooks/useFilterUrl";
 import type { GovTender } from "@/types";
@@ -109,8 +110,8 @@ export default function GovTendersClient() {
 
                 <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
-                <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
+                <div className={`flex min-h-0 flex-1 flex-col transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                    <AdminTableContainer stickyHead fill>
                         {/* table-fixed：原本只有標案名稱有 min-w / max-w，其餘四欄任 auto layout
                             按 min-content 分配。視窗一窄（側欄收起、瀏覽器放大）表格就被撐過容器寬度，
                             把關鍵字欄推出右邊。固定配寬讓標案名稱吃剩餘空間，其餘欄不再互搶。 */}
@@ -170,7 +171,7 @@ export default function GovTendersClient() {
                                 )}
                             </tbody>
                         </AdminTable>
-                    </div>
+                    </AdminTableContainer>
                 </div>
 
                 {hasMore && (

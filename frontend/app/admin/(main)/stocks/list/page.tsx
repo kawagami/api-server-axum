@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import StockTable from "@/components/stocks/stock-table";
 import PageHeader from "@/components/admin/page-header";
+import AdminTableContainer from "@/components/admin/admin-table-container";
 import { StatusLink } from "./status-link";
 import { getStockChanges } from "@/app/admin/(main)/stocks/actions";
 import type { StockChange } from "@/types";
@@ -63,11 +64,9 @@ async function StockContent({ status, page }: { status: string | undefined; page
                     </dd>
                 </div>
             </dl>
-            <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
-                <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
-                    <StockTable data={data} />
-                </div>
-            </div>
+            <AdminTableContainer stickyHead fill>
+                <StockTable data={data} />
+            </AdminTableContainer>
             <div className="flex items-center justify-between">
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">
                     {offset + 1}–{Math.min(offset + PER_PAGE, total)} / {total}

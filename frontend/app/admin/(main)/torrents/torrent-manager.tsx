@@ -13,6 +13,7 @@ import { TORRENT_STATUS_BADGE, TORRENT_STATUS_LABEL } from "@/libs/badge-styles"
 import { formatBytes } from "@/libs/format-bytes";
 import { formatDateTime } from "@/libs/admin-datetime";
 import ErrorBanner from "@/components/admin/error-banner";
+import AdminTableContainer from "@/components/admin/admin-table-container";
 import type { Torrent, TorrentStorage } from "@/types";
 
 interface Props {
@@ -128,8 +129,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
             <AddTorrentForm onAdded={refresh} />
             <ErrorBanner message={actionError} />
 
-            <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden">
-                <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
+            <AdminTableContainer stickyHead fill>
                 <AdminTable>
                     <thead>
                         <AdminHeadRow>
@@ -254,8 +254,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                         })}
                     </tbody>
                 </AdminTable>
-                </div>
-            </div>
+            </AdminTableContainer>
 
             <div className="flex items-center justify-between">
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">

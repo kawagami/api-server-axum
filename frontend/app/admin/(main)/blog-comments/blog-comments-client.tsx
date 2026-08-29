@@ -7,6 +7,7 @@ import { getAllBlogComments, deleteBlogComment } from "@/api/blog-comments";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import ErrorBanner, { LOAD_FAILED, DELETE_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
+import AdminTableContainer from "@/components/admin/admin-table-container";
 import usePagedList from "@/hooks/usePagedList";
 import { formatDateTime } from "@/libs/admin-datetime";
 import type { BlogComment } from "@/types";
@@ -46,8 +47,8 @@ export default function BlogCommentsClient({ canDelete }: { canDelete: boolean }
 
             <ErrorBanner message={failed ? LOAD_FAILED : deleteError} />
 
-            <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
+            <div className={`flex min-h-0 flex-1 flex-col transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                <AdminTableContainer stickyHead fill>
                     <AdminTable className="text-sm">
                         <thead>
                             <AdminHeadRow>
@@ -109,7 +110,7 @@ export default function BlogCommentsClient({ canDelete }: { canDelete: boolean }
                             )}
                         </tbody>
                     </AdminTable>
-                </div>
+                </AdminTableContainer>
             </div>
 
             {hasMore && (

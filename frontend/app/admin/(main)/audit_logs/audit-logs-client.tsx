@@ -5,6 +5,7 @@ import { getAuditLogs } from "@/api/logs";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+import AdminTableContainer from "@/components/admin/admin-table-container";
 import usePagedList from "@/hooks/usePagedList";
 import usePolling from "@/hooks/usePolling";
 import useFilterUrl from "@/hooks/useFilterUrl";
@@ -202,8 +203,8 @@ export default function AuditLogsClient() {
 
                 <ErrorBanner message={failed ? LOAD_FAILED : null} />
 
-                <div className={`flex min-h-0 flex-1 flex-col bg-white dark:bg-neutral-900 shadow-lg rounded-lg overflow-hidden transition-opacity ${isPending ? 'opacity-60' : ''}`}>
-                    <div className="admin-sticky-head overflow-auto min-h-0 flex-1">
+                <div className={`flex min-h-0 flex-1 flex-col transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+                    <AdminTableContainer stickyHead fill>
                         {/* table-fixed：auto layout 下路徑欄被 break 掉的字元拉到 1 字寬，
                             而 Query 的長字串不可斷、反過來把寬度全吃走，連狀態欄都被推出右邊。
                             固定配寬讓路徑吃剩餘空間，Query 截斷後靠 title 看全文。 */}
@@ -262,7 +263,7 @@ export default function AuditLogsClient() {
                                 )}
                             </tbody>
                         </AdminTable>
-                    </div>
+                    </AdminTableContainer>
                 </div>
 
                 {hasMore && (
