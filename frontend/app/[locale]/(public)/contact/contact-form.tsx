@@ -17,6 +17,9 @@ export default function ContactForm() {
         if (state.status === "success") formRef.current?.reset();
     }, [state]);
 
+    // 這支刻意不用 libs/input-styles 的 PUBLIC_INPUT：那支是給「卡片內」的欄位用的
+    // （深色 bg-neutral-700 才浮得出 -800 的卡片底）。本表單直接坐在頁面漸層上，
+    // 底色要跟頁面同階，套 PUBLIC_INPUT 會多出一塊比背景更亮的框。
     const inputClass =
         "w-full px-3 py-2 rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 transition-colors";
 

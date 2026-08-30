@@ -3,13 +3,13 @@ import { getStockDayAll } from "@/app/admin/(main)/stocks/actions";
 import PageHeader from "@/components/admin/page-header";
 import AdminTableContainer from "@/components/admin/admin-table-container";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
 
 export const metadata: Metadata = {
     title: "當日全部",
     description: "全市場每日行情查詢",
 };
 
-const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ trade_date?: string; stock_code?: string; page?: string; per_page?: string }> }) {
     const params = await searchParams;
@@ -27,19 +27,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
             <form method="get" className="flex flex-wrap gap-2 items-end bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-3 border border-neutral-200 dark:border-neutral-700">
                 <div className="flex flex-col gap-1">
                     <label className="text-xs text-neutral-500 dark:text-neutral-400">交易日期</label>
-                    <input type="text" name="trade_date" defaultValue={trade_date} placeholder="YYYYMMDD" className={inputClass} />
+                    <input type="text" name="trade_date" defaultValue={trade_date} placeholder="YYYYMMDD" className={ADMIN_FILTER_INPUT} />
                 </div>
                 <div className="flex flex-col gap-1">
                     <label className="text-xs text-neutral-500 dark:text-neutral-400">股票代號</label>
-                    <input type="text" name="stock_code" defaultValue={stock_code} placeholder="2330" className={inputClass} />
+                    <input type="text" name="stock_code" defaultValue={stock_code} placeholder="2330" className={ADMIN_FILTER_INPUT} />
                 </div>
                 <div className="flex flex-col gap-1">
                     <label className="text-xs text-neutral-500 dark:text-neutral-400">筆數</label>
-                    <input type="number" name="per_page" defaultValue={perPage} min={1} max={200} className={`${inputClass} w-20`} />
+                    <input type="number" name="per_page" defaultValue={perPage} min={1} max={200} className={`${ADMIN_FILTER_INPUT} w-20`} />
                 </div>
                 <div className="flex flex-col gap-1">
                     <label className="text-xs text-neutral-500 dark:text-neutral-400">頁碼</label>
-                    <input type="number" name="page" defaultValue={page} min={1} className={`${inputClass} w-20`} />
+                    <input type="number" name="page" defaultValue={page} min={1} className={`${ADMIN_FILTER_INPUT} w-20`} />
                 </div>
                 <button type="submit" className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white transition-colors">
                     查詢
@@ -93,7 +93,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                 {page > 1 && (
                     <a
                         href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page - 1}`}
-                        className="px-4 py-2 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
+                        className="px-4 py-2 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
                     >
                         上一頁
                     </a>
@@ -103,7 +103,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                 {page * perPage < total && (
                     <a
                         href={`?trade_date=${trade_date}&stock_code=${stock_code}&per_page=${perPage}&page=${page + 1}`}
-                        className="px-4 py-2 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
+                        className="px-4 py-2 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
                     >
                         下一頁
                     </a>

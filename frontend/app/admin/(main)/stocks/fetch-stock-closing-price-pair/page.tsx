@@ -6,8 +6,10 @@ import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/admin/page-header";
 import ErrorBanner from "@/components/admin/error-banner";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+import { cn } from "@/libs/cn";
+import { ADMIN_INPUT } from "@/libs/input-styles";
 
-const inputClass = "w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
+const inputClass = cn(ADMIN_INPUT, "w-full text-sm");
 
 interface StockPriceItem {
     stock_no: string;

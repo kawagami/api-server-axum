@@ -10,6 +10,9 @@ import AdminTableContainer from "@/components/admin/admin-table-container";
 import usePagedList from "@/hooks/usePagedList";
 import useFilterUrl from "@/hooks/useFilterUrl";
 import type { AdminVocabWord, UpdateVocabWordInput } from "@/types";
+import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
+import { cn } from "@/libs/cn";
+import Modal from "@/components/modal";
 
 const LIMIT = 50;
 
@@ -68,7 +71,6 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
         }
     }
 
-    const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -83,7 +85,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                         <label className="text-xs text-neutral-500 dark:text-neutral-400">語言</label>
                         <select value={filters.language}
                             onChange={e => setFilters(f => ({ ...f, language: e.target.value }))}
-                            className={inputClass}>
+                            className={ADMIN_FILTER_INPUT}>
                             <option value="">全部</option>
                             <option value="en">英文</option>
                             <option value="ja">日文</option>
@@ -93,7 +95,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                         <label className="text-xs text-neutral-500 dark:text-neutral-400">難度</label>
                         <select value={filters.difficulty}
                             onChange={e => setFilters(f => ({ ...f, difficulty: e.target.value }))}
-                            className={inputClass}>
+                            className={ADMIN_FILTER_INPUT}>
                             <option value="">全部</option>
                             {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
@@ -102,7 +104,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                         <label className="text-xs text-neutral-500 dark:text-neutral-400">狀態</label>
                         <select value={filters.enabled}
                             onChange={e => setFilters(f => ({ ...f, enabled: e.target.value }))}
-                            className={inputClass}>
+                            className={ADMIN_FILTER_INPUT}>
                             <option value="">全部</option>
                             <option value="true">上架</option>
                             <option value="false">下架</option>
@@ -113,7 +115,7 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                         <input type="text" value={filters.q}
                             onChange={e => setFilters(f => ({ ...f, q: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && search(filters)}
-                            placeholder="食べる" className={`${inputClass} w-40`} />
+                            placeholder="食べる" className={`${ADMIN_FILTER_INPUT} w-40`} />
                     </div>
                     <label className="flex items-center gap-1.5 pb-1.5 text-sm text-neutral-600 dark:text-neutral-300 cursor-pointer">
                         <input type="checkbox" checked={filters.wrongFirst}
@@ -277,67 +279,70 @@ function EditModal({ word, onClose, onSaved }: {
         }
     }
 
-    const fieldClass = "w-full px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
+    const fieldClass = cn(ADMIN_FILTER_INPUT, "w-full");
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            <div className="w-full max-w-md max-h-[90svh] overflow-y-auto bg-white dark:bg-neutral-900 rounded-lg shadow-xl p-5 flex flex-col gap-3"
-                onClick={e => e.stopPropagation()}>
-                <h2 className="font-semibold text-neutral-800 dark:text-neutral-100">
-                    編輯:<span lang={ja ? 'ja' : undefined}>{word.word}</span>
-                    <span className="ml-2 text-xs font-normal text-neutral-400">{word.language} / id {word.id}</span>
-                </h2>
-                {ja && (
-                    <>
-                        <Field label="讀音(平假名)">
-                            <input value={form.reading} lang="ja"
-                                onChange={e => setForm(f => ({ ...f, reading: e.target.value }))} className={fieldClass} />
-                        </Field>
-                        <Field label="可接受讀音(以 | 分隔;主讀音會自動補入)">
-                            <input value={form.accepted} lang="ja"
-                                onChange={e => setForm(f => ({ ...f, accepted: e.target.value }))} className={fieldClass} />
-                        </Field>
-                    </>
-                )}
-                <Field label="詞性">
-                    <input value={form.part_of_speech}
-                        onChange={e => setForm(f => ({ ...f, part_of_speech: e.target.value }))} className={fieldClass} />
-                </Field>
-                <Field label="中文釋義">
-                    <input value={form.meaning_zh}
-                        onChange={e => setForm(f => ({ ...f, meaning_zh: e.target.value }))} className={fieldClass} />
-                </Field>
-                <Field label="例句(拼字題挖空用;日文目前未使用)">
-                    <textarea value={form.example_sentence} rows={2}
-                        onChange={e => setForm(f => ({ ...f, example_sentence: e.target.value }))} className={fieldClass} />
-                </Field>
-                <div className="flex items-center gap-4">
-                    <Field label="難度">
-                        <select value={form.difficulty}
-                            onChange={e => setForm(f => ({ ...f, difficulty: Number(e.target.value) }))} className={fieldClass}>
-                            {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
+        <Modal
+            label={`編輯 ${word.word}`}
+            onClose={onClose}
+            dismissible={!saving}
+            size="md"
+            className="max-h-[90svh] overflow-y-auto p-5 flex flex-col gap-3"
+        >
+            <h2 className="font-semibold text-neutral-800 dark:text-neutral-100">
+                編輯:<span lang={ja ? 'ja' : undefined}>{word.word}</span>
+                <span className="ml-2 text-xs font-normal text-neutral-400">{word.language} / id {word.id}</span>
+            </h2>
+            {ja && (
+                <>
+                    <Field label="讀音(平假名)">
+                        <input value={form.reading} lang="ja"
+                            onChange={e => setForm(f => ({ ...f, reading: e.target.value }))} className={fieldClass} />
                     </Field>
-                    <label className="flex items-center gap-1.5 pt-4 text-sm text-neutral-600 dark:text-neutral-300 cursor-pointer whitespace-nowrap">
-                        <input type="checkbox" checked={form.enabled}
-                            onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))}
-                            className="accent-primary-500" />
-                        上架
-                    </label>
-                </div>
-                {error && <p className="text-sm text-red-500">{error}</p>}
-                <div className="flex justify-end gap-2 pt-1">
-                    <button onClick={onClose} disabled={saving}
-                        className="px-4 py-1.5 text-sm rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition-colors">
-                        取消
-                    </button>
-                    <button onClick={save} disabled={saving}
-                        className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1">
-                        {saving && <Loader2 size={14} className="animate-spin" />}儲存
-                    </button>
-                </div>
+                    <Field label="可接受讀音(以 | 分隔;主讀音會自動補入)">
+                        <input value={form.accepted} lang="ja"
+                            onChange={e => setForm(f => ({ ...f, accepted: e.target.value }))} className={fieldClass} />
+                    </Field>
+                </>
+            )}
+            <Field label="詞性">
+                <input value={form.part_of_speech}
+                    onChange={e => setForm(f => ({ ...f, part_of_speech: e.target.value }))} className={fieldClass} />
+            </Field>
+            <Field label="中文釋義">
+                <input value={form.meaning_zh}
+                    onChange={e => setForm(f => ({ ...f, meaning_zh: e.target.value }))} className={fieldClass} />
+            </Field>
+            <Field label="例句(拼字題挖空用;日文目前未使用)">
+                <textarea value={form.example_sentence} rows={2}
+                    onChange={e => setForm(f => ({ ...f, example_sentence: e.target.value }))} className={fieldClass} />
+            </Field>
+            <div className="flex items-center gap-4">
+                <Field label="難度">
+                    <select value={form.difficulty}
+                        onChange={e => setForm(f => ({ ...f, difficulty: Number(e.target.value) }))} className={fieldClass}>
+                        {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                </Field>
+                <label className="flex items-center gap-1.5 pt-4 text-sm text-neutral-600 dark:text-neutral-300 cursor-pointer whitespace-nowrap">
+                    <input type="checkbox" checked={form.enabled}
+                        onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))}
+                        className="accent-primary-500" />
+                    上架
+                </label>
             </div>
-        </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+                <button onClick={onClose} disabled={saving}
+                    className="px-4 py-1.5 text-sm rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition-colors">
+                    取消
+                </button>
+                <button onClick={save} disabled={saving}
+                    className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1">
+                    {saving && <Loader2 size={14} className="animate-spin" />}儲存
+                </button>
+            </div>
+        </Modal>
     );
 }
 

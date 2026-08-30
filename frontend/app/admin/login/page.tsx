@@ -185,7 +185,7 @@ export default function Login() {
     return (
         // 後台登入頁沒有 header / footer，不能沿用前台扣 120px 的公式（會多出一段空白）
         <div className="w-full min-h-screen overflow-auto flex justify-center items-center p-4">
-            <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-neutral-800 rounded-lg shadow-md">
+            <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-neutral-900 rounded-lg shadow-md">
                 {showUpgrade ? (
                     <div className="space-y-4">
                         <h2 className="text-2xl font-bold text-center text-neutral-800 dark:text-neutral-100">建立 Passkey</h2>

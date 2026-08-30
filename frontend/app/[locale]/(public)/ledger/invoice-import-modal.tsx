@@ -9,6 +9,8 @@ import InvoiceScanner from "@/components/invoices/invoice-scanner";
 import { apiErrorStatus } from "@/libs/api-error";
 import useLedgerCategoryLabel from "@/hooks/useLedgerCategoryLabel";
 import type { LedgerCategories, InvoiceInput } from "@/types";
+import Modal from "@/components/modal";
+import { PUBLIC_INPUT } from "@/libs/input-styles";
 
 interface Props {
     categories: LedgerCategories;
@@ -16,7 +18,6 @@ interface Props {
     onImported: () => void;
 }
 
-const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 
 export default function InvoiceImportModal({ categories, onClose, onImported }: Props) {
     const t = useTranslations('Ledger');
@@ -83,65 +84,66 @@ export default function InvoiceImportModal({ categories, onClose, onImported }: 
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-            <div
-                className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-                onClick={e => e.stopPropagation()}
-            >
-                <div className="flex items-center justify-between px-5 py-4 border-b dark:border-neutral-700">
-                    <h2 className="font-semibold">{parsed ? t('importTitle') : t('scanTitle')}</h2>
-                    <button onClick={onClose} className="p-1 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700" aria-label={t('cancel')}>
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div className="p-5">
-                    {!parsed ? (
-                        <div className="flex flex-col gap-3">
-                            <InvoiceScanner key={scanKey} mode="qr" onDecoded={handleDecoded} />
-                        </div>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                            <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                                {t('invoiceNumber')}: <span className="font-mono">{parsed.invoiceNumber}</span>
-                                {parsed.sellerTaxId && <> · {t('sellerTaxId')} {parsed.sellerTaxId}</>}
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-sm font-medium">{t('amount')}</label>
-                                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="0" step="0.01" inputMode="decimal" className={inputClass} />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-sm font-medium">{t('occurredAt')}</label>
-                                    <input type="date" value={occurredAt} onChange={e => setOccurredAt(e.target.value)} required className={inputClass} />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-sm font-medium">{t('category')}</label>
-                                    <select value={category} onChange={e => setCategory(e.target.value)} required className={inputClass}>
-                                        {expenseOptions.map(o => <option key={o.value} value={o.value}>{categoryLabel(o.value, o.label)}</option>)}
-                                    </select>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-sm font-medium">{t('note')}</label>
-                                    <input type="text" value={note} onChange={e => setNote(e.target.value)} maxLength={200} placeholder={t('notePlaceholder')} className={inputClass} />
-                                </div>
-                            </div>
-
-                            {error && <p className="text-red-500 text-sm">{error}</p>}
-
-                            <div className="flex gap-2 justify-end">
-                                <button type="button" onClick={rescan} className="px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700">
-                                    {t('rescan')}
-                                </button>
-                                <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
-                                    {saving && <Loader2 className="animate-spin" size={14} />}
-                                    {t('import')}
-                                </button>
-                            </div>
-                        </form>
-                    )}
-                </div>
+        <Modal
+            label={parsed ? t('importTitle') : t('scanTitle')}
+            onClose={onClose}
+            size="md"
+            surface="public"
+            className="max-h-[90vh] overflow-y-auto"
+        >
+            <div className="flex items-center justify-between px-5 py-4 border-b dark:border-neutral-700">
+                <h2 className="font-semibold">{parsed ? t('importTitle') : t('scanTitle')}</h2>
+                <button onClick={onClose} className="p-1 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-700" aria-label={t('cancel')}>
+                    <X size={18} />
+                </button>
             </div>
-        </div>
+
+            <div className="p-5">
+                {!parsed ? (
+                    <div className="flex flex-col gap-3">
+                        <InvoiceScanner key={scanKey} mode="qr" onDecoded={handleDecoded} />
+                    </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                            {t('invoiceNumber')}: <span className="font-mono">{parsed.invoiceNumber}</span>
+                            {parsed.sellerTaxId && <> · {t('sellerTaxId')} {parsed.sellerTaxId}</>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm font-medium">{t('amount')}</label>
+                                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="0" step="0.01" inputMode="decimal" className={PUBLIC_INPUT} />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm font-medium">{t('occurredAt')}</label>
+                                <input type="date" value={occurredAt} onChange={e => setOccurredAt(e.target.value)} required className={PUBLIC_INPUT} />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm font-medium">{t('category')}</label>
+                                <select value={category} onChange={e => setCategory(e.target.value)} required className={PUBLIC_INPUT}>
+                                    {expenseOptions.map(o => <option key={o.value} value={o.value}>{categoryLabel(o.value, o.label)}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm font-medium">{t('note')}</label>
+                                <input type="text" value={note} onChange={e => setNote(e.target.value)} maxLength={200} placeholder={t('notePlaceholder')} className={PUBLIC_INPUT} />
+                            </div>
+                        </div>
+
+                        {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                        <div className="flex gap-2 justify-end">
+                            <button type="button" onClick={rescan} className="px-4 py-2 text-sm rounded-sm border dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700">
+                                {t('rescan')}
+                            </button>
+                            <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50">
+                                {saving && <Loader2 className="animate-spin" size={14} />}
+                                {t('import')}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </div>
+        </Modal>
     );
 }

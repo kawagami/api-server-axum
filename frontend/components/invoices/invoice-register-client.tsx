@@ -11,6 +11,7 @@ import InvoiceScanner from "@/components/invoices/invoice-scanner";
 import { apiErrorStatus } from "@/libs/api-error";
 import useLedgerCategoryLabel from "@/hooks/useLedgerCategoryLabel";
 import type { LedgerCategories, InvoiceInput, InvoiceSource } from "@/types";
+import { PUBLIC_INPUT } from "@/libs/input-styles";
 
 interface Props {
     categories: LedgerCategories;
@@ -18,7 +19,6 @@ interface Props {
 
 type Tab = 'qr' | 'barcode' | 'manual';
 
-const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 const INVOICE_RE = /^[A-Z]{2}\d{8}$/;
 
 export default function InvoiceRegisterClient({ categories }: Props) {
@@ -204,16 +204,16 @@ export default function InvoiceRegisterClient({ categories }: Props) {
                                     required
                                     maxLength={10}
                                     placeholder="AB12345678"
-                                    className={`${inputClass} font-mono`}
+                                    className={`${PUBLIC_INPUT} font-mono`}
                                 />
                             </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-sm font-medium">{t('invoiceDate')}</label>
-                                <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} required className={inputClass} />
+                                <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} required className={PUBLIC_INPUT} />
                             </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-sm font-medium">{t('amount')} <span className="text-neutral-400 font-normal">({t('optional')})</span></label>
-                                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} min="0" step="0.01" inputMode="decimal" className={inputClass} />
+                                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} min="0" step="0.01" inputMode="decimal" className={PUBLIC_INPUT} />
                             </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-sm font-medium">{t('sellerTaxId')} <span className="text-neutral-400 font-normal">({t('optional')})</span></label>
@@ -223,7 +223,7 @@ export default function InvoiceRegisterClient({ categories }: Props) {
                                     onChange={e => setSellerTaxId(e.target.value.trim() || null)}
                                     maxLength={8}
                                     inputMode="numeric"
-                                    className={`${inputClass} font-mono`}
+                                    className={`${PUBLIC_INPUT} font-mono`}
                                 />
                             </div>
                         </div>
@@ -237,13 +237,13 @@ export default function InvoiceRegisterClient({ categories }: Props) {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="flex flex-col gap-1">
                                     <label className="text-sm font-medium">{t('category')}</label>
-                                    <select value={category} onChange={e => setCategory(e.target.value)} className={inputClass}>
+                                    <select value={category} onChange={e => setCategory(e.target.value)} className={PUBLIC_INPUT}>
                                         {expenseOptions.map(o => <option key={o.value} value={o.value}>{categoryLabel(o.value, o.label)}</option>)}
                                     </select>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <label className="text-sm font-medium">{t('note')}</label>
-                                    <input type="text" value={note} onChange={e => setNote(e.target.value)} maxLength={200} placeholder={t('optional')} className={inputClass} />
+                                    <input type="text" value={note} onChange={e => setNote(e.target.value)} maxLength={200} placeholder={t('optional')} className={PUBLIC_INPUT} />
                                 </div>
                             </div>
                         )}

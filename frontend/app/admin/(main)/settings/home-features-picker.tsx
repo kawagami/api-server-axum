@@ -53,7 +53,7 @@ export default function HomeFeaturesPicker({ initialEnabled }: { initialEnabled:
         "flex items-center gap-2 px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700";
 
     return (
-        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
             <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
                 首頁功能卡片
                 <span className="ml-2 text-xs text-neutral-400 dark:text-neutral-500 font-mono">home_features</span>

@@ -12,6 +12,7 @@ import useFilterUrl from "@/hooks/useFilterUrl";
 import type { AuditActorType, AuditLog, HttpMethod } from "@/types";
 import { METHOD_BADGE, httpStatusBadgeClass } from "@/libs/badge-styles";
 import { formatDateTimeSeconds } from "@/libs/admin-datetime";
+import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
 
 const LIMIT = 100;
 const REFRESH_MS = 1_800_000;
@@ -109,7 +110,6 @@ export default function AuditLogsClient() {
         loadMore();
     }
 
-    const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -123,7 +123,7 @@ export default function AuditLogsClient() {
                         <select
                             value={filters.actor_type}
                             onChange={e => setFilters(f => ({ ...f, actor_type: e.target.value as AuditActorType | '' }))}
-                            className={inputClass}
+                            className={ADMIN_FILTER_INPUT}
                         >
                             <option value="">全部</option>
                             <option value="admin">管理員</option>
@@ -138,7 +138,7 @@ export default function AuditLogsClient() {
                             onChange={e => setFilters(f => ({ ...f, user_email: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleSearch()}
                             placeholder="管理員顯示名 / member#1"
-                            className={`${inputClass} w-48`}
+                            className={`${ADMIN_FILTER_INPUT} w-48`}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -146,7 +146,7 @@ export default function AuditLogsClient() {
                         <select
                             value={filters.method}
                             onChange={e => setFilters(f => ({ ...f, method: e.target.value as HttpMethod | '' }))}
-                            className={inputClass}
+                            className={ADMIN_FILTER_INPUT}
                         >
                             <option value="">全部</option>
                             {(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as HttpMethod[]).map(m => (
@@ -162,7 +162,7 @@ export default function AuditLogsClient() {
                             onChange={e => setFilters(f => ({ ...f, path: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleSearch()}
                             placeholder="/images"
-                            className={`${inputClass} w-36`}
+                            className={`${ADMIN_FILTER_INPUT} w-36`}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -171,7 +171,7 @@ export default function AuditLogsClient() {
                             type="datetime-local"
                             value={filters.from}
                             onChange={e => setFilters(f => ({ ...f, from: e.target.value }))}
-                            className={inputClass}
+                            className={ADMIN_FILTER_INPUT}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -180,7 +180,7 @@ export default function AuditLogsClient() {
                             type="datetime-local"
                             value={filters.to}
                             onChange={e => setFilters(f => ({ ...f, to: e.target.value }))}
-                            className={inputClass}
+                            className={ADMIN_FILTER_INPUT}
                         />
                     </div>
                     <div className="flex gap-2">

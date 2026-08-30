@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useRef } from "react";
 import { postChangePassword } from "@/api/auth";
 import PageHeader from "@/components/admin/page-header";
+import { cn } from "@/libs/cn";
+import { ADMIN_INPUT } from "@/libs/input-styles";
 
 type ChangeState = { error: string | null; success: boolean };
 
@@ -45,7 +47,7 @@ export default function ChangePasswordPage() {
     }, [state.success]);
 
     // 焦點樣式由 globals.css 的全站 :focus-visible 規則統一提供，元件不再各自寫 focus 類別
-    const inputClass = "w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
+    const inputClass = cn(ADMIN_INPUT, "w-full");
 
     return (
         <div className="w-full max-w-2xl flex flex-col gap-4">

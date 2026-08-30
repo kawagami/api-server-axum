@@ -3,18 +3,33 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, Bell } from "lucide-react";
-import { setInvoiceNotify } from "@/api/invoices";
 import { apiErrorStatus } from "@/libs/api-error";
 
-interface Props {
+/**
+ * 「開獎後 email 通知我」的開關卡片（發票 / 樂透共用，兩邊只差 namespace 與後端端點）。
+ *
+ * `action` 由頁面把對應的 server action 傳進來（`setInvoiceNotify` / `setLottoNotify`，
+ * 兩支簽章相同）。初始值讀 `/members/me`（`lottery_notify_enabled` / `lotto_notify_enabled`），
+ * PATCH 的回傳值才是互動後真值 —— 不要拿樂觀更新當結果。
+ *
+ * 需要的翻譯 key（每個 namespace 都要有）：
+ * `notifyTitle` / `notifyDesc` / `notifyTarget` / `notifyNoEmail` / `notifyNeedsEmail` /
+ * `errorSave` / `disclaimer`。
+ */
+export default function NotifyToggle({
+    namespace,
+    action,
+    hasEmail,
+    email,
+    initialEnabled,
+}: {
+    namespace: string;
+    action: (enabled: boolean) => Promise<{ enabled: boolean }>;
     hasEmail: boolean;
     email: string | null;
     initialEnabled: boolean;
-}
-
-export default function NotifySettingsClient({ hasEmail, email, initialEnabled }: Props) {
-    const t = useTranslations('Invoices');
-    // 初始值讀 /members/me 的 lottery_notify_enabled；PATCH 回傳值作為互動後真值
+}) {
+    const t = useTranslations(namespace);
     const [enabled, setEnabled] = useState(initialEnabled);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -25,7 +40,7 @@ export default function NotifySettingsClient({ hasEmail, email, initialEnabled }
         setSaving(true);
         setError('');
         try {
-            const res = await setInvoiceNotify(next);
+            const res = await action(next);
             setEnabled(res.enabled);
         } catch (err) {
             // 後端訊息是寫死的繁中，印出來等於 en / zh-CN 使用者看到中文；改用 status 分流翻譯

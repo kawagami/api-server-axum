@@ -46,7 +46,7 @@ export default function AddTorrentForm({ onAdded }: Props) {
                     value={magnet}
                     onChange={(e) => setMagnet(e.target.value)}
                     placeholder="magnet:?xt=urn:btih:..."
-                    className="flex-1 px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500"
+                    className="flex-1 px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500"
                 />
                 <button
                     type="submit"

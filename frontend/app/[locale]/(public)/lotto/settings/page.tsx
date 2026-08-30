@@ -1,5 +1,6 @@
 import { getCurrentMember } from "@/api/members";
-import LottoNotifySettingsClient from "@/components/lotto/lotto-notify-settings-client";
+import { setLottoNotify } from "@/api/lotto";
+import NotifyToggle from "@/components/notify-toggle";
 import LottoNav from "@/components/lotto/lotto-nav";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
@@ -21,7 +22,13 @@ export default async function LottoSettingsPage() {
         <PageShell width="form" className="flex flex-col gap-6">
             <PageTitle title={t('settingsTitle')} />
             <LottoNav />
-            <LottoNotifySettingsClient hasEmail={!!member.email} email={member.email} initialEnabled={member.lotto_notify_enabled} />
+            <NotifyToggle
+                namespace="Lotto"
+                action={setLottoNotify}
+                hasEmail={!!member.email}
+                email={member.email}
+                initialEnabled={member.lotto_notify_enabled}
+            />
         </PageShell>
     );
 }

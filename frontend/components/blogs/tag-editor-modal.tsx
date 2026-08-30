@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Check, X } from 'lucide-react';
-import useDialog from '@/hooks/useDialog';
+import Modal from '@/components/modal';
 
 interface Props {
     tags: string[];
@@ -18,11 +18,8 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
     const [input, setInput] = useState('');
     const [hint, setHint] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    // Esc 關閉、鎖背景捲動、焦點鎖在對話框內、關閉後還原焦點，全走共用 hook
-    const dialogRef = useDialog<HTMLDivElement>(true, onClose);
-
-    // useDialog 會聚焦第一個可聚焦元素（＝第一顆 tag 移除鈕），但這個對話框是拿來打字的，
-    // 所以宣告在它之後覆寫成輸入框（effect 依宣告順序執行，這個跑在後面）。
+    // Modal 內的 useDialog 會聚焦第一個可聚焦元素（＝第一顆 tag 移除鈕），但這個對話框是
+    // 拿來打字的，所以在這裡覆寫成輸入框 —— Modal 是子元件，它的 effect 先跑，這支後跑。
     useEffect(() => { inputRef.current?.focus(); }, []);
 
     // 候選 = 全站 tags ∪ 本文 tags(含本次新建、尚未存檔的)
@@ -58,96 +55,84 @@ export default function TagEditorModal({ tags, allTags, onTagsChange, onClose }:
     const removeTag = (tag: string) => onTagsChange(tags.filter(t => tagKey(t) !== tagKey(tag)));
 
     return (
-        <div
-            className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4"
-            onClick={onClose}
-        >
-            <div
-                ref={dialogRef}
-                role="dialog"
-                aria-modal="true"
-                aria-label="編輯 Tag"
-                className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-lg w-full max-w-md max-h-[80vh] overflow-auto"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <h2 className="text-lg font-semibold mb-1">編輯 Tag</h2>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
-                    變更會先存為本機草稿,按「存檔」後才寫入文章。
-                </p>
+        <Modal label="編輯 Tag" onClose={onClose} size="md" className="p-6 max-h-[80vh] overflow-auto">
+            <h2 className="text-lg font-semibold mb-1">編輯 Tag</h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
+                變更會先存為本機草稿,按「存檔」後才寫入文章。
+            </p>
 
-                <div className="flex flex-wrap gap-2 mb-4">
-                    {tags.length === 0 && (
-                        <span className="text-sm text-neutral-400">尚未加入任何 tag</span>
-                    )}
-                    {tags.map((tag) => (
-                        <span
-                            key={tag}
-                            className="flex items-center gap-1 bg-primary-50 dark:bg-primary-900/40 border border-primary-200 dark:border-primary-800 rounded-lg pl-2.5 pr-1 py-0.5 text-sm text-neutral-700 dark:text-neutral-200"
-                        >
-                            {tag}
-                            <button
-                                onClick={() => removeTag(tag)}
-                                aria-label={`移除 ${tag}`}
-                                className="p-1.5 rounded-sm text-neutral-400 hover:text-red-600 transition-colors"
-                            >
-                                <X size={14} />
-                            </button>
-                        </span>
-                    ))}
-                </div>
-
-                <div className="flex gap-2 mb-1">
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={input}
-                        onChange={(e) => { setInput(e.target.value); setHint(null); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addTag(input); }}
-                        className="flex-1 min-w-0 p-2 border rounded-sm dark:bg-neutral-700 dark:border-neutral-600"
-                        placeholder="搜尋或輸入新 tag..."
-                    />
-                    <button
-                        onClick={() => addTag(input)}
-                        disabled={!input.trim()}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-400 disabled:cursor-not-allowed transition-colors"
+            <div className="flex flex-wrap gap-2 mb-4">
+                {tags.length === 0 && (
+                    <span className="text-sm text-neutral-400">尚未加入任何 tag</span>
+                )}
+                {tags.map((tag) => (
+                    <span
+                        key={tag}
+                        className="flex items-center gap-1 bg-primary-50 dark:bg-primary-900/40 border border-primary-200 dark:border-primary-800 rounded-lg pl-2.5 pr-1 py-0.5 text-sm text-neutral-700 dark:text-neutral-200"
                     >
-                        新增
-                    </button>
-                </div>
-                {hint && <p className="text-xs text-red-500 mb-1">{hint}</p>}
+                        {tag}
+                        <button
+                            onClick={() => removeTag(tag)}
+                            aria-label={`移除 ${tag}`}
+                            className="p-1.5 rounded-sm text-neutral-400 hover:text-red-600 transition-colors"
+                        >
+                            <X size={14} />
+                        </button>
+                    </span>
+                ))}
+            </div>
 
-                <h3 className="text-sm font-medium mt-4 mb-2 text-neutral-600 dark:text-neutral-300">
-                    所有 Tag(點擊加入或移除)
-                </h3>
-                <div className="flex flex-wrap gap-2 max-h-48 overflow-auto border-t border-neutral-200 dark:border-neutral-700 pt-3">
-                    {filtered.length === 0 && (
-                        <span className="text-sm text-neutral-400">沒有符合的 tag,可直接新增</span>
-                    )}
-                    {filtered.map((tag) => {
-                        const added = isAdded(tag);
-                        return (
-                            <button
-                                key={tag}
-                                onClick={() => (added ? removeTag(tag) : addTag(tag))}
-                                aria-pressed={added}
-                                className={`flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border transition-colors ${added
-                                    ? 'bg-primary-600 border-primary-600 text-white'
-                                    : 'bg-white dark:bg-neutral-700 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 hover:border-primary-400'}`}
-                            >
-                                {added && <Check size={14} />}
-                                {tag}
-                            </button>
-                        );
-                    })}
-                </div>
-
+            <div className="flex gap-2 mb-1">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={input}
+                    onChange={(e) => { setInput(e.target.value); setHint(null); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addTag(input); }}
+                    className="flex-1 min-w-0 p-2 border rounded-sm dark:bg-neutral-700 dark:border-neutral-600"
+                    placeholder="搜尋或輸入新 tag..."
+                />
                 <button
-                    onClick={onClose}
-                    className="mt-4 w-full px-4 py-2 bg-neutral-600 text-white rounded-lg hover:bg-neutral-700 transition-colors"
+                    onClick={() => addTag(input)}
+                    disabled={!input.trim()}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-neutral-400 disabled:cursor-not-allowed transition-colors"
                 >
-                    完成
+                    新增
                 </button>
             </div>
-        </div>
+            {hint && <p className="text-xs text-red-500 mb-1">{hint}</p>}
+
+            <h3 className="text-sm font-medium mt-4 mb-2 text-neutral-600 dark:text-neutral-300">
+                所有 Tag(點擊加入或移除)
+            </h3>
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-auto border-t border-neutral-200 dark:border-neutral-700 pt-3">
+                {filtered.length === 0 && (
+                    <span className="text-sm text-neutral-400">沒有符合的 tag,可直接新增</span>
+                )}
+                {filtered.map((tag) => {
+                    const added = isAdded(tag);
+                    return (
+                        <button
+                            key={tag}
+                            onClick={() => (added ? removeTag(tag) : addTag(tag))}
+                            aria-pressed={added}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border transition-colors ${added
+                                ? 'bg-primary-600 border-primary-600 text-white'
+                                : 'bg-white dark:bg-neutral-700 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 hover:border-primary-400'}`}
+                        >
+                            {added && <Check size={14} />}
+                            {tag}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <button
+                onClick={onClose}
+                className="mt-4 w-full px-4 py-2 bg-neutral-600 text-white rounded-lg hover:bg-neutral-700 transition-colors"
+            >
+                完成
+            </button>
+        </Modal>
     );
 }

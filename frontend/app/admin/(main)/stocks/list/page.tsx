@@ -75,7 +75,7 @@ async function StockContent({ status, page }: { status: string | undefined; page
                     {hasPrev ? (
                         <Link
                             href={buildHref(status, page - 1)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
                         >
                             <ChevronLeft className="w-4 h-4" /> 上一頁
                         </Link>
@@ -87,7 +87,7 @@ async function StockContent({ status, page }: { status: string | undefined; page
                     {hasNext ? (
                         <Link
                             href={buildHref(status, page + 1)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm transition-colors"
                         >
                             下一頁 <ChevronRight className="w-4 h-4" />
                         </Link>

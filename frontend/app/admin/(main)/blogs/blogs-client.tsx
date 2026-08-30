@@ -15,6 +15,7 @@ import usePagedList from "@/hooks/usePagedList";
 import useFilterUrl from "@/hooks/useFilterUrl";
 import { formatDateTime } from "@/libs/admin-datetime";
 import type { AdminBlogListItem, TagCount } from "@/types";
+import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
 
 const LIMIT = 50;
 
@@ -108,7 +109,6 @@ export default function BlogsClient({
 
     const filtered = Boolean(filters.q || filters.tag || filters.sort);
     const shown = Math.max(total - removed, 0);
-    const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -133,7 +133,7 @@ export default function BlogsClient({
                         onChange={e => setFilters(f => ({ ...f, q: e.target.value }))}
                         onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleSearch()}
                         placeholder="axum"
-                        className={`${inputClass} w-48`}
+                        className={`${ADMIN_FILTER_INPUT} w-48`}
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -142,7 +142,7 @@ export default function BlogsClient({
                         id="blog-tag"
                         value={filters.tag}
                         onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}
-                        className={`${inputClass} w-40`}
+                        className={`${ADMIN_FILTER_INPUT} w-40`}
                     >
                         <option value="">全部</option>
                         {tags.map(({ tag, count }) => (
@@ -156,7 +156,7 @@ export default function BlogsClient({
                         id="blog-sort"
                         value={filters.sort}
                         onChange={e => setFilters(f => ({ ...f, sort: e.target.value }))}
-                        className={`${inputClass} w-36`}
+                        className={`${ADMIN_FILTER_INPUT} w-36`}
                     >
                         <option value="">最新建立</option>
                         <option value="updated">最近更新</option>

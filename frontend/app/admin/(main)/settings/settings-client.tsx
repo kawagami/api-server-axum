@@ -5,8 +5,10 @@ import { Check, Eye, EyeOff } from "lucide-react";
 import { updateSetting } from "./actions";
 import type { Setting, SettingsResponse } from "@/types";
 import { FIELD_CONFIGS, CATEGORY_LABELS } from "./field-config";
+import { cn } from "@/libs/cn";
+import { ADMIN_INPUT } from "@/libs/input-styles";
 
-const inputClass = "px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100";
+const inputClass = cn(ADMIN_INPUT, "text-sm");
 
 export default function SettingsClient({ initialSettings }: { initialSettings: SettingsResponse }) {
     const initialValues = Object.fromEntries(
@@ -128,7 +130,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
     const renderSetting = (setting: Setting) => {
         const dirty = (drafts[setting.key] ?? "") !== (values[setting.key] ?? "");
         return (
-            <div key={setting.key} className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+            <div key={setting.key} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                     {setting.description}
                     <span className="ml-2 text-xs text-neutral-400 dark:text-neutral-500 font-mono">{setting.key}</span>

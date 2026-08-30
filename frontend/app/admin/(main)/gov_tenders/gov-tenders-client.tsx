@@ -10,6 +10,7 @@ import AdminTableContainer from "@/components/admin/admin-table-container";
 import usePagedList from "@/hooks/usePagedList";
 import useFilterUrl from "@/hooks/useFilterUrl";
 import type { GovTender } from "@/types";
+import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
 
 const LIMIT = 50;
 
@@ -46,7 +47,6 @@ export default function GovTendersClient() {
         load(page => getGovTenders({ page, per_page: LIMIT }));
     }
 
-    const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -63,7 +63,7 @@ export default function GovTendersClient() {
                             onChange={e => setFilters(f => ({ ...f, q: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleSearch()}
                             placeholder="弱點掃描"
-                            className={`${inputClass} w-48`}
+                            className={`${ADMIN_FILTER_INPUT} w-48`}
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -71,7 +71,7 @@ export default function GovTendersClient() {
                         <select
                             value={filters.tender_type}
                             onChange={e => setFilters(f => ({ ...f, tender_type: e.target.value }))}
-                            className={`${inputClass} w-48`}
+                            className={`${ADMIN_FILTER_INPUT} w-48`}
                         >
                             <option value="">全部</option>
                             {types.map(t => (
@@ -87,7 +87,7 @@ export default function GovTendersClient() {
                             onChange={e => setFilters(f => ({ ...f, keyword: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleSearch()}
                             placeholder="網站"
-                            className={`${inputClass} w-32`}
+                            className={`${ADMIN_FILTER_INPUT} w-32`}
                         />
                     </div>
                     <div className="flex gap-2">

@@ -65,7 +65,7 @@ export default function SaySomethingForm({ addr, online, focusToken }: Props) {
                     name="message"
                     rows={3}
                     placeholder="會以 admin_message 事件推給該連線"
-                    className="border border-neutral-300 dark:border-neutral-600 rounded-sm px-3 py-2 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm resize-y"
+                    className="border border-neutral-300 dark:border-neutral-600 rounded-sm px-3 py-2 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 text-sm resize-y"
                     required
                 />
             </div>

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { apiErrorStatus } from "@/libs/api-error";
 import useLedgerCategoryLabel from "@/hooks/useLedgerCategoryLabel";
 import type { LedgerEntry, LedgerInput, LedgerKind, LedgerCategories } from "@/types";
+import { PUBLIC_INPUT } from "@/libs/input-styles";
 
 interface Props {
     categories: LedgerCategories;
@@ -18,7 +19,6 @@ function todayTaipei() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 }
 
-const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 
 export default function LedgerForm({ categories, initial, onSave, onCancel }: Props) {
     const t = useTranslations('Ledger');
@@ -98,7 +98,7 @@ export default function LedgerForm({ categories, initial, onSave, onCancel }: Pr
                         step="0.01"
                         inputMode="decimal"
                         placeholder="0.00"
-                        className={inputClass}
+                        className={PUBLIC_INPUT}
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -107,7 +107,7 @@ export default function LedgerForm({ categories, initial, onSave, onCancel }: Pr
                         value={category}
                         onChange={e => setCategory(e.target.value)}
                         required
-                        className={inputClass}
+                        className={PUBLIC_INPUT}
                     >
                         <option value="" disabled>{t('selectCategory')}</option>
                         {options.map(o => (
@@ -122,7 +122,7 @@ export default function LedgerForm({ categories, initial, onSave, onCancel }: Pr
                         value={occurredAt}
                         onChange={e => setOccurredAt(e.target.value)}
                         required
-                        className={inputClass}
+                        className={PUBLIC_INPUT}
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -133,7 +133,7 @@ export default function LedgerForm({ categories, initial, onSave, onCancel }: Pr
                         onChange={e => setNote(e.target.value)}
                         maxLength={200}
                         placeholder={t('notePlaceholder')}
-                        className={inputClass}
+                        className={PUBLIC_INPUT}
                     />
                 </div>
             </div>

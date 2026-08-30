@@ -60,7 +60,7 @@ export default async function TorrentsPage({ searchParams }: { searchParams: Pro
                             href={buildHref(s)}
                             className={`px-4 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 text-sm transition-colors ${isActive
                                 ? "bg-primary-500 text-white"
-                                : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                                : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                                 }`}
                         >
                             {s ? TORRENT_STATUS_LABEL[s] ?? s : "全部"}

@@ -14,6 +14,7 @@ import useDialog from "@/hooks/useDialog";
 import type { Log, LogLevel } from "@/types";
 import { LEVEL_BADGE, LEVEL_ROW_BG } from "@/libs/badge-styles";
 import { formatDateTimeSeconds } from "@/libs/admin-datetime";
+import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
 
 const LIMIT = 100;
 const COLUMNS = 6;
@@ -189,7 +190,6 @@ export default function LogsClient() {
     }
 
     const groups = groupConsecutive(logs);
-    const inputClass = "px-2 py-1.5 text-sm rounded-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100";
 
     return (
         // 高度鏈：layout 的 h-full flex 欄 → 這裡 flex-1 → 表格區 flex-1 → AdminTableContainer fill。
@@ -244,7 +244,7 @@ export default function LogsClient() {
                         onChange={e => setQ(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSearch()}
                         placeholder="例：Cannot assign requested address"
-                        className={`${inputClass} w-full`}
+                        className={`${ADMIN_FILTER_INPUT} w-full`}
                     />
                 </div>
                 <button

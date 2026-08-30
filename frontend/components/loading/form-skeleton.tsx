@@ -14,7 +14,7 @@ export default function FormSkeleton({ fields = 4, cards = false }: { fields?: n
                         key={i}
                         className={
                             cards
-                                ? "bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 flex flex-col gap-2"
+                                ? "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 flex flex-col gap-2"
                                 : "flex flex-col gap-2"
                         }
                     >

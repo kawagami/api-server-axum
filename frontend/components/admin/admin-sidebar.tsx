@@ -237,7 +237,7 @@ export default function AdminSidebar({
 
             {/* Mobile: hamburger button */}
             <button
-                className="sm:hidden fixed top-3 left-3 z-40 p-1.5 rounded-lg bg-white dark:bg-neutral-800 shadow-sm border border-neutral-200 dark:border-neutral-700"
+                className="sm:hidden fixed top-3 left-3 z-40 p-1.5 rounded-lg bg-white dark:bg-neutral-900 shadow-sm border border-neutral-200 dark:border-neutral-700"
                 onClick={() => setDrawerOpen(true)}
                 aria-label="開啟選單"
                 aria-expanded={drawerOpen}

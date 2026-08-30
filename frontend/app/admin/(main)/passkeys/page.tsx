@@ -89,7 +89,7 @@ export default function PasskeysPage() {
                     ref={labelRef}
                     placeholder="名稱（如：工作筆電）"
                     maxLength={64}
-                    className="flex-1 px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+                    className="flex-1 px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
                 />
                 <button
                     type="button"

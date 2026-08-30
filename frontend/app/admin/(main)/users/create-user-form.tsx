@@ -57,7 +57,7 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
     }
 
     return (
-        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 space-y-3">
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 space-y-3">
             <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">新增管理員</h2>
 
             <div className="grid gap-3 sm:grid-cols-3">

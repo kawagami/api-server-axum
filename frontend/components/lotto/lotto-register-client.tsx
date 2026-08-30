@@ -12,10 +12,10 @@ import Balls from "@/components/lotto/balls";
 import LottoOcrScanner from "@/components/lotto/lotto-ocr-scanner";
 import { apiErrorStatus } from "@/libs/api-error";
 import type { LottoGame, LottoNote, LottoInput } from "@/types";
+import { PUBLIC_INPUT } from "@/libs/input-styles";
 
 type Mode = 'manual' | 'ocr';
 
-const inputClass = "border rounded-sm px-3 py-2 text-sm dark:bg-neutral-700 dark:border-neutral-600";
 
 export default function LottoRegisterClient() {
     const t = useTranslations('Lotto');
@@ -191,7 +191,7 @@ export default function LottoRegisterClient() {
                         type="date"
                         value={drawDate}
                         onChange={e => setDrawDate(e.target.value)}
-                        className={`${inputClass} w-fit`}
+                        className={`${PUBLIC_INPUT} w-fit`}
                     />
                     <span className="text-xs text-neutral-400 dark:text-neutral-500">{t('drawDateHint')}</span>
                 </div>
