@@ -142,7 +142,8 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 ## 常用指令
 
 ```bash
-docker build --no-cache -t kawagami77/api-server:axum .   # Docker build
+# 本機 build 只為驗證能不能編過；部署用的 image 一律由 CI 推(`:latest` + `:<commit sha>` 是契約,別用本機 build 覆蓋)
+docker build --no-cache -t api-server:local .              # Docker build（本機驗證用）
 cargo watch -x run                                        # 本機開發熱重載
 ```
 

@@ -109,7 +109,20 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 
 `?q=` 的搜尋是全站最貴的公開查詢：列表端點的 `count` 那一半無法靠 LIMIT 提早結束，一個命中大量文章的常見詞 ≈ **60ms 的 PG CPU**（2026-08-27 實測，2000 篇 / 3MB 表）。general 的 30r/s 放進來就是單核吃滿。
 
-`nginx.conf` 的 `search` zone（20r/m，burst 5）用一個 map 當 key：**沒有 `?q=` 時 key 是空字串，limit_req 對空 key 不計數**，所以同一條指令只對搜尋生效，一般瀏覽完全不受影響。
+`nginx.conf` 的 `search` zone（20r/m，burst 5）用一個 map 當 key：**沒有 `?q=` 時 key 是空字串，limit_req 對空 key 不計數**，所以同一條指令只對「帶 `q=` 的請求」生效，一般瀏覽不計數。
+
+### ⚠ map 只看 `q=`、不看路徑 —— 會誤中的路徑要開獨立 location（2026-08-30）
+
+`$arg_q` 是**任何**帶 `q=` 的網址，與「是不是搜尋」無關。Next.js 的圖片最佳化網址
+`/_next/image?url=…&w=1920&q=75` 那個 `q=` 是**畫質**，照樣被算進 search zone —— 圖多的 blog
+一次併發十幾張，第 7 張起（burst 5 + 1 個 rate token）一律 429，在瀏覽器上就是
+**「原圖網址打得開、頁面上卻破圖」**（2026-08-30 實測確認，commit 879a22d 修）。
+
+修法是把會誤中的路徑拉出獨立 location、只掛 `general`：目前已這樣處理的是
+`conf.d/kawa.homes.conf` 的 `location /_next/`（image 最佳化 + static 資產全段）。
+**日後前端新增任何帶 `q=` 卻不是搜尋的路徑，要照這個模式再開一個 location**，
+否則症狀是靜默的 429 破圖，不會有錯誤訊息。拉出來的 location 別自帶 `add_header` /
+`proxy_set_header`（會整組覆蓋掉 server 層那些）。
 
 兩個 vhost 都要掛,少一個等於沒掛:
 
@@ -124,6 +137,9 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 一般列表 x15   → 全 200        （不受 search zone 影響）
 搜尋     x12   → 6 個 200 後轉 429（burst 5 + 1 個 rate token）
 ```
+
+改動 `/_next/` 這類 location 後也要順手驗一次圖：連開一頁圖多的 blog，
+`curl -sI 'https://kawa.homes/_next/image?url=…&w=1920&q=75'` 連打 10 次應全 200。
 
 ## 公開 API 快取（`api_cache`，2026-08-27）
 
@@ -510,17 +526,23 @@ bash shells/issue-cert.sh && docker compose restart nginx
 migration 啟動時自動跑完，`roles` / `permissions` 有 seed，但 **users 沒有**，
 而 `POST /admin/users` 在認證牆後 — 第一個帳號只能手動塞：
 
+⚠️ **`name` 必填、而且它才是登入帳號**：`users.name` 是 `NOT NULL` 且無預設（少了它整句 INSERT
+就失敗），登入查的是 `WHERE name = $1`（`repositories/users.rs`，2026-07-06 起 email 降為選填）。
+只塞 email 的話不但寫不進去，寫進去也登不了。
+
 ```bash
 # 產 bcrypt hash
 docker run --rm python:3-alpine sh -c "pip -q install bcrypt && python -c \"import bcrypt;print(bcrypt.hashpw(b'你的密碼', bcrypt.gensalt()).decode())\""
 
 docker exec -it database psql -U kawa -d kawa -c "
-  INSERT INTO users (email, password) VALUES ('you@example.com', '<上面的hash>');
+  INSERT INTO users (name, email, password) VALUES ('admin', 'you@example.com', '<上面的hash>');
   INSERT INTO user_roles (user_id, role_id)
     SELECT u.id, r.id FROM users u, roles r
-    WHERE u.email = 'you@example.com' AND r.name = 'super_admin';
+    WHERE u.name = 'admin' AND r.name = 'super_admin';
 "
 ```
+
+登入頁填的是上面那個 `name`（`admin`）＋密碼，不是 email。
 
 ### 5. 後台補 runtime 設定
 
