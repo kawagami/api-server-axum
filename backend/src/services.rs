@@ -21,6 +21,7 @@ pub mod roster;
 pub mod stats;
 pub mod stocks;
 pub mod system_metrics;
+pub mod tools;
 pub mod torrents;
 pub mod twse;
 pub mod users;
