@@ -18,6 +18,10 @@
 # ⚠ 第二種靜默失敗:**群組 PR 開出來不代表成員到齊**（dependabot 對某個包報錯時，
 # 它照樣把其餘的送進 PR，少的那個看起來就像「沒新版」）。實例與檢查方式見下面
 # npm 那段 `prod-minor-patch` 的註解。
+#
+# ⚠ 第三種靜默失敗:**自己搶先手動升，會讓 dependabot 把整個群組 PR 連內容一起關掉**
+# —— 你補到的成員被當成「這個 PR 沒用了」的理由，沒補到的成員就跟著 PR 一起消失。
+# 實例與檢查方式同樣見下面 `prod-minor-patch` 的註解。
 
 version: 2
 updates:
@@ -78,6 +82,27 @@ updates:
       #   要補 next 就跟 eslint-config-next **一起**升，免得版本歪掉。
       #   ⚠ 一律用 `corepack pnpm` 而不是裸 pnpm:package.json 的 packageManager 釘 10.x，
       #   版本不同會寫出 CI `--frozen-lockfile` 讀不了的 lock。
+      #
+      # ── 第三種形狀:**手動先升 → PR 被判 superseded 整包關掉，漏帶的成員一起消失**
+      #
+      # 上面兩次是「PR 開出來但少成員」。2026-09-02 這次相反:**PR 直接不見。**
+      # 手動升 next 16.3.4 / sharp 0.35.4 / eslint-config-next 並 push 後 1 分鐘，
+      # dependabot 兩個 update job 判 **failure**，接著把 PR #39 / #40 關掉
+      # （`merged: false`）—— 因為 master 已經有 next 與 sharp 的目標版本。
+      # 但那兩個 PR 是**群組**，我們只帶了其中兩個成員，於是
+      #   PR #40  jose 6.2.9→6.2.10 漏（proxy.ts 驗 session cookie 用的就是它）
+      #   PR #39  @types/react-dom 19.2.4→19.2.5 漏
+      # 靜默落地，要等下一次 weekly 才重開（後來以 commit 394330d 手動補上）。
+      #
+      # ⚠ **紅燈本身無害，被關掉的 PR 內容才是問題。** 那兩個 job 失敗不影響部署
+      # （同一時間的 frontend-ci 是 success，image 照推、VPS 照重啟）。
+      # 而 run log 匿名抓不到（`Must have admin rights to Repository.`），
+      # 判讀靠時間軸:比對自己 push 的時間與
+      #   /repos/<owner>/<repo>/pulls?state=all 裡各 PR 的 closed_at。
+      #
+      # ⇒ **手動搶先升依賴後，一定要再跑一次 `corepack pnpm outdated`**，
+      #   確認沒有成員被連帶丟掉。順手把 dependabot 剛關掉的 PR 標題讀完
+      #   （關掉的 PR 仍留在 /pulls?state=all），標題裡的每個包都要在 master 上到位。
       prod-minor-patch:
         dependency-type: production
         update-types: ["minor", "patch"]
