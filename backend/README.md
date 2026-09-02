@@ -135,6 +135,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `TORRENT_PATH` | 否 | `./torrents` |
 | `TRUST_CF_HEADER` | 否 | `false`（true/1 才信任 CF-Connecting-IP，僅限只經 Cloudflare 的部署） |
 | `RUST_LOG` | 否 | 未設時 release build 用 `info,tower_http=warn`、debug build 用全 `debug`（`main.rs::default_log_filter`）。這是 stdout 的 filter，也是 `logs` 表門檻（`app_settings.log_db_level`）的天花板 |
+| `REDIS_TEST_REQUIRED` | 否 | —（**測試用**，非 runtime 設定：設了之後 `repositories/redis.rs` 的整合測試連不上 Redis 會 panic 而非靜默跳過；CI 已設） |
 | `GOOGLE_CLIENT_SECRET` | 否 | — |
 | `GITHUB_CLIENT_SECRET` | 否 | — |
 | `LINE_CLIENT_SECRET` | 否 | — |

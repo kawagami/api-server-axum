@@ -74,7 +74,7 @@ jobs:
         with:
           context: ./frontend
           push: true
-          # :latest 供 docker-env 部署；:sha 供回滾（docker pull kawagami77/my-next-blog:<sha>）
+          # :latest 供 deploy/ 的 compose 部署（VPS ~/kawa-deploy）；:sha 供回滾（docker pull kawagami77/my-next-blog:<sha>）
           tags: |
             kawagami77/my-next-blog:latest
             kawagami77/my-next-blog:${{ github.sha }}

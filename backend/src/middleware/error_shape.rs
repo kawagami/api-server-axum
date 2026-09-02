@@ -1,10 +1,11 @@
 //! 把**不是 handler 產生**的錯誤回應換成全站統一形狀。
 //!
-//! `crate::extract` 收掉的是 extractor 的 rejection，但還有兩種錯誤根本輪不到 extractor：
+//! `crate::extract` 收掉的是 extractor 的 rejection，但還有三種錯誤根本輪不到 extractor：
+//! - **408** —— `TimeoutLayer`（60 秒，見 `routes.rs`）逾時，回**空 body**
 //! - **413** —— `RequestBodyLimitLayer` 直接回純文字 `length limit exceeded`
 //! - **405** —— Router 對不上 method，回**空 body** + `Allow` header
 //!
-//! 兩者都不經過 `AppError`：body 形狀不一致、body 內沒有 `request_id`、也不落 log。
+//! 三者都不經過 `AppError`：body 形狀不一致、body 內沒有 `request_id`、也不落 log。
 //! 413 尤其該補 —— 上傳失敗是這個站已知的痛點（nginx `client_max_body_size` 與這裡的
 //! 10MB 必須相等，見 `routes.rs`），而「上傳到一半斷掉」正是最難查的那種回報。
 //!

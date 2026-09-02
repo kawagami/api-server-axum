@@ -95,7 +95,13 @@ pnpm lint         # ESLint（flat config）
 API_URL=https://api.kawa.homes
 WS_URL=wss://api.kawa.homes
 JWT_SECRET=...
+# 選填：瀏覽器直接打的連結用（torrent 下載），沒設 fallback API_URL
+API_PUBLIC_URL=https://api.kawa.homes
+# 選填：/changelog 的來源 repo，沒設 fallback 本 repo，空字串 = 關閉該頁
+GITHUB_REPO=kawagami/api-server-axum
 ```
+
+完整清單見 `.env.example`。
 
 ---
 
