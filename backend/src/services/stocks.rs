@@ -9,8 +9,8 @@ use crate::{
     structs::stocks::{
         Conditions, GetStockDayAll, NewStockClosingPrice, StockBuybackMoreInfo,
         StockBuybackPeriod, StockChange, StockChangeRef,
-        StockClosingPriceResponse, StockDayAll, StockDayAllInsertRow, StockDayAvgResponse,
-        BuybackRecord, StockRequest, StockStats
+        StockDayAll, StockDayAllInsertRow, StockDayAvgResponse,
+        BuybackRecord
     },
     utils::date::{parse_roc_compact_date, parse_roc_date},
     utils::reqwest::get_raw_html_string
@@ -396,42 +396,6 @@ pub async fn get_stock_buyback_periods(
     pool: &Pool<Postgres>,
 ) -> Result<Vec<StockBuybackPeriod>, AppError> {
     stocks_repo::get_stock_buyback_periods(pool).await
-}
-
-pub async fn get_closing_price_pair_stats(
-    pool: &Pool<Postgres>,
-    client: &Client,
-    payload: &StockRequest,
-) -> Result<StockClosingPriceResponse, AppError> {
-    let start_date = NaiveDate::parse_from_str(&payload.start_date, "%Y%m%d")
-        .map_err(|_| RequestError::InvalidContent(format!("invalid start_date: {}", payload.start_date)))?;
-    let end_date = NaiveDate::parse_from_str(&payload.end_date, "%Y%m%d")
-        .map_err(|_| RequestError::InvalidContent(format!("invalid end_date: {}", payload.end_date)))?;
-
-    let (start_price, end_price) = tokio::try_join!(
-        fetch_stock_price_for_date(pool, client, &payload.stock_no, start_date),
-        fetch_stock_price_for_date(pool, client, &payload.stock_no, end_date)
-    )?;
-
-    let price_diff = round_to_n_decimal(end_price.close_price - start_price.close_price, 2);
-    let raw_percent_change = if start_price.close_price != 0.0 {
-        (price_diff / start_price.close_price) * 100.0
-    } else {
-        0.0
-    };
-    let percent_change = round_to_n_decimal(raw_percent_change, 2);
-    let is_increase = price_diff > 0.0;
-    let day_span = (end_price.date - start_price.date).num_days();
-
-    Ok(StockClosingPriceResponse {
-        prices: (start_price, end_price),
-        stats: StockStats {
-            price_diff,
-            percent_change,
-            is_increase,
-            day_span,
-        },
-    })
 }
 
 #[cfg(test)]

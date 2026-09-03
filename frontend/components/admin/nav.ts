@@ -42,7 +42,6 @@ export const adminNavGroups: AdminNavGroup[] = [
             { label: "異動列表", href: "/admin/stocks/list", permission: "stock:read", feature: "stocks" },
             { label: "回購計畫", href: "/admin/stocks/get-buyback-plans", permission: "stock:read", feature: "stocks" },
             { label: "未完成回購", href: "/admin/stocks/get-unfinished-buyback-price-gap", permission: "stock:read", feature: "stocks" },
-            { label: "收盤價查詢", href: "/admin/stocks/fetch-stock-closing-price-pair", permission: "stock:read", feature: "stocks" },
             { label: "當日全部", href: "/admin/stocks/stock-day-all", permission: "stock:read", feature: "stocks" },
         ],
     },

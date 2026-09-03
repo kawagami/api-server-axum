@@ -34,24 +34,6 @@ export async function getStockChanges(
     });
 }
 
-function isValidDateFormat(dateStr: string): boolean {
-    if (!/^\d{8}$/.test(dateStr)) return false;
-    const month = parseInt(dateStr.substring(4, 6), 10);
-    const day = parseInt(dateStr.substring(6, 8), 10);
-    if (month < 1 || month > 12) return false;
-    const daysInMonth = new Date(parseInt(dateStr.substring(0, 4), 10), month, 0).getDate();
-    return day >= 1 && day <= daysInMonth;
-}
-
-export async function fetchStockClosingPricePair({ stock_no, start_date, end_date }: { stock_no: string; start_date: string; end_date: string }): Promise<unknown> {
-    if (!isValidDateFormat(start_date) || !isValidDateFormat(end_date)) throw new Error("日期格式錯誤，必須是 YYYYMMDD 格式");
-    const url = new URL(`${process.env.API_URL}/admin/stocks/closing_price_stats`);
-    url.searchParams.append("stock_no", stock_no);
-    url.searchParams.append("start_date", start_date);
-    url.searchParams.append("end_date", end_date);
-    return adminRequest({ url: url.toString(), method: "GET" });
-}
-
 export async function getStockDayAll({ trade_date = "", stock_code = "", page = 1, perPage = 100 } = {}): Promise<PaginatedResponse<StockDayAll>> {
     const url = new URL(`${process.env.API_URL}/admin/stocks/day_all`);
     if (trade_date) url.searchParams.append("trade_date", trade_date);

@@ -9,7 +9,7 @@ use crate::{
         roles::Perm,
         stocks::{
             Conditions, GetStockDayAll, StockBuybackMoreInfo, StockBuybackPeriod, StockChange,
-            StockClosingPriceResponse, StockDayAll, StockRequest
+            StockDayAll
         }
     }
 };
@@ -26,7 +26,6 @@ pub fn new(state: AppState) -> Router<AppState> {
         Router::new()
             .route("/changes", get(list_stock_changes))
             .route("/changes/{id}/pending", patch(reset_stock_change_pending))
-            .route("/closing_price_stats", get(closing_price_stats))
             .route("/day_all", get(stock_day_all))
             .route("/buyback_price_gaps", get(buyback_price_gaps))
             .route("/buyback_periods", get(buyback_periods)),
@@ -53,15 +52,6 @@ async fn reset_stock_change_pending(
     auth_user.require_permission(Perm::StockUpdate)?;
     stocks_service::update_one_stock_change_pending(state.get_pool(), id).await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-async fn closing_price_stats(
-    Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppState>,
-    Query(payload): Query<StockRequest>,
-) -> Result<Json<StockClosingPriceResponse>, AppError> {
-    auth_user.require_permission(Perm::StockRead)?;
-    Ok(Json(stocks_service::get_closing_price_pair_stats(state.get_pool(), state.get_http_client(), &payload).await?))
 }
 
 async fn stock_day_all(

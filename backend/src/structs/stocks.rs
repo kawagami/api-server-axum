@@ -3,14 +3,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-/// HTML 解析 / buyback API 輸入用（民國日期字串）
-#[derive(Serialize, Deserialize, FromRow)]
-pub struct StockRequest {
-    pub stock_no: String,
-    pub start_date: String,
-    pub end_date: String,
-}
-
 /// HTML 解析庫藏股結果（已轉換為西元 NaiveDate）
 pub struct BuybackRecord {
     pub stock_no: String,
@@ -60,20 +52,6 @@ pub struct NewStockClosingPrice {
     pub stock_no: String,
     pub date: NaiveDate,
     pub close_price: f64,
-}
-
-#[derive(Serialize)]
-pub struct StockClosingPriceResponse {
-    pub prices: (NewStockClosingPrice, NewStockClosingPrice),
-    pub stats: StockStats,
-}
-
-#[derive(Serialize)]
-pub struct StockStats {
-    pub price_diff: f64,
-    pub percent_change: f64,
-    pub is_increase: bool,
-    pub day_span: i64,
 }
 
 #[derive(Deserialize)]
