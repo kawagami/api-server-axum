@@ -40,7 +40,7 @@
 | `/{locale}/about` | 關於頁面 |
 | `/{locale}/contact` | 聯絡表單 |
 | `/{locale}/login` | OAuth 登入（Google；GitHub / LINE 前端仍標「規劃中」，後端已支援） |
-| `/admin/*` | 後台管理（需登入，無 locale prefix）：文章／文章留言、圖片、股票（5 個子頁）、會員、角色、使用者、WS、對局總覽、Torrents、單字題庫、標案、留言、日誌／稽核日誌／系統指標、到訪統計、passkey、改密碼、設定、平台設定 |
+| `/admin/*` | 後台管理（需登入，無 locale prefix）：文章／文章留言、圖片、股票（4 個子頁）、會員、角色、使用者、WS、對局總覽、Torrents、單字題庫、標案、留言、日誌／稽核日誌／系統指標、到訪統計、passkey、改密碼、設定、平台設定 |
 
 ---
 
