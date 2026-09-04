@@ -77,6 +77,13 @@ pub enum RequestError {
     /// （5xx 在轉換函式那層就變成 `SystemError`，所以這個 variant 恆為 4xx。）
     #[error("{message}")]
     Rejection { status: StatusCode, message: String },
+
+    /// path 參數解析失敗（`/blogs/null` 這種）。內容跟 `Rejection` 一樣，分成兩個
+    /// variant 只為了 log 分級：壞掉的 path 參數跟 404 同性質（都是壞連結或掃站），
+    /// 量大且不需要人看，所以走 `is_routine_request` 降到 debug。
+    /// body / 狀態碼與 `Rejection` 完全相同。
+    #[error("{message}")]
+    PathRejection { status: StatusCode, message: String },
 }
 
 #[derive(Error, Debug)]
@@ -171,6 +178,7 @@ impl AppError {
                 RequestError::NotFound => StatusCode::NOT_FOUND,
                 RequestError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
                 RequestError::Rejection { status, .. } => *status,
+                RequestError::PathRejection { status, .. } => *status,
             },
             Self::AuthError(err) => match err {
                 AuthError::MissingToken => StatusCode::UNAUTHORIZED,
@@ -233,16 +241,21 @@ fn is_routine_auth(err: &AuthError) -> bool {
 /// 於是所有 4xx 在 `logs` 表**零紀錄**。使用者回報最多的「按了沒反應 / 存不進去」正是
 /// 422 與 409。
 ///
-/// 兩個例外：
+/// 三個例外：
 /// - `NotFound` —— 爬蟲掃站（/wp-admin 之類）與 `with_feature` 關閉功能都走這條，
 ///   跟 `TokenExpired` 同一種噪音。
 /// - `TooManyRequests` —— 被擋下的請求**本來就是連續一整串**，每筆一列等於讓攻擊者
 ///   決定 `logs` 表的寫入量。這條的訊號已經由 `middleware/rate_limit.rs` 記了：
 ///   只在 `count == max + 1`（剛超過）那一刻一筆 WARN，帶 scope 與 ip。
+/// - `PathRejection` —— `/blogs/null` 這種 path 參數型別不合，來源是壞連結與掃站，
+///   跟 `NotFound` 同一種噪音（實測 14 天 6 筆全來自外部亂打的 URL）。**只有 path**：
+///   body / query 的 rejection 仍走 `Rejection` 留在 WARN，那些是自家前端送錯的訊號。
 fn is_routine_request(err: &RequestError) -> bool {
     matches!(
         err,
-        RequestError::NotFound | RequestError::TooManyRequests(_)
+        RequestError::NotFound
+            | RequestError::TooManyRequests(_)
+            | RequestError::PathRejection { .. }
     )
 }
 

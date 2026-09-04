@@ -13,6 +13,8 @@
 //!
 //! ⚠️ **狀態碼一律沿用 axum 原本回的**（`RequestError::Rejection` 帶著 `status` 走），
 //! 只換 body。逐一映射到既有 variant 會在 axum 新增 rejection 種類時悄悄改掉狀態碼。
+//! （`Path` 的 4xx 改帶 `RequestError::PathRejection` —— 狀態碼與 body 一樣，只是 log
+//! 降到 debug，理由見 `path_to_app_error`。）
 //!
 //! ⚠️ **`clippy.toml` 把 `axum::Json` / `axum::extract::Query` / `axum::extract::Path`
 //! 列為禁用型別**，CI 跑的是 `cargo clippy -- -D warnings`，所以用錯會直接紅燈。
@@ -24,7 +26,7 @@
 // 這裡就是那個包裝層，本來就得直接碰 axum 的原生型別
 #![allow(clippy::disallowed_types)]
 
-use crate::errors::{normalize_error_response, AppError};
+use crate::errors::{normalize_error_response, AppError, RequestError, SystemError};
 use axum::{
     extract::{FromRequest, FromRequestParts, OptionalFromRequest, Request},
     http::request::Parts,
@@ -32,7 +34,7 @@ use axum::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 
-/// rejection → `AppError`。
+/// rejection → `AppError`（`Json` / `Query` 用；`Path` 走下面的 `path_to_app_error`）。
 ///
 /// 5xx 的 rejection 只有 `PathRejection::MissingPathParams`（handler 的 `Path<T>` 與
 /// 路由上的 `{param}` 對不起來 —— 那是**我們寫錯**，不是使用者送錯），所以轉成
@@ -107,6 +109,24 @@ where
     }
 }
 
+/// `Path` 專用的 rejection → `AppError`。
+///
+/// 跟 `to_app_error` 差在 4xx 走 `RequestError::PathRejection`：狀態碼與 body 完全相同，
+/// 只是 log 降到 debug。`/blogs/null` 這種型別不合的 path 參數一律來自壞連結或掃站
+/// （前端的 id 都是從 API 拿的，不會自己生出 `null`），留在 WARN 只是噪音。
+/// 5xx（`MissingPathParams`）仍是我們寫錯，照樣記 ERROR。
+fn path_to_app_error<R>(rejection: R) -> AppError
+where
+    R: IntoResponse + std::fmt::Display,
+{
+    let message = rejection.to_string();
+    let status = rejection.into_response().status();
+    if status.is_server_error() {
+        return AppError::SystemError(SystemError::Internal(message));
+    }
+    RequestError::PathRejection { status, message }.into()
+}
+
 /// `axum::extract::Path` 的替身
 pub struct Path<T>(pub T);
 
@@ -120,7 +140,7 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let axum::extract::Path(value) = axum::extract::Path::<T>::from_request_parts(parts, state)
             .await
-            .map_err(to_app_error)?;
+            .map_err(path_to_app_error)?;
         Ok(Self(value))
     }
 }
