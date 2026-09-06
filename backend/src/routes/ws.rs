@@ -20,8 +20,17 @@ use axum::{
     Router
 };
 use axum_extra::{headers, TypedHeader};
+use tracing::Instrument;
 use futures::{sink::SinkExt, stream::StreamExt};
-use std::{net::SocketAddr, ops::ControlFlow, sync::Arc, time::SystemTime};
+use std::{
+    net::SocketAddr,
+    ops::ControlFlow,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::SystemTime,
+};
 use tokio::{
     sync::Mutex,
     time::{Duration, Instant},
@@ -131,8 +140,25 @@ async fn ws_handler(
         });
     }
 
-    ws.on_upgrade(move |socket| handle_socket(socket, addr, state, user_email, real_ip, user_agent))
-        .into_response()
+    // WS 的 log 全部掛在這條 span 底下。少了它，upgrade 之後的 socket task 既沒有
+    // `request_id`（那是 task-local，留在握手那個 task 裡）也沒有任何結構化欄位 ——
+    // `logs` 表裡只剩一段夾著 SocketAddr 的字串，對不回任何一條連線、也對不回握手請求。
+    // 必須顯式 `instrument`：`on_upgrade` 的 future 由 hyper 在另一個 task 上驅動，
+    // 當下的 span context 不會自己跟過去。
+    let span = tracing::info_span!(
+        "ws",
+        conn = %addr,
+        ip = %real_ip,
+        email = %user_email.as_deref().unwrap_or("-"),
+        // `DbLogLayer` 把 "-" 視同沒有，不會落地成假的 request_id
+        request_id = %crate::middleware::request_id::current_request_id()
+            .unwrap_or_else(|| "-".to_string()),
+    );
+
+    ws.on_upgrade(move |socket| {
+        handle_socket(socket, addr, state, user_email, real_ip, user_agent).instrument(span)
+    })
+    .into_response()
 }
 
 async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_email: Option<String>, real_ip: String, user_agent: String) {
@@ -170,20 +196,34 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     // std Mutex：只包一個 Instant，鎖不跨 await。
     let last_pong = Arc::new(std::sync::Mutex::new(Instant::now()));
 
+    // 收到的應用層訊息數。放在 task 外面共享，`select!` 不論由哪一邊勝出都拿得到
+    // —— 連線結束摘要（見下方 info）少了這個數字就答不出「掉線前對方還在動嗎」。
+    let msg_count = Arc::new(AtomicU64::new(0));
+
     // --- recv_task: 接收客戶端訊息 ---
     let recv_state_clone = state.clone();
     let recv_last_pong = last_pong.clone();
+    let recv_msg_count = msg_count.clone();
+    // 迴圈以「結束原因」收尾：那是摘要裡唯一能說明「為什麼掉線」的欄位，
+    // 也是判斷「一群人同時掉線」是我方還是對端的依據。
     let mut recv_task = tokio::spawn(async move {
-        let mut cnt = 0;
         let mut receiver = receiver;
         // 單條連線的收訊額度（純區域狀態，無鎖）。超量的訊息直接丟掉不解析 ——
         // 收線是最後手段：前端 ws-context 會自動重連，一超量就關等於送對方一個重連迴圈。
         let mut budget = ws_service::MessageBudget::new();
         let mut dropped = 0u32;
-        while let Some(msg_result) = receiver.next().await {
+        loop {
+            let Some(msg_result) = receiver.next().await else {
+                // 對端關掉 TCP，連 Close 帧都沒送（關分頁最常見的形狀）
+                break "stream_end";
+            };
             match msg_result {
                 Ok(msg) => {
-                    cnt += 1;
+                    // 只算應用層訊息（Text/Binary）。控制帧不計 —— Pong 是我們自己每 30 秒
+                    // 要來的，混進去會讓「掉線前對方還在動嗎」這個問題恆為 yes。
+                    if matches!(msg, Message::Text(_) | Message::Binary(_)) {
+                        recv_msg_count.fetch_add(1, Ordering::Relaxed);
+                    }
                     // 存活證明只認 Pong（其餘訊息可能來自沒在讀我們 ping 的客戶端）
                     if matches!(msg, Message::Pong(_)) {
                         *recv_last_pong.lock().unwrap() = Instant::now();
@@ -204,12 +244,12 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
                         }
                         if dropped >= MAX_DROPPED_MESSAGES {
                             tracing::warn!("{who} 持續灌訊息（已丟 {dropped} 則），收線");
-                            break;
+                            break "flood";
                         }
                         continue;
                     }
                     if process_message(msg, who, &recv_state_clone).await.is_break() {
-                        break;
+                        break "client_close";
                     }
                 }
                 Err(e) => {
@@ -218,11 +258,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
                     // （實測佔了 logs 表 WARN+ 的 45%）。而且斷線後下面照樣走完整清理，
                     // 沒有任何要人介入的事。真正需要注意的送出失敗另有其他 log。
                     tracing::debug!("Error receiving message from {}: {}", who, e);
-                    break;
+                    break "recv_error";
                 }
             }
         }
-        cnt
     });
 
     // --- ping_task: 主動發 Ping，並在遲遲收不到 Pong 時收掉連線 ---
@@ -243,32 +282,30 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
                     "{who} 已 {} 秒沒回 Pong，判定連線已死並清理",
                     silent_for.as_secs()
                 );
-                break;
+                break "pong_timeout";
             }
 
             {
                 let mut sender_guard = ping_sender_clone.lock().await;
                 if let Err(e) = sender_guard.send(Message::Ping(Bytes::new())).await {
                     tracing::warn!("Failed to send ping to {who}: {}", e);
-                    break;
+                    break "ping_failed";
                 }
             }
         }
     });
 
     // --- tokio::select!: 協調所有任務 ---
-    tokio::select! {
-        rv_b = (&mut recv_task) => {
-            if let Err(e) = rv_b {
-                tracing::error!("Error in recv_task for {who}: {:?}", e);
-            }
-        },
-        rv_c = (&mut ping_task) => {
-            if let Err(e) = rv_c {
-                tracing::error!("Error in ping_task for {who}: {:?}", e);
-            }
-        }
-    }
+    let reason = tokio::select! {
+        rv_b = (&mut recv_task) => rv_b.unwrap_or_else(|e| {
+            tracing::error!("Error in recv_task for {who}: {:?}", e);
+            "recv_task_error"
+        }),
+        rv_c = (&mut ping_task) => rv_c.unwrap_or_else(|e| {
+            tracing::error!("Error in ping_task for {who}: {:?}", e);
+            "ping_task_error"
+        }),
+    };
 
     // 清理工作
     recv_task.abort();
@@ -277,7 +314,20 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user
     // 最終清理連接
     cleanup_connection(&state, who).await;
 
-    tracing::debug!("Websocket context {who} ({real_ip}) destroyed");
+    // **INFO 不是 debug**：生產的 `RUST_LOG` 天花板是 `info`（見 `main.rs`），所以 WS
+    // 這邊原本清一色的 `debug!` 在生產**根本不存在** —— EnvFilter 就擋掉了，stdout 與
+    // `logs` 表兩邊都沒有，「一群人同時掉線」事後完全無跡可循。
+    //
+    // 每條連線只留這一行摘要（開了多久、收了幾則、為什麼結束），其餘識別欄位
+    // （conn / ip / email / request_id）在 span 上，量級 = 每條連線一行。
+    // 落地 `logs` 表仍需把 `log_db_level` 調到 INFO（預設 WARN 不收），但 stdout 一定有。
+    // 逐則收訊/送出失敗維持 debug 不變（那是關分頁的常態，理由見上面的 recv 迴圈）。
+    tracing::info!(
+        reason,
+        duration_secs = connected_at.elapsed().map(|d| d.as_secs()).unwrap_or(0),
+        messages = msg_count.load(Ordering::Relaxed),
+        "websocket 連線結束"
+    );
 }
 
 /// 依信封 `game` 欄分派給對應遊戲 hub。回傳 true 表示已當作遊戲訊息處理。

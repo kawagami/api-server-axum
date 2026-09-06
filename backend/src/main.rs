@@ -42,6 +42,9 @@ async fn main() {
         .with(logging::DbLogLayer::new(log_tx))
         .init();
 
+    // 必須在 subscriber 之後：hook 內容是 `tracing::error!`，沒有 subscriber 的話那行會蒸發
+    install_panic_hook();
+
     let app = routes::app(log_rx).await;
 
     // 設定伺服器監聽的主機與埠號
@@ -94,6 +97,48 @@ fn default_log_filter() -> String {
     } else {
         format!("{crate_name}=info,tower_http=warn")
     }
+}
+
+/// 讓**所有** panic 都留下一筆 `tracing` ERROR。
+///
+/// 沒有這個的話，panic 的唯一痕跡是預設 hook 印在 **stderr** 的那段 —— 它不經 tracing，
+/// 所以 `logs` 表零筆、`kawa-logs rid` 撈不到，只能上 VPS 撈 `docker logs`（10m×3）。
+/// 請求路徑有 `CatchPanicLayer`（`errors::handle_panic`）、排程有 `scheduler.rs` 的
+/// `is_panic` 檢查，但那之外還有一整批裸 `tokio::spawn` 沒人接住：torrents 的
+/// `sync_active` / `run_torrent`、ws 的 recv / ping task、遊戲的 `timeout_watcher`、
+/// 廣播用的 per-connection task，以及**兩個批次寫入器自己**（那個最糟 —— log 管線死掉
+/// 且靜默，見 `batch_writer::supervise`）。
+///
+/// 刻意保留預設 hook 並先呼叫它：backtrace（`RUST_BACKTRACE=1`）只有它拿得到。
+/// 因此 handler panic 會有兩筆紀錄 —— 這裡帶檔案:行號，`handle_panic` 帶 request_id。
+fn install_panic_hook() {
+    // 巢狀防護：`DbLogLayer::on_event` 自己 panic 時，這裡再 `tracing::error!` 會遞迴
+    // 回 `on_event` → panic in panic → process abort。那種情況只留預設 hook 的 stderr。
+    thread_local! {
+        static IN_HOOK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    }
+
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        default_hook(info);
+
+        if IN_HOOK.get() {
+            return;
+        }
+        IN_HOOK.set(true);
+        // location 是這筆紀錄的價值所在：panic 的訊息常常是 `unwrap()` 的固定字串，
+        // 沒有檔案:行號就不知道是哪一顆
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "unknown".to_string());
+        tracing::error!(
+            panic = %errors::panic_message(info.payload()),
+            location = %location,
+            "task panicked"
+        );
+        IN_HOOK.set(false);
+    }));
 }
 
 // 監聽系統訊號，實作優雅關閉機制

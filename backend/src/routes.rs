@@ -158,11 +158,18 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
 
     // 兩個批次寫入器：WARN+ 的 log 與 /admin/* 的稽核紀錄。
     // 都刻意不在請求路徑上碰 DB —— 尖峰時不與真正的查詢搶那 20 條連線。
-    tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone()));
-    tokio::spawn(crate::services::audit_logs::audit_writer(
-        audit_rx,
-        state.get_pool().clone(),
-    ));
+    // 兩者都掛 `supervise`：它們死掉等於觀測資料靜默停止落地，是最糟的失敗模式
+    crate::batch_writer::supervise(
+        "log_writer",
+        tokio::spawn(crate::logging::log_writer(log_rx, state.get_pool().clone())),
+    );
+    crate::batch_writer::supervise(
+        "audit_writer",
+        tokio::spawn(crate::services::audit_logs::audit_writer(
+            audit_rx,
+            state.get_pool().clone(),
+        )),
+    );
 
     initialize_scheduler(state.clone()).await;
 

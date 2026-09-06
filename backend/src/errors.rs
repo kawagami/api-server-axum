@@ -308,6 +308,17 @@ pub fn normalize_error_response(status: StatusCode, message: String) -> AppError
     RequestError::Rejection { status, message }.into()
 }
 
+/// panic payload 轉字串。`CatchPanicLayer` 與 `main.rs` 的 panic hook 共用 ——
+/// 兩邊拿到的都只是 `dyn Any`，而 payload 的實際型別只有 `&str` / `String` 兩種常見情況，
+/// 取不到就留個明確字串（比空字串好查）。
+pub fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<&'static str>()
+        .map(|s| (*s).to_string())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "non-string panic payload".to_string())
+}
+
 /// handler panic 的回應（給 `CatchPanicLayer::custom` 用）。
 ///
 /// 沒有這層的話 panic 只會讓連線被切斷：client 看到的是 network error 而不是 500、
@@ -319,12 +330,7 @@ pub fn normalize_error_response(status: StatusCode, message: String) -> AppError
 ///
 /// 回應形狀走 `AppError`，所以自動帶 `request_id`、細節不外洩（統一的 500 訊息）。
 pub fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
-    // panic payload 只有 &str / String 兩種常見型別，取不到就留個明確字串
-    let detail = err
-        .downcast_ref::<&'static str>()
-        .map(|s| (*s).to_string())
-        .or_else(|| err.downcast_ref::<String>().cloned())
-        .unwrap_or_else(|| "non-string panic payload".to_string());
+    let detail = panic_message(&*err);
 
     // 這行才是查得到的那筆：`?q=panic` 能直接撈出來，位置資訊在 stderr 的 hook 輸出裡
     tracing::error!(panic = %detail, "handler panicked");

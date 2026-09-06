@@ -63,6 +63,26 @@ where
     }
 }
 
+/// 監看長駐寫入 task 的死亡。
+///
+/// `log_writer` 一旦 panic，**tracing 這條路本身就斷了**：event 照樣進 `DbLogLayer`、
+/// 照樣塞進 channel，但再也沒人取出 → 佇列塞滿 → 全部丟棄，而負責喊丟棄數的
+/// `logging::report_dropped` 也隨那個 task 一起沒了，徵兆完全為零。
+/// 所以這裡用 `eprintln!`（同 `logging::flush` 的理由）：那是這條管線壞掉時
+/// 唯一還活著的通道。panic 的內容與位置由 `main.rs` 的 panic hook 另外記一筆。
+pub fn supervise(name: &'static str, handle: tokio::task::JoinHandle<()>) {
+    tokio::spawn(async move {
+        match handle.await {
+            // 正常關機：sender 全部 drop → `run` 把剩下的寫完才返回
+            Ok(()) => eprintln!("{name}: 已結束（channel 關閉）"),
+            Err(e) if e.is_panic() => {
+                eprintln!("{name}: panic 中止，此後不再寫入任何資料（panic 位置見 ERROR log）")
+            }
+            Err(e) => eprintln!("{name}: task 中止: {e}"),
+        }
+    });
+}
+
 /// 取走整批、原地換一個保有容量的空 buffer（`mem::take` 會退回容量 0，每輪重新配置）
 fn take<T>(buf: &mut Vec<T>) -> Vec<T> {
     std::mem::replace(buf, Vec::with_capacity(BATCH_SIZE))
