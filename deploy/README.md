@@ -171,8 +171,9 @@ curl -sI https://api.kawa.homes/blogs -H 'Cookie: a=b' | grep -i x-cache-status 
 沒有 `X-Cache-Status` 這個 header ＝ 請求根本沒進到那個 location。一直 MISS ＝ backend 沒送 `Cache-Control`,或快取目錄不可寫（`docker exec nginx ls -ld /var/cache/nginx/api`,並看 `docker logs nginx` 有沒有 `Permission denied`）。
 
 > ⚠️ 這兩節（`search` zone 與 `api_cache`）**同時動了 `nginx.conf` 與 `conf.d/`**，所以
-> **必須 recreate nginx，不能只 reload** —— `limit_req_zone search` / `proxy_cache_path`
-> 都在 `nginx.conf` 裡，只 reload 的話容器吃到的是舊檔，會報 `zero size shared memory
+> **必須 recreate nginx，不能只 reload** —— `limit_req_zone search` 在 `nginx.conf` 裡
+> （`proxy_cache_path` 則在 `conf.d/02-proxy.conf`，那是目錄掛載、reload 吃得到），
+> 只 reload 的話容器吃到的是舊的 `nginx.conf`，會報 `zero size shared memory
 > zone "search"`（看起來像語法錯，其實是設定檔沒更新）。理由見下一節。
 > CI 的 `deploy.yml` 本來就會 `--force-recreate` nginx，走 CI 不必額外處理。
 
@@ -413,7 +414,7 @@ resolver 是依序轉發、成功就停，所以那兩台 v6 只有在 8.8.8.8 �
 真正還沒解釋的仍是「內嵌 DNS 對 127.0.0.11 那一問為什麼會掉」。
 對應的候選修法見下面「候選修法：查完認定沒用」。
 
-### 兩處改動
+### 三處改動
 
 1. **`docker-compose.yml` backend 加 `dns_opt: [single-request-reopen, timeout:2, attempts:3]`**
    —— glibc 預設把 A/AAAA 塞同一個 UDP socket 平行送，改成序列 + 換 socket。

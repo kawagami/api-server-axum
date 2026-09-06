@@ -186,19 +186,23 @@ pub async fn del_user_login(
     Ok(())
 }
 
-/// WS 一次性連線票：30 秒 TTL，value 為 admin 顯示名（name）
+/// WS 一次性連線票：30 秒 TTL，value 為 admin 顯示名（`users.name`）。
+/// ⚠ 不是 email —— admin 的登入識別是 name（2026-07-06 起 email 降為選填），
+/// 呼叫端 `routes/ws.rs::create_ws_ticket` 存的是 `auth_user.name`。
+/// 消費端把它塞進 `connections` map 的 `user_email` 欄，那個欄位名是舊名、內容是 name。
 pub async fn set_ws_ticket(
     pool: &RedisPool<RedisConnectionManager>,
     ticket: &str,
-    email: &str,
+    user_name: &str,
 ) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
     let key = format!("ws:ticket:{}", ticket);
-    conn.set_ex::<_, _, ()>(key, email, WS_TICKET_TTL_SECS).await?;
+    conn.set_ex::<_, _, ()>(key, user_name, WS_TICKET_TTL_SECS)
+        .await?;
     Ok(())
 }
 
-/// 取出並刪除 WS ticket（一次性），回傳持票人 email；不存在或已用過回 None
+/// 取出並刪除 WS ticket（一次性），回傳持票人顯示名（見 `set_ws_ticket`）；不存在或已用過回 None
 pub async fn consume_ws_ticket(
     pool: &RedisPool<RedisConnectionManager>,
     ticket: &str,

@@ -149,6 +149,9 @@ cargo watch -x run                                        # 本機開發熱重�
 ```
 
 ## 在 VPS 環境中給予指定 user 角色(super_admin)的指令
+
+以 `users.name` 定位 —— 那才是登入識別且有 UNIQUE 約束；`email` 自 2026-07-06 起降為選填(可 NULL、不唯一),拿它當條件可能對不到或對到多筆。
+
 ```
-docker exec -it database psql -U USER -d DATABASE -c "INSERT INTO user_roles (user_id, role_id) SELECT u.id, r.id FROM users u, roles r WHERE u.email = 'kawa@gmail.com' AND r.name = 'super_admin';"
+docker exec -it database psql -U kawa -d kawa -c "INSERT INTO user_roles (user_id, role_id) SELECT u.id, r.id FROM users u, roles r WHERE u.name = 'admin' AND r.name = 'super_admin';"
 ```

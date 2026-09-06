@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-// 下行訊息外殼。遊戲框架信封含 `game` 欄（chess/gomoku/banqi）；
+// 下行訊息外殼。遊戲框架信封含 `game` 欄（chess / gomoku / banqi / western_chess / go / avalon / farm）；
 // 非遊戲訊息（user_joined 等）無 game。listener 第二參數拿到整則 msg 供過濾。
 export interface WsMessage { type: string; game?: string; data?: unknown }
 type Listener = (data: unknown, msg: WsMessage) => void;
