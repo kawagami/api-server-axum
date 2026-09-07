@@ -3,19 +3,27 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { getPortfolioHistory } from "@/api/portfolio";
-import type { HistoryRecord, PortfolioEntry } from "@/types";
+import type { HistoryRecord, PortfolioSummaryEntry, PeriodKey } from "@/types";
 import Modal from "@/components/modal";
+import PeriodTabs from "./period-tabs";
+
+/** 「今日」在逐日表格裡只有一列，所以這裡的選項是近一週 / 近一月 / 全部。 */
+const RANGES = ['week', 'month', 'all'] as const;
+type Range = typeof RANGES[number];
 
 interface Props {
-    entry: PortfolioEntry;
+    entry: PortfolioSummaryEntry;
+    /** 總覽選的期間；`day` 沒有對應的表格區間，退回「全部」 */
+    period: PeriodKey;
     onClose: () => void;
 }
 
-export default function StockHistoryTable({ entry, onClose }: Props) {
+export default function StockHistoryTable({ entry, period, onClose }: Props) {
     const t = useTranslations('Portfolio');
     const [records, setRecords] = useState<HistoryRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [range, setRange] = useState<Range>(period === 'day' ? 'all' : period);
 
     useEffect(() => {
         getPortfolioHistory(entry.id)
@@ -30,11 +38,17 @@ export default function StockHistoryTable({ entry, onClose }: Props) {
     const totalPnl = latest?.pnl ?? null;
     const totalPnlPct = latest?.pnl_pct ?? null;
 
-    // daily close-to-close change (not from backend, computed locally)
-    function dailyChange(i: number): number {
-        if (i === 0) return 0;
-        return records[i].close - records[i - 1].close;
-    }
+    // 區間起點直接用後端算增減時的基準日 —— 自己在前端重推一次日期，就會有
+    // 「表格從哪天開始」與「卡片上那個 % 從哪天算起」對不起來的機會（JS 的
+    // setUTCMonth 跨月會溢位，chrono 的 checked_sub_months 是夾到當月最後一天）。
+    // null = 該期間沒有基準日（持股太新／行情有洞），那本來就沒有更早的資料可濾。
+    const from = range === 'all' ? null : (entry.changes[range]?.base_date ?? null);
+
+    // 逐日漲跌（後端不回，本地算）。**先算完整序列再濾區間** —— 反過來的話
+    // 區間第一列會顯示 0，而它其實相對前一交易日有漲跌。
+    const rows = records
+        .map((r, i) => ({ r, chg: i === 0 ? 0 : r.close - records[i - 1].close }))
+        .filter(({ r }) => from === null || r.date >= from);
 
     return (
         <Modal
@@ -52,12 +66,15 @@ export default function StockHistoryTable({ entry, onClose }: Props) {
                         {t('buyDate')}: {entry.buy_date} · {t('costPerShare')}: {entry.cost_per_share} · {t('shares')}: {entry.shares}
                     </p>
                 </div>
-                <button
-                    onClick={onClose}
-                    className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 text-xl leading-none px-2"
-                >
-                    ✕
-                </button>
+                <div className="flex items-center gap-3">
+                    <PeriodTabs options={RANGES} value={range} onChange={setRange} label={r => t(`period.${r}`)} />
+                    <button
+                        onClick={onClose}
+                        className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 text-xl leading-none px-2"
+                    >
+                        ✕
+                    </button>
+                </div>
             </div>
 
             {/* Summary */}
@@ -89,7 +106,7 @@ export default function StockHistoryTable({ entry, onClose }: Props) {
                     <p className="text-center py-8 text-neutral-500">{t('loading')}</p>
                 ) : error ? (
                     <p className="text-center py-8 text-red-500">{t('errorLoad')}</p>
-                ) : records.length === 0 ? (
+                ) : rows.length === 0 ? (
                     <p className="text-center py-8 text-neutral-500">{t('noHistory')}</p>
                 ) : (
                     <table className="w-full min-w-[480px] text-sm">
@@ -103,9 +120,7 @@ export default function StockHistoryTable({ entry, onClose }: Props) {
                             </tr>
                         </thead>
                         <tbody>
-                            {records.map((r, i) => {
-                                const chg = dailyChange(i);
-                                return (
+                            {rows.map(({ r, chg }) => ((
                                     <tr key={r.date} className="border-b dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/50">
                                         <td className="px-4 py-2">{r.date}</td>
                                         <td className="px-4 py-2 text-right">{r.close.toFixed(2)}</td>
@@ -119,8 +134,7 @@ export default function StockHistoryTable({ entry, onClose }: Props) {
                                             {r.pnl_pct >= 0 ? '+' : ''}{r.pnl_pct.toFixed(2)}%
                                         </td>
                                     </tr>
-                                );
-                            })}
+                            )))}
                         </tbody>
                     </table>
                 )}

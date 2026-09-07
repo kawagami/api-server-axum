@@ -101,8 +101,13 @@
     "noHistory": "No data",
     "errorLoad": "Failed to load",
     "errorSave": "Failed to save",
-    "todayChange": "Today's Change",
-    "todayChangePartial": "Today's Change (partial)",
+    "period": {
+      "day": "Today",
+      "week": "1 Week",
+      "month": "1 Month",
+      "all": "All"
+    },
+    "partialSuffix": " (partial)",
     "totalCost": "Total Cost",
     "currentValue": "Current Value",
     "currentPrice": "Price",

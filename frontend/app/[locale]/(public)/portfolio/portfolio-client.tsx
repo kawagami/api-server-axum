@@ -9,7 +9,8 @@ import { putPortfolio } from "@/api/portfolio";
 import { deletePortfolio } from "@/api/portfolio";
 import PortfolioForm from "./portfolio-form";
 import StockHistoryTable from "./stock-history-table";
-import type { PortfolioSummaryEntry, PortfolioEntryInput } from "@/types";
+import PeriodTabs from "./period-tabs";
+import type { PortfolioSummaryEntry, PortfolioEntryInput, PeriodKey } from "@/types";
 
 interface Props {
     initialEntries: PortfolioSummaryEntry[];
@@ -43,12 +44,15 @@ const fmtInt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigit
 const signed = (n: number) => `${n >= 0 ? '+' : ''}${fmtInt(n)}`;
 const signedPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 
+const PERIODS: PeriodKey[] = ['day', 'week', 'month'];
+
 export default function PortfolioClient({ initialEntries }: Props) {
     const t = useTranslations('Portfolio');
     const router = useRouter();
     const [entries, setEntries] = useState<PortfolioSummaryEntry[]>(initialEntries);
     const [mode, setMode] = useState<Mode>({ type: 'list' });
     const [mutating, setMutating] = useState(false);
+    const [period, setPeriod] = useState<PeriodKey>('day');
 
     // router.refresh() 後同步新 props（adjust-state-during-render 模式，取代 useEffect）
     const [prevInitialEntries, setPrevInitialEntries] = useState(initialEntries);
@@ -89,21 +93,25 @@ export default function PortfolioClient({ initialEntries }: Props) {
     const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
     const hasPrices = pricedEntries.length > 0;
 
-    // 今日增減：只加總拿得到前一交易日行情的持股（新加入的持股可能只有一天資料）。
-    // 百分比的分母是「這些持股的前收市值」而不是總成本 —— 問的是「今天漲跌幾 %」，
+    // 期間增減：只加總該期間拿得到基準日的持股（新加入的持股沒有一週/一月前的行情）。
+    // 百分比的分母是「這些持股在基準日的市值」而不是總成本 —— 問的是「這段期間漲跌幾 %」，
     // 用成本當分母算出來的是別的東西。
-    const dayEntries = entries.filter(e => e.day_value_change !== null);
-    const totalDayChange = dayEntries.reduce((s, e) => s + (e.day_value_change ?? 0), 0);
-    const prevValue = dayEntries.reduce((s, e) => s + (e.prev_close ?? 0) * e.shares, 0);
-    const totalDayChangePct = prevValue > 0 ? (totalDayChange / prevValue) * 100 : 0;
-    const hasDayChange = dayEntries.length > 0;
-    // 部分持股沒有前一日行情 → 這個數字不是整個投組的當日增減，要標出來
-    const dayChangePartial = hasDayChange && dayEntries.length < entries.length;
+    const periodEntries = entries.filter(e => e.changes[period] !== null);
+    const totalChange = periodEntries.reduce((s, e) => s + (e.changes[period]?.value_change ?? 0), 0);
+    const baseValue = periodEntries.reduce((s, e) => s + (e.changes[period]?.base_close ?? 0) * e.shares, 0);
+    const totalChangePct = baseValue > 0 ? (totalChange / baseValue) * 100 : 0;
+    const hasChange = periodEntries.length > 0;
+    // 有持股缺這個期間的基準日 → 這不是整個投組的增減，要標出來
+    const changePartial = hasChange && periodEntries.length < entries.length;
 
     return (
         <div className="flex flex-col gap-4">
             {/* Summary bar */}
             {entries.length > 0 && (
+                <>
+                <div className="flex justify-end">
+                    <PeriodTabs options={PERIODS} value={period} onChange={setPeriod} label={p => t(`period.${p}`)} />
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-2">
                     <SummaryCard
                         label={t('totalCost')}
@@ -126,13 +134,14 @@ export default function PortfolioClient({ initialEntries }: Props) {
                         positive={totalPnlPct >= 0}
                     />
                     <SummaryCard
-                        label={dayChangePartial ? t('todayChangePartial') : t('todayChange')}
-                        value={hasDayChange ? signed(totalDayChange) : '-'}
-                        sub={hasDayChange ? `(${signedPct(totalDayChangePct)})` : undefined}
-                        colored={hasDayChange}
-                        positive={totalDayChange >= 0}
+                        label={`${t(`period.${period}`)}${changePartial ? t('partialSuffix') : ''}`}
+                        value={hasChange ? signed(totalChange) : '-'}
+                        sub={hasChange ? `(${signedPct(totalChangePct)})` : undefined}
+                        colored={hasChange}
+                        positive={totalChange >= 0}
                     />
                 </div>
+                </>
             )}
 
             {/* Add button */}
@@ -202,12 +211,16 @@ export default function PortfolioClient({ initialEntries }: Props) {
                                                 <span className="text-neutral-500 dark:text-neutral-400">
                                                     {t('currentPrice')}: {entry.current_price?.toFixed(2)}
                                                 </span>
-                                                {entry.day_change !== null && (
-                                                    <span className={`text-xs ${entry.day_change >= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                        {t('todayChange')} {entry.day_change >= 0 ? '+' : ''}{entry.day_change.toFixed(2)}
-                                                        <span className="ml-1">({signedPct(entry.day_change_pct ?? 0)})</span>
-                                                    </span>
-                                                )}
+                                                {(() => {
+                                                    const c = entry.changes[period];
+                                                    if (!c) return null;
+                                                    return (
+                                                        <span className={`text-xs ${c.change >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                            {t(`period.${period}`)} {c.change >= 0 ? '+' : ''}{c.change.toFixed(2)}
+                                                            <span className="ml-1">({signedPct(c.change_pct)})</span>
+                                                        </span>
+                                                    );
+                                                })()}
                                                 <span className={`font-semibold ${entry.pnl! >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                                                     {entry.pnl! >= 0 ? '+' : ''}{entry.pnl!.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                                     <span className="font-normal ml-1 text-xs">
@@ -256,6 +269,7 @@ export default function PortfolioClient({ initialEntries }: Props) {
             {mode.type === 'history' && (
                 <StockHistoryTable
                     entry={mode.entry}
+                    period={period}
                     onClose={() => setMode({ type: 'list' })}
                 />
             )}

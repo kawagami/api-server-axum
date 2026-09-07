@@ -12,14 +12,31 @@ pub struct PortfolioSummaryEntry {
     pub current_value: Option<f64>,
     pub pnl: Option<f64>,
     pub pnl_pct: Option<f64>,
-    /// 前一交易日收盤價，已還原期間內的除權息（讓 `day_change` 不把除權息當成下跌）。
-    /// 只有一天收盤資料時為 `None`。
-    pub prev_close: Option<f64>,
-    /// 每股當日漲跌（`current_price - prev_close`）。
-    pub day_change: Option<f64>,
-    pub day_change_pct: Option<f64>,
-    /// 這筆持股的當日市值增減（`day_change * shares`）。
-    pub day_value_change: Option<f64>,
+    /// 各期間的增減（今日 / 近一週 / 近一月）。資料不足的期間為 `None`。
+    pub changes: PeriodChanges,
+}
+
+/// 一筆持股在某個期間的增減。基準價都已還原期間內的除權息 —— 少了這步，
+/// 除息日會被算成一次大跌，而那正是這幾個數字最容易騙人的地方。
+#[derive(Serialize)]
+pub struct PeriodChange {
+    /// 實際拿來比較的交易日（不一定等於目標日，市場休市就往前找最近的一天）
+    pub base_date: NaiveDate,
+    /// 基準日收盤價，已還原到今天的除權息基準
+    pub base_close: f64,
+    /// 每股增減
+    pub change: f64,
+    pub change_pct: f64,
+    /// 這筆持股的市值增減（`change * shares`）
+    pub value_change: f64,
+}
+
+/// 三個期間各一份。`None` = 那個期間沒有可用的基準日（新持股、或行情還沒補齊）。
+#[derive(Serialize, Default)]
+pub struct PeriodChanges {
+    pub day: Option<PeriodChange>,
+    pub week: Option<PeriodChange>,
+    pub month: Option<PeriodChange>,
 }
 
 #[derive(Clone, Serialize, FromRow)]

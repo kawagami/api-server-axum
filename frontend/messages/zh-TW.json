@@ -101,8 +101,13 @@
     "noHistory": "無資料",
     "errorLoad": "載入失敗",
     "errorSave": "儲存失敗",
-    "todayChange": "今日增減",
-    "todayChangePartial": "今日增減（部分）",
+    "period": {
+      "day": "今日",
+      "week": "近一週",
+      "month": "近一月",
+      "all": "全部"
+    },
+    "partialSuffix": "（部分）",
     "totalCost": "總成本",
     "currentValue": "目前市值",
     "currentPrice": "現價",
