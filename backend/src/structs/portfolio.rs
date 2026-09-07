@@ -12,6 +12,14 @@ pub struct PortfolioSummaryEntry {
     pub current_value: Option<f64>,
     pub pnl: Option<f64>,
     pub pnl_pct: Option<f64>,
+    /// 前一交易日收盤價，已還原期間內的除權息（讓 `day_change` 不把除權息當成下跌）。
+    /// 只有一天收盤資料時為 `None`。
+    pub prev_close: Option<f64>,
+    /// 每股當日漲跌（`current_price - prev_close`）。
+    pub day_change: Option<f64>,
+    pub day_change_pct: Option<f64>,
+    /// 這筆持股的當日市值增減（`day_change * shares`）。
+    pub day_value_change: Option<f64>,
 }
 
 #[derive(Clone, Serialize, FromRow)]

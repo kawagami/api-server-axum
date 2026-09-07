@@ -100,6 +100,31 @@ struct ExEvent {
     stock_rate: f64,
 }
 
+/// `compute_latest` 的結果。欄位一多就不該再用 tuple —— summary 現在要的是
+/// 「相對成本的損益」加「相對前一交易日的漲跌」兩組數字。
+struct LatestSnapshot {
+    current_price: f64,
+    current_value: f64,
+    pnl: f64,
+    pnl_pct: f64,
+    /// 前一交易日收盤價（已還原兩日之間的除權息）。只有一天資料時為 `None`。
+    prev_close: Option<f64>,
+    day_change: Option<f64>,
+    day_change_pct: Option<f64>,
+    day_value_change: Option<f64>,
+}
+
+/// 除權息還原因子：把「除權息前」的價格換算成「除權息後」的可比價格。
+/// 成本調整與前收盤價調整用的是同一個因子，所以抽出來共用。
+fn ex_adjust_factor(ev: &ExEvent) -> Option<f64> {
+    if ev.close_before <= 0.0 {
+        return None;
+    }
+    let numer = ev.close_before - ev.cash_div;
+    let denom = ev.close_before * (1.0 + ev.stock_rate / 1000.0);
+    (denom > 0.0).then_some(numer / denom)
+}
+
 pub async fn get_by_member(pool: &Pool<Postgres>, member_id: i64) -> Result<Vec<PortfolioEntry>, AppError> {
     portfolio_repo::get_by_member(pool, member_id).await
 }
@@ -181,19 +206,19 @@ pub async fn get_summary(
                 fetch_ex_events(&pool, &redis_pool, &client, &entry.stock_code, entry.buy_date, today, &budget),
             )?;
 
-            let (current_price, current_value, pnl, pnl_pct) =
-                match compute_latest(entry.cost_per_share, entry.shares, &closes, ex_events) {
-                    Some((cp, cv, p, pp)) => (Some(cp), Some(cv), Some(p), Some(pp)),
-                    None => (None, None, None, None),
-                };
+            let latest = compute_latest(entry.cost_per_share, entry.shares, &closes, ex_events);
 
             Ok::<_, AppError>(PortfolioSummaryEntry {
                 base: entry,
                 stock_name,
-                current_price,
-                current_value,
-                pnl,
-                pnl_pct,
+                current_price: latest.as_ref().map(|l| l.current_price),
+                current_value: latest.as_ref().map(|l| l.current_value),
+                pnl: latest.as_ref().map(|l| l.pnl),
+                pnl_pct: latest.as_ref().map(|l| l.pnl_pct),
+                prev_close: latest.as_ref().and_then(|l| l.prev_close),
+                day_change: latest.as_ref().and_then(|l| l.day_change),
+                day_change_pct: latest.as_ref().and_then(|l| l.day_change_pct),
+                day_value_change: latest.as_ref().and_then(|l| l.day_value_change),
             })
         }
     }))
@@ -484,7 +509,7 @@ fn compute_latest(
     shares: i64,
     closes: &[DayClose],
     mut ex_events: Vec<ExEvent>,
-) -> Option<(f64, f64, f64, f64)> {
+) -> Option<LatestSnapshot> {
     let last = closes.last()?;
     ex_events.sort_by_key(|e| e.date);
 
@@ -493,12 +518,8 @@ fn compute_latest(
         if ev.date > last.date {
             break;
         }
-        if ev.close_before > 0.0 {
-            let numer = ev.close_before - ev.cash_div;
-            let denom = ev.close_before * (1.0 + ev.stock_rate / 1000.0);
-            if denom > 0.0 {
-                adjusted_cost = adjusted_cost * numer / denom;
-            }
+        if let Some(f) = ex_adjust_factor(ev) {
+            adjusted_cost *= f;
         }
     }
 
@@ -509,7 +530,46 @@ fn compute_latest(
         0.0
     };
 
-    Some((last.close, last.close * shares as f64, pnl, pnl_pct))
+    // 前一交易日：`closes` 只含這檔實際有成交的日子，所以「倒數第二筆」就是前一交易日，
+    // 不需要自己算日曆。落在兩日之間的除權息要還原到前收盤價上，否則除權息當天會被
+    // 當成一次大跌（那正是「今日增減」最容易騙人的地方）。
+    let (prev_close, day_change, day_change_pct, day_value_change) =
+        match closes.len().checked_sub(2).map(|i| &closes[i]) {
+            Some(prev) => {
+                let mut prev_close = prev.close;
+                for ev in &ex_events {
+                    if ev.date > prev.date && ev.date <= last.date {
+                        if let Some(f) = ex_adjust_factor(ev) {
+                            prev_close *= f;
+                        }
+                    }
+                }
+                let day_change = last.close - prev_close;
+                let day_change_pct = if prev_close != 0.0 {
+                    day_change / prev_close * 100.0
+                } else {
+                    0.0
+                };
+                (
+                    Some(prev_close),
+                    Some(day_change),
+                    Some(day_change_pct),
+                    Some(day_change * shares as f64),
+                )
+            }
+            None => (None, None, None, None),
+        };
+
+    Some(LatestSnapshot {
+        current_price: last.close,
+        current_value: last.close * shares as f64,
+        pnl,
+        pnl_pct,
+        prev_close,
+        day_change,
+        day_change_pct,
+        day_value_change,
+    })
 }
 
 fn build_history(
@@ -526,13 +586,8 @@ fn build_history(
 
     for day in &closes {
         while applied < ex_events.len() && ex_events[applied].date <= day.date {
-            let ev = &ex_events[applied];
-            if ev.close_before > 0.0 {
-                let numer = ev.close_before - ev.cash_div;
-                let denom = ev.close_before * (1.0 + ev.stock_rate / 1000.0);
-                if denom > 0.0 {
-                    adjusted_cost = adjusted_cost * numer / denom;
-                }
+            if let Some(f) = ex_adjust_factor(&ex_events[applied]) {
+                adjusted_cost *= f;
             }
             applied += 1;
         }
@@ -554,4 +609,52 @@ fn build_history(
     }
 
     records
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn d(s: &str) -> NaiveDate {
+        s.parse().expect("測試日期")
+    }
+
+    fn closes(rows: &[(&str, f64)]) -> Vec<DayClose> {
+        rows.iter().map(|(dt, c)| DayClose { date: d(dt), close: *c }).collect()
+    }
+
+    #[test]
+    fn day_change_is_relative_to_previous_trading_day() {
+        // `closes` 只含有成交的日子，所以「倒數第二筆」就是前一交易日（不必看日曆）
+        let c = closes(&[("2026-09-02", 100.0), ("2026-09-05", 110.0)]);
+        let s = compute_latest(80.0, 1000, &c, vec![]).expect("有收盤價");
+
+        assert_eq!(s.prev_close, Some(100.0));
+        assert_eq!(s.day_change, Some(10.0));
+        assert_eq!(s.day_change_pct, Some(10.0));
+        assert_eq!(s.day_value_change, Some(10_000.0));
+    }
+
+    #[test]
+    fn single_day_has_no_day_change() {
+        let c = closes(&[("2026-09-05", 110.0)]);
+        let s = compute_latest(80.0, 1000, &c, vec![]).expect("有收盤價");
+
+        assert_eq!(s.prev_close, None);
+        assert_eq!(s.day_change, None);
+        assert_eq!(s.day_value_change, None);
+    }
+
+    #[test]
+    fn ex_dividend_day_is_not_reported_as_a_crash() {
+        // 前一日收 100、配息 5 元，除息日開平收 95：帳面是 -5，實際沒漲沒跌。
+        // 少了前收盤價的還原，這天會顯示 -5%（今日增減最容易騙人的地方）。
+        let c = closes(&[("2026-09-04", 100.0), ("2026-09-05", 95.0)]);
+        let ev = vec![ExEvent { date: d("2026-09-05"), close_before: 100.0, cash_div: 5.0, stock_rate: 0.0 }];
+        let s = compute_latest(80.0, 1000, &c, ev).expect("有收盤價");
+
+        assert_eq!(s.prev_close, Some(95.0));
+        assert_eq!(s.day_change, Some(0.0));
+        assert_eq!(s.day_value_change, Some(0.0));
+    }
 }

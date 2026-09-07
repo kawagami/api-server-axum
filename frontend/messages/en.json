@@ -101,6 +101,8 @@
     "noHistory": "No data",
     "errorLoad": "Failed to load",
     "errorSave": "Failed to save",
+    "todayChange": "Today's Change",
+    "todayChangePartial": "Today's Change (partial)",
     "totalCost": "Total Cost",
     "currentValue": "Current Value",
     "currentPrice": "Price",

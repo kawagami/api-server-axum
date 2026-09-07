@@ -21,9 +21,10 @@ type Mode =
     | { type: 'edit'; entry: PortfolioSummaryEntry }
     | { type: 'history'; entry: PortfolioSummaryEntry };
 
-function SummaryCard({ label, value, colored, positive }: {
+function SummaryCard({ label, value, sub, colored, positive }: {
     label: string;
     value: string;
+    sub?: string;
     colored?: boolean;
     positive?: boolean;
 }) {
@@ -32,10 +33,15 @@ function SummaryCard({ label, value, colored, positive }: {
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">{label}</p>
             <p className={`font-semibold text-lg ${colored ? (positive ? 'text-red-500' : 'text-green-500') : ''}`}>
                 {value}
+                {sub && <span className="font-normal text-xs ml-1">{sub}</span>}
             </p>
         </div>
     );
 }
+
+const fmtInt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+const signed = (n: number) => `${n >= 0 ? '+' : ''}${fmtInt(n)}`;
+const signedPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 
 export default function PortfolioClient({ initialEntries }: Props) {
     const t = useTranslations('Portfolio');
@@ -83,30 +89,48 @@ export default function PortfolioClient({ initialEntries }: Props) {
     const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
     const hasPrices = pricedEntries.length > 0;
 
+    // 今日增減：只加總拿得到前一交易日行情的持股（新加入的持股可能只有一天資料）。
+    // 百分比的分母是「這些持股的前收市值」而不是總成本 —— 問的是「今天漲跌幾 %」，
+    // 用成本當分母算出來的是別的東西。
+    const dayEntries = entries.filter(e => e.day_value_change !== null);
+    const totalDayChange = dayEntries.reduce((s, e) => s + (e.day_value_change ?? 0), 0);
+    const prevValue = dayEntries.reduce((s, e) => s + (e.prev_close ?? 0) * e.shares, 0);
+    const totalDayChangePct = prevValue > 0 ? (totalDayChange / prevValue) * 100 : 0;
+    const hasDayChange = dayEntries.length > 0;
+    // 部分持股沒有前一日行情 → 這個數字不是整個投組的當日增減，要標出來
+    const dayChangePartial = hasDayChange && dayEntries.length < entries.length;
+
     return (
         <div className="flex flex-col gap-4">
             {/* Summary bar */}
             {entries.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-2">
                     <SummaryCard
                         label={t('totalCost')}
-                        value={totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        value={fmtInt(totalCost)}
                     />
                     <SummaryCard
                         label={t('currentValue')}
-                        value={hasPrices ? totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '-'}
+                        value={hasPrices ? fmtInt(totalValue) : '-'}
                     />
                     <SummaryCard
                         label={t('pnl')}
-                        value={hasPrices ? `${totalPnl >= 0 ? '+' : ''}${totalPnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-'}
+                        value={hasPrices ? signed(totalPnl) : '-'}
                         colored={hasPrices}
                         positive={totalPnl >= 0}
                     />
                     <SummaryCard
                         label={t('pnlPercent')}
-                        value={hasPrices ? `${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%` : '-'}
+                        value={hasPrices ? signedPct(totalPnlPct) : '-'}
                         colored={hasPrices}
                         positive={totalPnlPct >= 0}
+                    />
+                    <SummaryCard
+                        label={dayChangePartial ? t('todayChangePartial') : t('todayChange')}
+                        value={hasDayChange ? signed(totalDayChange) : '-'}
+                        sub={hasDayChange ? `(${signedPct(totalDayChangePct)})` : undefined}
+                        colored={hasDayChange}
+                        positive={totalDayChange >= 0}
                     />
                 </div>
             )}
@@ -178,6 +202,12 @@ export default function PortfolioClient({ initialEntries }: Props) {
                                                 <span className="text-neutral-500 dark:text-neutral-400">
                                                     {t('currentPrice')}: {entry.current_price?.toFixed(2)}
                                                 </span>
+                                                {entry.day_change !== null && (
+                                                    <span className={`text-xs ${entry.day_change >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                        {t('todayChange')} {entry.day_change >= 0 ? '+' : ''}{entry.day_change.toFixed(2)}
+                                                        <span className="ml-1">({signedPct(entry.day_change_pct ?? 0)})</span>
+                                                    </span>
+                                                )}
                                                 <span className={`font-semibold ${entry.pnl! >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                                                     {entry.pnl! >= 0 ? '+' : ''}{entry.pnl!.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                                     <span className="font-normal ml-1 text-xs">

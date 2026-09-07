@@ -101,6 +101,8 @@
     "noHistory": "无数据",
     "errorLoad": "加载失败",
     "errorSave": "保存失败",
+    "todayChange": "今日增减",
+    "todayChangePartial": "今日增减（部分）",
     "totalCost": "总成本",
     "currentValue": "当前市值",
     "currentPrice": "现价",
