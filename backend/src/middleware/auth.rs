@@ -137,3 +137,122 @@ pub(crate) fn decode_jwt(jwt: String, secret: &str) -> Result<TokenData<Claims>,
         _ => AppError::AuthError(AuthError::InvalidToken),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use chrono::{Duration, Utc};
+    use http::HeaderValue;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+
+    const SECRET: &str = "test-secret";
+
+    fn req_with(value: HeaderValue) -> Request {
+        Request::builder()
+            .header(http::header::AUTHORIZATION, value)
+            .body(Body::empty())
+            .expect("建立測試 request")
+    }
+
+    fn req_auth(value: &str) -> Request {
+        req_with(HeaderValue::from_str(value).expect("header 值"))
+    }
+
+    fn token_expiring(delta: Duration) -> String {
+        let now = Utc::now();
+        let claims = Claims {
+            iat: now.timestamp() as usize,
+            exp: (now + delta).timestamp() as usize,
+            sub: "42".to_string(),
+            role: "admin".to_string(),
+        };
+        encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(SECRET.as_ref()),
+        )
+        .expect("簽發測試 token")
+    }
+
+    #[test]
+    fn extracts_bearer_token_case_insensitively() {
+        assert_eq!(extract_token(&req_auth("Bearer abc.def.ghi")).unwrap(), "abc.def.ghi");
+        assert_eq!(extract_token(&req_auth("bearer abc.def.ghi")).unwrap(), "abc.def.ghi");
+        // 多餘空白由 split_whitespace 吸收
+        assert_eq!(extract_token(&req_auth("Bearer   abc.def.ghi")).unwrap(), "abc.def.ghi");
+    }
+
+    /// 沒帶 header 與帶了壞 header 必須是不同錯誤：前端靠 401 的訊息決定
+    /// 「導去登入頁」還是「這個請求本身寫錯了」
+    #[test]
+    fn missing_header_is_distinct_from_malformed_one() {
+        let req = Request::builder().body(Body::empty()).unwrap();
+        assert!(matches!(
+            extract_token(&req),
+            Err(AppError::AuthError(AuthError::MissingToken))
+        ));
+        assert!(extract_token(&req_auth("Bearer abc")).is_ok());
+    }
+
+    /// 這幾種都不該被當成有效憑證放進 decode_jwt
+    #[test]
+    fn malformed_authorization_headers_are_rejected() {
+        for bad in ["Bearer", "Bearer ", "abc.def.ghi", "Basic abc", "BearerX abc", ""] {
+            assert!(
+                matches!(
+                    extract_token(&req_auth(bad)),
+                    Err(AppError::AuthError(AuthError::InvalidHeader))
+                ),
+                "{bad:?} 應被擋下"
+            );
+        }
+        // 非 UTF-8 的 header 值（to_str 失敗）
+        let raw = HeaderValue::from_bytes(&[0x42, 0xff]).expect("非 UTF-8 header");
+        assert!(matches!(
+            extract_token(&req_with(raw)),
+            Err(AppError::AuthError(AuthError::InvalidHeader))
+        ));
+    }
+
+    #[test]
+    fn valid_token_decodes_to_its_claims() {
+        let data = decode_jwt(token_expiring(Duration::hours(1)), SECRET).expect("應解得開");
+        assert_eq!(data.claims.sub, "42");
+        assert_eq!(data.claims.role, "admin");
+    }
+
+    /// 過期必須映射成 TokenExpired 而非 InvalidToken —— 前端靠這個分辨
+    /// 「拿 refresh token 換一張」與「這張根本是偽造的，直接登出」。
+    /// 兩者都是 401，映射寫反不會有任何徵兆，只會讓續期流程整個失效。
+    #[test]
+    fn expired_token_maps_to_token_expired() {
+        // Validation::default() 有 60 秒 leeway，要退得夠遠才算過期
+        let expired = token_expiring(-Duration::hours(1));
+        assert!(matches!(
+            decode_jwt(expired, SECRET),
+            Err(AppError::AuthError(AuthError::TokenExpired))
+        ));
+    }
+
+    #[test]
+    fn wrong_secret_and_garbage_map_to_invalid_token() {
+        let token = token_expiring(Duration::hours(1));
+        assert!(matches!(
+            decode_jwt(token.clone(), "another-secret"),
+            Err(AppError::AuthError(AuthError::InvalidToken))
+        ));
+        assert!(matches!(
+            decode_jwt("not-a-jwt".to_string(), SECRET),
+            Err(AppError::AuthError(AuthError::InvalidToken))
+        ));
+        // 簽章被動過一個字元
+        let mut tampered = token;
+        tampered.pop();
+        tampered.push('x');
+        assert!(matches!(
+            decode_jwt(tampered, SECRET),
+            Err(AppError::AuthError(AuthError::InvalidToken))
+        ));
+    }
+}

@@ -70,6 +70,18 @@ async fn load_user_passkeys(state: &AppState, user_id: i64) -> Result<Vec<Passke
         .collect())
 }
 
+/// start_passkey_registration 預設不要求 resident key，但 Conditional UI（discoverable login）
+/// 只認 resident credential——少了這步註冊照樣成功、autofill 卻永遠不會跳出。
+///
+/// 抽成獨立函式是為了讓測試驗得到**這一份**邏輯：測試若自己複製一次 mutate，
+/// 刪掉 production 這段也照樣綠。
+fn require_resident_key(ccr: &mut CreationChallengeResponse) {
+    if let Some(selection) = ccr.public_key.authenticator_selection.as_mut() {
+        selection.resident_key = Some(ResidentKeyRequirement::Required);
+        selection.require_resident_key = true;
+    }
+}
+
 pub async fn begin_registration(
     state: &AppState,
     user_id: i64,
@@ -89,12 +101,7 @@ pub async fn begin_registration(
         .start_passkey_registration(handle, &name, &name, exclude)
         .map_err(webauthn_err)?;
 
-    // start_passkey_registration 預設不要求 resident key，但 Conditional UI（discoverable login）
-    // 只認 resident credential——不改這裡的話註冊照樣成功、autofill 卻永遠不會跳出
-    if let Some(selection) = ccr.public_key.authenticator_selection.as_mut() {
-        selection.resident_key = Some(ResidentKeyRequirement::Required);
-        selection.require_resident_key = true;
-    }
+    require_resident_key(&mut ccr);
 
     redis::cache_set(
         state.get_redis_pool(),
@@ -215,9 +222,11 @@ pub async fn finish_login(
 mod tests {
     use super::*;
 
-    // resident key mutate 是 Conditional UI 能否運作的關鍵——見 begin_registration 內註解
+    /// resident key 是 Conditional UI 能否運作的關鍵——見 `require_resident_key` 的註解。
+    /// 這條驗的是 production 那個函式本身：先確認 webauthn_rs 的預設**不是** Required
+    /// （否則這步就沒必要存在，測試也失去意義），再確認函式把它改過來。
     #[test]
-    fn start_registration_challenge_requires_resident_key() {
+    fn require_resident_key_upgrades_the_default_challenge() {
         let rp_origin = webauthn_rs::prelude::Url::parse("http://localhost:3000").unwrap();
         let webauthn = webauthn_rs::WebauthnBuilder::new("localhost", &rp_origin)
             .unwrap()
@@ -228,16 +237,24 @@ mod tests {
             .start_passkey_registration(Uuid::new_v4(), "tester", "tester", None)
             .unwrap();
 
-        if let Some(selection) = ccr.public_key.authenticator_selection.as_mut() {
-            selection.resident_key = Some(ResidentKeyRequirement::Required);
-            selection.require_resident_key = true;
-        }
+        let before = ccr
+            .public_key
+            .authenticator_selection
+            .clone()
+            .expect("challenge 應帶 authenticator_selection");
+        assert_ne!(
+            before.resident_key,
+            Some(ResidentKeyRequirement::Required),
+            "上游預設已是 Required，require_resident_key 可以拿掉了"
+        );
 
-        let selection = ccr
+        require_resident_key(&mut ccr);
+
+        let after = ccr
             .public_key
             .authenticator_selection
             .expect("challenge 應帶 authenticator_selection");
-        assert_eq!(selection.resident_key, Some(ResidentKeyRequirement::Required));
-        assert!(selection.require_resident_key);
+        assert_eq!(after.resident_key, Some(ResidentKeyRequirement::Required));
+        assert!(after.require_resident_key);
     }
 }

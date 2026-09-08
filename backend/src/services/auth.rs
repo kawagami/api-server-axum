@@ -175,56 +175,32 @@ pub(crate) async fn hash_password(password: String) -> Result<String, AppError> 
 /// 那條路徑上是登入、middleware 驗 token、torrent 簽名連結 —— 等於全站認證掛掉。
 /// 2026-08-02 Dependabot 的升版 PR 就是這個形態：CI 全綠，因為當時沒有任何測試碰 JWT。
 #[cfg(test)]
-mod jwt_crypto_provider {
-    use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-    use serde::{Deserialize, Serialize};
+mod tests {
+    use super::*;
+    use crate::middleware::auth::decode_jwt;
 
-    #[derive(Debug, Serialize, Deserialize)]
-    struct Claims {
-        sub: String,
-        exp: usize,
-    }
+    const SECRET: &str = "test-secret";
 
-    fn claims() -> Claims {
-        Claims {
-            sub: "smoke@test".to_string(),
-            exp: 9_999_999_999,
-        }
-    }
-
+    /// 三個欄位都是契約：`sub` 是 user id（`verify_admin_token` 直接 parse 成 i64）、
+    /// `role` 是擋前台 member token 的那道、`exp` 決定前端何時去 refresh。
+    /// 順帶當 jsonwebtoken crypto provider 的 smoke test——換 backend 時簽不出來這裡先炸。
     #[test]
-    fn hs256_sign_then_verify() {
-        let token = encode(
-            &Header::default(),
-            &claims(),
-            &EncodingKey::from_secret(b"secret"),
-        )
-        .expect("簽發失敗");
+    fn admin_token_carries_id_role_and_one_hour_expiry() {
+        let token = encode_jwt(42, SECRET).expect("簽發失敗");
+        let data = decode_jwt(token, SECRET).expect("驗證失敗");
 
-        let decoded = decode::<Claims>(
-            &token,
-            &DecodingKey::from_secret(b"secret"),
-            &Validation::default(),
-        )
-        .expect("驗證失敗");
-
-        assert_eq!(decoded.claims.sub, "smoke@test");
+        assert_eq!(data.claims.sub, "42");
+        assert_eq!(data.claims.role, "admin");
+        assert_eq!(data.claims.exp - data.claims.iat, 3600);
     }
 
+    /// 換 secret 的 token 必須驗不過（本地前後端 JWT_SECRET 不同步時就是這個症狀）
     #[test]
-    fn wrong_secret_is_rejected() {
-        let token = encode(
-            &Header::default(),
-            &claims(),
-            &EncodingKey::from_secret(b"secret"),
-        )
-        .expect("簽發失敗");
-
-        assert!(decode::<Claims>(
-            &token,
-            &DecodingKey::from_secret(b"another-secret"),
-            &Validation::default(),
-        )
-        .is_err());
+    fn token_from_another_secret_is_rejected() {
+        let token = encode_jwt(42, SECRET).expect("簽發失敗");
+        assert!(matches!(
+            decode_jwt(token, "another-secret"),
+            Err(AppError::AuthError(AuthError::InvalidToken))
+        ));
     }
 }
