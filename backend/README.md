@@ -15,7 +15,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 - 圖片上傳 / 管理（本機儲存）
 - Torrent 下載（磁力連結 → 內嵌 librqbit session 下載 → 短效簽名連結取檔，併發上限 / 容量配額 / 完成 email 通知）
 - 使用者 / 角色 / 權限管理
-- 投資組合管理（member 持股 CRUD）
+- 投資組合管理（member 持股 CRUD，即時損益 + 今日／近一週／近一月增減，除權息還原）
 - 記帳（member 收支記錄 CRUD，固定分類，收支結餘 / 分類加總 / 每月趨勢統計）
 - 發票登錄 + 統一發票自動對獎（member 登錄發票，排程每期抓財政部中獎號碼比對，中獎寄 email 通知，opt-in）
 - 樂透登錄 + 大樂透 / 威力彩自動對獎（member 批次登錄選號，排程每日抓台彩開獎號碼比對，中獎寄 email 通知，opt-in）
@@ -50,7 +50,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/admin/blog_comments` | 文章留言管理 |
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
-| `/member/portfolio` | member 投資組合 CRUD、即時損益總覽、歷史價格 / 還原成本（需 Bearer token） |
+| `/member/portfolio` | member 投資組合 CRUD、即時損益總覽（含今日 / 近一週 / 近一月增減）、歷史價格 / 還原成本（需 Bearer token） |
 | `/member/ledger` | member 記帳 CRUD、固定分類清單、收支 / 分類 / 每月統計（需 Bearer token） |
 | `/member/invoices` | member 發票登錄 CRUD、中獎 email 通知開關（需 Bearer token；對獎由排程處理） |
 | `/member/lotto` | member 樂透選號批次登錄、列表 / 開獎結果查詢、中獎 email 通知開關（需 Bearer token；對獎由排程處理） |
