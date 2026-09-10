@@ -2,7 +2,6 @@ mod admin;
 mod admin_blog_comments;
 mod admin_games;
 mod admin_gov_tenders;
-mod admin_invoice_lottery;
 mod admin_messages;
 mod admin_stats;
 mod admin_vocab;
@@ -13,9 +12,6 @@ mod auth;
 mod blogs;
 mod logs;
 mod images;
-mod invoices;
-mod ledger;
-mod lotto;
 mod members;
 mod messages;
 mod metrics;
@@ -117,7 +113,7 @@ pub(super) fn with_auth(state: AppState, router: Router<AppState>) -> Router<App
 /// `/member/*` 一直是直接掛 `authorize_member`、跳過 audit 的，於是「會員改了什麼、
 /// 刪了什麼」零紀錄，出事只能靠 DB 現值猜。
 ///
-/// **只有資料 CRUD 的四支走這裡**（portfolio / ledger / invoices / lotto）。
+/// **只有資料 CRUD 的 portfolio 走這裡**。
 /// `vocab` 刻意不掛：它每答一題就是一個 `POST /runs/{id}/answer`，掛上去等於用 180 天
 /// 保留期的稽核表存遊戲操作，而那些事件的稽核價值近乎零。
 /// audit middleware 對 member 也只記非 GET（見 `middleware/audit.rs`）。
@@ -197,9 +193,6 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/members", members::new(state.clone()))
         .nest("/messages", with_feature(state.clone(), Feature::Message, messages::new(state.clone())))
         .nest("/member/portfolio", with_feature(state.clone(), Feature::Portfolio, portfolio::new(state.clone())))
-        .nest("/member/ledger", with_feature(state.clone(), Feature::Ledger, ledger::new(state.clone())))
-        .nest("/member/invoices", with_feature(state.clone(), Feature::Invoices, invoices::new(state.clone())))
-        .nest("/member/lotto", with_feature(state.clone(), Feature::Lotto, lotto::new(state.clone())))
         .nest("/member/vocab", with_feature(state.clone(), Feature::Vocab, vocab::new(state.clone())))
         .nest("/oauth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))

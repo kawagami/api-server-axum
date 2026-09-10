@@ -8,7 +8,7 @@ import { TOOLS, GAMES } from "@/libs/site-nav";
 
 const BASE = "https://kawa.homes";
 
-// 需登入的會員頁（invoices / lotto / ledger / portfolio / dashboard / profile）不進 sitemap
+// 需登入的會員頁（portfolio / dashboard / profile）不進 sitemap
 const CORE_PATHS: { path: string; feature?: string; priority: number }[] = [
     { path: "", priority: 1 },
     { path: "/blogs", feature: "blog", priority: 0.9 },

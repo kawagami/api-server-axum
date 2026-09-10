@@ -128,7 +128,7 @@ where
 /// 對方已經收到並回了狀態碼的，一律原樣回傳 —— 那不是抖動，重試只會放大問題。
 ///
 /// 呼叫端：`get_raw_html_string` / `get_json_data`（本檔，2026-08-11 起 —— 於是 TWSE、
-/// lotto、gov_tenders 這些排程抓取全部涵蓋）與 `services/oauth.rs`。
+/// gov_tenders 這些排程抓取全部涵蓋）與 `services/oauth.rs`。
 /// **新的對外呼叫一律走這兩支或本函式，不要自己 `.send()`。**
 pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response, reqwest::Error> {
     /// 總嘗試次數（含第一次）

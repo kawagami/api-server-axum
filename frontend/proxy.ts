@@ -38,8 +38,8 @@ export default async function proxy(req: NextRequest) {
     }
 
     // Member-only routes — check access_token
-    // 各功能的 settings 子頁（/invoices/settings、/lotto/settings）由所屬 prefix 涵蓋，不另列
-    const memberPaths = ['/dashboard', '/profile', '/portfolio', '/ledger', '/invoices', '/lotto'];
+    // 功能的 settings 子頁由所屬 prefix 涵蓋，不另列
+    const memberPaths = ['/dashboard', '/profile', '/portfolio'];
     const isMemberRoute = routing.locales.some(locale =>
         memberPaths.some(p => path === `/${locale}${p}` || path.startsWith(`/${locale}${p}/`))
     );

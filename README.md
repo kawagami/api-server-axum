@@ -37,7 +37,7 @@
 
 - **部落格**:文章 CRUD、標籤、Markdown 閱讀頁 + TOC、文章留言
 - **後台管理**:RBAC 權限(user/role/permission)、passkey 登入(WebAuthn)、稽核紀錄、站台設定熱更新、主題切換、instance 功能開關
-- **會員系統**:OAuth 登入(Google / GitHub / LINE)、投資組合、記帳、統一發票登錄對獎、大樂透/威力彩選號對獎
+- **會員系統**:OAuth 登入(Google / GitHub / LINE)、投資組合、單字闖關
 - **單字闖關**:英文 / 日文生存模式、學習進度、週期排行榜
 - **對戰遊戲平台**(WebSocket):象棋、五子棋、暗棋、西洋棋、圍棋、阿瓦隆、農場經營;另有單機 wasm 的越南大戰(Bevy)
 - **股票**:庫藏股追蹤、股價變動追蹤、每日行情

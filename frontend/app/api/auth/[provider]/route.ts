@@ -44,7 +44,7 @@ export async function GET(
     // 後端只把 state 存進 Redis 驗「這個 state 存在過」，不含任何瀏覽器識別 ——
     // 攻擊者可以自己走完授權、攔下 code 不放行，再誘導受害者開
     // /auth/callback/google?code=<攻擊者的>&state=<配對的>，受害者的瀏覽器就被寫入
-    // **攻擊者帳號**的 token，之後記的發票／記帳／樂透選號全進攻擊者帳號。
+    // **攻擊者帳號**的 token，之後記的持股全進攻擊者帳號。
     // callback 端會比對這個 cookie 與 query 的 state，不符就不 exchange。
     // 後端的 Redis 一次性消費保留當第二層（防重放）。
     const state = new URL(data.url).searchParams.get('state')

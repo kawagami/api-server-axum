@@ -32,15 +32,11 @@ pub async fn count_members(pool: &Pool<Postgres>) -> Result<i64, AppError> {
 
 /// 會員明細。
 ///
-/// **兩支查詢，併發跑**。收斂前是三支序列：`members` 查一次拿基本欄位、`member_oauth`
-/// 查一次、然後**再查一次 `members` 同一列**只為了兩個 bool 欄位。同一張表同一列查兩次
-/// 是純粹的浪費，而 `member_oauth` 那支不依賴前者（會員不存在時它本來就回空陣列），
-/// 所以序列等待也是白吃的延遲。
+/// **兩支查詢，併發跑**：`member_oauth` 那支不依賴 `members`（會員不存在時它本來就回
+/// 空陣列），序列等待是白吃的延遲。
 pub async fn get_member_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<MemberDetail>, AppError> {
-    let member = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, DateTime<Utc>, bool, bool)>(
-        "SELECT id, name, email, avatar_url, created_at,
-                lottery_notify_enabled, lotto_notify_enabled
-         FROM members WHERE id = $1",
+    let member = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, DateTime<Utc>)>(
+        "SELECT id, name, email, avatar_url, created_at FROM members WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(pool);
@@ -53,9 +49,7 @@ pub async fn get_member_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<M
 
     let (member, providers) = tokio::try_join!(member, providers)?;
 
-    let Some((id, name, email, avatar_url, created_at, lottery_notify_enabled, lotto_notify_enabled)) =
-        member
-    else {
+    let Some((id, name, email, avatar_url, created_at)) = member else {
         return Ok(None);
     };
 
@@ -66,8 +60,6 @@ pub async fn get_member_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<M
         avatar_url,
         created_at,
         providers,
-        lottery_notify_enabled,
-        lotto_notify_enabled,
     }))
 }
 

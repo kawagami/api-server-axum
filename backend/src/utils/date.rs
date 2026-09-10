@@ -58,8 +58,8 @@ pub fn parse_roc_compact_date(s: &str) -> Option<NaiveDate> {
 mod tests {
     use super::*;
 
-    /// 守住「台北 = UTC+8」這件事本身：偏移寫錯會讓所有日界（訪客統計、排行榜週界、
-    /// 對獎的當日判斷）整批偏移，而那種錯不會有任何編譯或執行期徵兆。
+    /// 守住「台北 = UTC+8」這件事本身：偏移寫錯會讓所有日界（訪客統計、排行榜週界）
+    /// 整批偏移，而那種錯不會有任何編譯或執行期徵兆。
     #[test]
     fn taipei_is_utc_plus_eight() {
         assert_eq!(taipei_offset().local_minus_utc(), 8 * 3600);

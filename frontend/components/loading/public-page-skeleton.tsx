@@ -7,7 +7,7 @@ const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
  * 容器規格必須與對應 page.tsx 一致（同 width、同 gap-6），否則載完會跳版。
  *
  * variant：
- *   list  清單頁（發票 / 樂透 / 記帳 / 持股）
+ *   list  清單頁（持股）
  *   cards 卡片網格（dashboard）
  *   form  單張表單卡（設定 / 個人資料）
  */

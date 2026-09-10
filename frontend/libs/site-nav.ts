@@ -55,9 +55,6 @@ export const MEMBER_LINKS: readonly SiteNavItem[] = [
     { key: "profile", href: "/profile", labelKey: "profile", icon: User },
     { key: "notifications", href: "/dashboard/notifications", labelKey: "notifications", icon: Bell },
     { key: "portfolio", href: "/portfolio", labelKey: "portfolio", icon: TrendingUp, feature: "portfolio" },
-    { key: "ledger", href: "/ledger", labelKey: "ledger", icon: Wallet, feature: "ledger" },
-    { key: "invoices", href: "/invoices", labelKey: "invoices", icon: ReceiptText, feature: "invoices" },
-    { key: "lotto", href: "/lotto", labelKey: "lotto", icon: Ticket, feature: "lotto" },
 ] as const;
 
 /** 依 instance 功能開關過濾導航項目（enabled 來自 resolveEnabledFeatures，null = 全開） */

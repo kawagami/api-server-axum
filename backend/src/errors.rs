@@ -206,8 +206,8 @@ impl AppError {
 }
 
 /// 422 的簡寫：驗證程式碼裡 `RequestError::UnprocessableContent(msg).into()` 出現頻率最高，
-/// 每個 service 各寫一份私有 helper 是重複的來源（收斂前 `services/{invoices,lotto_tickets,
-/// app_settings}.rs` 各一份，兩份吃 `&str`、一份吃 `String`，簽名還不一致）。
+/// 每個 service 各寫一份私有 helper 是重複的來源（收斂前三支 service 各一份，
+/// 兩份吃 `&str`、一份吃 `String`，簽名還不一致）。
 ///
 /// 吃 `impl Into<String>` 讓字面值與 `format!` 兩種呼叫端都不必在呼叫處補 `.into()`。
 pub fn unprocessable(msg: impl Into<String>) -> AppError {

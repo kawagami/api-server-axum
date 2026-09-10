@@ -2,7 +2,7 @@ use crate::{state::AppState, structs::features::Feature};
 use axum::Router;
 
 use super::{
-    admin_blog_comments, admin_blogs, admin_games, admin_gov_tenders, admin_invoice_lottery,
+    admin_blog_comments, admin_blogs, admin_games, admin_gov_tenders,
     admin_messages, admin_stats, admin_vocab, app_settings, audit_logs, auth, images, permissions,
     roles, stocks, torrents, users, with_feature,
 };
@@ -21,7 +21,6 @@ pub fn new(state: AppState) -> Router<AppState> {
         .nest("/torrents", with_feature(state.clone(), Feature::Torrents, torrents::new(state.clone())))
         .nest("/games", with_feature(state.clone(), Feature::Games, admin_games::new(state.clone())))
         .nest("/gov_tenders", with_feature(state.clone(), Feature::GovTenders, admin_gov_tenders::new(state.clone())))
-        .nest("/invoice_lottery_numbers", with_feature(state.clone(), Feature::Invoices, admin_invoice_lottery::new(state.clone())))
         .nest("/stats", admin_stats::new(state.clone()))
         .nest("/vocab", with_feature(state.clone(), Feature::Vocab, admin_vocab::new(state.clone())))
         .nest("/messages", with_feature(state.clone(), Feature::Message, admin_messages::new(state.clone())))

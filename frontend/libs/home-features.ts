@@ -29,10 +29,7 @@ export const HOME_FEATURES: readonly HomeFeature[] = [
     { key: "blog", href: "/blogs", icon: FileText, label: "文章", feature: "blog" },
     { key: "vocab", href: "/vocab", icon: GraduationCap, label: "單字闖關", feature: "vocab" },
     { key: "games", href: "/games", icon: Gamepad2, label: "對戰遊戲", feature: "games" },
-    { key: "ledger", href: "/ledger", icon: Wallet, label: "記帳本", feature: "ledger" },
     { key: "portfolio", href: "/portfolio", icon: TrendingUp, label: "投資組合", feature: "portfolio" },
-    { key: "invoices", href: "/invoices", icon: ReceiptText, label: "發票對獎", feature: "invoices" },
-    { key: "lotto", href: "/lotto", icon: Ticket, label: "樂透對獎", feature: "lotto" },
     { key: "tools", href: "/tools", icon: Wrench, label: "實用工具", feature: "tools" },
     { key: "about", href: "/about", icon: Info, label: "關於本站" },
 ] as const;

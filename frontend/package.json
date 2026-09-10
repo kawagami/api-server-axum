@@ -17,7 +17,6 @@
   "dependencies": {
     "@simplewebauthn/browser": "^14.0.0",
     "@tailwindcss/typography": "^0.5.20",
-    "@zxing/browser": "^0.2.1",
     "github-slugger": "^2.0.0",
     "highlight.js": "^11.12.0",
     "jose": "^6.2.12",
@@ -31,7 +30,6 @@
     "rehype-slug": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "sharp": "^0.35.4",
-    "tesseract.js": "^7.0.0",
     "uuid": "^14.0.2",
     "wanakana": "^5.3.1"
   },

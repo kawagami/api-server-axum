@@ -53,6 +53,4 @@ export interface MemberDetail {
   avatar_url: string | null;
   created_at: string;
   providers: string[];
-  lottery_notify_enabled: boolean; // 發票中獎 email 通知開關（預設關閉）
-  lotto_notify_enabled: boolean; // 樂透選號中獎 email 通知開關（預設關閉）
 }

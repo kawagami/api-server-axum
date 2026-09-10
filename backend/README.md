@@ -16,9 +16,6 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 - Torrent 下載（磁力連結 → 內嵌 librqbit session 下載 → 短效簽名連結取檔，併發上限 / 容量配額 / 完成 email 通知）
 - 使用者 / 角色 / 權限管理
 - 投資組合管理（member 持股 CRUD，即時損益 + 今日／近一週／近一月增減，除權息還原）
-- 記帳（member 收支記錄 CRUD，固定分類，收支結餘 / 分類加總 / 每月趨勢統計）
-- 發票登錄 + 統一發票自動對獎（member 登錄發票，排程每期抓財政部中獎號碼比對，中獎寄 email 通知，opt-in）
-- 樂透登錄 + 大樂透 / 威力彩自動對獎（member 批次登錄選號，排程每日抓台彩開獎號碼比對，中獎寄 email 通知，opt-in）
 - 排班（roster，環狀 pattern：每日各班人力是輸入而非副作用，工時／班別均衡，晚班不接隔日早班，連續上班天數上限；人力不足時仍排得出來但回警告碼）
 - 單字闖關（member 生存模式，英文 / 日文，週期排行榜）
 - 政府採購網標案追蹤（依關鍵字每日抓取，新公告 email 通知）
@@ -51,11 +48,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
 | `/member/portfolio` | member 投資組合 CRUD、即時損益總覽（含今日 / 近一週 / 近一月增減）、歷史價格 / 還原成本（需 Bearer token） |
-| `/member/ledger` | member 記帳 CRUD、固定分類清單、收支 / 分類 / 每月統計（需 Bearer token） |
-| `/member/invoices` | member 發票登錄 CRUD、中獎 email 通知開關（需 Bearer token；對獎由排程處理） |
-| `/member/lotto` | member 樂透選號批次登錄、列表 / 開獎結果查詢、中獎 email 通知開關（需 Bearer token；對獎由排程處理） |
 | `/member/vocab` | 單字闖關開局 / 答題 / 個人統計 / 週期排行榜（en / ja） |
-| `/admin/invoice_lottery_numbers` | 手動補統一發票中獎號碼（需 `invoice_lottery:write`，自動抓取失敗時的後備） |
 | `/settings/public` | 公開設定（白名單，如 `site_theme`，無認證） |
 | `/blogs` | 部落格查詢（列表 / tags / 單篇，公開；列表/單篇/tags 帶 `Cache-Control: s-maxage=60`，`?q=` 關鍵字上限 100 字） |
 | `/messages` | 站內留言 |
@@ -96,8 +89,6 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `FetchStockDayAll` | 每日 UTC 20:00 | 抓全市場行情寫入 `stock_day_all` |
 | `FetchBuybackPeriods` | 每日 UTC 20:00 | 抓庫藏股計畫 HTML 寫入 `stock_buyback_periods`；有新未來庫藏股時 email 通知（需設定 `smtp_username` / `smtp_password`） |
 | `SyncBuybackToPending` | 每日 UTC 20:10 | 將 `stock_buyback_periods` 同步為 pending stock_changes；若 end_date 有異動，自動更新 pending 狀態的記錄 |
-| `CheckInvoiceLottery` | 每日 UTC 17:00 | 抓財政部統一發票中獎號碼，對 member 登錄發票比對，中獎且已開啟通知者寄 email |
-| `CheckLottoWins` | 每日 UTC 13:30 | 抓台彩大樂透 / 威力彩開獎號碼，對 member 登錄選號比對，中獎且已開啟通知者寄 email |
 | `AggregateVisitors` | 每日 UTC 16:05（台北 00:05） | 落地前一台北日不重複到訪 PFCOUNT → `daily_visitor_stats` |
 | `FetchGovTenders` | 每日 UTC 23:00（台北 07:00） | 依 `gov_tender_keywords` 抓政府採購網標案，新公告寄 email 通知 |
 

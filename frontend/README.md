@@ -32,9 +32,6 @@
 | `/{locale}/dashboard` | 個人儀表板（需登入） |
 | `/{locale}/dashboard/notifications` | 通知列表（需登入） |
 | `/{locale}/portfolio` | 投資組合追蹤，記錄持股並查看每日漲跌盈虧（需登入） |
-| `/{locale}/ledger` | 記帳，收支記錄＋分類/日期篩選＋統計總覽（收支結餘、分類圓餅、每月趨勢）；可掃電子發票 QR 順便記一筆支出（需登入） |
-| `/{locale}/invoices` | 統一發票登錄＋自動對獎，掃 QR／掃條碼／手動登錄、我的發票／中獎、中獎 email 通知設定（需登入） |
-| `/{locale}/lotto` | 大樂透／威力彩選號登錄＋自動對獎，手動選號或拍照 OCR 辨識（即時相機／拍照）、我的彩券／中獎、開獎結果、中獎 email 通知設定（需登入） |
 | `/{locale}/profile` | 個人資料（需登入） |
 | `/{locale}/changelog` | 更新紀錄，直接讀 GitHub commits（來源 repo 由 `GITHUB_REPO` 決定，設成空字串＝關閉此頁） |
 | `/{locale}/about` | 關於頁面 |
@@ -51,7 +48,7 @@
 - **i18n**：next-intl v4，支援 zh-TW / zh-CN / en
 - **Markdown**：react-markdown（rehype-highlight 程式碼高亮、rehype-slug 標題錨點 + 自動目錄 TOC）
 - **圖片**：next/image（自動 WebP 轉換、lazy loading、縮圖）；公開網域 `media.kawa.homes`（nginx 直出 VPS 上的 `/srv/kawa/uploads`），`remotePatterns` 只放行這一個 host
-- **認證**：JWT（`jose`），`proxy.ts`（Next 16 起 middleware 改名）保護 `/admin/*` 與 `/{locale}/dashboard|profile|portfolio|ledger|invoices|lotto`（`proxy.ts` 的 `memberPaths`；`/invoices/settings`、`/lotto/settings` 等子頁由所屬 prefix 涵蓋，沒有獨立的 `/{locale}/settings`）
+- **認證**：JWT（`jose`），`proxy.ts`（Next 16 起 middleware 改名）保護 `/admin/*` 與 `/{locale}/dashboard|profile|portfolio`（`proxy.ts` 的 `memberPaths`；各功能的設定子頁由所屬 prefix 涵蓋，沒有獨立的 `/{locale}/settings`）
 - **OCR**：`tesseract.js`（動態載入、數字白名單），彩券選號拍照／即時相機辨識輔助
 - **後端 API**：`https://api.kawa.homes`（Rust Axum；舊名 `axum.kawa.homes` 仍為有效 alias）
 - **WebSocket**：`wss://api.kawa.homes`

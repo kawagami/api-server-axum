@@ -353,7 +353,7 @@ dns error
 
 成因未定，可能是上游 DNS 或內嵌 DNS 轉發的抖動。**沒有再往下追**，理由是形狀與上一節一致
 （單發、重新 resolve 就通），而 08-11 已把 `send_retrying` 補到 `get_raw_html_string` /
-`get_json_data`（＝ TWSE 全部路徑）與 `services/lotto.rs`、`services/gov_tenders.rs`，
+`get_json_data`（＝ TWSE 全部路徑）與 `services/lotto.rs`（該檔已隨樂透功能移除）、`services/gov_tenders.rs`，
 現在第一次抖就在 250ms 後重解析（08-12 前是 200ms），而不是等 job 層退避 3600 秒。
 
 ⚠️ **若之後 `logs` 表開始出現「重試到最後一次」的 WARN**，代表重試已經吃不下，
@@ -459,7 +459,7 @@ resolver 是依序轉發、成功就停，所以那兩台 v6 只有在 8.8.8.8 �
 docker network ls          # 先確認網路名
 docker run --rm --network kawa_default debian:12-slim sh -c '
   i=0; while [ $i -lt 40 ]; do
-    for h in www.twse.com.tw api.taiwanlottery.com pcc-api.openfun.app oauth2.googleapis.com; do
+    for h in www.twse.com.tw pcc-api.openfun.app oauth2.googleapis.com; do
       getent hosts $h >/dev/null || echo "FAIL $h"
     done &
     i=$((i+1))

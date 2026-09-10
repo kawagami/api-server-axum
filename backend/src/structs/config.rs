@@ -7,7 +7,7 @@ pub struct OAuthProviderConfig {
 /// torrent 下載）並與 Next.js 共用。
 ///
 /// 弱密鑰最直接的後果是**偽造 member token**：`authorize_member` 不查 Redis session
-/// 也不查 DB，偽造出來的 token 立即生效，可讀寫任一會員的記帳／發票／持股／樂透。
+/// 也不查 DB，偽造出來的 token 立即生效，可讀寫任一會員的持股與闖關紀錄。
 /// 取得一份合法簽名樣本毫無門檻（任何人 OAuth 登入一次就有）。
 const MIN_JWT_SECRET_LEN: usize = 32;
 

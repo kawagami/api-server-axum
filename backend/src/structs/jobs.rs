@@ -9,8 +9,6 @@ pub enum AppJob {
     FetchHistoricalClosingPrices,
     ConsumePendingStockChange,
     SyncBuybackToPending,
-    CheckInvoiceLottery,
-    CheckLottoWins,
     AggregateVisitors,
     CollectSystemMetrics,
     CleanupObservability,
@@ -30,8 +28,6 @@ impl AppJob {
         AppJob::FetchHistoricalClosingPrices,
         AppJob::ConsumePendingStockChange,
         AppJob::SyncBuybackToPending,
-        AppJob::CheckInvoiceLottery,
-        AppJob::CheckLottoWins,
         AppJob::AggregateVisitors,
         AppJob::CollectSystemMetrics,
         AppJob::CleanupObservability,
@@ -47,8 +43,6 @@ impl AppJob {
             AppJob::FetchHistoricalClosingPrices => "FetchHistoricalClosingPrices",
             AppJob::ConsumePendingStockChange => "ConsumePendingStockChange",
             AppJob::SyncBuybackToPending => "SyncBuybackToPending",
-            AppJob::CheckInvoiceLottery => "CheckInvoiceLottery",
-            AppJob::CheckLottoWins => "CheckLottoWins",
             AppJob::AggregateVisitors => "AggregateVisitors",
             AppJob::CollectSystemMetrics => "CollectSystemMetrics",
             AppJob::CleanupObservability => "CleanupObservability",
@@ -67,8 +61,6 @@ impl AppJob {
             | AppJob::ConsumePendingStockChange
             | AppJob::SyncBuybackToPending => Some(Feature::Stocks),
             AppJob::FetchGovTenders => Some(Feature::GovTenders),
-            AppJob::CheckInvoiceLottery => Some(Feature::Invoices),
-            AppJob::CheckLottoWins => Some(Feature::Lotto),
             AppJob::AggregateVisitors
             | AppJob::CollectSystemMetrics
             | AppJob::CleanupObservability => None,
@@ -86,10 +78,6 @@ impl AppJob {
             AppJob::FetchHistoricalClosingPrices => "0 * * * * *",
             AppJob::ConsumePendingStockChange => "0 * * * * *",
             AppJob::SyncBuybackToPending => "0 10 20 * * *",
-            // 每日 UTC 17:00（= UTC+8 隔日 01:00）；偵測新開獎期別才實際動作
-            AppJob::CheckInvoiceLottery => "0 0 17 * * *",
-            // 每日 UTC 13:30（= UTC+8 21:30）；已過大樂透/威力彩開獎時間，每天跑覆蓋四個開獎日
-            AppJob::CheckLottoWins => "0 30 13 * * *",
             // 每日 UTC 16:05（= UTC+8 隔日 00:05）；台北日界剛過，落地前一日不重複到訪
             AppJob::AggregateVisitors => "0 5 16 * * *",
             // 每分鐘採集一筆系統指標
@@ -109,8 +97,6 @@ impl AppJob {
             AppJob::FetchHistoricalClosingPrices => crate::jobs::fetch_historical_closing_prices::run(state).await,
             AppJob::ConsumePendingStockChange => crate::jobs::consume_pending_stock_change::run(state).await,
             AppJob::SyncBuybackToPending => crate::jobs::sync_buyback_to_pending::run(state).await,
-            AppJob::CheckInvoiceLottery => crate::jobs::check_invoice_lottery::run(state).await,
-            AppJob::CheckLottoWins => crate::jobs::check_lotto_wins::run(state).await,
             AppJob::AggregateVisitors => crate::jobs::aggregate_visitors::run(state).await,
             AppJob::CollectSystemMetrics => crate::jobs::collect_system_metrics::run(state).await,
             AppJob::CleanupObservability => crate::jobs::cleanup_observability::run(state).await,
