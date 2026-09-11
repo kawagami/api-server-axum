@@ -49,7 +49,6 @@
 - **Markdown**：react-markdown（rehype-highlight 程式碼高亮、rehype-slug 標題錨點 + 自動目錄 TOC）
 - **圖片**：next/image（自動 WebP 轉換、lazy loading、縮圖）；公開網域 `media.kawa.homes`（nginx 直出 VPS 上的 `/srv/kawa/uploads`），`remotePatterns` 只放行這一個 host
 - **認證**：JWT（`jose`），`proxy.ts`（Next 16 起 middleware 改名）保護 `/admin/*` 與 `/{locale}/dashboard|profile|portfolio`（`proxy.ts` 的 `memberPaths`；各功能的設定子頁由所屬 prefix 涵蓋，沒有獨立的 `/{locale}/settings`）
-- **OCR**：`tesseract.js`（動態載入、數字白名單），彩券選號拍照／即時相機辨識輔助
 - **後端 API**：`https://api.kawa.homes`（Rust Axum；舊名 `axum.kawa.homes` 仍為有效 alias）
 - **WebSocket**：`wss://api.kawa.homes`
 - **部署**：Docker multi-stage build，standalone output

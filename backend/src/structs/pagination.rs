@@ -8,8 +8,9 @@ pub const MAX_PER_PAGE: i64 = 200;
 /// `axum::extract::Query` 走 `serde_urlencoded`，flatten 會讓 serde 先把值緩衝成字串、
 /// 之後無法轉回 `i64`，runtime 直接噴 `invalid type: string "3", expected i64`
 /// —— 而且**編譯期完全看不出來**（2026-07-31 實測過）。
-/// 所以 `LedgerListQuery` / `TicketListQuery` / `InvoiceListQuery` 是刻意各自重複宣告
-/// `page` / `per_page`，再手動組成 `PageQuery` 呼叫 `to_limit_offset`。
+/// 所以 handler 一律**併列兩個 extractor**（`Query(filter): Query<XxxListQuery>` 加
+/// `Query(page): Query<PageQuery>`，範例見 `routes/admin_gov_tenders.rs`），
+/// 篩選條件與分頁各自反序列化，不把 `PageQuery` flatten 進篩選 struct。
 /// 真要收斂得換成 `axum_extra::extract::Query`（走 `serde_html_form`，支援 flatten），
 /// 但那會讓少數端點用不同的 extractor，不划算。
 #[derive(Deserialize)]

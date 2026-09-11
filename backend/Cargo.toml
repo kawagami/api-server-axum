@@ -55,7 +55,7 @@ rust_decimal = { version = "1", features = ["serde"] }
 axum-extra = { version = "0.12.6", features = ["typed-header"] }
 zhconv = "0.4.1"
 # `pool`：讓 AsyncSmtpTransport 保留連線重用。沒有它時每封信都是一次完整的
-# TCP + STARTTLS + AUTH 握手 —— 中獎通知是「一個 member 一封」的迴圈，握手成本會乘上人數。
+# TCP + STARTTLS + AUTH 握手 —— 一輪通知可能連寄多封（torrent 完成、標案新公告），握手成本會乘上封數。
 # 只多拉 futures-util（axum / bb8 / futures 已各自拉進來），無新增 crate。搭配 services/email.rs 的
 # transport 快取才有效：transport 每次重建等於連線池每次重建，等於沒有池。
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder", "hostname", "pool"] }

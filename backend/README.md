@@ -92,7 +92,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `AggregateVisitors` | 每日 UTC 16:05（台北 00:05） | 落地前一台北日不重複到訪 PFCOUNT → `daily_visitor_stats` |
 | `FetchGovTenders` | 每日 UTC 23:00（台北 07:00） | 依 `gov_tender_keywords` 抓政府採購網標案，新公告寄 email 通知 |
 
-共 13 支，權威清單在 `src/structs/jobs.rs` 的 `AppJob::ALL`（`scheduler.rs` 從那裡迭代）。
+共 11 支，權威清單在 `src/structs/jobs.rs` 的 `AppJob::ALL`（`scheduler.rs` 從那裡迭代）。
 
 ## 技術棧
 
@@ -102,11 +102,11 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 - `tokio-cron-scheduler` — cron job
 - `jsonwebtoken 11` — JWT（`default-features = false` + `aws_lc_rs` backend，只簽驗 HS256）
 - `reqwest 0.12` — 對外 HTTP 請求
-- `tower-http 0.7` — CORS、timeout、trace、body limit（10 MB）、catch-panic
-- `tower` — ServiceExt::oneshot（檔案下載走 ServeFile，內建 Range）
+- `tower-http 0.7` — CORS、timeout、trace、body limit（10 MB）、catch-panic、靜態檔（`ServeDir` / `ServeFile`，內建 Range）
+- `tower` — `ServiceExt::oneshot`（torrent 簽名下載把請求交給 `ServeFile`）
 - `bcrypt` — 密碼 hash
 - `lettre` — SMTP email 通知
-- `regex` — 民國日期 / 中獎號碼 feed / 庫藏股 HTML 解析（後者原用 `scraper`，2026-08-19 改 regex，省 28 個 crate）
+- `regex` — 庫藏股 HTML 解析（原用 `scraper`，2026-08-19 改 regex，省 28 個 crate）／文章 markdown 解析（圖片 URL、TOC 標題）。民國日期解析不走 regex，是 `utils/date.rs` 的手刻 split
 - `librqbit 9` — 內嵌 BitTorrent session（rustls）
 - `image 0.25` + `webp 0.3` — 圖片上傳 decode 驗證 + lossy WebP 轉檔（libwebp）
 - `webauthn-rs 0.5`（+ `webauthn-rs-proto`）— admin passkey 登入；硬依賴 OpenSSL ≥3.0，故 openssl crate 開 `vendored`

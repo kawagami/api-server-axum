@@ -13,7 +13,7 @@ use std::sync::{LazyLock, Mutex};
 ///
 /// 2026-08-05 的實例：`send_to` 當時回傳 `()`，寄失敗只記一行 log 就吞掉，呼叫端照樣
 /// `mark_notified` —— 那筆政府標案公告因此**永久遺失**（同一天 SMTP 因容器沒有 IPv6
-/// 撞到 `EADDRNOTAVAIL`）。中獎通知走的是一模一樣的路徑。
+/// 撞到 `EADDRNOTAVAIL`）。日後任何「標了就不再寄」的通知都走同一條路徑。
 #[derive(Debug)]
 pub enum SendError {
     /// SMTP 未設定。商家 instance 的常態，**刻意不記 log**
