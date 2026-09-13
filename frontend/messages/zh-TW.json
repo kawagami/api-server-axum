@@ -694,6 +694,11 @@
         "title": "關於本站",
         "desc": "認識這個專案的架構與技術選型。"
       }
+    },
+    "latest": {
+      "title": "最新文章",
+      "viewAll": "看全部文章",
+      "untitled": "未命名文章"
     }
   },
   "ToolsHub": {

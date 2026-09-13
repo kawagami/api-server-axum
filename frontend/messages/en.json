@@ -694,6 +694,11 @@
         "title": "About",
         "desc": "Learn about this project's architecture and tech choices."
       }
+    },
+    "latest": {
+      "title": "Latest Posts",
+      "viewAll": "View all posts",
+      "untitled": "Untitled post"
     }
   },
   "ToolsHub": {
