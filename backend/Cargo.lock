@@ -635,9 +635,9 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "combine"
-version = "4.6.7"
+version = "4.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
+checksum = "cfc320937d09e6de266b31b9afb480f197d7a861be86be7cb2ea7e5d1bfffc5e"
 dependencies = [
  "bytes",
  "futures-core",
@@ -3248,9 +3248,9 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "1.6.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e37a4ca5c6ca42aa3e6df2fd32b987a65d32a4c2159a6f3fe0fd1df306a2658f"
+checksum = "2acbc41a996f7652b2ddd9dfd98cc4ff602cfd742ae35382f07f608405ab50ed"
 dependencies = [
  "arcstr",
  "async-lock",
@@ -5656,9 +5656,9 @@ dependencies = [
 
 [[package]]
 name = "zhconv"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efb55e02815ab07bf8c9d608359c5cc42951e0e70f82cbaf4bb25746fb3aeaff"
+checksum = "fbb4f247ec21be13451293e760f6246e57300ce80208231ab3e0a437a5d96b27"
 dependencies = [
  "console_error_panic_hook",
  "daachorse",
