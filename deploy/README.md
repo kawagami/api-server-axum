@@ -68,14 +68,14 @@ sudo du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail
 
 ## CI 部署（日常）
 
-- 改 `deploy/**` → `deploy.yml`：scp 到 staging → `compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `compose up -d` → 一次性容器 `nginx -t` → `--force-recreate` nginx。
+- 改 `deploy/**` → `deploy.yml`：scp 到 staging → `compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `compose up -d` → 一次性容器 `nginx -t` → `--force-recreate` nginx → 冒煙檢查（`curl https://api.kawa.homes/health`，最多重試 10 次）。
 - 改 `backend/**` / `frontend/**` → 各自 workflow build image 後 SSH：`cd ~/kawa-deploy && docker pull … && docker compose up -d` → **`nginx -s reload`**（原因見下）。
 - 三條 deploy 共用 `concurrency: vps-deploy`，序列化不撞車。
 
 ### ⚠ 換 image 後必須 reload nginx —— upstream IP 會過期
 
-`proxy_pass http://backend:3000` 是**靜態 hostname**，nginx 只在載入設定時解析一次、之後永久
-快取那個 IP。`docker compose up -d` recreate 掉 backend / frontend 容器後 Docker 可能配到新 IP，
+`upstream backend_app` / `frontend_app`（`conf.d/02-proxy.conf`）的 `server backend:3000` 是**靜態 hostname**，
+nginx 只在載入設定時解析一次、之後永久快取那個 IP。`docker compose up -d` recreate 掉 backend / frontend 容器後 Docker 可能配到新 IP，
 nginx 卻還在打舊 IP → **502**，而且只會等到 compose 裡那個 6h reload 循環才自癒（最久 6 小時）。
 Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部署都炸。
 
@@ -185,7 +185,7 @@ curl -sI https://api.kawa.homes/blogs -H 'Cookie: a=b' | grep -i x-cache-status 
 
 因此 `deploy.yml` 的做法是：
 
-1. **用一次性容器驗證**，掛載當下磁碟上的檔案（不是執行中容器裡那份舊的）。借 `--network container:nginx` 取得 compose 網路，否則 `proxy_pass http://backend:3000` 在載入階段就 host not found。
+1. **用一次性容器驗證**，掛載當下磁碟上的檔案（不是執行中容器裡那份舊的）。借 `--network container:nginx` 取得 compose 網路，否則 upstream 的 `server backend:3000` 在載入階段就 host not found。
 2. 通過後 **`docker compose up -d --force-recreate --no-deps nginx`** —— 只有 recreate 會重新解析 bind mount，`restart` 與 `nginx -s reload` 都不會。
 
 手動改 VPS 上的 nginx 設定時同理：動到 `nginx.conf` 就得 recreate，只動 `conf.d` 才能 reload 了事。

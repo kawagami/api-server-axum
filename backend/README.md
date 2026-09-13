@@ -29,7 +29,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 
 | 前綴 | 說明 |
 |------|------|
-| `/admin/auth` | admin 登入、me、token refresh、passkey 註冊 / 登入 / 管理 |
+| `/admin/auth` | admin 登入、me、token refresh、改密碼（`POST /change_password`）、passkey 註冊 / 登入 / 管理 |
 | `/admin/users` | 使用者管理 |
 | `/admin/roles` | 角色管理 |
 | `/admin/permissions` | 權限清單 |
@@ -48,9 +48,9 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
 | `/member/portfolio` | member 投資組合 CRUD、即時損益總覽（含今日 / 近一週 / 近一月增減）、歷史價格 / 還原成本（需 Bearer token） |
-| `/member/vocab` | 單字闖關開局 / 答題 / 個人統計 / 週期排行榜（en / ja） |
+| `/member/vocab` | 單字闖關開局 / 答題 / 提早結束（`POST /runs/{id}/finish`）/ 個人統計 / 錯題清單（`GET /mistakes`）/ 週期排行榜（en / ja） |
 | `/settings/public` | 公開設定（白名單，如 `site_theme`，無認證） |
-| `/blogs` | 部落格查詢（列表 / tags / 單篇，公開；列表/單篇/tags 帶 `Cache-Control: s-maxage=60`，`?q=` 關鍵字上限 100 字） |
+| `/blogs` | 部落格查詢（列表 / tags / tags 計數（`GET /tags/counts`）/ 單篇 / 單篇留言，公開；列表、單篇、兩支 tags 帶 `Cache-Control: s-maxage=60`，`?q=` 關鍵字上限 100 字） |
 | `/messages` | 站內留言 |
 | `/ws` | WebSocket 連線、線上清單（`/ws/connections`）、點對點訊息（`/ws/messages`）、一次性連線票（`/ws/ticket`）、對戰遊戲配對/對戰（象棋/五子棋/暗棋/西洋棋/圍棋/阿瓦隆/農場經營） |
 | `/roster` | 排班計算（公開無認證，套 tools 的 rate limit；回班表 + 實際採用的每日人力 `plan` + 機器可讀 `warnings`）|
@@ -119,7 +119,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 |------|------|--------|
 | `DATABASE_URL` | 是 | — |
 | `REDIS_URL` | 是 | —（完整 URL，如 `redis://valkey:6379`；可帶密碼 / `rediss://` / db index） |
-| `JWT_SECRET` | 是 | — |
+| `JWT_SECRET` | 是 | —（**至少 32 bytes**，`structs/config.rs::require_jwt_secret` 啟動時 assert，太短直接 panic 不起來；產生：`openssl rand -base64 48`） |
 | `APP_HOST` | 否 | `0.0.0.0` |
 | `APP_PORT` | 否 | `3000`（**僅限本機直跑**；生產的 3000 被 nginx upstream 與 `API_URL` 寫死，改這個只會 502，故 `kawa.env` 不放這個 key） |
 | `UPLOAD_PATH` | 否 | `./uploads` |
