@@ -74,7 +74,8 @@ pub(super) fn with_feature(
 /// 沒有這個標頭時，任何直接打 `api.kawa.homes` 的請求都會一路到 PG —— 前端 SSR 那條有
 /// Next Data Cache（`frontend/api/blogs.ts` 的 `revalidate`）擋著，但那是走內網
 /// `http://backend:3000`、根本不經 nginx，對「有人拿 origin IP 直接洪水打公開 API」
-/// 這個情境一點幫助都沒有。搭配 `deploy/nginx/nginx.conf` 的 `api_cache`，重複的匿名
+/// 這個情境一點幫助都沒有。搭配 `deploy/nginx/conf.d/02-proxy.conf` 的 `api_cache`
+/// （zone 定義在那裡，套用在 `conf.d/api.kawa.homes.conf` 的 `location /blogs`），重複的匿名
 /// GET 會停在 nginx，不再消耗 PG 連線池（20 條）。
 ///
 /// - `max-age=30`：瀏覽器端，短到使用者幾乎不會察覺

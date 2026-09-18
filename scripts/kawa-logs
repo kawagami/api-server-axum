@@ -23,8 +23,9 @@
 
 輸出:stdout 一行一筆 JSON;統計與提示走 stderr,所以 `| head`、`| jq` 都乾淨。
     -f text 改成人類可讀的單行摘要。
-    ⚠ `audit` 那支端點**沒有 total**(全站 4 支無 total 之一),所以 stderr 只會有回傳筆數。
-      拿到滿 per_page 筆就代表「還有更多」,要算總量得上 VPS 用 psql COUNT。
+    分頁端點(`errors` / `logs` / `audit`)都回 `{data,total}`,stderr 會一併印總量
+      (`/admin/audit_logs` 自 2026-08-07 起才補上 total,在那之前是裸陣列)。
+      `rid` 與 `metrics` 本來就不分頁、回裸陣列,所以只印回傳筆數。
 
 判讀重點:
   * **錯誤細節在 `fields.self`,不在 `message`** —— message 常只是 "System error occurred"
@@ -204,7 +205,7 @@ def summarize(row):
 
 
 def unwrap(body):
-    """/logs 與 /admin/audit_logs 形狀不同:前者 {data,total},後者仍是裸陣列"""
+    """現行端點一律回 {data,total};裸陣列那條留給 2026-08-07 前的舊 /admin/audit_logs"""
     if isinstance(body, dict):
         return body.get("data", []), body.get("total")
     return body or [], None
