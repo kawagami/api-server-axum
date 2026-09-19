@@ -8,7 +8,8 @@ interface ShiftStyle {
 }
 
 /**
- * key 是後端 `POST /roster` 回傳的班別字串（backend/src/routes/roster.rs 寫死中文），
+ * key 是後端 `POST /roster` 回傳的班別字串（`backend/src/structs/roster.rs` 的
+ * `SHIFT_MORNING` / `SHIFT_NIGHT` / `SHIFT_OFF` 常數，寫死中文），
  * 屬 API 契約，**不可改成英文代碼**；要 i18n 的是渲染出來的文字（見 SHIFT_KEY）。
  * 橘色是「未知班別」的警示語意色，屬 CLAUDE.md 列明的語意色例外。
  */

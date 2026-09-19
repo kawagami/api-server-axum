@@ -1,5 +1,7 @@
-// 單檔大小上限,對齊 server 端最緊的一道：backend RequestBodyLimitLayer 10*1000*1000 bytes
-// （nginx client_max_body_size 10M 與 Next server action bodySizeLimit 10mb 都是 10*1024*1024，較寬）。
+// 單檔大小上限,對齊 server 端的三道：backend RequestBodyLimitLayer、nginx
+// client_max_body_size 10m、Next server action bodySizeLimit 10mb —— **三者現在都是
+// 10*1024*1024**（後端曾是 decimal 的 10*1000*1000，落在兩者之間的檔案會由 nginx 放行、
+// 後端才 413,已對齊,見 deploy/nginx/nginx.conf 的 client_max_body_size 註解）。
 // 多圖走「一張一請求」逐張上傳(part 數最少避開 WAF 誤殺、後端單張處理遠低於 30 秒逾時),
 // 所以請求上限=單檔上限;預留 multipart 邊界/標頭開銷,取 9.5MB。
 export const MAX_UPLOAD_FILE_BYTES = 9_500_000;

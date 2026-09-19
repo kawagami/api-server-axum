@@ -67,10 +67,12 @@ components/   # 共用 UI 元件
 i18n/         # next-intl 設定（routing / request / navigation）
 messages/     # 翻譯字串（zh-TW.json / zh-CN.json / en.json）
 api/          # 前端 API 請求函式（fetch 封裝，一個資源一檔：blogs / portfolio / images …）
+actions/      # 跨 route 共用的 Server Actions（單一 route 用的 colocate 在該 route）
 types/        # 後端 API 共用型別
 hooks/        # React custom hooks
 libs/         # 工具函式庫
 public/       # 靜態資源
+proxy.ts      # 路由保護（Next 16 起 middleware 改名），見「技術棧」的認證一項
 ```
 
 ---

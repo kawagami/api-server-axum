@@ -11,7 +11,7 @@ export const MAX_NAMES = 100;
 export const MAX_NAME_LEN = 50;
 export const MAX_DAYS = 31;
 
-/** 班別字串是 API 契約（後端 `routes/roster.rs` 回傳的原字串），不可改成英文代碼 */
+/** 班別字串是 API 契約（後端 `structs/roster.rs` 的 `SHIFT_MORNING`/`SHIFT_NIGHT`/`SHIFT_OFF`），不可改成英文代碼 */
 export const SHIFT_MORNING = "早班";
 export const SHIFT_NIGHT = "晚班";
 export const SHIFT_OFF = "休";
