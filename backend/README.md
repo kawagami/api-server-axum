@@ -2,6 +2,8 @@
 
 Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `axum.kawa.homes` 仍為有效 alias）。
 
+內部架構、不變式、踩過的坑與已知技術債見 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+
 ## 功能
 
 - JWT 驗證（admin 登入 / 登出 / token refresh / Redis session）

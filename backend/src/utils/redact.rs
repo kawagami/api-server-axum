@@ -6,7 +6,7 @@
 /// - `/oauth/{provider}/callback?code=` —— OAuth authorization code
 /// - torrent 的簽名下載連結（`sig=` / `signature=`）
 ///
-/// CLAUDE.md 之所以規定「JWT 不走 WS URL query」，理由正是「會進 access log」——
+/// ARCHITECTURE.md 之所以規定「JWT 不走 WS URL query」，理由正是「會進 access log」——
 /// 現在 access log 是我們自己在記的，那條規定就得在這裡兌現。
 const SENSITIVE_KEYS: &[&str] = &[
     "ticket",
