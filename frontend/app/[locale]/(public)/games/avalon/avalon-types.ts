@@ -1,4 +1,4 @@
-// 阿瓦隆 Avalon wire 型別（唯一契約 docs/2026-06-19-avalon-frontend.md）。
+// 阿瓦隆 Avalon wire 型別（唯一契約：protocol/games-wire.md「三、阿瓦隆」）。
 // N 人社交推理，與 2 人對戰框架無關，只共用 /ws + 信封 { game:"avalon", type, data }。
 
 export const GAME = 'avalon';

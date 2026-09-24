@@ -1,6 +1,6 @@
-// 對戰遊戲 WS 共用 wire 型別（唯一契約來源 docs/chess-wire-protocol.md）。
-// 大廳/桌位/配對/計時/斷線三遊戲共用；各遊戲的 move/move_made 內容在各自 logic 檔。
-// 信封 { game, type, data }，game 必填（'chess'/'gomoku'/'banqi'）。
+// 對戰遊戲 WS 共用 wire 型別（唯一契約來源：monorepo 根 protocol/games-wire.md）。
+// 大廳/桌位/配對/計時/斷線五款 2 人遊戲共用；各遊戲的 move/move_made 內容在各自 logic 檔。
+// 信封 { game, type, data }，game 必填（'chess'/'gomoku'/'banqi'/'western_chess'/'go'；avalon / farm 走各自的 types 檔）。
 
 export type GameId = 'chess' | 'gomoku' | 'banqi' | 'western_chess' | 'go';
 

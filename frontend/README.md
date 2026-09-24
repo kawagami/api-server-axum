@@ -2,6 +2,8 @@
 
 個人部落格與工具整合平台，Next.js 16 + React 19，後端對接 Rust Axum API (`api.kawa.homes`)。
 
+內部架構、慣例、踩過的坑與已知技術債見 [`ARCHITECTURE.md`](ARCHITECTURE.md)；對戰遊戲 WS 協定見 [`../protocol/games-wire.md`](../protocol/games-wire.md)。
+
 ---
 
 ## 功能模組

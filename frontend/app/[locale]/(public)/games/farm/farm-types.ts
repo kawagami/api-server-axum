@@ -1,4 +1,4 @@
-// 農場經營 Farm wire 型別（唯一契約 docs/2026-06-19-farm-frontend.md）。
+// 農場經營 Farm wire 型別（唯一契約：protocol/games-wire.md「四、農場經營」）。
 // 2–4 人完全資訊 worker-placement。每次 action 後 server 廣播完整 state，前端整盤重繪。
 // 信封 { game:"farm", type, data }。盤面抽象（無逐格座標，phase-1）。
 

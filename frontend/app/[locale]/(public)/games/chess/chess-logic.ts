@@ -1,7 +1,7 @@
 // 象棋前端純資料模型（零 DOM、零 WS）。
 // 規則裁判全在後端，前端只負責：初始擺位、套用 server 廣播的走步、座標/字面對照。
 // 座標系：絕對座標 [col, row]，col 0–8（左→右），row 0–9（下→上），紅在下（row 0–4）。
-// 見 docs/chess-multiplayer-spec.md §8。
+// 初始擺位表見 protocol/games-wire.md「初始局面」。
 
 export type Side = 'red' | 'black';
 export type PieceType =

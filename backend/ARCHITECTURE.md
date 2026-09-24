@@ -352,7 +352,7 @@ JWT **不走** WS URL query（會進 access log）。流程：登入中的 admin
 
 ## 對戰遊戲框架（複用 `/ws`，點對點）
 
-Server-authoritative 對戰，匿名可玩。**七遊戲**：回合制 2 人 — **象棋 chess / 五子棋 gomoku / 暗棋 banqi / 西洋棋 western_chess / 圍棋 go**；N 人獨立子系統 — **阿瓦隆 avalon**（社交推理）、**農場經營 farm**（worker-placement，完全資訊）。**WS 協定以 `docs/old/chess-wire-protocol.md` 為準（2 人通用流程 + 共通信封）**；per-game 差異見：西洋棋/圍棋 `docs/old/2026-06-19-western-chess-go-frontend.md`、阿瓦隆 `docs/old/2026-06-19-avalon-frontend.md`、農場 `docs/old/2026-06-19-farm-frontend.md`；象棋棋規 `docs/old/chess-multiplayer-spec.md`。衝突以對應 wire 文件為準。
+Server-authoritative 對戰，匿名可玩。**七遊戲**：回合制 2 人 — **象棋 chess / 五子棋 gomoku / 暗棋 banqi / 西洋棋 western_chess / 圍棋 go**；N 人獨立子系統 — **阿瓦隆 avalon**（社交推理）、**農場經營 farm**（worker-placement，完全資訊）。**WS 協定以 monorepo 根 `protocol/games-wire.md` 為準**（進版控；2 人通用流程 + 共通信封 + 各遊戲差異 + 阿瓦隆 / 農場完整協定，2026-09-25 由原本不進版控的 `docs/old/` 四份整合而來）。改協定＝同一個 commit 改前後端與該檔。
 
 - **共用框架在 `src/games/common/`**：`GameEngine` trait（`initial`/`turn`/`side_label`/`try_move`/`status`/`hints`）+ 泛型 `HubInner<E>`/`service::*`。大廳/桌位/配對/Fischer 計時/斷線/timeout_watcher **全泛型**，新遊戲只寫純引擎 + adapter（`impl GameEngine`），零 glue。
 - 各遊戲：純引擎 `games/<game>/engine.rs`（零 WS）+ **測試在 `games/<game>/engine/tests.rs` 子模組**（每個遊戲都有，不在 engine.rs 內）+ adapter `games/<game>/game.rs`。chess 14 測 / gomoku 6 測 / banqi 12 測 / western_chess 10 測 / go 9 測 / avalon 13 測 / farm 12 測，合計 **76**（2026-08-17 核對相符）。
