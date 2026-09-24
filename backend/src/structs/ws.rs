@@ -41,3 +41,10 @@ impl WsEvent {
         }
     }
 }
+
+/// `POST /ws/messages` 的 body（admin 點對點直送；前身是 `routes/ws.rs` 的 `SendMessageParams`）。
+#[derive(serde::Deserialize)]
+pub struct SendMessageRequest {
+    pub addr: String,
+    pub message: String,
+}
