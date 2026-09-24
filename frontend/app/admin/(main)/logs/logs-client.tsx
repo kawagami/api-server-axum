@@ -1,30 +1,25 @@
 "use client";
 
-import { Fragment, useState, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { getLogTrace } from "@/api/logs";
 import { getLogs } from "@/libs/admin-queries";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
 import AdminTableContainer from "@/components/admin/admin-table-container";
-import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
+import { AdminTable, AdminHeadRow, AdminTh, AdminEmptyRow } from "@/components/admin/table";
 import usePagedList from "@/hooks/usePagedList";
 import useFilterUrl from "@/hooks/useFilterUrl";
 import usePolling from "@/hooks/usePolling";
 import useDialog from "@/hooks/useDialog";
 import type { Log, LogLevel } from "@/types";
-import { LEVEL_BADGE, LEVEL_ROW_BG } from "@/libs/badge-styles";
-import { formatDateTimeSeconds } from "@/libs/admin-datetime";
 import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
+import { groupConsecutive } from "./log-groups";
+import LogRow, { COLUMNS } from "./log-row";
+import TraceDrawer from "./trace-drawer";
 
 const LIMIT = 100;
-const COLUMNS = 6;
 /** 自動刷新週期。usePolling 在背景分頁會跳過該次請求，所以不必怕擱著的分頁一直打後端 */
 const REFRESH_MS = 15_000;
-/** 連續重複的 log 合併成一列的時間窗（retry 這類事件常常一秒內連噴好幾筆） */
-const DUPE_WINDOW_MS = 5 * 60 * 1000;
-/** 沒有 fields / request_id，但訊息長到會被裁掉的也要能展開看全文 */
-const LONG_MESSAGE = 120;
 
 type LevelFilter = '' | LogLevel;
 
@@ -41,57 +36,6 @@ const defaultFilters = { level: '', q: '' };
 const CHIP = "px-3 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50";
 const CHIP_ON = "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900";
 const CHIP_OFF = "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700";
-
-/**
- * fields 的顯示順序。`self` 一定排第一 —— 那是真正的錯誤原因
- * （message 只是 `System error occurred` 這種固定字串），其餘照請求上下文的閱讀順序。
- * 不在清單裡的 key 依字母序接在後面，所以新增 span field 不必改這裡。
- */
-const FIELD_ORDER = ['self', 'panic', 'method', 'path', 'query', 'ip', 'status', 'latency_ms'];
-
-function sortedFields(fields: Record<string, unknown>): [string, string][] {
-    return Object.entries(fields)
-        .map(([k, v]): [string, string] => [k, typeof v === 'string' ? v : JSON.stringify(v)])
-        .sort(([a], [b]) => {
-            const ia = FIELD_ORDER.indexOf(a);
-            const ib = FIELD_ORDER.indexOf(b);
-            if (ia !== -1 && ib !== -1) return ia - ib;
-            if (ia !== -1) return -1;
-            if (ib !== -1) return 1;
-            return a.localeCompare(b);
-        });
-}
-
-/** 一列 = 一個事件；連續重複的原始 log 收在 rows 裡（head 是最新那筆） */
-interface LogGroup {
-    head: Log;
-    rows: Log[];
-}
-
-/**
- * 把**相鄰**且同層級／同來源／同訊息、時間相差在 DUPE_WINDOW_MS 內的 log 合併成一列。
- *
- * 只合併相鄰的（清單是新→舊），所以不會把中間夾著別的事件的兩筆黏在一起。
- * 合併掉的筆數不會消失 —— 列上標 `×N`，展開面板逐筆列出時間與 request_id；
- * 面板上方的 fields 一律取最新那筆。
- */
-function groupConsecutive(logs: Log[]): LogGroup[] {
-    const groups: LogGroup[] = [];
-    for (const log of logs) {
-        const last = groups[groups.length - 1];
-        const prev = last?.rows[last.rows.length - 1];
-        const sameEvent =
-            last && last.head.level === log.level && last.head.target === log.target && last.head.message === log.message;
-        const withinWindow =
-            prev && Math.abs(new Date(prev.created_at).getTime() - new Date(log.created_at).getTime()) <= DUPE_WINDOW_MS;
-        if (sameEvent && withinWindow) {
-            last.rows.push(log);
-        } else {
-            groups.push({ head: log, rows: [log] });
-        }
-    }
-    return groups;
-}
 
 export default function LogsClient() {
     const { items: logs, total, hasMore, isPending, failed, load, loadMore } = usePagedList<Log>();
@@ -290,143 +234,16 @@ export default function LogsClient() {
                                     {isPending ? '載入中…' : '目前沒有日誌'}
                                 </AdminEmptyRow>
                             ) : (
-                                groups.map(({ head: log, rows }) => {
-                                    const fields = log.fields ?? {};
-                                    const hasDetail =
-                                        Object.keys(fields).length > 0 ||
-                                        !!log.request_id ||
-                                        rows.length > 1 ||
-                                        log.message.length > LONG_MESSAGE;
-                                    const isExpanded = expanded.has(log.id);
-                                    const Chevron = isExpanded ? ChevronDown : ChevronRight;
-                                    return (
-                                        <Fragment key={log.id}>
-                                            <AdminRow tone={LEVEL_ROW_BG[log.level]}>
-                                                <AdminTd className="text-neutral-500 dark:text-neutral-500 font-mono align-top hidden sm:table-cell">{log.id}</AdminTd>
-                                                <AdminTd className="align-top">
-                                                    <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${LEVEL_BADGE[log.level]}`}>
-                                                        {log.level}
-                                                    </span>
-                                                </AdminTd>
-                                                <AdminTd className="align-top">
-                                                    {/* chevron 與訊息同一顆 button：整段可點、鍵盤可用，
-                                                        焦點框吃全站那條 focus-visible 規則，不必自己補 */}
-                                                    {hasDetail ? (
-                                                        <button
-                                                            onClick={() => toggleExpand(log.id)}
-                                                            aria-expanded={isExpanded}
-                                                            className="flex w-full items-start gap-1.5 text-left"
-                                                        >
-                                                            <Chevron className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
-                                                            {/* line-clamp 需要 display:-webkit-box，直接掛在 <td> 上會把
-                                                                cell 從 table-cell 拔掉、整個表格排版壞掉，所以一定要有內層元素 */}
-                                                            <span className={`grow min-w-0 font-mono wrap-break-word ${isExpanded ? '' : 'line-clamp-2'}`}>
-                                                                {log.message}
-                                                            </span>
-                                                            {rows.length > 1 && (
-                                                                <span
-                                                                    title={rows.map(r => formatDateTimeSeconds(r.created_at)).join('\n')}
-                                                                    className="shrink-0 px-1.5 py-0.5 rounded-sm text-xs font-medium bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
-                                                                >
-                                                                    ×{rows.length}
-                                                                </span>
-                                                            )}
-                                                        </button>
-                                                    ) : (
-                                                        <div className="flex items-start gap-1.5">
-                                                            <span className="w-3.5 shrink-0" aria-hidden="true" />
-                                                            <span className="grow min-w-0 font-mono wrap-break-word line-clamp-2">{log.message}</span>
-                                                        </div>
-                                                    )}
-                                                </AdminTd>
-                                                <AdminTd
-                                                    title={log.target}
-                                                    className="text-neutral-600 dark:text-neutral-400 font-mono text-xs align-top truncate hidden lg:table-cell"
-                                                >
-                                                    {log.target}
-                                                </AdminTd>
-                                                <AdminTd
-                                                    title={`${log.file}:${log.line}`}
-                                                    className="text-neutral-600 dark:text-neutral-400 font-mono text-xs align-top truncate hidden xl:table-cell"
-                                                >
-                                                    {log.file}:{log.line}
-                                                </AdminTd>
-                                                <AdminTd className="text-neutral-500 dark:text-neutral-400 text-xs align-top whitespace-nowrap">
-                                                    {formatDateTimeSeconds(log.created_at)}
-                                                </AdminTd>
-                                            </AdminRow>
-
-                                            {isExpanded && (
-                                                <tr>
-                                                    <td
-                                                        colSpan={COLUMNS}
-                                                        className="border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/40 px-4 py-3"
-                                                    >
-                                                        <div className="flex flex-col gap-3">
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="text-xs text-neutral-500 dark:text-neutral-400">完整訊息</span>
-                                                                <pre className="font-mono text-xs whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200">
-                                                                    {log.message}
-                                                                </pre>
-                                                            </div>
-
-                                                            {log.request_id && (
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">request_id</span>
-                                                                    <code className="font-mono text-xs break-all">{log.request_id}</code>
-                                                                    <button
-                                                                        onClick={() => showTrace(log.request_id!)}
-                                                                        disabled={tracePendingId === log.request_id}
-                                                                        className="px-2 py-0.5 rounded-sm text-xs font-medium bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 transition-colors"
-                                                                    >
-                                                                        {tracePendingId === log.request_id ? '載入中…' : '整條軌跡'}
-                                                                    </button>
-                                                                </div>
-                                                            )}
-
-                                                            {sortedFields(fields).map(([key, value]) => (
-                                                                <div key={key} className="flex flex-col gap-1">
-                                                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">{key}</span>
-                                                                    <pre className="font-mono text-xs whitespace-pre-wrap break-all text-neutral-800 dark:text-neutral-200">
-                                                                        {value}
-                                                                    </pre>
-                                                                </div>
-                                                            ))}
-
-                                                            {rows.length > 1 && (
-                                                                <div className="flex flex-col gap-1 border-t border-neutral-300 dark:border-neutral-700 pt-3">
-                                                                    <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                                                                        合併的 {rows.length} 筆（上方 fields 取最新那筆）
-                                                                    </span>
-                                                                    {rows.map(row => (
-                                                                        <div key={row.id} className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                                                                            <span className="text-neutral-500 dark:text-neutral-500">#{row.id}</span>
-                                                                            <span className="text-neutral-500 dark:text-neutral-400">
-                                                                                {formatDateTimeSeconds(row.created_at)}
-                                                                            </span>
-                                                                            {row.request_id && (
-                                                                                <>
-                                                                                    <code className="break-all">{row.request_id}</code>
-                                                                                    <button
-                                                                                        onClick={() => showTrace(row.request_id!)}
-                                                                                        disabled={tracePendingId === row.request_id}
-                                                                                        className="px-1.5 py-0.5 rounded-sm font-medium bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors"
-                                                                                    >
-                                                                                        {tracePendingId === row.request_id ? '載入中…' : '軌跡'}
-                                                                                    </button>
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </Fragment>
-                                    );
-                                })
+                                groups.map(group => (
+                                    <LogRow
+                                        key={group.head.id}
+                                        group={group}
+                                        expanded={expanded.has(group.head.id)}
+                                        onToggle={toggleExpand}
+                                        onTrace={showTrace}
+                                        tracePendingId={tracePendingId}
+                                    />
+                                ))
                             )}
                         </tbody>
                     </AdminTable>
@@ -450,66 +267,8 @@ export default function LogsClient() {
                 </div>
             )}
 
-            {/* 軌跡改用 drawer：塞在展開列裡會變成「表格→列→面板→軌跡」四層縮排，
-                而且長軌跡會把表格撐爆。行為（Esc / 背景捲動鎖 / 焦點鎖）全交給 useDialog */}
             {trace && (
-                <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="absolute inset-0 bg-black/40" onClick={closeTrace} aria-hidden="true" />
-                    <div
-                        ref={traceRef}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="請求的完整軌跡"
-                        className="relative flex h-full w-full max-w-2xl flex-col gap-3 overflow-auto bg-white dark:bg-neutral-900 p-4 shadow-xl"
-                    >
-                        <div className="flex items-start justify-between gap-2">
-                            <div className="flex flex-col gap-1 min-w-0">
-                                <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                                    請求的完整軌跡（時間正序，{trace.rows.length} 筆）
-                                </h2>
-                                <code className="font-mono text-xs break-all text-neutral-500 dark:text-neutral-400">
-                                    {trace.requestId}
-                                </code>
-                            </div>
-                            <button
-                                onClick={closeTrace}
-                                aria-label="關閉"
-                                className="shrink-0 p-1 rounded-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                            >
-                                <X className="h-4 w-4" aria-hidden="true" />
-                            </button>
-                        </div>
-
-                        {trace.rows.length === 0 ? (
-                            <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                                {traceFailed ? '軌跡載入失敗' : '查不到紀錄'}
-                            </span>
-                        ) : (
-                            <div className="flex flex-col gap-2">
-                                {trace.rows.map(row => (
-                                    <div key={row.id} className="flex flex-col gap-1 border-b border-neutral-200 dark:border-neutral-800 pb-2 last:border-b-0">
-                                        <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                                            <span className="text-neutral-500 dark:text-neutral-400">
-                                                {formatDateTimeSeconds(row.created_at)}
-                                            </span>
-                                            <span className={`px-1.5 rounded-sm ${LEVEL_BADGE[row.level]}`}>{row.level}</span>
-                                            <span className="text-neutral-600 dark:text-neutral-400 break-all">{row.target}</span>
-                                        </div>
-                                        <pre className="font-mono text-xs whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200">
-                                            {row.message}
-                                        </pre>
-                                        {sortedFields(row.fields ?? {}).map(([key, value]) => (
-                                            <div key={key} className="flex flex-wrap gap-2 font-mono text-xs">
-                                                <span className="shrink-0 text-neutral-500 dark:text-neutral-400">{key}</span>
-                                                <span className="break-all text-neutral-700 dark:text-neutral-300">{value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <TraceDrawer trace={trace} failed={traceFailed} onClose={closeTrace} dialogRef={traceRef} />
             )}
         </div>
     );

@@ -3,124 +3,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
-    AlertTriangle,
-    CalendarDays,
-    ClipboardCopy,
-    Download,
-    Loader2,
-    RotateCcw,
-    Send,
-    Trash2,
-    UserPlus,
-} from "lucide-react";
-import { postRoster } from "@/api/tools";
-import { apiErrorStatus } from "@/libs/api-error";
-import PageShell from "@/components/page-shell";
-import PageTitle from "@/components/page-title";
-import Toast, { useToast } from "@/components/toast";
-import {
     MAX_DAYS,
     MAX_NAMES,
     MAX_NAME_LEN,
     nextShift,
     parseNames,
-    ROSTER_RULES,
     rosterStats,
     rosterToCsv,
     rosterToRows,
     type RosterEntry,
     type RosterPlan,
-    type RosterRule,
     type RosterWarning,
 } from "@/libs/roster";
-import RosterDayView from "./roster-day-view";
+import { postRoster } from "@/api/tools";
+import { apiErrorStatus } from "@/libs/api-error";
+import PageShell from "@/components/page-shell";
+import PageTitle from "@/components/page-title";
+import Toast, { useToast } from "@/components/toast";
+import RosterForm from "./roster-form";
+import RosterResult from "./roster-result";
 import RosterStatsPanel from "./roster-stats";
-import RosterTable from "./roster-table";
-
-const RULE_LABEL_KEYS: Record<RosterRule, string> = {
-    fairness: "ruleFairness",
-    morning_heavy: "ruleMorning",
-    night_heavy: "ruleNight",
-};
-
-/** 後端 `RosterWarning` 機器碼 → 本頁 i18n key（後端刻意不回文案，見 `libs/roster.ts`） */
-const WARNING_KEYS: Record<RosterWarning, string> = {
-    understaffed: "warnUnderstaffed",
-    shift_uncovered: "warnShiftUncovered",
-    night_to_morning: "warnNightToMorning",
-    max_consecutive_exceeded: "warnMaxConsecutiveExceeded",
-};
-
-/**
- * 名單與參數存 localStorage：重新整理就要重打 20 個名字是這頁最大的日常痛點。
- * 版號在 key 裡，欄位改形狀時直接換號、不必寫遷移。
- */
-const STORAGE_KEY = "roster_settings_v1";
-
-/** 會被持久化的表單狀態。整包一個 state：分成八個 useState 的話 mount 後要塞八次 */
-interface Settings {
-    names: string[];
-    days: string;
-    rule: RosterRule;
-    startDate: string;
-    manualSlots: boolean;
-    morningSlots: string;
-    nightSlots: string;
-    maxConsecutive: string;
-}
-
-const DEFAULT_SETTINGS: Settings = {
-    names: [],
-    days: String(MAX_DAYS),
-    rule: "fairness",
-    startDate: "",
-    manualSlots: false,
-    morningSlots: "",
-    nightSlots: "",
-    maxConsecutive: "",
-};
-
-/** 逐欄驗型：手改過或舊版格式的 localStorage 不該讓整頁掛掉，對不上就退回預設 */
-function readSettings(): Settings | null {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return null;
-        const saved = JSON.parse(raw) as Record<string, unknown>;
-        const text = (value: unknown, fallback: string) => (typeof value === "string" ? value : fallback);
-        return {
-            names: Array.isArray(saved.names)
-                ? saved.names
-                      // 長度用字元數，跟後端的 chars 計數對齊
-                      .filter((n): n is string => typeof n === "string" && [...n].length <= MAX_NAME_LEN)
-                      .slice(0, MAX_NAMES)
-                : DEFAULT_SETTINGS.names,
-            days: text(saved.days, DEFAULT_SETTINGS.days),
-            rule: ROSTER_RULES.includes(saved.rule as RosterRule) ? (saved.rule as RosterRule) : DEFAULT_SETTINGS.rule,
-            startDate: text(saved.startDate, DEFAULT_SETTINGS.startDate),
-            manualSlots: typeof saved.manualSlots === "boolean" ? saved.manualSlots : DEFAULT_SETTINGS.manualSlots,
-            morningSlots: text(saved.morningSlots, DEFAULT_SETTINGS.morningSlots),
-            nightSlots: text(saved.nightSlots, DEFAULT_SETTINGS.nightSlots),
-            maxConsecutive: text(saved.maxConsecutive, DEFAULT_SETTINGS.maxConsecutive),
-        };
-    } catch {
-        return null;
-    }
-}
-
-const fieldClass =
-    "w-full px-4 py-2 rounded-xl border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700";
-const labelClass = "text-sm font-medium text-neutral-700 dark:text-neutral-300";
-
-/** 數字欄位一律存字串：存 number 的話清空欄位那一刻會被 `|| 1` 搶成 1，改不了值 */
-function clampNumber(raw: string, min: number, max: number, fallback: number): number {
-    const parsed = parseInt(raw, 10);
-    if (Number.isNaN(parsed)) return fallback;
-    return Math.min(max, Math.max(min, parsed));
-}
-
-function digitsOnly(value: string): string {
-    return value.replace(/\D/g, "").slice(0, 3);
-}
+import { clampNumber, DEFAULT_SETTINGS, readSettings, STORAGE_KEY, type Settings } from "./settings";
 
 export default function RosterPage() {
     const t = useTranslations("Roster");
@@ -297,275 +200,33 @@ export default function RosterPage() {
         <PageShell width="wide" className="flex flex-col gap-6">
             <PageTitle title={t("title")} />
 
-            <section className="bg-white/60 dark:bg-neutral-800/60 backdrop-blur-md p-6 rounded-3xl shadow-lg border border-white/20">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <CalendarDays className="text-primary-500" /> {t("paramsHeading")}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                        <label htmlFor="roster-name" className={labelClass}>
-                            {t("membersLabel", { count: names.length })}
-                        </label>
-                        <div className="flex gap-2">
-                            <input
-                                id="roster-name"
-                                value={newName}
-                                onChange={e => setNewName(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        addNames();
-                                    }
-                                }}
-                                placeholder={t("namePlaceholder")}
-                                className={`flex-1 ${fieldClass}`}
-                            />
-                            <button
-                                onClick={addNames}
-                                aria-label={t("addName")}
-                                className="p-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors"
-                            >
-                                <UserPlus size={20} />
-                            </button>
-                        </div>
-                        <p className="text-xs text-neutral-500">{t("namesHint")}</p>
-                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
-                            {names.map((name, i) => (
-                                <span
-                                    key={name}
-                                    className="px-3 py-1 bg-white/80 dark:bg-neutral-600 rounded-full text-sm flex items-center gap-2 shadow-xs border border-neutral-100 dark:border-neutral-500"
-                                >
-                                    {name}
-                                    <button
-                                        onClick={() => removeName(i)}
-                                        aria-label={`${t("removeName")} ${name}`}
-                                        className="hover:text-red-500 transition-colors"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </span>
-                            ))}
-                        </div>
-                        {names.length > 0 && (
-                            <button
-                                onClick={() => update("names", [])}
-                                className="text-xs text-neutral-500 hover:text-red-500 transition-colors"
-                            >
-                                {t("clearNames")}
-                            </button>
-                        )}
-                    </div>
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="roster-days" className={labelClass}>{t("daysLabel")}</label>
-                            <input
-                                id="roster-days"
-                                type="text"
-                                inputMode="numeric"
-                                value={days}
-                                onChange={e => update("days", digitsOnly(e.target.value))}
-                                onBlur={() => update("days", String(clampNumber(days, 1, MAX_DAYS, MAX_DAYS)))}
-                                className={`mt-1 ${fieldClass}`}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="roster-start" className={labelClass}>{t("startDateLabel")}</label>
-                            <input
-                                id="roster-start"
-                                type="date"
-                                value={startDate}
-                                onChange={e => update("startDate", e.target.value)}
-                                className={`mt-1 ${fieldClass}`}
-                            />
-                            <p className="mt-1 text-xs text-neutral-500">{t("startDateHint")}</p>
-                        </div>
-                        <div>
-                            <label htmlFor="roster-rule" className={labelClass}>{t("ruleLabel")}</label>
-                            <select
-                                id="roster-rule"
-                                value={rule}
-                                onChange={e => update("rule", e.target.value as RosterRule)}
-                                className={`mt-1 ${fieldClass}`}
-                            >
-                                {ROSTER_RULES.map(value => (
-                                    <option key={value} value={value}>{t(RULE_LABEL_KEYS[value])}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <details className="mt-6 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
-                    <summary className="cursor-pointer font-medium">{t("advancedHeading")}</summary>
-                    <div className="mt-4 space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                            {[
-                                { manual: false, label: t("slotsAuto") },
-                                { manual: true, label: t("slotsManual") },
-                            ].map(option => (
-                                <button
-                                    key={option.label}
-                                    onClick={() => (option.manual ? enableManualSlots() : update("manualSlots", false))}
-                                    aria-pressed={manualSlots === option.manual}
-                                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                                        manualSlots === option.manual
-                                            ? "bg-primary-500 text-white border-primary-500"
-                                            : "border-neutral-300 dark:border-neutral-600 hover:bg-white/60 dark:hover:bg-neutral-700"
-                                    }`}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {manualSlots && (
-                                <>
-                                    <div>
-                                        <label htmlFor="roster-morning" className={labelClass}>{t("morningSlotsLabel")}</label>
-                                        <input
-                                            id="roster-morning"
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={morningSlots}
-                                            onChange={e => update("morningSlots", digitsOnly(e.target.value))}
-                                            className={`mt-1 ${fieldClass}`}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="roster-night" className={labelClass}>{t("nightSlotsLabel")}</label>
-                                        <input
-                                            id="roster-night"
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={nightSlots}
-                                            onChange={e => update("nightSlots", digitsOnly(e.target.value))}
-                                            className={`mt-1 ${fieldClass}`}
-                                        />
-                                    </div>
-                                </>
-                            )}
-                            <div>
-                                <label htmlFor="roster-streak" className={labelClass}>{t("maxConsecutiveLabel")}</label>
-                                <input
-                                    id="roster-streak"
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={maxConsecutive}
-                                    onChange={e => update("maxConsecutive", digitsOnly(e.target.value))}
-                                    className={`mt-1 ${fieldClass}`}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </details>
-
-                <button
-                    onClick={handleGenerate}
-                    disabled={loading || names.length === 0}
-                    className="w-full mt-6 py-3 bg-linear-to-r from-primary-600 to-primary-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity active:scale-[0.98]"
-                >
-                    {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}
-                    {loading ? t("generating") : t("generate")}
-                </button>
-
-                {error && (
-                    <p
-                        role="alert"
-                        className="mt-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-700 dark:text-red-400"
-                    >
-                        {error}
-                    </p>
-                )}
-            </section>
+            <RosterForm
+                settings={settings}
+                update={update}
+                newName={newName}
+                onNewNameChange={setNewName}
+                onAddNames={addNames}
+                onRemoveName={removeName}
+                onEnableManualSlots={enableManualSlots}
+                onGenerate={handleGenerate}
+                loading={loading}
+                error={error}
+            />
 
             {entries && plan && (
-                <section className="bg-white/70 dark:bg-neutral-900/70 backdrop-blur-lg rounded-3xl shadow-xl border border-white/30 overflow-hidden">
-                    <div className="p-4 sm:p-6 flex flex-col gap-3 border-b border-neutral-200 dark:border-neutral-700">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h2 className="text-xl font-bold">{t("resultHeading")}</h2>
-                            <div className="flex flex-wrap items-center gap-2 text-sm">
-                                {[
-                                    { key: "person" as const, label: t("viewByPerson") },
-                                    { key: "day" as const, label: t("viewByDay") },
-                                ].map(option => (
-                                    <button
-                                        key={option.key}
-                                        onClick={() => setView(option.key)}
-                                        aria-pressed={view === option.key}
-                                        className={`px-3 py-1.5 rounded-full border transition-colors ${
-                                            view === option.key
-                                                ? "bg-primary-500 text-white border-primary-500"
-                                                : "border-neutral-300 dark:border-neutral-600 hover:bg-white/60 dark:hover:bg-neutral-800"
-                                        }`}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
-                                <button
-                                    onClick={copyTable}
-                                    className="px-3 py-1.5 rounded-full border border-neutral-300 dark:border-neutral-600 flex items-center gap-1.5 hover:bg-white/60 dark:hover:bg-neutral-800 transition-colors"
-                                >
-                                    <ClipboardCopy size={14} /> {t("copyTable")}
-                                </button>
-                                <button
-                                    onClick={exportCsv}
-                                    className="px-3 py-1.5 rounded-full border border-neutral-300 dark:border-neutral-600 flex items-center gap-1.5 hover:bg-white/60 dark:hover:bg-neutral-800 transition-colors"
-                                >
-                                    <Download size={14} /> {t("exportCsv")}
-                                </button>
-                            </div>
-                        </div>
-
-                        <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                            {t("planSummary", {
-                                morning: plan.morning_slots,
-                                night: plan.night_slots,
-                                rest: plan.rest_slots,
-                                streak: plan.max_consecutive,
-                            })}
-                        </p>
-
-                        {warnings.length > 0 && (
-                            <div
-                                role="alert"
-                                // 橘＝警示語意（CLAUDE.md 列明的例外）：班表排得出來但有前提，不是錯誤
-                                className="rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 p-3 text-sm text-orange-700 dark:text-orange-300"
-                            >
-                                <p className="font-semibold flex items-center gap-1.5">
-                                    <AlertTriangle size={15} /> {t("warningsHeading")}
-                                </p>
-                                <ul className="mt-1 list-disc list-inside space-y-0.5">
-                                    {warnings.map(code => (
-                                        <li key={code}>{t(WARNING_KEYS[code])}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {view === "person" && (
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-500">
-                                <span>{t("editHint")}</span>
-                                {edited && (
-                                    <>
-                                        <span className="font-semibold text-orange-600 dark:text-orange-400">{t("edited")}</span>
-                                        <button
-                                            onClick={() => setEntries(baseline)}
-                                            className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                        >
-                                            <RotateCcw size={13} /> {t("resetEdits")}
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {view === "person" ? (
-                        <RosterTable entries={entries} startDate={startDate} onToggle={toggleShift} />
-                    ) : (
-                        <RosterDayView entries={entries} startDate={startDate} />
-                    )}
-                </section>
+                <RosterResult
+                    entries={entries}
+                    plan={plan}
+                    warnings={warnings}
+                    startDate={startDate}
+                    view={view}
+                    onViewChange={setView}
+                    edited={edited}
+                    onResetEdits={() => setEntries(baseline)}
+                    onCopy={copyTable}
+                    onExport={exportCsv}
+                    onToggleShift={toggleShift}
+                />
             )}
 
             {stats && <RosterStatsPanel stats={stats} />}
