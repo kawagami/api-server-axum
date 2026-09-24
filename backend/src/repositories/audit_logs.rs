@@ -1,3 +1,4 @@
+use crate::errors::AppError;
 use crate::structs::audit_logs::{AuditLog, AuditLogQuery};
 use sqlx::{Pool, Postgres};
 
@@ -22,7 +23,7 @@ pub struct AuditEntry {
 pub async fn insert_batch(
     pool: &Pool<Postgres>,
     entries: &[AuditEntry],
-) -> Result<(), sqlx::Error> {
+) -> Result<(), AppError> {
     let actor_types: Vec<&str> = entries.iter().map(|e| e.actor_type).collect();
     let user_emails: Vec<&str> = entries.iter().map(|e| e.user_email.as_str()).collect();
     let methods: Vec<&str> = entries.iter().map(|e| e.method.as_str()).collect();
@@ -63,8 +64,8 @@ pub async fn get_audit_logs(
     filter: &AuditLogQuery,
     limit: i64,
     offset: i64,
-) -> Result<Vec<AuditLog>, sqlx::Error> {
-    sqlx::query_as::<_, AuditLog>(&format!(
+) -> Result<Vec<AuditLog>, AppError> {
+    Ok(sqlx::query_as::<_, AuditLog>(&format!(
         "SELECT id, actor_type, user_email, method, path, query, status_code, request_id, created_at
          FROM admin_audit_logs
          WHERE {AUDIT_FILTER}
@@ -80,13 +81,13 @@ pub async fn get_audit_logs(
     .bind(limit)
     .bind(offset)
     .fetch_all(pool)
-    .await
+    .await?)
 }
 
 pub async fn count_audit_logs(
     pool: &Pool<Postgres>,
     filter: &AuditLogQuery,
-) -> Result<i64, sqlx::Error> {
+) -> Result<i64, AppError> {
     let (total,): (i64,) = sqlx::query_as(&format!(
         "SELECT COUNT(*) FROM admin_audit_logs WHERE {AUDIT_FILTER}"
     ))

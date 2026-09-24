@@ -1,6 +1,7 @@
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
 use chrono::{Datelike, NaiveDate};
+use crate::errors::AppError;
 use crate::structs::stats::DailyVisitorStat;
 use sqlx::{Pool, Postgres};
 
@@ -52,7 +53,7 @@ async fn record_visit_inner(
 pub async fn count_day(
     pool: &RedisPool<RedisConnectionManager>,
     date: NaiveDate,
-) -> Result<i64, redis::RedisError> {
+) -> Result<i64, AppError> {
     let mut conn = get_redis_conn(pool).await?;
     let count: i64 = redis::cmd("PFCOUNT")
         .arg(day_key(date))
@@ -65,7 +66,7 @@ pub async fn count_day(
 pub async fn count_days(
     pool: &RedisPool<RedisConnectionManager>,
     dates: &[NaiveDate],
-) -> Result<i64, redis::RedisError> {
+) -> Result<i64, AppError> {
     if dates.is_empty() {
         return Ok(0);
     }
@@ -83,7 +84,7 @@ pub async fn upsert_daily(
     pool: &Pool<Postgres>,
     date: NaiveDate,
     unique_visitors: i64,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), AppError> {
     sqlx::query(
         r#"INSERT INTO daily_visitor_stats (date, unique_visitors)
            VALUES ($1, $2)
@@ -101,8 +102,8 @@ pub async fn upsert_daily(
 pub async fn history(
     pool: &Pool<Postgres>,
     limit: i64,
-) -> Result<Vec<DailyVisitorStat>, sqlx::Error> {
-    sqlx::query_as::<_, DailyVisitorStat>(
+) -> Result<Vec<DailyVisitorStat>, AppError> {
+    Ok(sqlx::query_as::<_, DailyVisitorStat>(
         r#"SELECT date, unique_visitors
            FROM daily_visitor_stats
            ORDER BY date DESC
@@ -110,5 +111,5 @@ pub async fn history(
     )
     .bind(limit)
     .fetch_all(pool)
-    .await
+    .await?)
 }

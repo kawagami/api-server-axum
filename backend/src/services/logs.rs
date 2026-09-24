@@ -24,5 +24,5 @@ pub async fn logs_by_request(
     pool: &Pool<Postgres>,
     request_id: &str,
 ) -> Result<Vec<Log>, AppError> {
-    Ok(logs_repo::logs_by_request(pool, request_id).await?)
+    logs_repo::logs_by_request(pool, request_id).await
 }

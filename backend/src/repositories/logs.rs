@@ -1,3 +1,4 @@
+use crate::errors::AppError;
 use crate::structs::logs::LogQuery;
 use crate::structs::logs::Log;
 use sqlx::{Pool, Postgres};
@@ -29,8 +30,8 @@ pub async fn get_logs(
     filter: &LogQuery,
     limit: i64,
     offset: i64,
-) -> Result<Vec<Log>, sqlx::Error> {
-    sqlx::query_as::<_, Log>(&format!(
+) -> Result<Vec<Log>, AppError> {
+    Ok(sqlx::query_as::<_, Log>(&format!(
         "SELECT {LOG_COLUMNS}
          FROM logs
          WHERE {LOG_FILTER}
@@ -46,10 +47,10 @@ pub async fn get_logs(
     .bind(limit)
     .bind(offset)
     .fetch_all(pool)
-    .await
+    .await?)
 }
 
-pub async fn count_logs(pool: &Pool<Postgres>, filter: &LogQuery) -> Result<i64, sqlx::Error> {
+pub async fn count_logs(pool: &Pool<Postgres>, filter: &LogQuery) -> Result<i64, AppError> {
     let (total,): (i64,) =
         sqlx::query_as(&format!("SELECT COUNT(*) FROM logs WHERE {LOG_FILTER}"))
             .bind(filter.levels())
@@ -68,8 +69,8 @@ pub async fn count_logs(pool: &Pool<Postgres>, filter: &LogQuery) -> Result<i64,
 pub async fn logs_by_request(
     pool: &Pool<Postgres>,
     request_id: &str,
-) -> Result<Vec<Log>, sqlx::Error> {
-    sqlx::query_as::<_, Log>(&format!(
+) -> Result<Vec<Log>, AppError> {
+    Ok(sqlx::query_as::<_, Log>(&format!(
         "SELECT {LOG_COLUMNS}
          FROM logs
          WHERE request_id = $1
@@ -79,5 +80,5 @@ pub async fn logs_by_request(
     .bind(request_id)
     .bind(REQUEST_TRACE_LIMIT)
     .fetch_all(pool)
-    .await
+    .await?)
 }

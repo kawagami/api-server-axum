@@ -66,19 +66,20 @@ fn login_key(user_id: i64) -> String {
 pub async fn set_user_login(
     pool: &RedisPool<RedisConnectionManager>,
     user_id: i64,
-) -> Result<(), RedisError> {
+) -> Result<(), crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    conn.set_ex(login_key(user_id), user_id.to_string(), LOGIN_TTL_SECS)
-        .await
+    conn.set_ex::<_, _, ()>(login_key(user_id), user_id.to_string(), LOGIN_TTL_SECS)
+        .await?;
+    Ok(())
 }
 
 /// 登入 session 是否還在（middleware 每請求呼叫）。
 pub async fn user_login_exists(
     pool: &RedisPool<RedisConnectionManager>,
     user_id: i64,
-) -> Result<bool, RedisError> {
+) -> Result<bool, crate::errors::AppError> {
     let mut conn = get_redis_conn(pool).await?;
-    conn.exists(login_key(user_id)).await
+    Ok(conn.exists(login_key(user_id)).await?)
 }
 
 // ---- 認證身分快取 ----

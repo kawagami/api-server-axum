@@ -1,3 +1,4 @@
+use crate::errors::AppError;
 use crate::structs::system_metrics::SystemMetric;
 use sqlx::{Pool, Postgres};
 
@@ -16,7 +17,7 @@ pub struct MetricSample {
     pub backend_rss_mb: i32,
 }
 
-pub async fn insert(pool: &Pool<Postgres>, s: &MetricSample) -> Result<(), sqlx::Error> {
+pub async fn insert(pool: &Pool<Postgres>, s: &MetricSample) -> Result<(), AppError> {
     sqlx::query(
         r#"INSERT INTO system_metrics
            (cpu_pct, cpu_steal_pct, mem_used_mb, mem_total_mb, disk_used_mb, disk_total_mb, load1, load5, load15, backend_rss_mb)
@@ -56,8 +57,8 @@ pub fn bucket_seconds(hours: i64) -> i64 {
 /// 桶內取 **max** 而非 avg —— 這頁是拿來找尖峰的,平均會把短暫的 CPU/load 爆衝抹平。
 /// 每筆原始採樣本身已是整個採樣間隔(1 分鐘)的平均,所以這裡的 max = 該桶內最忙的那一分鐘。
 /// 12 小時以內桶寬會退化成 60 秒,等同原始每分鐘採樣。
-pub async fn get_recent(pool: &Pool<Postgres>, hours: i64) -> Result<Vec<SystemMetric>, sqlx::Error> {
-    sqlx::query_as::<_, SystemMetric>(
+pub async fn get_recent(pool: &Pool<Postgres>, hours: i64) -> Result<Vec<SystemMetric>, AppError> {
+    Ok(sqlx::query_as::<_, SystemMetric>(
         r#"SELECT max(id) AS id,
                   max(cpu_pct) AS cpu_pct,
                   max(cpu_steal_pct) AS cpu_steal_pct,
@@ -81,7 +82,7 @@ pub async fn get_recent(pool: &Pool<Postgres>, hours: i64) -> Result<Vec<SystemM
     .bind(hours)
     .bind(bucket_seconds(hours))
     .fetch_all(pool)
-    .await
+    .await?)
 }
 
 #[cfg(test)]

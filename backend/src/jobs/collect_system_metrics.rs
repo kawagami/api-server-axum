@@ -21,6 +21,6 @@ pub async fn run(state: AppState) {
     };
 
     if let Err(e) = metrics_repo::insert(state.get_pool(), &sample).await {
-        tracing::error!("collect_system_metrics: insert failed: {e}");
+        tracing::error!("collect_system_metrics: insert failed: {e:?}");
     }
 }
