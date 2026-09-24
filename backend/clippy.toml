@@ -15,3 +15,16 @@ disallowed-types = [
     { path = "axum::extract::Query", reason = "改用 crate::extract::Query" },
     { path = "axum::extract::Path", reason = "改用 crate::extract::Path" },
 ]
+
+# 兩條原本只寫在 ARCHITECTURE.md 的規則，改由 lint 守：
+#
+# - `Local::now()`：結果取決於行程的 `TZ`，拿掉 Dockerfile 的 `ENV TZ` 或換了沒 tzdata
+#   的基底就悄悄退回 UTC，台北 00:00–08:00 的「今天」全變昨天。一律用 `utils::date` 的
+#   `taipei_now` / `taipei_today`。
+# - `RequestBuilder::send()`：對外連線的 connect / DNS 抖動要重新 resolve 才救得回來，
+#   一律走 `utils::reqwest` 的 `send_retrying`（或包好的 `get_raw_html_string` /
+#   `get_json_data`）。唯一例外是 `send_retrying` 本身，以函式層級 allow 標註。
+disallowed-methods = [
+    { path = "chrono::offset::Local::now", reason = "改用 crate::utils::date::taipei_now / taipei_today" },
+    { path = "reqwest::RequestBuilder::send", reason = "改用 crate::utils::reqwest::send_retrying" },
+]

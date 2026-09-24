@@ -129,7 +129,8 @@ where
 ///
 /// 呼叫端：`get_raw_html_string` / `get_json_data`（本檔，2026-08-11 起 —— 於是 TWSE、
 /// gov_tenders 這些排程抓取全部涵蓋）與 `services/oauth.rs`。
-/// **新的對外呼叫一律走這兩支或本函式，不要自己 `.send()`。**
+/// **新的對外呼叫一律走這兩支或本函式，不要自己 `.send()`**（`clippy.toml` 禁用，本函式是唯一例外）。
+#[allow(clippy::disallowed_methods)]
 pub async fn send_retrying(builder: RequestBuilder) -> Result<reqwest::Response, reqwest::Error> {
     /// 總嘗試次數（含第一次）
     const ATTEMPTS: u32 = 4;

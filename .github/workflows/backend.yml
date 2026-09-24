@@ -65,6 +65,10 @@ jobs:
           # master 照存，下次 push 才有得 restore。
           save-if: ${{ github.ref == 'refs/heads/master' }}
       -
+        # 模組依賴方向（routes ↛ repositories 等），clippy 管不到，見腳本檔頭
+        name: Layering
+        run: scripts/check-layering.sh
+      -
         name: Clippy
         run: cargo clippy --all-targets --locked -- -D warnings
       -

@@ -24,32 +24,32 @@ use crate::structs::features::Feature;
 use crate::structs::ws::WsEvent;
 use std::collections::HashSet;
 
-pub struct AppStateInner {
-    pub pg_pool: Pool<Postgres>,
-    pub redis_pool: RedisPool<RedisConnectionManager>,
-    pub http_client: Client,
-    pub connections: ConnectionMap,
-    pub storage: Storage,
-    pub config: AppConfig,
-    pub settings: Arc<RwLock<HashMap<String, String>>>,
+struct AppStateInner {
+    pg_pool: Pool<Postgres>,
+    redis_pool: RedisPool<RedisConnectionManager>,
+    http_client: Client,
+    connections: ConnectionMap,
+    storage: Storage,
+    config: AppConfig,
+    settings: Arc<RwLock<HashMap<String, String>>>,
     /// enabled_features 設定的 parse 結果（reload 時更新）；None = 全開
-    pub enabled_features: Arc<RwLock<Option<HashSet<Feature>>>>,
-    pub torrents: TorrentManager,
-    pub games: GameRegistry,
+    enabled_features: Arc<RwLock<Option<HashSet<Feature>>>>,
+    torrents: TorrentManager,
+    games: GameRegistry,
     /// 稽核紀錄的批次寫入佇列（消費端 = `services::audit_logs::audit_writer`）
-    pub audit_tx: mpsc::Sender<AuditEntry>,
+    audit_tx: mpsc::Sender<AuditEntry>,
     /// 由 app_settings 的 webauthn_rp_id / webauthn_rp_origin 建構（reload 時重建）；
     /// None = 設定缺漏或無效，passkey 端點回錯、密碼登入不受影響
-    pub webauthn: Arc<RwLock<Option<webauthn_rs::Webauthn>>>,
+    webauthn: Arc<RwLock<Option<webauthn_rs::Webauthn>>>,
     /// 上一次讀到的 /proc/stat 累計值，`CollectSystemMetrics` 用來算整個採樣間隔的 CPU 平均。
     /// None = 行程剛起來還沒有基準（第一輪不落地）。
-    pub cpu_times: Arc<RwLock<Option<CpuTimes>>>,
+    cpu_times: Arc<RwLock<Option<CpuTimes>>>,
 }
 
 impl AppStateInner {
     /// 一併回傳稽核佇列的接收端 —— 呼叫端必須把它交給
     /// `services::audit_logs::audit_writer`，否則佇列會塞滿、稽核靜默消失。
-    pub async fn new() -> (Self, mpsc::Receiver<AuditEntry>) {
+    async fn new() -> (Self, mpsc::Receiver<AuditEntry>) {
         let db_connection_str = std::env::var("DATABASE_URL").expect("找不到 DATABASE_URL");
 
         let pg_pool = PgPoolOptions::new()
