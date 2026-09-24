@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { localeAlternates } from "@/libs/seo";
+// eslint-disable-next-line no-restricted-imports -- 外部連結（GitHub），不需要 locale prefix
 import NextLink from "next/link";
 import { Link } from "@/i18n/navigation";
 import { ArrowRight, MessageSquare, History } from "lucide-react";

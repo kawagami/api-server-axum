@@ -50,6 +50,14 @@ jobs:
       -
         name: Type check
         run: pnpm exec tsc --noEmit
+      -
+        # 專案慣例（公開頁導航、updateTag、禁 alert 等）在 eslint.config.mjs；warning 不擋，error 擋
+        name: Lint
+        run: pnpm lint
+      -
+        # ESLint 管不到的慣例（Tailwind class、"use server" 擺放等），見腳本檔頭
+        name: Conventions
+        run: scripts/check-conventions.sh
 
   build:
     # 不掛 needs: test —— 與 test 並行，閘門在 deploy（理由見檔頭）

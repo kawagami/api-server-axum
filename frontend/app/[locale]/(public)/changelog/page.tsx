@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+// eslint-disable-next-line no-restricted-imports -- 外部連結（GitHub），不需要 locale prefix
 import NextLink from "next/link";
 import { Sparkles, Bug, Zap, Wrench, ShieldCheck, ExternalLink, type LucideIcon } from "lucide-react";
 import PageShell from "@/components/page-shell";
