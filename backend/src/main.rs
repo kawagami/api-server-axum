@@ -15,8 +15,19 @@ mod structs;
 mod utils;
 
 use std::{env::var, net::SocketAddr};
-use tokio::{net::TcpListener, signal, sync::mpsc};
+use tokio::{
+    net::TcpListener,
+    signal,
+    sync::{mpsc, watch},
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+/// 收到關機訊號後，等 in-flight 連線結束的上限。
+///
+/// **必須明顯小於 docker 的 stop grace period**（backend 用預設 10 秒，`deploy/docker-compose.yml`
+/// 沒有另設）：排水 5 秒 + 下面 flush 的 0.7 秒 = 5.7 秒退出。調到接近 10 秒的話，行程
+/// 仍會被 SIGKILL 收掉，flush 照樣跑不到，等於白做。
+const DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 #[tokio::main]
 async fn main() {
@@ -58,14 +69,36 @@ async fn main() {
     // 啟動事件是 info 不是 debug —— 生產跑在 info，這行是 stdout 上「行程有沒有起來」的唯一依據
     tracing::info!("listening on {}", listener.local_addr().unwrap());
 
-    // 啟動 Axum 伺服器，並加入優雅關閉（graceful shutdown）機制
-    axum::serve(
+    // 收到訊號 → axum 停止收新連線並等 in-flight；同時開始計 DRAIN_TIMEOUT，逾時就放棄
+    // 還沒結束的連線，照樣走到下面的 flush。
+    // 沒有這層的話，進行中的串流回應（`/uploads` 的 ServeDir、torrent 簽名下載的 ServeFile）
+    // 會讓 graceful shutdown 一直等到 body 串完 —— 生產上就是等到 docker SIGKILL，而
+    // SIGKILL 那條路徑上後面的 flush 完全不執行，關機前的 log 與稽核直接丟掉。
+    // WS 長連線不受影響：upgrade 之後本來就不算 in-flight（見 ARCHITECTURE.md「優雅關閉」）。
+    let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+    let server = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .unwrap();
+    .with_graceful_shutdown(async move {
+        shutdown_signal().await;
+        let _ = shutdown_tx.send(true);
+    });
+    let drain_deadline = async move {
+        // sender 只在送出 true 之後才 drop，Err 不會發生；真的發生也只是退化成不限時等待
+        if shutdown_rx.wait_for(|stopped| *stopped).await.is_err() {
+            std::future::pending::<()>().await;
+        }
+        tokio::time::sleep(DRAIN_TIMEOUT).await;
+    };
+
+    tokio::select! {
+        result = server => result.unwrap(),
+        _ = drain_deadline => tracing::warn!(
+            "graceful shutdown 等了 {}s 仍有連線未結束（多半是串流下載），放棄等待",
+            DRAIN_TIMEOUT.as_secs()
+        ),
+    }
 
     tracing::info!("server stopped, flushing logs");
     // `log_writer` 的 buffer 最多攢 500ms 才落地，而 DbLogLayer 的 sender 活在全域
@@ -80,7 +113,7 @@ async fn main() {
 /// - debug 會讓 tower_http 對**每個請求**印 started/finished 兩行，而 compose 給
 ///   backend 的 rotation 是「稀疏」規格（10m×3）
 /// - `tower_http=warn` 只掐掉那兩行，5xx 的 `on_failure` 是 ERROR，照樣留著
-///   （CLAUDE.md 講的「一個 5xx 落 3 筆」不受影響）
+///   （ARCHITECTURE.md 講的「一個 5xx 落 3 筆」不受影響）
 /// - `logs` 表的落地門檻另有 app_settings 的 `log_db_level`，但**只能在這個天花板
 ///   底下調** —— EnvFilter 掛在 registry 上是全域 filter，被它擋掉的 event 到不了
 ///   `DbLogLayer`。所以這裡是 info，那邊的上限才會是 INFO
