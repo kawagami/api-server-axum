@@ -1,0 +1,9 @@
+import type { NextRequest } from "next/server";
+import { getSystemMetrics } from "@/api/metrics";
+import { adminJson, intParam } from "@/libs/admin-route";
+
+// 後台輪詢用的讀取端點（為什麼不直接呼叫 Server Action 見 libs/admin-route.ts）。hours 的 clamp 在後端
+export async function GET(request: NextRequest) {
+    const hours = intParam(request.nextUrl.searchParams, "hours");
+    return adminJson(() => getSystemMetrics(hours));
+}

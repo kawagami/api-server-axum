@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Users, CalendarRange, Loader2 } from "lucide-react";
-import { getVisitorStats } from "@/api/stats";
+import { getVisitorStats } from "@/libs/admin-queries";
 import type { VisitorStats } from "@/types";
 import PageHeader from "@/components/admin/page-header";
 import usePolling from "@/hooks/usePolling";

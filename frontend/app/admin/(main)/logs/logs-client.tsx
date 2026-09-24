@@ -2,7 +2,8 @@
 
 import { Fragment, useState, useEffect, useCallback } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
-import { getLogs, getLogTrace } from "@/api/logs";
+import { getLogTrace } from "@/api/logs";
+import { getLogs } from "@/libs/admin-queries";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
 import AdminTableContainer from "@/components/admin/admin-table-container";

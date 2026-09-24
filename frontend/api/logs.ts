@@ -3,7 +3,7 @@
 import adminRequest from "@/libs/adminRequest";
 import type { Log, LogLevel, AuditLog, AuditActorType, HttpMethod, PaginatedResponse } from "@/types";
 
-interface GetLogsParams {
+export interface GetLogsParams {
     level?: LogLevel;
     /** message 與 fields 一起模糊比對 —— 錯誤細節在 fields.self，只搜 message 找不到 */
     q?: string;

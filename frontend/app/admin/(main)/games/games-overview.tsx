@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
-import { getGamesOverview } from "@/api/games";
+import { getGamesOverview } from "@/libs/admin-queries";
 import type { GameOverview } from "@/types";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import PageHeader from "@/components/admin/page-header";

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, Loader2, RefreshCw, Send } from "lucide-react";
-import { getWsConnections } from "@/api/ws";
+import { getWsConnections } from "@/libs/admin-queries";
 import { useWsContext } from "@/libs/ws-context";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import PageHeader from "@/components/admin/page-header";

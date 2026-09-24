@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { getAuditLogs } from "@/api/logs";
+import { getAuditLogs } from "@/libs/admin-queries";
 import ErrorBanner, { LOAD_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";

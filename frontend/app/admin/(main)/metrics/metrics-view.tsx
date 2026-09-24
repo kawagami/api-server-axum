@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cpu, MemoryStick, HardDrive, Activity, Loader2 } from "lucide-react";
-import { getSystemMetrics } from "@/api/metrics";
+import { getSystemMetrics } from "@/libs/admin-queries";
 import type { SystemMetric } from "@/types";
 import PageHeader from "@/components/admin/page-header";
 import usePolling from "@/hooks/usePolling";
