@@ -20,15 +20,13 @@ pub async fn handle(hub: &FarmHub, state: &AppState, who: SocketAddr, value: &Va
         return true;
     }
     match typ {
-        "start_game" => start_game(hub, state, who).await,
+        "start_game" => {
+            room::start_game(hub, state, who, |r| Ok(engine::initial_state(r.players.len())), broadcast_state).await
+        }
         "action" => action(hub, state, who, data).await,
         _ => return false,
     }
     true
-}
-
-pub async fn handle_disconnect(hub: &FarmHub, state: &AppState, who: SocketAddr) {
-    room::handle_disconnect(hub, state, who).await;
 }
 
 fn msg(typ: &str, data: Value) -> String {
@@ -37,26 +35,6 @@ fn msg(typ: &str, data: Value) -> String {
 
 fn err1(state: &AppState, who: SocketAddr, reason: &str) {
     room::err1::<FarmRoom>(state, who, reason);
-}
-
-// ---- 開局 ----
-
-async fn start_game(hub: &FarmHub, state: &AppState, who: SocketAddr) {
-    let mut outbox = Vec::new();
-    {
-        let mut h = hub.lock().await;
-        let room_id = match room::start_check(&h, who) {
-            Ok(id) => id,
-            Err(e) => { err1(state, who, e); return; }
-        };
-        let room = h.rooms.get_mut(&room_id).unwrap();
-        let gs = engine::initial_state(room.players.len());
-        room.state = RoomState::Playing(gs);
-        let room = h.rooms.get(&room_id).unwrap();
-        broadcast_state(room, &mut outbox);
-        room::push_lobby_update(&h, &mut outbox);
-    }
-    room::flush(state, outbox);
 }
 
 // ---- 對局動作 ----
@@ -91,8 +69,7 @@ async fn action(hub: &FarmHub, state: &AppState, who: SocketAddr, data: Option<&
             // game_over 帶最終分數，並解散房
             if let RoomState::Playing(gs) = &room.state {
                 let scores = engine::final_scores(gs);
-                let m = msg("game_over", json!({ "scores": scores }));
-                for &p in &room.players { outbox.push((p, m.clone())); }
+                room::broadcast_to_room(room, msg("game_over", json!({ "scores": scores })), &mut outbox);
             }
             room::dissolve_room(&mut h, room_id, &mut outbox);
         }

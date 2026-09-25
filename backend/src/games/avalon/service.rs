@@ -21,7 +21,9 @@ pub async fn handle(hub: &AvalonHub, state: &AppState, who: SocketAddr, value: &
         return true;
     }
     match typ {
-        "start_game" => start_game(hub, state, who).await,
+        "start_game" => {
+            room::start_game(hub, state, who, |r| engine::setup(r.players.len(), r.options), announce_start).await
+        }
         "chat" => chat(hub, state, who, data).await,
         "propose_team" => propose_team(hub, state, who, data).await,
         "team_vote" => team_vote(hub, state, who, data).await,
@@ -30,10 +32,6 @@ pub async fn handle(hub: &AvalonHub, state: &AppState, who: SocketAddr, value: &
         _ => return false,
     }
     true
-}
-
-pub async fn handle_disconnect(hub: &AvalonHub, state: &AppState, who: SocketAddr) {
-    room::handle_disconnect(hub, state, who).await;
 }
 
 fn msg(typ: &str, data: Value) -> String {
@@ -46,45 +44,29 @@ fn err1(state: &AppState, who: SocketAddr, reason: &str) {
 
 // ---- 開局 ----
 
-async fn start_game(hub: &AvalonHub, state: &AppState, who: SocketAddr) {
-    let mut outbox = Vec::new();
-    {
-        let mut h = hub.lock().await;
-        let room_id = match room::start_check(&h, who) {
-            Ok(id) => id,
-            Err(e) => { err1(state, who, e); return; }
-        };
-        let room = h.rooms.get_mut(&room_id).unwrap();
-        let n = room.players.len();
-        let st = match engine::setup(n, room.options) {
-            Ok(st) => st,
-            Err(e) => { err1(state, who, e); return; }
-        };
-        // 私有角色推送：每座位收到自己的角色 + known
-        for seat in 0..n {
-            let role = st.roles[seat];
-            let known = roles::known_seats(&st.roles, seat);
-            let players: Vec<Value> = room.names.iter().enumerate()
-                .map(|(i, name)| json!({ "seat": i, "name": name })).collect();
-            outbox.push((
-                room.players[seat],
-                msg("role_assigned", json!({
-                    "your_seat": seat,
-                    "your_role": role.as_str(),
-                    "known": known,
-                    "n": n,
-                    "sizes": st.sizes,
-                    "players": players,
-                })),
-            ));
-        }
-        room.state = RoomState::Playing(st);
-        // 公開階段
-        let room = h.rooms.get(&room_id).unwrap();
-        broadcast_phase(room, &mut outbox);
-        room::push_lobby_update(&h, &mut outbox);
+/// 開局推送：先逐座位私有推 `role_assigned`（自己的角色 + known），再公開 `phase_changed`。
+/// 順序是協定的一部分（前端 `your_seat` 只從前者取），同一批 outbox 送出故有保證。
+fn announce_start(room: &Room, outbox: &mut Vec<(SocketAddr, String)>) {
+    let RoomState::Playing(st) = &room.state else { return; };
+    let n = room.players.len();
+    let players: Vec<Value> = room.names.iter().enumerate()
+        .map(|(i, name)| json!({ "seat": i, "name": name })).collect();
+    for seat in 0..n {
+        let role = st.roles[seat];
+        let known = roles::known_seats(&st.roles, seat);
+        outbox.push((
+            room.players[seat],
+            msg("role_assigned", json!({
+                "your_seat": seat,
+                "your_role": role.as_str(),
+                "known": known,
+                "n": n,
+                "sizes": st.sizes,
+                "players": players,
+            })),
+        ));
     }
-    room::flush(state, outbox);
+    broadcast_phase(room, outbox);
 }
 
 async fn chat(hub: &AvalonHub, state: &AppState, who: SocketAddr, data: Option<&Value>) {
@@ -97,8 +79,7 @@ async fn chat(hub: &AvalonHub, state: &AppState, who: SocketAddr, data: Option<&
         let Some(&room_id) = h.conn_room.get(&who) else { return; };
         let room = h.rooms.get(&room_id).unwrap();
         let Some(seat) = room.seat_of(who) else { return; };
-        let m = msg("chat", json!({ "seat": seat, "name": room.names[seat], "text": text }));
-        for &p in &room.players { outbox.push((p, m.clone())); }
+        room::broadcast_to_room(room, msg("chat", json!({ "seat": seat, "name": room.names[seat], "text": text })), &mut outbox);
     }
     room::flush(state, outbox);
 }
@@ -117,8 +98,7 @@ async fn propose_team(hub: &AvalonHub, state: &AppState, who: SocketAddr, data: 
         let room = h.rooms.get_mut(&room_id).unwrap();
         let RoomState::Playing(st) = &mut room.state else { return; };
         if let Err(e) = engine::propose_team(st, seat, &team) { err1(state, who, e); return; }
-        let m = msg("team_proposed", json!({ "team": team, "leader": seat }));
-        for &p in &room.players { outbox.push((p, m.clone())); }
+        room::broadcast_to_room(room, msg("team_proposed", json!({ "team": team, "leader": seat })), &mut outbox);
         broadcast_phase(room, &mut outbox);
     }
     room::flush(state, outbox);
@@ -139,8 +119,7 @@ async fn team_vote(hub: &AvalonHub, state: &AppState, who: SocketAddr, data: Opt
             Ok(None) => {} // 尚未投完，靜默
             Ok(Some(tally)) => {
                 let votes: Vec<Value> = tally.votes.iter().map(|(s, a)| json!({ "seat": s, "approve": a })).collect();
-                let m = msg("vote_result", json!({ "votes": votes, "approved": tally.approved }));
-                for &p in &room.players { outbox.push((p, m.clone())); }
+                room::broadcast_to_room(room, msg("vote_result", json!({ "votes": votes, "approved": tally.approved })), &mut outbox);
                 push_transition(&mut h, room_id, &mut outbox);
             }
         }
@@ -165,7 +144,7 @@ async fn quest_card(hub: &AvalonHub, state: &AppState, who: SocketAddr, data: Op
                 let m = msg("quest_result", json!({
                     "round": tally.round, "fails": tally.fails, "success": tally.success,
                 }));
-                for &p in &room.players { outbox.push((p, m.clone())); }
+                room::broadcast_to_room(room, m, &mut outbox);
                 push_transition(&mut h, room_id, &mut outbox);
             }
         }
@@ -215,10 +194,7 @@ fn phase_payload(st: &AvalonState) -> Value {
 
 fn broadcast_phase(room: &Room, outbox: &mut Vec<(SocketAddr, String)>) {
     if let RoomState::Playing(st) = &room.state {
-        let m = msg("phase_changed", phase_payload(st));
-        for &p in &room.players {
-            outbox.push((p, m.clone()));
-        }
+        room::broadcast_to_room(room, msg("phase_changed", phase_payload(st)), outbox);
     }
 }
 
@@ -235,7 +211,7 @@ fn push_transition(h: &mut AvalonHubInner, room_id: u64, outbox: &mut Vec<(Socke
             None => Value::Null,
         };
         let m = msg("game_over", json!({ "winner": winner, "reason": st.reason, "roles": roles_reveal }));
-        for &p in &room.players { outbox.push((p, m.clone())); }
+        room::broadcast_to_room(room, m, outbox);
         room::dissolve_room(h, room_id, outbox);
     } else {
         broadcast_phase(room, outbox);

@@ -1,8 +1,9 @@
 //! N 人房共用框架：大廳 / 房間 CRUD / 座位 / 斷線，泛型於 `RoomKind`。
 //!
 //! 2 人對戰走 `common::{hub,service}`（桌位 + 配對 + 計時）；N 人子系統（avalon / farm）
-//! 走這裡：各遊戲以 marker type impl `RoomKind` 提供靜態參數，遊戲專屬的開局 / 對局
-//! 動作 / 廣播留在各自 `service.rs`，共通指令由 `handle_common` 統一分派。
+//! 走這裡：各遊戲以 marker type impl `RoomKind` 提供靜態參數，共通指令由 `handle_common`
+//! 統一分派；開局骨架是 `start_game`，遊戲只提供建狀態與開局推送兩個 closure。
+//! 對局動作與遊戲專屬廣播留在各自 `service.rs`。
 
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
@@ -114,6 +115,13 @@ pub fn err1<K: RoomKind>(state: &AppState, who: SocketAddr, reason: &str) {
     state.send_to(who, msg::<K>("error", json!({ "reason": reason })));
 }
 
+/// 同一則訊息推給房內所有玩家。
+pub fn broadcast_to_room<K: RoomKind>(room: &Room<K>, m: String, outbox: &mut Vec<(SocketAddr, String)>) {
+    for &p in &room.players {
+        outbox.push((p, m.clone()));
+    }
+}
+
 /// 玩家暱稱（`nickname` 欄），trim、≤20 字；空則回 None 由呼叫端帶預設。
 pub fn nickname(data: Option<&Value>) -> Option<String> {
     data.and_then(|d| d.get("nickname"))
@@ -180,10 +188,7 @@ pub fn push_room_update<K: RoomKind>(room: &Room<K>, outbox: &mut Vec<(SocketAdd
             outbox.push((p, msg::<K>("room_update", v)));
         }
     } else {
-        let m = msg::<K>("room_update", base);
-        for &p in &room.players {
-            outbox.push((p, m.clone()));
-        }
+        broadcast_to_room(room, msg::<K>("room_update", base), outbox);
     }
 }
 
@@ -303,6 +308,34 @@ pub async fn handle_disconnect<K: RoomKind>(hub: &RoomHub<K>, state: &AppState, 
         let mut h = hub.lock().await;
         h.lobby.remove(&who);
         remove_from_room(&mut h, who, &mut outbox);
+    }
+    flush(state, outbox);
+}
+
+/// host 開局：`start_check` → `setup` 建對局狀態 → 轉 Playing → `on_started` 推開局訊息 → 大廳更新。
+/// 任一步失敗把 reason 回給 host，房維持等待中。`on_started` 拿到的房已是 Playing。
+pub async fn start_game<K: RoomKind>(
+    hub: &RoomHub<K>,
+    state: &AppState,
+    who: SocketAddr,
+    setup: impl FnOnce(&Room<K>) -> Result<K::Playing, &'static str>,
+    on_started: impl FnOnce(&Room<K>, &mut Vec<(SocketAddr, String)>),
+) {
+    let mut outbox = Vec::new();
+    {
+        let mut h = hub.lock().await;
+        let room_id = match start_check(&h, who) {
+            Ok(id) => id,
+            Err(e) => { err1::<K>(state, who, e); return; }
+        };
+        let room = h.rooms.get_mut(&room_id).unwrap();
+        let playing = match setup(room) {
+            Ok(p) => p,
+            Err(e) => { err1::<K>(state, who, e); return; }
+        };
+        room.state = RoomState::Playing(playing);
+        on_started(room, &mut outbox);
+        push_lobby_update(&h, &mut outbox);
     }
     flush(state, outbox);
 }

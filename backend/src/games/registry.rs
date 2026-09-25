@@ -17,7 +17,7 @@ use crate::games::banqi::game::BanqiGame;
 use crate::games::chess::game::ChessGame;
 use crate::games::common::engine::GameEngine;
 use crate::games::common::hub::{GameHub, HubInner, TableState};
-use crate::games::common::room::{RoomHub, RoomKind, RoomState};
+use crate::games::common::room::{self, RoomHub, RoomKind, RoomState};
 use crate::games::common::service;
 use crate::games::farm::hub::FarmHub;
 use crate::games::farm::service as farm_service;
@@ -126,8 +126,8 @@ impl AnyHub {
             AnyHub::Banqi(h) => service::handle_disconnect(h, state, who).await,
             AnyHub::WesternChess(h) => service::handle_disconnect(h, state, who).await,
             AnyHub::Go(h) => service::handle_disconnect(h, state, who).await,
-            AnyHub::Avalon(h) => avalon_service::handle_disconnect(h, state, who).await,
-            AnyHub::Farm(h) => farm_service::handle_disconnect(h, state, who).await,
+            AnyHub::Avalon(h) => room::handle_disconnect(h, state, who).await,
+            AnyHub::Farm(h) => room::handle_disconnect(h, state, who).await,
         }
     }
 

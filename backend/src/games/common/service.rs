@@ -48,6 +48,10 @@ fn msg<E: GameEngine>(typ: &str, data: Value) -> String {
     crate::structs::ws::game_envelope(E::NAME, typ, data)
 }
 
+fn err1<E: GameEngine>(state: &AppState, who: SocketAddr, reason: &str) {
+    state.send_to(who, msg::<E>("error", json!({ "reason": reason })));
+}
+
 /// 把合法步提示推給當前輪到的那一方（只有他需要）。對局已結束或該遊戲不提供則不送。
 fn push_hints<E: GameEngine>(game: &Game<E>, outbox: &mut Vec<(SocketAddr, String)>) {
     if game.ended {
@@ -119,11 +123,11 @@ async fn create_table<E: GameEngine>(
     {
         let mut h = hub.lock().await;
         if h.is_committed(who) {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "already_committed" })))]);
+            err1::<E>(state, who, "already_committed");
             return;
         }
         if h.tables.len() >= MAX_TABLES {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "too_many_tables" })))]);
+            err1::<E>(state, who, "too_many_tables");
             return;
         }
         let id = h.next_id;
@@ -161,28 +165,28 @@ async fn join_table<E: GameEngine>(
     {
         let mut h = hub.lock().await;
         if h.is_committed(who) {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "already_committed" })))]);
+            err1::<E>(state, who, "already_committed");
             return;
         }
         let Some(table_id) = data.and_then(|d| d.get("table_id")).and_then(|v| v.as_u64()) else {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "bad_table_id" })))]);
+            err1::<E>(state, who, "bad_table_id");
             return;
         };
         let host = match h.tables.get(&table_id) {
             Some(t) => match &t.state {
                 TableState::Waiting { host } => *host,
                 TableState::Playing(_) => {
-                    flush(state, vec![(who, msg::<E>("error", json!({ "reason": "table_full" })))]);
+                    err1::<E>(state, who, "table_full");
                     return;
                 }
             },
             None => {
-                flush(state, vec![(who, msg::<E>("error", json!({ "reason": "table_not_found" })))]);
+                err1::<E>(state, who, "table_not_found");
                 return;
             }
         };
         if host == who {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "cannot_join_self" })))]);
+            err1::<E>(state, who, "cannot_join_self");
             return;
         }
         open_game(&mut h, table_id, host, who, &mut outbox);
@@ -220,7 +224,7 @@ async fn join_queue<E: GameEngine>(hub: &GameHub<E>, state: &AppState, who: Sock
             return;
         }
         if h.tables.len() >= MAX_TABLES {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "too_many_tables" })))]);
+            err1::<E>(state, who, "too_many_tables");
             return;
         }
         h.queue.push_back(who);
@@ -307,15 +311,15 @@ async fn handle_move<E: GameEngine>(
         let mut h = hub.lock().await;
 
         let Some(&table_id) = h.conn_table.get(&who) else {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "not_in_game" })))]);
+            err1::<E>(state, who, "not_in_game");
             return;
         };
         let Some(game) = playing_game_mut(&mut h, table_id) else {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "not_in_game" })))]);
+            err1::<E>(state, who, "not_in_game");
             return;
         };
         if game.ended {
-            flush(state, vec![(who, msg::<E>("error", json!({ "reason": "game_ended" })))]);
+            err1::<E>(state, who, "game_ended");
             return;
         }
 
