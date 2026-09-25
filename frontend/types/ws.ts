@@ -33,14 +33,6 @@ export interface WsUserEventData {
   user_agent?: string;
 }
 
-// ⚠ 這支是 `libs/ws-context.tsx` 的 `WsMessage` 的重複定義，且**沒有 `game` 欄**、
-// 目前零消費點（訂閱端一律 import 自 ws-context 那份）。留著只會讓人挑錯的那個用。
-// 要用 WS 信封型別請 `import { type WsMessage } from '@/libs/ws-context'`。
-export interface WsMessage {
-  type: string;
-  data: unknown;
-}
-
 // WS online connection（後端 DisplayTrackedConnection，已依 connected_at 新→舊排序）
 export interface WsConnection {
   addr: string;
