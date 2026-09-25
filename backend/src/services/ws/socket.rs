@@ -206,10 +206,10 @@ pub async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, 
     );
 }
 
-/// 依信封 `game` 欄分派給對應遊戲 hub。回傳 true 表示已當作遊戲訊息處理。
-async fn dispatch_game(state: &AppState, who: SocketAddr, value: &serde_json::Value) -> bool {
+/// 依信封 `game` 欄分派給對應遊戲 hub。沒帶 `game` 或未知的遊戲一律忽略。
+async fn dispatch_game(state: &AppState, who: SocketAddr, value: &serde_json::Value) {
     let Some(game) = value.get("game").and_then(|v| v.as_str()) else {
-        return false;
+        return;
     };
     // instance 級功能開關：games 關閉時擋下所有遊戲訊息（watcher 照常跑，熱開關不需重啟）
     if !state
@@ -224,11 +224,10 @@ async fn dispatch_game(state: &AppState, who: SocketAddr, value: &serde_json::Va
                 serde_json::json!({ "reason": "feature_disabled" }),
             ),
         );
-        return true;
+        return;
     }
-    match state.games().get(game) {
-        Some(hub) => hub.handle(state, who, value).await,
-        None => false,
+    if let Some(hub) = state.games().get(game) {
+        hub.handle(state, who, value).await;
     }
 }
 

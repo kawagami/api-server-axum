@@ -1,23 +1,21 @@
 use crate::{
-    repositories::stocks::{get_active_buyback_prices_filtered, upsert_stock_closing_prices},
+    repositories::stocks::{get_buybacks_missing_start_price, upsert_stock_closing_prices},
     services::stocks::{get_stock_day_avg, parse_stock_day_avg_response},
     state::AppState,
-    structs::stocks::StartPriceFilter,
 };
 
 pub async fn run(state: AppState) {
     let pool = state.get_pool();
     let client = state.get_http_client();
 
-    let no_start_price_data =
-        match get_active_buyback_prices_filtered(pool, StartPriceFilter::MissingOnly).await {
-            Ok(data) => data,
-            Err(e) => {
-                // 同檔其他 error 都帶得出「哪支股票哪一天」，這行原本只有一句裸訊息
-                tracing::error!("get_active_buyback_prices_filtered fail: {}", e);
-                return;
-            }
-        };
+    let no_start_price_data = match get_buybacks_missing_start_price(pool).await {
+        Ok(data) => data,
+        Err(e) => {
+            // 同檔其他 error 都帶得出「哪支股票哪一天」，這行原本只有一句裸訊息
+            tracing::error!("get_buybacks_missing_start_price fail: {}", e);
+            return;
+        }
+    };
 
     // Take the oldest entry first; one per minute to avoid TWSE rate limiting
     if let Some(data) = no_start_price_data.into_iter().next() {

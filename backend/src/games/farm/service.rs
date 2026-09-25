@@ -13,20 +13,19 @@ use super::hub::{FarmHub, FarmRoom, Room, RoomState};
 use crate::games::common::room;
 use crate::state::AppState;
 
-pub async fn handle(hub: &FarmHub, state: &AppState, who: SocketAddr, value: &Value) -> bool {
+pub async fn handle(hub: &FarmHub, state: &AppState, who: SocketAddr, value: &Value) {
     let data = value.get("data");
-    let Some(typ) = value.get("type").and_then(|v| v.as_str()) else { return false };
+    let Some(typ) = value.get("type").and_then(|v| v.as_str()) else { return };
     if room::handle_common(hub, state, who, typ, data).await {
-        return true;
+        return;
     }
     match typ {
         "start_game" => {
             room::start_game(hub, state, who, |r| Ok(engine::initial_state(r.players.len())), broadcast_state).await
         }
         "action" => action(hub, state, who, data).await,
-        _ => return false,
+        _ => {}
     }
-    true
 }
 
 fn msg(typ: &str, data: Value) -> String {

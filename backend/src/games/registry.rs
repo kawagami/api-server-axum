@@ -107,7 +107,7 @@ pub enum AnyHub {
 }
 
 impl AnyHub {
-    pub async fn handle(&self, state: &AppState, who: SocketAddr, value: &Value) -> bool {
+    pub async fn handle(&self, state: &AppState, who: SocketAddr, value: &Value) {
         match self {
             AnyHub::Chess(h) => service::handle(h, state, who, value).await,
             AnyHub::Gomoku(h) => service::handle(h, state, who, value).await,

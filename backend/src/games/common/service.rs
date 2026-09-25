@@ -21,13 +21,13 @@ use crate::state::AppState;
 /// 200 遠高於這個站實際同時的桌數（後台 `/admin/games` 的即時數字是個位數）。
 const MAX_TABLES: usize = 200;
 
-/// 收到的 WS 文字訊息分派。回傳 true 表示已處理（呼叫端不再 echo）。
+/// 收到的 WS 文字訊息分派。未知 `type` 一律忽略。
 pub async fn handle<E: GameEngine>(
     hub: &GameHub<E>,
     state: &AppState,
     who: SocketAddr,
     value: &Value,
-) -> bool {
+) {
     let data = value.get("data");
     match value.get("type").and_then(|v| v.as_str()) {
         Some("join_lobby") => join_lobby(hub, state, who).await,
@@ -39,9 +39,8 @@ pub async fn handle<E: GameEngine>(
         Some("leave_queue") => leave_queue(hub, who).await,
         Some("resign") => resign(hub, state, who).await,
         Some("move") => handle_move(hub, state, who, data).await,
-        _ => return false,
+        _ => {}
     }
-    true
 }
 
 fn msg<E: GameEngine>(typ: &str, data: Value) -> String {

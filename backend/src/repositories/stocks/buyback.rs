@@ -1,8 +1,8 @@
 use crate::{
     errors::AppError,
-    structs::stocks::{BuybackRecord, StartPriceFilter, StockBuybackInfo, StockBuybackMoreInfo, StockBuybackPeriod},
+    structs::stocks::{BuybackRecord, StockBuybackInfo, StockBuybackMoreInfo, StockBuybackPeriod},
 };
-use sqlx::{Pool, Postgres, QueryBuilder};
+use sqlx::{Pool, Postgres};
 
 pub async fn bulk_insert_stock_buyback_periods(
     pool: &Pool<Postgres>,
@@ -70,11 +70,12 @@ pub async fn get_active_buyback_prices(
     .await?)
 }
 
-pub async fn get_active_buyback_prices_filtered(
+/// 進行中、起始日已過但還沒補到起始日收盤價的庫藏股期間（舊→新），給
+/// `fetch_historical_closing_prices` 逐筆回補。
+pub async fn get_buybacks_missing_start_price(
     pool: &Pool<Postgres>,
-    filter: StartPriceFilter,
 ) -> Result<Vec<StockBuybackInfo>, AppError> {
-    let mut qb = QueryBuilder::new(
+    Ok(sqlx::query_as(
         "SELECT
             p.stock_no,
             p.start_date,
@@ -93,22 +94,13 @@ pub async fn get_active_buyback_prices_filtered(
                 AND date BETWEEN p.start_date AND p.start_date + INTERVAL '3 days'
             ORDER BY date ASC LIMIT 1
         ) AS start_date_price ON TRUE
-        WHERE p.end_date > CURRENT_DATE",
-    );
-
-    match filter {
-        StartPriceFilter::All => {}
-        StartPriceFilter::MissingOnly => {
-            qb.push(" AND start_date_price.close_price IS NULL AND p.start_date < CURRENT_DATE");
-        }
-        StartPriceFilter::ExistsOnly => {
-            qb.push(" AND start_date_price.close_price IS NOT NULL");
-        }
-    }
-
-    qb.push(" ORDER BY p.start_date ASC");
-
-    Ok(qb.build_query_as().fetch_all(pool).await?)
+        WHERE p.end_date > CURRENT_DATE
+            AND start_date_price.close_price IS NULL
+            AND p.start_date < CURRENT_DATE
+        ORDER BY p.start_date ASC",
+    )
+    .fetch_all(pool)
+    .await?)
 }
 
 pub async fn get_new_future_buybacks(

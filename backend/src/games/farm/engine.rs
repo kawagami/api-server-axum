@@ -722,7 +722,6 @@ pub fn score(f: &Farm) -> i32 {
     s
 }
 
-#[allow(dead_code)]
 pub fn final_scores(gs: &GameState) -> Vec<i32> {
     gs.players.iter().map(score).collect()
 }

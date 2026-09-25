@@ -111,14 +111,6 @@ pub struct StockBuybackMoreInfo {
     pub diff_percent: Option<f64>,
 }
 
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-pub enum StartPriceFilter {
-    All,
-    MissingOnly,
-    ExistsOnly,
-}
-
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct StockExRight {
     pub stock_no: String,
