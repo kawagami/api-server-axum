@@ -208,7 +208,7 @@ services:
     #   backend 在 16:14 又中了一次同型失敗 —— 那條的真正成因是 Docker 內嵌 DNS 冷快取
     #   回 AAAA-only（沒有 A 就沒有 happy eyeballs 可退），關 IPv6 修不到它。
     #   由 `utils/reqwest.rs::send_retrying` 的重試（會重新 resolve）處理。
-    #   推導見 deploy/README.md 的「對外連線偶發 connect 失敗」。
+    #   推導見 deploy/INCIDENTS.md 的「對外連線偶發 connect 失敗」。
     #
     # 這兩行留著的理由只剩「這個 netns 的 IPv6 確實不可用，關掉是正確的衛生」。
     # 宿主機關掉之後它們就是多餘的，但無害，也擋得住宿主機設定被還原的情況。
@@ -245,7 +245,7 @@ services:
     # ⚠ 這裡**刻意沒有 `dns:`**（曾經寫過 `dns: [8.8.8.8, 1.1.1.1]` 又撤掉，2026-08-13）。
     #   動機是 dockerd log 顯示內嵌 DNS 的四台上游有兩台是打不通的 IPv6，但那條推論
     #   自己站不住：v6 那兩台是 append 在清單**尾端**的 fallback，正常路徑碰不到。
-    #   完整推翻過程見 `deploy/README.md`「候選修法：查完認定沒用」。**別因為「反正無害」加回來。**
+    #   完整推翻過程見 `deploy/INCIDENTS.md`「候選修法：查完認定沒用」。**別因為「反正無害」加回來。**
     working_dir: /app   # distroless image 無預設 workdir；UPLOAD_PATH 等相對路徑以 /app 為基準
     env_file:
       - /srv/kawa/env/kawa.env

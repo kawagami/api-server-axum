@@ -102,7 +102,7 @@ where
 /// 時才會 v6 失敗後退回 v4；答案只有 AAAA 時 fallback 是空的，第一個錯誤直接吐出來。
 /// 而那種 AAAA-only 的答案來自 Docker 內嵌 DNS 的冷快取（容器剛重啟、A 與 AAAA 兩個
 /// 上游查詢掉了一個），**下一次解析就正常** —— 所以重試會重新 resolve 並接上。
-/// 完整推導見 `deploy/README.md` 的「對外連線偶發 connect 失敗」。
+/// 完整推導見 `deploy/INCIDENTS.md` 的「對外連線偶發 connect 失敗」。
 ///
 /// 第二種抖動（2026-08-11）：**解析本身失敗**，`dns error <- failed to lookup address
 /// information: Name or service not known`（`EAI_NONAME`）。與上面那個不同 —— 那個是拿到

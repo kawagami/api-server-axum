@@ -734,7 +734,7 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
    近兩週只中 `www.twse.com.tw`，08-03 / 08-05 / 08-10 / 08-11 各一次、全是單發。
    成因未定（上游 DNS 或內嵌 DNS 轉發抖動皆有可能），但形狀與第 2 點一致：重新 resolve 就通。
 
-**完整證據與推導見 `deploy/README.md`** 的「主機 IPv6」與「對外連線偶發 connect 失敗」兩節。
+**現況與規則見 `deploy/README.md`** 的「主機 IPv6」與「對外連線 DNS 抖動」兩節；**完整證據與推導見 `deploy/INCIDENTS.md`**。
 
 後端這側：
 
@@ -747,7 +747,7 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
   同日另一半修法是 `deploy/docker-compose.yml` backend 的 `dns_opt: [single-request-reopen,
   timeout:2, attempts:3]` —— 三種 errno 的共同根因是內嵌 DNS 把一次解析拆成並行的 A/AAAA 兩問，
   序列化那兩問即可降低發生率；**序列化只在單一 getaddrinfo 內部，不影響併發與承載量**。
-  統計與推導見 `deploy/README.md`「三種失敗的共同根因與修法」。
+  統計與推導見 `deploy/INCIDENTS.md`「三種失敗的共同根因與修法」。
   **只重試「請求還沒送達對方」的失敗**：對方已回狀態碼的不重試，那不是抖動。
   對成因 2、3 這是**對症的解**（重試會重新 resolve），不是將就。
   - 呼叫端：`services/oauth.rs`（token 交換 / Google userinfo / GitHub user+emails / LINE profile）
