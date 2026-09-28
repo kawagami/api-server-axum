@@ -117,8 +117,10 @@ pub async fn change_password(
         .await?
         .ok_or(AppError::AuthError(AuthError::UserNotFound))?;
 
+    // 422 而非 401：呼叫者的 session 是有效的，只是表單欄位錯了。回 401 的話前端
+    // （`libs/createAuthRequest.ts`）會當成登入失效，把人踢回登入頁。
     if !verify_password(current_password.to_string(), current_hash).await? {
-        return Err(AppError::AuthError(AuthError::InvalidPassword));
+        return Err(crate::errors::unprocessable("目前密碼錯誤"));
     }
 
     let new_hash = hash_password(new_password.to_string()).await?;

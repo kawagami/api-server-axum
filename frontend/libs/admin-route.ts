@@ -11,7 +11,7 @@ import { apiErrorStatus, type ApiError } from "@/libs/api-error";
  * 後台有 6 頁在輪詢，輪詢與使用者操作（載入更多、展開軌跡、刪除…）因此互相排隊；
  * Route Handler 是一般的 GET，彼此平行。寫入（mutation）仍走 Server Action。
  *
- * - 401/403：`adminRequest` 會 `redirect()` 到登入頁。那是 Next 內部 error，必須 `unstable_rethrow`
+ * - 401：`adminRequest` 會 `redirect()` 到登入頁。那是 Next 內部 error，必須 `unstable_rethrow`
  *   讓它照常變成 307 —— client 端 `libs/admin-queries.ts` 以 `redirect: "manual"` 接住後導頁。
  * - 其他後端錯誤：沿用後端狀態碼，body 帶 `errorData`（與 `ApiError` 同形），client 端還原成 ApiError。
  * - **不做通用代理**：每支 route 只呼叫一個固定的讀取函式、只收白名單參數。通用的「帶 session 打任意路徑」

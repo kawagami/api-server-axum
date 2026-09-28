@@ -43,15 +43,22 @@ export default function PasskeysPage() {
             const options = await beginPasskeyRegistration();
             const credential = await startRegistration({ optionsJSON: options.publicKey });
             const label = labelRef.current?.value.trim() || "我的裝置";
-            await finishPasskeyRegistration(credential, label);
+            const result = await finishPasskeyRegistration(credential, label);
+            if (!result.ok) {
+                setError(
+                    result.status === 409
+                        ? "此裝置已註冊過 passkey"
+                        : "建立失敗，請確認裝置支援 passkey 後再試",
+                );
+                return;
+            }
             if (labelRef.current) labelRef.current.value = "";
             await reload();
         } catch (e) {
-            const err = e as Error & { status?: number };
+            // 走到這裡的是瀏覽器端 ceremony（startRegistration）或 begin 的錯誤
+            const err = e as Error;
             if (err.name === "NotAllowedError" || err.name === "AbortError") {
                 // 使用者取消，不當錯誤
-            } else if (err.status === 409) {
-                setError("此裝置已註冊過 passkey");
             } else if (err.name === "InvalidStateError") {
                 setError("此裝置已註冊過 passkey");
             } else {

@@ -17,7 +17,7 @@ export interface TorrentLinksResult extends TorrentActionResult {
 }
 
 function toErrorResult(e: unknown): TorrentActionResult & { ok: false } {
-    // adminRequest 在 401/403 會 redirect()，丟的是 Next.js 內部 error — 必須重丟，吞掉會讓 redirect 失效
+    // adminRequest 在 401 會 redirect()，丟的是 Next.js 內部 error — 必須重丟，吞掉會讓 redirect 失效
     unstable_rethrow(e);
     const err = e as Error & { status?: number; errorData?: { message?: string } };
     return {

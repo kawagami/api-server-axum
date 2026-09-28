@@ -3,13 +3,48 @@ use crate::{
     structs::roles::{NewRole, Permission, Role, RoleWithPermissions},
 };
 use sqlx::{Pool, Postgres};
+use std::collections::HashMap;
 
-pub async fn get_roles(pool: &Pool<Postgres>) -> Result<Vec<Role>, AppError> {
-    Ok(
-        sqlx::query_as("SELECT id, name, description FROM roles ORDER BY id")
-            .fetch_all(pool)
-            .await?,
+/// 全部角色，各自帶上權限組。
+///
+/// 列表必須帶 permissions：後台角色頁直接拿它當勾選框的初始狀態，而
+/// `PUT /admin/roles/{id}/permissions` 是**整組覆寫**。列表少了這欄時，每個角色都顯示成
+/// 全未勾，點一下就會把該角色其餘權限全部清掉。
+///
+/// 兩條查詢在這裡分組，不逐角色查（N+1），也不用 json_agg（要另外包 `sqlx::types::Json`）。
+pub async fn get_roles(pool: &Pool<Postgres>) -> Result<Vec<RoleWithPermissions>, AppError> {
+    let roles: Vec<Role> = sqlx::query_as("SELECT id, name, description FROM roles ORDER BY id")
+        .fetch_all(pool)
+        .await?;
+
+    let rows: Vec<(i32, i32, String, String, Option<String>)> = sqlx::query_as(
+        r#"
+        SELECT rp.role_id, p.id, p.resource, p.action, p.description
+        FROM role_permissions rp
+        JOIN permissions p ON p.id = rp.permission_id
+        ORDER BY p.resource, p.action
+        "#,
     )
+    .fetch_all(pool)
+    .await?;
+
+    let mut by_role: HashMap<i32, Vec<Permission>> = HashMap::new();
+    for (role_id, id, resource, action, description) in rows {
+        by_role
+            .entry(role_id)
+            .or_default()
+            .push(Permission { id, resource, action, description });
+    }
+
+    Ok(roles
+        .into_iter()
+        .map(|role| RoleWithPermissions {
+            permissions: by_role.remove(&role.id).unwrap_or_default(),
+            id: role.id,
+            name: role.name,
+            description: role.description,
+        })
+        .collect())
 }
 
 pub async fn get_role_with_permissions(

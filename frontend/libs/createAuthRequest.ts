@@ -35,7 +35,10 @@ export function createAuthRequest(cookieKey: string, onUnauthorized: () => Promi
             clearTimeout(timeout);
         }
 
-        if (response.status === 401 || response.status === 403) {
+        // 只有 401（沒登入 / token 失效）才導回登入頁。403 是「已登入但權限不足」
+        // （權限放大防護、指派 super_admin…），導去登入頁只會讓人重新登入後又被擋，
+        // 看不到原因 —— 照一般錯誤丟出，由呼叫端顯示。
+        if (response.status === 401) {
             return await onUnauthorized();
         }
 

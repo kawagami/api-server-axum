@@ -49,8 +49,11 @@ pub async fn authorize_member(
     let token = extract_token(&req)?;
     let token_data = decode_jwt(token, &state.get_config().jwt_secret)?;
 
+    // 角色不符 = 這張 token 在這裡不是有效憑證 → 401，不是 403。
+    // 403 只留給「已登入、但缺某項權限」：前端（`libs/createAuthRequest.ts`）靠這個區分
+    // 「導回登入頁」與「顯示權限不足」。
     if token_data.claims.role != "member" {
-        return Err(AppError::AuthError(AuthError::Forbidden));
+        return Err(AppError::AuthError(AuthError::Unauthorized));
     }
 
     let member_id: i64 = token_data
@@ -106,8 +109,9 @@ pub(crate) fn extract_token(req: &Request) -> Result<String, AppError> {
 pub(crate) async fn verify_admin_token(state: &AppState, token: String) -> Result<i64, AppError> {
     let token_data = decode_jwt(token, &state.get_config().jwt_secret)?;
 
+    // 同 authorize_member：角色不符回 401，403 只代表權限不足
     if token_data.claims.role != "admin" {
-        return Err(AppError::AuthError(AuthError::Forbidden));
+        return Err(AppError::AuthError(AuthError::Unauthorized));
     }
 
     let id: i64 = token_data

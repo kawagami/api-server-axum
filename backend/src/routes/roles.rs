@@ -28,7 +28,7 @@ pub fn new(state: AppState) -> Router<AppState> {
 async fn list_roles(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
-) -> Result<Json<Vec<Role>>, AppError> {
+) -> Result<Json<Vec<RoleWithPermissions>>, AppError> {
     auth_user.require_permission(Perm::RoleRead)?;
     Ok(Json(roles_service::get_roles(state.get_pool()).await?))
 }

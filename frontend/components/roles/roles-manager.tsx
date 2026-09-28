@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { Trash2, ChevronDown, ChevronRight, Plus, Loader2, CheckCheck, X } from 'lucide-react';
 import { createRole, deleteRole, setRolePermissions } from '@/app/admin/(main)/roles/actions';
 import PageHeader from '@/components/admin/page-header';
+import ErrorBanner, { DELETE_FAILED } from '@/components/admin/error-banner';
 import type { Role, Permission } from '@/types';
 
 interface Props {
@@ -16,6 +17,7 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [isPending, startTransition] = useTransition();
     const [createError, setCreateError] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     // 依 resource（XXX:YYY 的 XXX）分組，resource 與 action 皆字母排序
     const permissionGroups = useMemo(() => {
@@ -38,8 +40,16 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
     }
 
     function applyPermissions(role: Role, next: Permission[]) {
+        setError(null);
         startTransition(async () => {
-            await setRolePermissions(role.id, next.map(p => p.id));
+            try {
+                await setRolePermissions(role.id, next.map(p => p.id));
+            } catch {
+                // 失敗就不動本地狀態，勾選框維持與後端一致。
+                // 常見原因：內建角色不可改、或授出了自己沒有的權限（後端 403）
+                setError('權限更新失敗：內建角色不可修改，且不能授出自己沒有的權限');
+                return;
+            }
             setRoles(prev =>
                 prev.map(r => (r.id === role.id ? { ...r, permissions: next } : r))
             );
@@ -66,8 +76,14 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
     }
 
     function handleDelete(id: number) {
+        setError(null);
         startTransition(async () => {
-            await deleteRole(id);
+            try {
+                await deleteRole(id);
+            } catch {
+                setError(DELETE_FAILED);
+                return;
+            }
             setRoles(prev => prev.filter(r => r.id !== id));
             if (expandedId === id) setExpandedId(null);
         });
@@ -108,6 +124,7 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
                 </button>
             </form>
             {createError && <p className="text-sm text-red-500">{createError}</p>}
+            <ErrorBanner message={error} />
 
             {/* Role list */}
             <div className="space-y-2">

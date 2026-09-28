@@ -16,7 +16,6 @@ import {
     type RosterWarning,
 } from "@/libs/roster";
 import { postRoster } from "@/api/tools";
-import { apiErrorStatus } from "@/libs/api-error";
 import PageShell from "@/components/page-shell";
 import PageTitle from "@/components/page-title";
 import Toast, { useToast } from "@/components/toast";
@@ -142,21 +141,27 @@ export default function RosterPage() {
         setError(null);
         setLoading(true);
         try {
-            const response = await postRoster({
+            const result = await postRoster({
                 names,
                 days: dayCount,
                 rule,
                 ...slots,
                 ...(streakLimit ? { max_consecutive: streakLimit } : {}),
             });
+            if (!result.ok) {
+                // 依 status 分流到自己 namespace 的 key，不要印後端訊息（那是寫死的繁中）
+                const { status } = result;
+                setError(status === 429 ? t("errorTooMany") : status === 422 ? t("errorInvalid") : t("failed"));
+                return;
+            }
+            const response = result.data;
             setEntries(response.data);
             setBaseline(response.data);
             setPlan(response.plan);
             setWarnings(response.warnings);
-        } catch (e) {
-            // 依 status 分流到自己 namespace 的 key，不要印後端訊息（那是寫死的繁中）
-            const status = apiErrorStatus(e);
-            setError(status === 429 ? t("errorTooMany") : status === 422 ? t("errorInvalid") : t("failed"));
+        } catch {
+            // Server Action 本身沒送達（離線、部署切換中）
+            setError(t("failed"));
         } finally {
             setLoading(false);
         }

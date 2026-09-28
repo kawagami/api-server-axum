@@ -1,3 +1,5 @@
+import { unstable_rethrow } from "next/navigation";
+
 /**
  * 後端錯誤回應在前端的形狀。
  *
@@ -22,4 +24,29 @@ export function apiErrorStatus(e: unknown): number | undefined {
 /** 後端給的錯誤訊息，沒有就用呼叫端的 fallback（不要把 `API 500: …` 這種原文露給使用者） */
 export function apiErrorMessage(e: unknown, fallback: string): string {
     return (e as ApiError | null)?.errorData?.message || fallback;
+}
+
+/**
+ * Server Action 的失敗結果。
+ *
+ * Server Action **丟出**的錯誤在 production 會被 Next 清掉 `status` / `errorData`
+ * （client 只拿到一個通用訊息加 digest），於是 client 端的 `e.status === 409` 這類分流
+ * 只在 dev 有效。要讓 client 依狀態碼顯示訊息，就得把它放在**回傳值**裡帶過邊界。
+ */
+export interface ActionFailure {
+    ok: false;
+    /** 網路中斷 / 逾時為 undefined */
+    status?: number;
+    message?: string;
+}
+
+export type ActionResult<T = undefined> = { ok: true; data: T } | ActionFailure;
+
+/**
+ * 把 catch 到的錯誤轉成 `ActionFailure`。只能在 server 端（Server Action 內）呼叫。
+ * `adminRequest` / `memberRequest` 在 401 丟的是 Next 的 redirect，必須重丟，吞掉導頁就失效。
+ */
+export function toActionFailure(e: unknown): ActionFailure {
+    unstable_rethrow(e);
+    return { ok: false, status: apiErrorStatus(e), message: (e as ApiError | null)?.errorData?.message };
 }

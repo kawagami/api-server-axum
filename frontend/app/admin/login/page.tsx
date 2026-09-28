@@ -159,14 +159,20 @@ export default function Login() {
             const options = await beginPasskeyRegistration();
             const credential = await startRegistration({ optionsJSON: options.publicKey });
             const label = labelRef.current?.value.trim() || '我的裝置';
-            await finishPasskeyRegistration(credential, label);
+            const result = await finishPasskeyRegistration(credential, label);
+            if (!result.ok) {
+                setUpgradeError(
+                    result.status === 409
+                        ? '此裝置已註冊過 passkey'
+                        : '建立失敗，可稍後至「Passkey 管理」再試',
+                );
+                return;
+            }
             completeLogin();
         } catch (e) {
-            const err = e as Error & { status?: number };
+            const err = e as Error;
             if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
                 setUpgradeError(null); // 使用者取消，不當錯誤
-            } else if (err.status === 409) {
-                setUpgradeError('此裝置已註冊過 passkey');
             } else {
                 setUpgradeError('建立失敗，可稍後至「Passkey 管理」再試');
             }

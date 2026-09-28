@@ -43,7 +43,7 @@ async fn upload_image(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     multipart: Multipart,
-) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
+) -> Result<(StatusCode, Json<ImageRecord>), AppError> {
     auth_user.require_permission(Perm::ImageCreate)?;
     let settings = state.get_settings();
     let base_url = settings
@@ -55,5 +55,7 @@ async fn upload_image(
         .and_then(|v| v.parse::<f32>().ok())
         .unwrap_or(images_service::DEFAULT_WEBP_QUALITY);
     let record = images_service::upload_image(state.get_pool(), state.get_storage(), &base_url, Some(auth_user.id), quality, multipart).await?;
-    Ok((StatusCode::CREATED, Json(serde_json::json!({ "id": record.id, "url": record.url }))))
+    // 回整筆 ImageRecord（與 GET 列表同形）：前端把它直接併進列表，缺 status 會讓
+    // active / unused 統計漏算這張，直到重新整理
+    Ok((StatusCode::CREATED, Json(record)))
 }

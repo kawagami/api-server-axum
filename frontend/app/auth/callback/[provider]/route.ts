@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { NextRequest } from 'next/server'
 import { clientIpHeaders } from '@/libs/client-ip'
+import { setMemberSessionCookies, type MemberTokens } from '@/libs/member-session'
 
 // 同 /api/auth/[provider]：擋掉用 %2F 編碼把 provider 變成路徑片段的代理用法
 const PROVIDERS = ['google', 'github', 'line'] as const
@@ -44,20 +45,7 @@ export async function GET(
         redirect('/login?error=oauth_failed')
     }
 
-    const { access_token, refresh_token } = await res.json()
-
-    cookieStore.set('access_token', access_token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        maxAge: 60 * 60,
-    })
-    cookieStore.set('refresh_token', refresh_token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-    })
+    setMemberSessionCookies(cookieStore, (await res.json()) as MemberTokens)
 
     // Return to the page the member originally tried to reach, if any.
     const dest = cookieStore.get('post_login_redirect')?.value

@@ -73,7 +73,7 @@ fn ensure_no_amplification(
     Ok(())
 }
 
-pub async fn get_roles(pool: &Pool<Postgres>) -> Result<Vec<Role>, AppError> {
+pub async fn get_roles(pool: &Pool<Postgres>) -> Result<Vec<RoleWithPermissions>, AppError> {
     roles_repo::get_roles(pool).await
 }
 

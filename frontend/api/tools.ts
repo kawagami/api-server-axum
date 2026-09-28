@@ -2,6 +2,7 @@
 
 import { fetchApi } from "@/libs/fetchApi";
 import { clientIpHeaders } from "@/libs/client-ip";
+import { toActionFailure, type ActionResult } from "@/libs/api-error";
 import type { ConversionDirection } from "@/libs/convert-text";
 import type { RosterEntry, RosterPlan, RosterRule, RosterWarning } from "@/libs/roster";
 
@@ -35,11 +36,20 @@ export interface RosterResponse {
     warnings: RosterWarning[];
 }
 
-export async function postRoster(params: RosterParams): Promise<RosterResponse> {
-    return fetchApi(`${process.env.API_URL}/roster`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(await clientIpHeaders()) },
-        body: JSON.stringify(params),
-        cache: 'no-store',
-    });
+/**
+ * 由 client 元件直接呼叫的 Server Action，所以回結果而不 throw：頁面要依 status 分流
+ * 429（限流）/ 422（參數不合法），throw 的話 production 會把 status 剝掉。
+ */
+export async function postRoster(params: RosterParams): Promise<ActionResult<RosterResponse>> {
+    try {
+        const data = await fetchApi<RosterResponse>(`${process.env.API_URL}/roster`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await clientIpHeaders()) },
+            body: JSON.stringify(params),
+            cache: 'no-store',
+        });
+        return { ok: true, data };
+    } catch (e) {
+        return toActionFailure(e);
+    }
 }

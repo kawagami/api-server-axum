@@ -109,9 +109,6 @@ pub enum AuthError {
     #[error("使用者不存在")]
     UserNotFound,
 
-    #[error("密碼驗證失敗")]
-    InvalidPassword,
-
     // 登入失敗統一回此訊息，不區分帳號不存在/密碼錯誤，防帳號枚舉
     #[error("帳號或密碼錯誤")]
     InvalidCredentials,
@@ -188,7 +185,6 @@ impl AppError {
                 AuthError::Unauthorized => StatusCode::UNAUTHORIZED,
                 AuthError::Forbidden => StatusCode::FORBIDDEN,
                 AuthError::UserNotFound => StatusCode::UNAUTHORIZED,
-                AuthError::InvalidPassword => StatusCode::UNAUTHORIZED,
                 AuthError::InvalidCredentials => StatusCode::UNAUTHORIZED,
                 AuthError::WebauthnFailed => StatusCode::UNAUTHORIZED,
             },
@@ -217,7 +213,7 @@ pub fn unprocessable(msg: impl Into<String>) -> AppError {
 /// 「沒帶票 / 票過期」這類日常 401 —— 記 debug。
 ///
 /// 反過來說，留在 WARN 的是**帶著身分卻被擋下**的那些：`Forbidden`（權限不足）、
-/// `InvalidPassword` / `InvalidCredentials`（登入失敗）、`WebauthnFailed`、
+/// `InvalidCredentials`（登入失敗）、`WebauthnFailed`、
 /// `UserNotFound`（token 有效但帳號已刪 —— 撤銷沒撤乾淨的徵兆）。那幾種每一筆
 /// 都值得看，且可以用 `request_id` 對回 `admin_audit_logs` 查是誰。
 fn is_routine_auth(err: &AuthError) -> bool {

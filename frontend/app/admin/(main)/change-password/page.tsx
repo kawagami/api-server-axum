@@ -21,13 +21,12 @@ export default function ChangePasswordPage() {
                 return { error: "新密碼與確認密碼不一致", success: false };
             }
 
-            try {
-                await postChangePassword({ current_password: currentPassword, new_password: newPassword });
-                return { error: null, success: true };
-            } catch (e) {
-                const err = e as Error & { status?: number };
-                return { error: err.status === 401 ? "舊密碼錯誤或 token 無效" : err.message, success: false };
-            }
+            const result = await postChangePassword({ current_password: currentPassword, new_password: newPassword });
+            if (result.ok) return { error: null, success: true };
+            return {
+                error: result.status === 422 ? "目前密碼錯誤" : "變更失敗，請稍後再試",
+                success: false,
+            };
         },
         { error: null, success: false }
     );

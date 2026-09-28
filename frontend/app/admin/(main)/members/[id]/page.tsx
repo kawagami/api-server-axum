@@ -1,9 +1,11 @@
 import { getMember } from "@/api/members";
 import Image from "next/image";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { AdminTable, AdminTh, AdminTd } from "@/components/admin/table";
 import PageHeader from "@/components/admin/page-header";
 import { formatDateTime } from "@/libs/admin-datetime";
+import { apiErrorStatus } from "@/libs/api-error";
 
 export const metadata: Metadata = {
     title: "會員詳情",
@@ -12,7 +14,12 @@ export const metadata: Metadata = {
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const id = Number((await params).id);
-    const member = await getMember(id);
+    // 查無此人後端回 404；網址 id 不是數字時 path 解析失敗回 400 —— 兩者都是壞連結，給 404 頁
+    const member = await getMember(id).catch((e: unknown) => {
+        const status = apiErrorStatus(e);
+        if (status === 400 || status === 404) notFound();
+        throw e;
+    });
 
     return (
         <div className="w-full max-w-2xl">
