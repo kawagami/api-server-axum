@@ -101,7 +101,7 @@ export default function MetricsAuditPanel({
                                         {fmtRow.format(new Date(log.created_at))}
                                     </AdminTd>
                                     <AdminTd className="text-xs font-mono hidden md:table-cell">
-                                        {log.user_email}
+                                        {log.actor}
                                     </AdminTd>
                                     <AdminTd>
                                         <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${METHOD_BADGE[log.method] ?? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}`}>

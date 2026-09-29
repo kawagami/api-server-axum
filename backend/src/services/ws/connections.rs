@@ -20,7 +20,7 @@ pub async fn list_connections(state: &AppState) -> Vec<DisplayTrackedConnection>
             .map(|(addr, info)| DisplayTrackedConnection {
                 addr: addr.to_string(),
                 connected_at: to_iso(info.connected_at),
-                user_email: info.user_email.clone(),
+                user_name: info.user_name.clone(),
                 real_ip: info.real_ip.clone(),
                 user_agent: info.user_agent.clone(),
             })

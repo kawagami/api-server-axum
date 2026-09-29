@@ -2,8 +2,12 @@ use crate::{
     errors::AppError,
     repositories::vocab as vocab_repo,
     state::AppState,
-    structs::vocab::{
-        Language, LeaderboardPeriod, LeaderboardResponse, MistakeListQuery, MistakesResponse, VocabMe,
+    structs::{
+        pagination::PageQuery,
+        vocab::{
+            Language, LeaderboardPeriod, LeaderboardResponse, MistakeListQuery, MistakesResponse,
+            VocabMe, MISTAKES_DEFAULT_PER_PAGE,
+        },
     },
 };
 use chrono::Utc;
@@ -13,11 +17,15 @@ pub async fn mistakes(
     state: &AppState,
     member_id: i64,
     q: &MistakeListQuery,
+    page: &PageQuery,
 ) -> Result<MistakesResponse, AppError> {
-    let items = vocab_repo::mistakes(state.get_pool(), member_id, q).await?;
-    let (total, reviewable) = vocab_repo::mistake_counts(state.get_pool(), member_id, q).await?;
+    let (limit, offset) = page.to_limit_offset(MISTAKES_DEFAULT_PER_PAGE);
+    let (data, (total, reviewable)) = tokio::try_join!(
+        vocab_repo::mistakes(state.get_pool(), member_id, q, limit, offset),
+        vocab_repo::mistake_counts(state.get_pool(), member_id, q),
+    )?;
     Ok(MistakesResponse {
-        items,
+        data,
         total,
         reviewable,
     })

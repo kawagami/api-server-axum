@@ -7,7 +7,7 @@ import ErrorBanner, { DELETE_FAILED } from "@/components/admin/error-banner";
 import { deleteUser } from "./actions";
 
 interface Props {
-    user: { id: string; name: string };
+    user: { id: number; name: string };
     // 目前登入者本人那列 → 停用，避免誤刪自己導致無人可管
     isSelf?: boolean;
 }
@@ -35,14 +35,12 @@ export default function DeleteUserButton({ user, isSelf }: Props) {
 
         setIsDeleting(true);
         setError(null);
-        try {
-            await deleteUser(user);
+        const res = await deleteUser(user.id);
+        setIsDeleting(false);
+        if (res.ok) {
             router.refresh();
-        } catch (err) {
-            if ((err as { digest?: string }).digest?.startsWith("NEXT_REDIRECT")) throw err;
-            setError(DELETE_FAILED);
-        } finally {
-            setIsDeleting(false);
+        } else {
+            setError(res.message ?? DELETE_FAILED);
         }
     };
 

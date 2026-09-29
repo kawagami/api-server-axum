@@ -83,6 +83,22 @@ pub struct AdminBlogListItem {
     pub updated_at: DateTime<Utc>,
 }
 
+/// 公開列表的一列（`GET /blogs`）。
+///
+/// **不含 `markdown`，改帶 `excerpt`** —— 列表卡片只需要一段摘要，但以前整篇全文照送、
+/// 由前端 `makeExcerpt` 自己截；一頁 10 篇（sitemap 200 篇）的全文就這樣進 SSR payload。
+/// 摘要規則見 `services::blogs::make_excerpt`。單篇內文仍走 `DbBlog`。
+#[derive(Serialize)]
+pub struct PublicBlogListItem {
+    pub id: Uuid,
+    pub tocs: Vec<String>,
+    pub tags: Vec<String>,
+    pub excerpt: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub author_name: Option<String>,
+}
+
 /// tag 與其文章數（公開列表側欄用）
 #[derive(Serialize, FromRow)]
 pub struct TagCount {

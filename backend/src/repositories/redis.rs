@@ -190,7 +190,7 @@ pub async fn del_user_login(
 /// WS 一次性連線票：30 秒 TTL，value 為 admin 顯示名（`users.name`）。
 /// ⚠ 不是 email —— admin 的登入識別是 name（2026-07-06 起 email 降為選填），
 /// 呼叫端 `routes/ws.rs::create_ws_ticket` 存的是 `auth_user.name`。
-/// 消費端把它塞進 `connections` map 的 `user_email` 欄，那個欄位名是舊名、內容是 name。
+/// 消費端把它塞進 `connections` map 的 `user_name` 欄（2026-09-29 前叫 `user_email`，名實不符）。
 pub async fn set_ws_ticket(
     pool: &RedisPool<RedisConnectionManager>,
     ticket: &str,

@@ -217,18 +217,18 @@ libs/           # 工具函式庫（.ts）
 base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.homes` 仍為有效 alias）
 
 常用端點（參考 `api/` 目錄的實際實作）：
-- `GET /blogs/` — 文章列表（分頁），params: `page`(預設1)、`per_page`(預設10)、`tag`(可選)，回傳 `{ data: Blog[], total }`（後端 `Paginated<T>` 只有這兩欄，**不回 `page` / `per_page`**）
+- `GET /blogs/` — 文章列表（分頁），params: `page`(預設1)、`per_page`(預設10，上限 200)、`tag` / `author` / `q` / `sort`(可選)，回傳 `{ data: PublicBlogListItem[], total }`（後端 `Paginated<T>` 只有這兩欄，**不回 `page` / `per_page`**）。**列表項沒有 `markdown`，改帶後端算好的 `excerpt`**（2026-09-29 起；原本整篇全文照送、由前端 `libs/blog-excerpt.ts` 自己截，該檔已刪除，規則搬到後端 `services/blogs.rs::make_excerpt`）。要全文走 `GET /blogs/:id`
 - `GET /blogs/tags` — 所有 tags 字串陣列（去重、字母排序），無需認證
 - `GET /blogs/tags/counts` — 每個 tag 附文章數（`TagCount[]`），無需認證；公開列表側欄的 tag 篩選用（`api/blogs.ts` 的 `getBlogTagCounts`，與 `getBlogTags` 同吃 `tags:['blogs']` 快取標籤）
 - `GET /blogs/:id` — 單篇文章
 - `PUT /admin/blogs/:id` — 新建或更新（upsert），需 `blog:update` 權限，body: `{ markdown, tags }`，回傳 204 無 body
 - `DELETE /admin/blogs/:id` — 刪除，需 `blog:delete` 權限，回傳 204 無 body
 - `GET /admin/auth/me` — 目前登入管理員，回 `{ id, name, permissions, is_super_admin }`（`libs/admin-permissions.ts` 的 `getCurrentAdmin` 以 `cache()` 去重，同一次請求只打一次）
-- `POST /admin/auth/refresh` — admin JWT 續期，`Authorization: Bearer <token>`，no body
-- **Admin passkey**：`POST /admin/auth/passkeys/register/begin`（需認證，回 CreationChallengeResponse）、`POST /admin/auth/passkeys/register/finish` body `{ label, credential }`（201；409=已註冊過、422=label 超長）、`POST /admin/auth/passkeys/login/begin`（公開，回 `{ auth_id, options }`）、`POST /admin/auth/passkeys/login/finish` body `{ auth_id, credential }`（回 JWT，與 `POST /admin/auth` 同形；失敗一律 401，挑戰 5 分鐘過期）、`GET /admin/auth/passkeys`（`PasskeyItem[]`）、`DELETE /admin/auth/passkeys/:id`（204；非本人 404）
+- `POST /admin/auth` / `POST /admin/auth/refresh` — admin 密碼登入 / JWT 續期（後者 `Authorization: Bearer <token>`，no body），都回 `{ access_token }`（2026-09-29 起；原本是裸 JSON 字串，根節點是字串就加不了欄位）。三支登入類 Route Handler（`app/api/auth/{login,refresh,passkey/login/finish}`）的 cookie 寫法與錯誤對應收在 `libs/admin-session.ts`：**429 原樣透傳**（原本一律轉成 500「伺服器錯誤 (429)」）
+- **Admin passkey**：`POST /admin/auth/passkeys/register/begin`（需認證，回 CreationChallengeResponse）、`POST /admin/auth/passkeys/register/finish` body `{ label, credential }`（201；409=已註冊過、422=label 超長）、`POST /admin/auth/passkeys/login/begin`（公開，回 `{ auth_id, options }`）、`POST /admin/auth/passkeys/login/finish` body `{ auth_id, credential }`（回 `{ access_token }`，與 `POST /admin/auth` 同形；失敗一律 401，挑戰 5 分鐘過期）、`GET /admin/auth/passkeys`（`PasskeyItem[]`）、`DELETE /admin/auth/passkeys/:id`（204；非本人 404）
 - `GET /oauth/{provider}` — OAuth 登入 URL 取得
 - `POST /oauth/{provider}/exchange` — OAuth code 換 token，body: `{ code, state }`
-- `POST /admin/users` — 建立使用者，回傳 201 無 body
+- `POST /admin/users` — 建立使用者，回傳 201 + `User`（2026-09-29 前無 body）；`DELETE /admin/users/:id` — 刪除，204（**2026-09-29 前是 `DELETE /admin/users` 把 `{ id, name }` 放 body**；刪自己回 403、查無此人 404）。`PUT /admin/users/:id/roles` 改自己的角色回 **403**（原為 400）。users / roles / settings 的寫入 action 全部回 `ActionResult`（見「錯誤形狀」）
 - `POST /roster` — 排班計算。body `{ names, days, rule, morning_slots?, night_slots?, max_consecutive? }`（`rule` 是後端 enum，未知值 422；slots 兩者同給或同省），回 `{ status, data, plan, warnings }`。**`warnings` 是機器碼**（`understaffed` / `shift_uncovered` / `night_to_morning` / `max_consecutive_exceeded`），文案在 `Roster` namespace 的 `warn*` key（`tools/roster/page.tsx` 的 `WARNING_KEYS`）。純函式與上限鏡射在 `libs/roster.ts`（`MAX_NAMES` / `MAX_NAME_LEN` / `MAX_DAYS` 要與 `backend/src/structs/roster.rs` 同步）
 - `GET /members` — 會員列表，需認證（`member:read` permission），回 `{ data, total }`
 - `GET /members/:id` — 會員詳細 + OAuth providers，需認證
@@ -238,16 +238,18 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 - `GET /admin/stocks/changes` — 股票異動列表，分頁 `page`/`per_page`（預設 50），需認證
 - `PATCH /admin/stocks/changes/:id/pending` — 更新單筆 pending，id 在 path、無 body，回傳 204，需認證
 - `GET /admin/stocks/day_all` — 每日行情，分頁 `page`/`per_page`（預設 100），需認證
-- `GET /admin/stocks/buyback_price_gaps` — 未完成庫買價差，需認證
+- `GET /admin/stocks/buyback_price_gaps` — 未完成庫買價差，需認證，回 `StockBuybackPriceGap[]`（價格 / 價差欄位皆可為 null；原本前端宣告成 `unknown` 再 `as` 成把價差當字串的型別）
+- ⚠️ `GET /admin/stocks/day_all` 的價格欄位是後端 `rust_decimal::Decimal`，**序列化成字串**（`types/stock.ts` 已照實宣告 `string | null`），要算數先 `Number()`
 - `GET /admin/stocks/buyback_periods` — 庫買期間，需認證
-- `GET /admin/audit_logs` — 分頁 `page`/`per_page`（預設 100），回 `{ data: AuditLog[], total }`（2026-08-07 起，原為裸陣列）；query 支援 `user_email` / `method` / `path` / `from` / `to` / `actor_type`（`admin` / `member`，不給 = 兩者都列；member 的稽核 2026-08-09 才開始記，且**只記非 GET**）
+- `GET /admin/audit_logs` — 分頁 `page`/`per_page`（預設 100），回 `{ data: AuditLog[], total }`（2026-08-07 起，原為裸陣列）；query 支援 `actor` / `method` / `path` / `from` / `to` / `actor_type`（`admin` / `member`，不給 = 兩者都列；member 的稽核 2026-08-09 才開始記，且**只記非 GET**）。**`actor` 欄（與同名篩選參數）2026-09-29 前叫 `user_email`**，但內容從來是 admin 顯示名或 `member#{id}`，所以改名
 - `GET /logs` — 分頁 `page`/`per_page`（預設 100），回 `{ data: Log[], total }`（2026-08-03 起，原為裸陣列）；query 另支援 `level`（逗號分隔多值、大小寫不敏感）/ `q`（message 與 fields 模糊）/ `target` / `request_id` / `from` / `to`，**前端目前用 `level` + `q`**（兩者都進 URL，走 `useFilterUrl`）。`Log` 另有 `request_id` 與 `fields`（`fields.self` = 真正的錯誤細節，`message` 只是固定字串），**`logs-client.tsx` 的展開面板已渲染這兩欄**（`self` 固定排第一）
 - `GET /logs/request/:request_id` — 單一請求的完整 log 軌跡（時間正序、不分頁、回裸陣列），需 `log:read`；前端已接（`api/logs.ts` 的 `getLogTrace`，每列一顆「整條軌跡」鈕就地展開）
 - `GET /admin/gov_tenders` — 政府採購網標案列表（需 `gov_tender:read`），query `keyword`/`tender_type`（完全比對）/`q`（標案名稱/機關模糊）/`page`/`per_page`（預設 50），回傳 `{ data: GovTender[], total }`；`api/gov-tenders.ts` 的 `getGovTenders` 回整包 `PaginatedResponse<GovTender>`（同上方「api 層不解包」規則），消費端在 `usePagedList` 的 fetcher 內用。`GET /admin/gov_tenders/types` 回所有出現過的類型（`string[]`，去重排序），頁面篩選下拉（`getGovTenderTypes`）用。頁面 `/admin/gov_tenders`，`detail_url` 為官方公告頁外連。資料由後端排程每日抓取，前端唯讀
 - `GET /admin/settings` — 設定（依 category 群組），需認證；`PATCH /admin/settings/:key` body `{ value }`，`site_theme` 接受 7 套主題（forest/ocean/sky/sunset/sakura/grape/mono）+ `auto`（每日輪播），非法回 422
 - `GET /settings/public` — 公開設定白名單（無認證，後端記憶體 map 直讀）。**值已是該有的型別**（2026-08-07 起）：`theme_rotation` 是物件、`home_features` / `enabled_features` 是陣列（`enabled_features` 為 `"all"` 時仍是字串）、`image_client_compress` 是布林、`image_client_quality` / `image_client_max_edge` 是數字。原本整包回字串（JSON 字串包在 JSON 裡），每個消費端都得自己再 parse 一次。**後端轉不動的值會原樣退回字串**，故各 resolver 仍要吃得下字串形（`resolveEnabledFeatures` 就吃兩種）。`api/settings.ts` 的 `PublicSettings` 欄位型別刻意寫 `unknown`：值是 runtime 可改的設定，收斂責任在各 resolver
 - 分頁參數全站統一 `page`（從 1 起算）/`per_page`（上限 200）
-- `POST /admin/roles`、`POST /member/portfolio` 回傳 201 + entity
+- `POST /admin/roles`、`POST /admin/users`、`POST /member/portfolio` 回傳 201 + entity。`GET /admin/roles/:id` 已刪除（2026-09-29：列表本身就帶 `permissions`，無人呼叫）
+- `GET /member/vocab/mistakes` — 錯題本，`page` / `per_page`（預設 50，上限 200）+ `language` / `q` / `sort` / `unmastered`，回 `{ data, total, reviewable }`（**2026-09-29 前是 `limit`/`offset` + `{ items, … }`**，全站唯一不照分頁慣例的端點）
 - `GET /member/portfolio` — 當前 member 的投資組合列表，需 access_token 認證，回傳 `PortfolioEntry[]`
 - `POST /member/portfolio` — 新增持股，body: `{ stock_code, buy_date, cost_per_share, shares }`，回傳 `PortfolioEntry`
 - `PUT /member/portfolio/:id` — 更新持股（只能更新自己的），body 同 POST，回傳 `PortfolioEntry`
@@ -280,7 +282,9 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 
 **上傳前壓縮可設定**：前端上傳前的縮圖/轉 WebP 由後端設定控制（`GET /settings/public` 下發 `image_client_compress` / `image_client_quality` / `image_client_max_edge`），`libs/image-config.ts` 的 `resolveImageCompressConfig` 收斂成 `ImageCompressConfig`（壞值 fallback 預設 on/q80/2560）。**交付走 server-prop**：admin server page（`blogs/[id]/page.tsx`、`images/page.tsx`）`getPublicSettings()` 後把 `compressConfig` 當 prop 傳給 client 元件（**刻意不走 `getSettings()` admin API**，避免 blog 編輯者需要 `setting:read` 權限的耦合）。`compress=false` 時跳過壓縮直接送原檔，後端 `process_image` 照樣 decode 驗證+轉檔。後端另有 `image_webp_quality`（僅後端讀、不公開）控重編碼品質。管理走 `/admin/settings` 的「儲存」分組（`field-config.ts` 已登記型別）。
 
-**錯誤形狀**：`adminRequest` / `memberRequest` 用 `response.text()` 統一讀 body，空字串回 `null`，parse 失敗也回 `null`，正確處理 204 空 body。失敗時丟 `Error`（message: `API {status}: {statusText}`），並附 `.status`（number）與 `.errorData`。**`fetchApi` 2026-08-07 起也附這兩個欄位**，型別與取值 helper 收在 `libs/api-error.ts`（`ApiError` / `apiErrorStatus` / `apiErrorMessage`）——在那之前 `fetchApi` 不帶 status，`contact/actions.ts` 只能用 `msg.includes("429")` 比對錯誤訊息字串判狀態碼（改文案就靜默失效）。**新的 catch 區塊用 helper，不要再 inline cast**（既有 7 處 `err as Error & { status?: number; ... }` 尚未收斂（2026-09-25 重數仍是 7），改到時順手換掉；數字與下方「已知的技術債」那條同一份，改一邊要同步）。
+**錯誤形狀**：`adminRequest` / `memberRequest` 用 `response.text()` 統一讀 body，空字串回 `null`，parse 失敗也回 `null`，正確處理 204 空 body。失敗時丟 `Error`（message: `API {status}: {statusText}`），並附 `.status`（number）與 `.errorData`。**`fetchApi` 2026-08-07 起也附這兩個欄位**，型別與取值 helper 收在 `libs/api-error.ts`（`ApiError` / `apiErrorStatus` / `apiErrorMessage`）——在那之前 `fetchApi` 不帶 status，`contact/actions.ts` 只能用 `msg.includes("429")` 比對錯誤訊息字串判狀態碼（改文案就靜默失效）。**新的 catch 區塊用 helper，不要再 inline cast**（既有 4 處 `err as Error & { status?: number; ... }` 尚未收斂（2026-09-29 重數），改到時順手換掉；數字與下方「已知的技術債」那條同一份，改一邊要同步）。
+
+**client 元件直接呼叫的 Server Action 一律回 `ActionResult`，不 throw**（`libs/api-error.ts` 的 `ActionResult<T>` / `toActionFailure`）：Server Action **丟出**的錯誤在 production 會被 Next 剝掉 `status` / `errorData`，client 只拿到通用訊息加 digest —— `e.status === 409`、`(err as Error).message` 這類分流在 dev 看起來正常、上線就只剩「發生錯誤」。後端 4xx 的 `message` 本來就是給人看的原因（「不可變更自己的角色」「授出了自己沒有的權限」），要靠回傳值帶過邊界。`toActionFailure` 會先 `unstable_rethrow`，所以 401 的 redirect 照常生效。2026-09-29 收齊的有 auth（改密碼 / passkey 註冊）、roster、users、roles、settings；torrents 另有一份同形的 `toErrorResult`。
 
 ---
 
@@ -298,7 +302,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 
 - 全站用 `libs/ws-context.tsx` 的 `WsProvider`（layout 注入），建立單一 WS 連線
 - **admin 身分連線走一次性 ticket**：root layout 只傳 `hasSession` 布林（token 不進 RSC payload），client 連線前打同源 `POST /api/auth/ws-ticket`（server 端用 session cookie 向後端 `POST /ws/ticket` 換 30 秒一次性票），再以 `?ticket=` 連 WS；票是一次性的，**每次重連都換新票**，換票失敗退回匿名連線。JWT 不出現在 WS URL / access log
-- 後端 `user_joined` / `user_left` 事件（含 `real_ip`/`user_email`）**只推給 admin 連線**，匿名訪客收不到
+- 後端 `user_joined` / `user_left` 事件（含 `real_ip`/`user_name`）**只推給 admin 連線**，匿名訪客收不到（`user_name` 與 `GET /ws/connections` 的同名欄位 2026-09-29 前叫 `user_email`，內容一直是 admin 顯示名）
 - 訊息格式：`{ type: WsEventType, data: unknown }`。`types/ws.ts` 的 `WsEventType` 與後端 `structs/ws.rs` 的 `WsEvent` enum **一一對應**（新增事件兩邊同步加）；`WsNotifyEventType` 是「會彈 toast / 進通知列表」的子集（排除 `torrent_*`，那些只有後台 torrents 頁在看、每秒推一次）
 - 訂閱用 `useWsContext()` 的 `subscribe(type, fn)` / `unsubscribe(type, fn)`（listener 第二參數拿到整則 `WsMessage`，含 `game` 欄供分流）；上行用 `send(type, data?, game?)`（連線未開時暫存，onopen flush；`game` 為對戰遊戲框架信封欄，一般 WS 訊息省略）
 - `app/[locale]/(public)/dashboard/notifications/` — notification feed 頁（`components/ws/notification-feed.tsx`），訂閱所有 event type 即時顯示，入口在 header 會員下拉／dashboard。**原本另有一支無導航入口的 `/ws` 孤兒頁 render 同一個元件，且未被 `proxy.ts` 保護，已於 2026-07-31 刪除** —— 要再開 debug 頁記得同時加進 `memberPaths`
@@ -327,7 +331,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 
 ### 跨模組可抽共用
 - **`libs/fetchApi.ts` 與 `libs/createAuthRequest.ts` 的核心該合併**。剩下三個關鍵分歧：timeout（10s vs 30s）、空 body（`res.json()` 直接 throw vs `text()` 後回 null）、401 處理（2026-09-29 起只有 401 導登入頁，403 照一般錯誤丟出）。**錯誤物件那一項已在 2026-08-07 收斂** —— 兩邊都附 `status` / `errorData`（見上方「錯誤形狀」），`contact/actions.ts` 也已改用 `apiErrorStatus(e)`，不再字串比對 `429`。`adminRequest` / `memberRequest` 本身已是 `createAuthRequest` 的薄組態，重複早就消除了。
-- **`err as Error & { status?: number; errorData?: {...} }` 這種 inline cast 還剩 7 處**（`admin/login/page.tsx` ×4、`change-password` / `passkeys` / `api/torrents.ts` 各 1，2026-08-26 重數，2026-09-25 複驗相同）。**型別與 helper 已經有了** —— `libs/api-error.ts` 匯出 `ApiError` / `apiErrorStatus` / `apiErrorMessage`，這 7 處只是還沒改過去。
+- **`err as Error & { status?: number; errorData?: {...} }` 這種 inline cast 還剩 4 處**（`admin/login/page.tsx` ×3、`api/torrents.ts` 1，2026-09-29 重數；2026-08-26 ~ 09-25 是 7）。**型別與 helper 已經有了** —— `libs/api-error.ts` 匯出 `ApiError` / `apiErrorStatus` / `apiErrorMessage` / `toActionFailure`；`api/torrents.ts` 的 `toErrorResult` 與 `toActionFailure` 幾乎同形，可直接換掉。
 - ~~**沒有 `cn()`，`inputClass` 在 15 個檔案各自宣告**~~（2026-08-30 收斂：`libs/cn.ts` + `libs/input-styles.ts` 的 `ADMIN_INPUT` / `ADMIN_FILTER_INPUT` / `PUBLIC_INPUT` 吃掉 14 份，用法見「樣式慣例」。剩下的 `contact/contact-form.tsx` 是列明例外 —— 表單不在卡片上，底色跟頁面漸層走）。
 - **缺 `libs/format-number.ts` 與公開端的日期 formatter**：金額格式化散 5 處、`Intl.DateTimeFormat(locale, {... Asia/Taipei})` 逐字重複 3 份、「今天（台北）」2 份。（~~bytes 格式化 3 份~~ 已收斂進 `libs/format-bytes.ts`，torrents 的 3 個消費點都 import 它。）admin 側已有 `libs/admin-datetime.ts` 當範本（但 metrics 那 4 處仍繞過它自建 formatter）。
 - ~~`{ data: T[]; total: number }` 重複定義~~（2026-08-03：`types/pagination.ts` 的 `PaginatedResponse<T>` 收斂了全部 7 份 inline 定義；resource 專屬名稱如 `TorrentPaginatedResponse` 保留為 type alias，消費端不必改）。另有 4 個後端契約型別（`PublicSettings` / `RosterResponse` / `TorrentActionResult` / `TorrentLinksResult`）住在 `api/` 而非 `types/`。

@@ -39,11 +39,13 @@ export default function HomeFeaturesPicker({ initialEnabled }: { initialEnabled:
         setError(null);
         setSaving(true);
         try {
-            await updateHomeFeatures(enabled);
+            const res = await updateHomeFeatures(enabled);
+            if (!res.ok) {
+                setError(res.message ?? "儲存失敗，請稍後再試");
+                return;
+            }
             setSaved(enabled);
             router.refresh();
-        } catch (err) {
-            setError((err as Error).message);
         } finally {
             setSaving(false);
         }

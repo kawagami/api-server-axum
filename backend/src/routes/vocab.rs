@@ -6,6 +6,7 @@ use crate::{
     state::AppState,
     structs::{
         members::AuthenticatedMember,
+        pagination::PageQuery,
         vocab::{
             AnswerRequest, AnswerResponse, Language, LeaderboardPeriod, LeaderboardResponse,
             MistakeListQuery, MistakesResponse, StartRunRequest, StartRunResponse, VocabMe,
@@ -108,9 +109,10 @@ async fn mistakes(
     member: Option<Extension<AuthenticatedMember>>,
     State(state): State<AppState>,
     Query(q): Query<MistakeListQuery>,
+    Query(page): Query<PageQuery>,
 ) -> Result<Json<MistakesResponse>, AppError> {
     let mid = caller(member).ok_or(AppError::AuthError(AuthError::Unauthorized))?;
-    Ok(Json(vocab_service::mistakes(&state, mid, &q).await?))
+    Ok(Json(vocab_service::mistakes(&state, mid, &q, &page).await?))
 }
 
 async fn me(

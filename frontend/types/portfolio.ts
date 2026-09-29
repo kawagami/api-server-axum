@@ -26,7 +26,8 @@ export interface PortfolioEntryInput {
 }
 
 export interface PortfolioSummaryEntry extends PortfolioEntry {
-  stock_name: string;
+  /** 行情表查不到這檔時為 null */
+  stock_name: string | null;
   current_price: number | null;
   current_value: number | null;
   pnl: number | null;

@@ -3,7 +3,6 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import ShowClientTime from "@/components/blogs/show-client-time";
 import { getBlogs } from "@/api/blogs";
-import { makeExcerpt } from "@/libs/blog-excerpt";
 
 const LIMIT = 3;
 
@@ -47,7 +46,7 @@ export default async function LatestPosts() {
                                     {title}
                                 </h3>
                                 <p className="line-clamp-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
-                                    {makeExcerpt(blog.markdown ?? "", blog.tocs[0] ?? "")}
+                                    {blog.excerpt}
                                 </p>
                                 <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                                     {blog.created_at && (

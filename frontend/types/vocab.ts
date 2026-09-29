@@ -48,8 +48,9 @@ export interface VocabRunResult {
 export type VocabMistakeSort = 'wrong' | 'recent' | 'difficulty' | 'word';
 
 /// GET /member/vocab/mistakes 一頁;total 跟著搜尋條件走,reviewable 一律是全部未掌握字數
+// `{ data, total }` 與 PaginatedResponse 同形，另多 reviewable
 export interface VocabMistakesPage {
-    items: VocabMistake[];
+    data: VocabMistake[];
     total: number;
     reviewable: number;
 }

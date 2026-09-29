@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::{state::AppState, structs::torrents::TorrentLive};
 use librqbit::{ManagedTorrent, Session, SessionOptions};
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -124,6 +124,29 @@ pub(super) fn setting<T: std::str::FromStr>(state: &AppState, key: &str, default
 pub(super) fn max_active(state: &AppState) -> usize {
     setting(state, "torrent_max_active", DEFAULT_MAX_ACTIVE)
 }
+
+/// librqbit 的進度快照 → 對外的 `TorrentLive`。詳情 API 與 WS 進度推播共用，
+/// 兩處原本各自手組一份逐字相同的 `json!`，改一邊就漂移。
+pub(super) fn live_progress(stats: &librqbit::TorrentStats) -> TorrentLive {
+    let progress = if stats.total_bytes > 0 {
+        (stats.progress_bytes as f64 / stats.total_bytes as f64 * 10000.0).round() / 100.0
+    } else {
+        0.0
+    };
+    let (down_speed, peers) = stats
+        .live
+        .as_ref()
+        .map(|l| (l.download_speed.to_string(), l.snapshot.peer_stats.live))
+        .unwrap_or_default();
+    TorrentLive {
+        progress,
+        progress_bytes: stats.progress_bytes,
+        total_bytes: stats.total_bytes,
+        down_speed,
+        peers,
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

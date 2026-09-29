@@ -5,7 +5,6 @@ import Pagination from '@/components/blogs/pagination';
 import BlogSearchBar from '@/components/blogs/blog-search-bar';
 import BlogEmptyReset from '@/components/blogs/blog-empty-reset';
 import PageShell from '@/components/page-shell';
-import { makeExcerpt } from '@/libs/blog-excerpt';
 import { getTranslations } from 'next-intl/server';
 import { Suspense } from 'react';
 
@@ -60,7 +59,7 @@ export default async function BlogList({ selectedTag = null, page = 1, q = null,
                                 key={blog.id}
                                 id={blog.id}
                                 toc={blog.tocs[0] || t('untitled')}
-                                excerpt={makeExcerpt(blog.markdown ?? '', blog.tocs[0] ?? '')}
+                                excerpt={blog.excerpt}
                                 tags={blog.tags || []}
                                 created_at={blog.created_at ?? ''}
                                 updated_at={blog.updated_at ?? ''}

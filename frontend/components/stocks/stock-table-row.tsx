@@ -8,17 +8,18 @@ export default function StockTableRow({ stock }: { stock: StockChange }) {
         <AdminRow>
             <AdminTd>{stock.stock_no}</AdminTd>
             <AdminTd>{stock.stock_name}</AdminTd>
-            <AdminTd>{STOCK_STATUS_LABEL[stock.status] ?? stock.status}</AdminTd>
+            <AdminTd>{stock.status ? (STOCK_STATUS_LABEL[stock.status] ?? stock.status) : "—"}</AdminTd>
             <AdminTd>{stock.start_date}</AdminTd>
             <AdminTd className="text-right">{stock.start_price}</AdminTd>
             <AdminTd>{stock.end_date}</AdminTd>
             <AdminTd className="text-right">{stock.end_price}</AdminTd>
             {/* 台股慣例：紅漲綠跌 */}
-            <AdminTd className={`text-right ${stock.change < 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+            <AdminTd className={`text-right ${stock.change != null && stock.change < 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                 {stock.change ? `${stock.change}%` : ``}
             </AdminTd>
             <AdminTd>
-                <form action={patchStockPendingAction} className="inline">
+                {/* id 為 null 的列不在 stock_changes 表裡，沒有東西可以重設 */}
+                {stock.id != null && <form action={patchStockPendingAction} className="inline">
                     <input type="hidden" name="id" value={String(stock.id)} />
                     <button
                         type="submit"
@@ -26,7 +27,7 @@ export default function StockTableRow({ stock }: { stock: StockChange }) {
                     >
                         再查詢
                     </button>
-                </form>
+                </form>}
             </AdminTd>
         </AdminRow>
     );

@@ -14,7 +14,7 @@ use axum::{
 pub async fn audit_log(State(state): State<AppState>, req: Request, next: Next) -> Response<Body> {
     // auth middleware（外層）已驗證並塞入身分，直接讀，不重複 decode JWT。
     // 同一個 middleware 服務兩種入口：`with_auth`（admin）與 `with_member_auth`（member）。
-    // admin 的 user_email 欄存顯示名（name）；member 沒有現成的名字（`authorize_member`
+    // admin 的 actor 欄存顯示名（name）；member 沒有現成的名字（`authorize_member`
     // 只 decode JWT、不查 DB），存 `member#{id}` —— 為了稽核在請求路徑上多打一次 DB 不划算。
     let actor = req
         .extensions()
@@ -46,10 +46,10 @@ pub async fn audit_log(State(state): State<AppState>, req: Request, next: Next) 
 
     let response = next.run(req).await;
 
-    if let Some((actor_type, user_email)) = actor.filter(|_| !skip) {
+    if let Some((actor_type, actor)) = actor.filter(|_| !skip) {
         let entry = AuditEntry {
             actor_type,
-            user_email,
+            actor,
             method,
             path,
             query,

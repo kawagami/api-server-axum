@@ -1,5 +1,5 @@
 use crate::{
-    errors::AppError,
+    errors::{AppError, RequestError},
     structs::{roles::Role, users::{NewUser, User}},
 };
 use sqlx::{Pool, Postgres};
@@ -78,11 +78,11 @@ pub async fn create_user(
     pool: &Pool<Postgres>,
     new_user: NewUser,
     role_ids: &[i32],
-) -> Result<(), AppError> {
+) -> Result<User, AppError> {
     let mut tx = pool.begin().await?;
 
-    let (user_id,): (i64,) = sqlx::query_as(
-        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id",
+    let user: User = sqlx::query_as(
+        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email",
     )
     .bind(&new_user.name)
     .bind(&new_user.email)
@@ -96,14 +96,14 @@ pub async fn create_user(
              SELECT $1, unnest($2::int[])
              ON CONFLICT DO NOTHING",
         )
-        .bind(user_id)
+        .bind(user.id)
         .bind(role_ids)
         .execute(&mut *tx)
         .await?;
     }
 
     tx.commit().await?;
-    Ok(())
+    Ok(user)
 }
 
 pub async fn delete_user(pool: &Pool<Postgres>, user_id: i64) -> Result<(), AppError> {
@@ -114,10 +114,14 @@ pub async fn delete_user(pool: &Pool<Postgres>, user_id: i64) -> Result<(), AppE
         .execute(&mut *tx)
         .await?;
 
-    sqlx::query("DELETE FROM users WHERE id = $1")
+    let deleted = sqlx::query("DELETE FROM users WHERE id = $1")
         .bind(user_id)
         .execute(&mut *tx)
-        .await?;
+        .await?
+        .rows_affected();
+    if deleted == 0 {
+        return Err(RequestError::NotFound.into());
+    }
 
     tx.commit().await?;
     Ok(())
@@ -162,7 +166,7 @@ pub async fn set_user_roles(
         .await?;
 
     if count == 0 {
-        return Err(AppError::RequestError(crate::errors::RequestError::NotFound));
+        return Err(RequestError::NotFound.into());
     }
 
     sqlx::query("DELETE FROM user_roles WHERE user_id = $1")

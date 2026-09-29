@@ -33,7 +33,7 @@ const ImageGrid = ({ images, copiedImage, onRequestDelete, onCopy, emptyHint }: 
                 const copied = copiedImage === image.url;
                 return (
                     <div
-                        key={image.name}
+                        key={image.id}
                         className="group flex flex-col overflow-hidden rounded-xl bg-white dark:bg-neutral-800 ring-1 ring-neutral-200 dark:ring-neutral-700 hover:ring-primary-400 dark:hover:ring-primary-600 hover:shadow-md transition-shadow"
                     >
                         <div className="relative aspect-square overflow-hidden bg-neutral-100 dark:bg-neutral-900">
@@ -41,7 +41,7 @@ const ImageGrid = ({ images, copiedImage, onRequestDelete, onCopy, emptyHint }: 
                                 fill
                                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                                 src={image.url}
-                                alt={image.name}
+                                alt={`image ${image.id}`}
                                 className="object-cover transition-transform duration-300 group-hover:scale-105"
                             />
                             {status && (

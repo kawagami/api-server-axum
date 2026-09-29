@@ -11,7 +11,7 @@ use crate::{
 use axum::{
     extract::{Extension, State},
     http::StatusCode,
-    routing::{get, put},
+    routing::{delete, get, put},
     Router
 };
 
@@ -20,7 +20,7 @@ pub fn new(state: AppState) -> Router<AppState> {
         state,
         Router::new()
             .route("/", get(list_roles).post(create_role))
-            .route("/{id}", get(role_detail).delete(delete_role))
+            .route("/{id}", delete(delete_role))
             .route("/{id}/permissions", put(set_permissions)),
     )
 }
@@ -31,15 +31,6 @@ async fn list_roles(
 ) -> Result<Json<Vec<RoleWithPermissions>>, AppError> {
     auth_user.require_permission(Perm::RoleRead)?;
     Ok(Json(roles_service::get_roles(state.get_pool()).await?))
-}
-
-async fn role_detail(
-    Extension(auth_user): Extension<AuthenticatedUser>,
-    State(state): State<AppState>,
-    Path(id): Path<i32>,
-) -> Result<Json<RoleWithPermissions>, AppError> {
-    auth_user.require_permission(Perm::RoleRead)?;
-    Ok(Json(roles_service::get_role(state.get_pool(), id).await?))
 }
 
 async fn create_role(

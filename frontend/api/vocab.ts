@@ -16,19 +16,20 @@ export interface VocabMistakeQuery {
     sort?: VocabMistakeSort;
     /** 只看未掌握(答錯 > 答對) */
     unmastered?: boolean;
-    /** 後端上限 100 */
-    limit?: number;
-    offset?: number;
+    /** 從 1 起算 */
+    page?: number;
+    /** 後端上限 200(全站共用的 per_page 上限) */
+    per_page?: number;
 }
 
-/** 錯題本一頁;後端強制分頁(上限 100),不要期待一次拿完 */
+/** 錯題本一頁;後端強制分頁,不要期待一次拿完 */
 export async function getVocabMistakes(query: VocabMistakeQuery = {}): Promise<VocabMistakesPage> {
     const params = new URLSearchParams({ language: query.language ?? 'en' });
     if (query.q?.trim()) params.set('q', query.q.trim());
     if (query.sort) params.set('sort', query.sort);
     if (query.unmastered) params.set('unmastered', 'true');
-    if (query.limit != null) params.set('limit', String(query.limit));
-    if (query.offset) params.set('offset', String(query.offset));
+    if (query.page != null) params.set('page', String(query.page));
+    if (query.per_page != null) params.set('per_page', String(query.per_page));
     return memberRequest<VocabMistakesPage>({
         url: `${process.env.API_URL}/member/vocab/mistakes?${params}`,
     });

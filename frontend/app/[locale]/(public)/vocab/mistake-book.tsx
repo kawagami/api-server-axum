@@ -16,7 +16,7 @@ export function MistakeBook({ page, query, searchInput, loading, error, canTts, 
     onSearch: (v: string) => void; onQuery: (patch: Partial<MistakeQuery>) => void;
     onMore: () => void; onSpeak: (text: string) => void; t: T;
 }) {
-    const items = page?.items ?? [];
+    const items = page?.data ?? [];
     const total = page?.total ?? 0;
     const filtering = query.q !== "" || query.unmastered;
     // page 為 null = 從沒拿到資料(SSR 那趟就掛了),不能當成「沒錯過字」

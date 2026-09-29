@@ -47,37 +47,6 @@ pub async fn get_roles(pool: &Pool<Postgres>) -> Result<Vec<RoleWithPermissions>
         .collect())
 }
 
-pub async fn get_role_with_permissions(
-    pool: &Pool<Postgres>,
-    role_id: i32,
-) -> Result<RoleWithPermissions, AppError> {
-    let role: Role =
-        sqlx::query_as("SELECT id, name, description FROM roles WHERE id = $1")
-            .bind(role_id)
-            .fetch_one(pool)
-            .await?;
-
-    let permissions: Vec<Permission> = sqlx::query_as(
-        r#"
-        SELECT p.id, p.resource, p.action, p.description
-        FROM permissions p
-        JOIN role_permissions rp ON p.id = rp.permission_id
-        WHERE rp.role_id = $1
-        ORDER BY p.resource, p.action
-        "#,
-    )
-    .bind(role_id)
-    .fetch_all(pool)
-    .await?;
-
-    Ok(RoleWithPermissions {
-        id: role.id,
-        name: role.name,
-        description: role.description,
-        permissions,
-    })
-}
-
 /// 這組 role_ids 裡是否含 `super_admin`。
 ///
 /// 用查名稱而不是寫死 id：baseline migration 的 super_admin 剛好是 4，但那是巧合，

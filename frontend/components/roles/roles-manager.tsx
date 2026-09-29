@@ -42,12 +42,11 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
     function applyPermissions(role: Role, next: Permission[]) {
         setError(null);
         startTransition(async () => {
-            try {
-                await setRolePermissions(role.id, next.map(p => p.id));
-            } catch {
+            const res = await setRolePermissions(role.id, next.map(p => p.id));
+            if (!res.ok) {
                 // 失敗就不動本地狀態，勾選框維持與後端一致。
-                // 常見原因：內建角色不可改、或授出了自己沒有的權限（後端 403）
-                setError('權限更新失敗：內建角色不可修改，且不能授出自己沒有的權限');
+                // 常見原因：內建角色不可改、或授出了自己沒有的權限（後端 403，訊息帶原因）
+                setError(res.message ?? '權限更新失敗，請稍後再試');
                 return;
             }
             setRoles(prev =>
@@ -68,20 +67,21 @@ export default function RolesManager({ initialRoles, allPermissions }: Props) {
 
     async function handleCreate(formData: FormData) {
         setCreateError(null);
-        try {
-            await createRole(formData);
-        } catch {
-            setCreateError('建立失敗');
+        const res = await createRole(formData);
+        if (!res.ok) {
+            setCreateError(res.message ?? '建立失敗');
+            return;
         }
+        // 本地清單只在掛載時從 props 初始化，不併進來的話新角色要重新整理才看得到
+        setRoles(prev => [...prev, { ...res.data, permissions: [] }]);
     }
 
     function handleDelete(id: number) {
         setError(null);
         startTransition(async () => {
-            try {
-                await deleteRole(id);
-            } catch {
-                setError(DELETE_FAILED);
+            const res = await deleteRole(id);
+            if (!res.ok) {
+                setError(res.message ?? DELETE_FAILED);
                 return;
             }
             setRoles(prev => prev.filter(r => r.id !== id));

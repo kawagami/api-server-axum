@@ -101,22 +101,22 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
     }, [language]);
 
     /**
-     * 依當前搜尋條件抓錯題本;offset 0 為重抓,其他為「載入更多」。
+     * 依當前搜尋條件抓錯題本;page 1 為重抓,其他為「載入更多」。
      *
      * 帶請求序號閘:fetcher 是 Server Action、沒得 abort,只能在回應端裁決 ——
      * 否則「載入更多」慢回時會把之後換過條件的結果接在後面,拼出一份混合清單。
      */
-    const fetchMistakes = useCallback((query: MistakeQuery, offset: number) => {
+    const fetchMistakes = useCallback((query: MistakeQuery, page: number) => {
         if (!isMember) return;
         const seq = ++mistakeSeqRef.current;
         setMistakeLoading(true);
         setMistakeError(false);
-        getVocabMistakes({ language, ...query, limit: MISTAKE_PAGE_SIZE, offset })
-            .then(page => {
+        getVocabMistakes({ language, ...query, page, per_page: MISTAKE_PAGE_SIZE })
+            .then(res => {
                 if (seq !== mistakeSeqRef.current) return;
-                setMistakes(prev => (offset > 0 && prev
-                    ? { ...page, items: [...prev.items, ...page.items] }
-                    : page));
+                setMistakes(prev => (page > 1 && prev
+                    ? { ...res, data: [...prev.data, ...res.data] }
+                    : res));
             })
             .catch(() => { if (seq === mistakeSeqRef.current) setMistakeError(true); })
             .finally(() => { if (seq === mistakeSeqRef.current) setMistakeLoading(false); });
@@ -138,13 +138,13 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
             firstQueryRef.current = false;
             return;
         }
-        fetchMistakes(mistakeQuery, 0);
+        fetchMistakes(mistakeQuery, 1);
     }, [mistakeQuery, fetchMistakes]);
 
     function refreshAfterRun() {
         if (!isMember) return; // 訪客不打會員端點(會 401 轉登入);訪客局也不落地、榜不會變
         getVocabMe(language).then(setMe).catch(() => { });
-        fetchMistakes(mistakeQuery, 0);
+        fetchMistakes(mistakeQuery, 1);
         getVocabLeaderboard(language, boardPeriod).then(setBoard).catch(() => { });
     }
 
@@ -354,7 +354,8 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
             loading={mistakeLoading} error={mistakeError} canTts={canTts} ja={ja}
             onSearch={setSearchInput}
             onQuery={patch => setMistakeQuery(q => ({ ...q, ...patch }))}
-            onMore={() => fetchMistakes(mistakeQuery, mistakes?.items.length ?? 0)}
+            // 已載入的每一頁（最後一頁以外）都是滿的，下一頁 = 已載入頁數 + 1
+            onMore={() => fetchMistakes(mistakeQuery, Math.floor((mistakes?.data.length ?? 0) / MISTAKE_PAGE_SIZE) + 1)}
             onSpeak={say} t={t} />
     );
     const leaderboardCard = board && (

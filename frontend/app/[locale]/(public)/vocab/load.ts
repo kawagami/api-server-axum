@@ -23,7 +23,7 @@ export async function loadVocabPage(language: VocabLanguage): Promise<VocabPageD
     const [me, mistakes, leaderboard] = await Promise.all([
         isMember ? getVocabMe(language).catch(() => null) : null,
         isMember
-            ? getVocabMistakes({ language, limit: MISTAKE_PAGE_SIZE }).catch(() => null)
+            ? getVocabMistakes({ language, per_page: MISTAKE_PAGE_SIZE }).catch(() => null)
             : null,
         getVocabLeaderboard(language, "weekly").catch(() => null),
     ]);

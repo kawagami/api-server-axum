@@ -4,7 +4,7 @@ use crate::{
     services::{auth as auth_service, webauthn as webauthn_service},
     state::AppState,
     structs::{
-        auth::{AuthenticatedUser, ChangePasswordData, SignInData},
+        auth::{AdminTokenResponse, AuthenticatedUser, ChangePasswordData, SignInData},
         webauthn::{
             PasskeyListItem, PasskeyLoginBeginResponse, PasskeyLoginFinishData,
             PasskeyRegisterFinishData,
@@ -77,7 +77,7 @@ async fn sign_in(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(user_data): Json<SignInData>,
-) -> Result<Json<String>, AppError> {
+) -> Result<Json<AdminTokenResponse>, AppError> {
     let ip = crate::utils::net::client_ip(
         state.get_config().trust_cf_header,
         &headers,
@@ -95,7 +95,7 @@ async fn sign_in(
         tracing::warn!("admin 登入失敗 name={:?} ip={} 原因={}", user_data.name, ip, e)
     })?;
     tracing::info!("admin 登入成功 name={:?} ip={}", user_data.name, ip);
-    Ok(Json(token))
+    Ok(Json(AdminTokenResponse { access_token: token }))
 }
 
 async fn me(
@@ -112,14 +112,14 @@ async fn me(
 async fn refresh(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthenticatedUser>,
-) -> Result<Json<String>, AppError> {
+) -> Result<Json<AdminTokenResponse>, AppError> {
     let token = auth_service::refresh_admin_token(
         state.get_redis_pool(),
         &state.get_config().jwt_secret,
         auth_user.id,
     )
     .await?;
-    Ok(Json(token))
+    Ok(Json(AdminTokenResponse { access_token: token }))
 }
 
 async fn change_password(
@@ -162,14 +162,14 @@ async fn passkey_login_begin(
     Ok(Json(webauthn_service::begin_login(&state).await?))
 }
 
-// 回傳與 POST /admin/auth 同形（Json<String> token），前端代理可照抄。
+// 回傳與 POST /admin/auth 同形（`AdminTokenResponse`），前端代理可照抄。
 // 與密碼登入同理不進 audit（公開端點、還沒有身分），登入結果自己記。
 async fn passkey_login_finish(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<PasskeyLoginFinishData>,
-) -> Result<Json<String>, AppError> {
+) -> Result<Json<AdminTokenResponse>, AppError> {
     let ip = crate::utils::net::client_ip(
         state.get_config().trust_cf_header,
         &headers,
@@ -179,7 +179,7 @@ async fn passkey_login_finish(
         .await
         .inspect_err(|e| tracing::warn!("passkey 登入失敗 ip={} 原因={}", ip, e))?;
     tracing::info!("passkey 登入成功 ip={}", ip);
-    Ok(Json(token))
+    Ok(Json(AdminTokenResponse { access_token: token }))
 }
 
 async fn list_passkeys(

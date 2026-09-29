@@ -7,7 +7,7 @@ use crate::{
         auth::AuthenticatedUser,
         pagination::{PageQuery, Paginated, StatusFilter},
         roles::Perm,
-        torrents::{CreateTorrent, DownloadLink, Torrent}
+        torrents::{CreateTorrent, DownloadLink, Torrent, TorrentDetail, TorrentStorage}
     }
 };
 use axum::{
@@ -65,7 +65,7 @@ async fn list_torrents(
 async fn storage_stats(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<TorrentStorage>, AppError> {
     auth_user.require_permission(Perm::TorrentRead)?;
     Ok(Json(torrents_service::storage_stats(&state).await?))
 }
@@ -74,7 +74,7 @@ async fn torrent_detail(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
     Path(id): Path<i32>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<TorrentDetail>, AppError> {
     auth_user.require_permission(Perm::TorrentRead)?;
     Ok(Json(torrents_service::detail(&state, &auth_user, id).await?))
 }

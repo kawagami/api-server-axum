@@ -10,7 +10,7 @@ pub struct AuditEntry {
     pub actor_type: &'static str,
     /// admin 是顯示名（`users.name`）；member 是 `member#{id}` ——
     /// member 的名字要多打一次 DB 才拿得到，而稽核不值得在請求路徑上加一次查詢。
-    pub user_email: String,
+    pub actor: String,
     pub method: String,
     pub path: String,
     pub query: Option<String>,
@@ -25,7 +25,7 @@ pub async fn insert_batch(
     entries: &[AuditEntry],
 ) -> Result<(), AppError> {
     let actor_types: Vec<&str> = entries.iter().map(|e| e.actor_type).collect();
-    let user_emails: Vec<&str> = entries.iter().map(|e| e.user_email.as_str()).collect();
+    let actors: Vec<&str> = entries.iter().map(|e| e.actor.as_str()).collect();
     let methods: Vec<&str> = entries.iter().map(|e| e.method.as_str()).collect();
     let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
     let queries: Vec<Option<&str>> = entries.iter().map(|e| e.query.as_deref()).collect();
@@ -33,13 +33,13 @@ pub async fn insert_batch(
     let request_ids: Vec<Option<&str>> = entries.iter().map(|e| e.request_id.as_deref()).collect();
 
     sqlx::query(
-        "INSERT INTO admin_audit_logs (actor_type, user_email, method, path, query, status_code, request_id)
-         SELECT actor_type, user_email, method, path, query, status_code, request_id
+        "INSERT INTO admin_audit_logs (actor_type, actor, method, path, query, status_code, request_id)
+         SELECT actor_type, actor, method, path, query, status_code, request_id
          FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::smallint[], $7::text[])
-              AS t(actor_type, user_email, method, path, query, status_code, request_id)",
+              AS t(actor_type, actor, method, path, query, status_code, request_id)",
     )
     .bind(&actor_types)
-    .bind(&user_emails)
+    .bind(&actors)
     .bind(&methods)
     .bind(&paths)
     .bind(&queries)
@@ -52,7 +52,7 @@ pub async fn insert_batch(
 }
 
 /// list 與 count 共用的 WHERE —— 兩邊漂移會讓 total 與實際筆數對不上
-const AUDIT_FILTER: &str = "($1::text IS NULL OR user_email = $1)
+const AUDIT_FILTER: &str = "($1::text IS NULL OR actor = $1)
              AND ($2::text IS NULL OR method = $2)
              AND ($3::text IS NULL OR path ILIKE '%' || $3 || '%')
              AND ($4::timestamptz IS NULL OR created_at >= $4)
@@ -66,13 +66,13 @@ pub async fn get_audit_logs(
     offset: i64,
 ) -> Result<Vec<AuditLog>, AppError> {
     Ok(sqlx::query_as::<_, AuditLog>(&format!(
-        "SELECT id, actor_type, user_email, method, path, query, status_code, request_id, created_at
+        "SELECT id, actor_type, actor, method, path, query, status_code, request_id, created_at
          FROM admin_audit_logs
          WHERE {AUDIT_FILTER}
          ORDER BY created_at DESC
          LIMIT $7 OFFSET $8"
     ))
-    .bind(&filter.user_email)
+    .bind(&filter.actor)
     .bind(&filter.method)
     .bind(&filter.path)
     .bind(filter.from)
@@ -91,7 +91,7 @@ pub async fn count_audit_logs(
     let (total,): (i64,) = sqlx::query_as(&format!(
         "SELECT COUNT(*) FROM admin_audit_logs WHERE {AUDIT_FILTER}"
     ))
-    .bind(&filter.user_email)
+    .bind(&filter.actor)
     .bind(&filter.method)
     .bind(&filter.path)
     .bind(filter.from)

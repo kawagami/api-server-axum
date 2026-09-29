@@ -37,7 +37,7 @@ const MAX_DROPPED_MESSAGES: u32 = 200;
 /// 單條 WS 連線的完整生命週期：登記進 `connections` → 收訊迴圈 + ping task → 任一邊結束就
 /// 收掉另一邊並 `cleanup_connection` → 留一行 INFO 摘要。由 `routes/ws.rs` 的握手 handler 在
 /// `on_upgrade` 裡呼叫（外層已掛好 `ws` span）。
-pub async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_email: Option<String>, real_ip: String, user_agent: String) {
+pub async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, user_name: Option<String>, real_ip: String, user_agent: String) {
     let (sender, receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
 
@@ -45,7 +45,7 @@ pub async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, 
     let connection_info = TrackedConnection {
         connected_at,
         sender: sender_arc.clone(),
-        user_email: user_email.clone(),
+        user_name: user_name.clone(),
         real_ip: real_ip.clone(),
         user_agent: user_agent.clone(),
     };
@@ -55,14 +55,14 @@ pub async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, 
         connections.insert(who, connection_info);
     }
 
-    // 含 IP / email 個資，只推給 admin 連線，不對匿名訪客廣播。
+    // 含 IP / UA / 管理員名 個資，只推給 admin 連線，不對匿名訪客廣播。
     // 欄位與 list_connections 的列一致，admin 頁可直接用這則事件插入新列，不必重抓。
     state.broadcast_to_admins(
         crate::structs::ws::WsEvent::UserJoined,
         serde_json::json!({
             "addr": who.to_string(),
             "real_ip": real_ip,
-            "user_email": user_email,
+            "user_name": user_name,
             "connected_at": to_iso(connected_at),
             "user_agent": user_agent,
         }),
@@ -195,7 +195,7 @@ pub async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, 
     // `logs` 表兩邊都沒有，「一群人同時掉線」事後完全無跡可循。
     //
     // 每條連線只留這一行摘要（開了多久、收了幾則、為什麼結束），其餘識別欄位
-    // （conn / ip / email / request_id）在 span 上，量級 = 每條連線一行。
+    // （conn / ip / user / request_id）在 span 上，量級 = 每條連線一行。
     // 落地 `logs` 表仍需把 `log_db_level` 調到 INFO（預設 WARN 不收），但 stdout 一定有。
     // 逐則收訊/送出失敗維持 debug 不變（那是關分頁的常態，理由見上面的 recv 迴圈）。
     tracing::info!(
@@ -267,15 +267,15 @@ async fn cleanup_connection(state: &AppState, who: SocketAddr) {
         hub.disconnect(state, who).await;
     }
 
-    let (user_email, real_ip) = {
+    let (user_name, real_ip) = {
         let mut connections = state.get_connections().lock().await;
-        let email = connections.get(&who).and_then(|c| c.user_email.clone());
+        let name = connections.get(&who).and_then(|c| c.user_name.clone());
         let ip = connections.get(&who).map(|c| c.real_ip.clone()).unwrap_or_else(|| who.ip().to_string());
         connections.remove(&who);
-        (email, ip)
+        (name, ip)
     };
     state.broadcast_to_admins(
         crate::structs::ws::WsEvent::UserLeft,
-        serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_email": user_email }),
+        serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_name": user_name }),
     );
 }

@@ -1,9 +1,9 @@
 // Image (server storage)
 export interface Image {
-  id: string;
+  id: number;
   storage_key: string;
   url: string;
-  status?: string;
+  status: string;
 }
 
 // Setting
@@ -26,11 +26,13 @@ export interface AuditLog {
   id: number;
   actor_type: AuditActorType;
   /** admin 是顯示名；member 是 `member#{id}`（後端不為了稽核多打一次 DB 取名字） */
-  user_email: string;
+  actor: string;
   method: string;
   path: string;
   query: string | null;
   status_code: number;
+  /** 對應 `Log.request_id`，可撈該次請求的完整軌跡（2026-08-06 前的舊列為 null） */
+  request_id: string | null;
   created_at: string;
 }
 
@@ -64,8 +66,8 @@ export interface Log {
   level: LogLevel;
   message: string;
   target: string;
-  file: string;
-  line: number;
+  file: string | null;
+  line: number | null;
   // 對應 `x-request-id` / 錯誤 body 的 request_id；非請求路徑的 log（排程 job、啟動期）為 null
   request_id: string | null;
   // event 與 span 的其餘 field。`self` = 真正的錯誤細節（message 只是固定字串）、

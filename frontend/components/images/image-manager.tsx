@@ -38,7 +38,7 @@ export default function ImageManager({ initialImages, compressConfig }: { initia
 
     const confirmDelete = async () => {
         if (!pendingDelete) return;
-        await handleDelete(pendingDelete.name);
+        await handleDelete(pendingDelete.id);
         setPendingDelete(null);
     };
 
@@ -88,7 +88,7 @@ export default function ImageManager({ initialImages, compressConfig }: { initia
             {pendingDelete && (
                 <DeleteConfirmModal
                     image={pendingDelete}
-                    deleting={deletingImage === pendingDelete.name}
+                    deleting={deletingImage === pendingDelete.id}
                     onConfirm={confirmDelete}
                     onClose={() => setPendingDelete(null)}
                 />

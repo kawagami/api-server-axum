@@ -10,7 +10,7 @@ const ACTORS: readonly AuditActorType[] = ["admin", "member"];
 export async function GET(request: NextRequest) {
     const p = request.nextUrl.searchParams;
     return adminJson(() => getAuditLogs({
-        user_email: strParam(p, "user_email"),
+        actor: strParam(p, "actor"),
         method: METHODS.find(m => m === p.get("method")),
         path: strParam(p, "path"),
         from: strParam(p, "from"),

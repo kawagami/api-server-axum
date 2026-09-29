@@ -31,10 +31,9 @@ export interface PasskeyItem {
 
 // User（後台管理員；name 為登入識別，email 選填）
 export interface User {
-  id: string;
+  id: number;
   name: string;
-  email?: string | null;
-  created_at?: string;
+  email: string | null;
 }
 
 // Member

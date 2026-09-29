@@ -11,6 +11,18 @@ export interface Blog {
   author_name?: string | null;
 }
 
+// 公開列表的一列（`GET /blogs`，後端 PublicBlogListItem）。**沒有 markdown**，
+// 改帶後端算好的 `excerpt`（純文字、已去掉與標題重複的開頭、上限 120 字）
+export interface PublicBlogListItem {
+  id: string;
+  tocs: string[];
+  tags: string[];
+  excerpt: string;
+  created_at: string;
+  updated_at: string;
+  author_name: string | null;
+}
+
 export interface TagCount {
   tag: string;
   count: number;
@@ -31,7 +43,7 @@ export type AdminBlogPaginatedResponse = PaginatedResponse<AdminBlogListItem>;
 
 // 後端 2026-08-03 起回 `Paginated<T>`（`{ data, total }`）；原本另有 page / per_page，
 // 但那兩欄只是把 request 參數回抄給 client，全站無人讀，已隨後端一起移除
-export type BlogPaginatedResponse = PaginatedResponse<Blog>;
+export type BlogPaginatedResponse = PaginatedResponse<PublicBlogListItem>;
 
 // PUT /admin/blogs/:id 的 body。**沒有 tocs** ——
 // 標題與目錄由後端從 markdown 解析（services/blogs.rs 的 extract_toc_texts），

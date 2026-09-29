@@ -51,11 +51,13 @@ export default function EnabledFeaturesPicker({ initialValue }: { initialValue: 
         setError(null);
         setSaving(true);
         try {
-            await updateEnabledFeatures(currentValue);
+            const res = await updateEnabledFeatures(currentValue);
+            if (!res.ok) {
+                setError(res.message ?? "儲存失敗，請稍後再試");
+                return;
+            }
             setSaved(currentValue);
             router.refresh();
-        } catch (err) {
-            setError((err as Error).message);
         } finally {
             setSaving(false);
         }

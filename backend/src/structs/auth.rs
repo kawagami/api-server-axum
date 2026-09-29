@@ -23,6 +23,16 @@ pub struct SignInData {
     pub password: String,
 }
 
+/// admin 登入（密碼 / passkey）與續期的回應。
+///
+/// 以前是裸 JSON 字串（`"eyJ..."`）—— 根節點是字串就再也加不了欄位（`expires_in` 之類）。
+/// 欄位名對齊 member 的 `TokenResponse.access_token`；admin 沒有 refresh token
+/// （續期是拿仍有效的 access token 換新的）。
+#[derive(Serialize)]
+pub struct AdminTokenResponse {
+    pub access_token: String,
+}
+
 #[derive(Deserialize)]
 pub struct ChangePasswordData {
     pub current_password: String,

@@ -9,7 +9,7 @@ use crate::{errors::AppError, repositories::redis, state::AppState};
 ///
 /// ⚠️ **門檻必須與 `GET /ws/connections` 一致**：票換來的連線會被標成 admin 身分，
 /// 因而收得到 `broadcast_to_admins` 的 `user_joined` / `user_left` —— 那兩則帶
-/// `real_ip` / `user_email` / `user_agent`。
+/// `real_ip` / `user_name` / `user_agent`。
 pub async fn issue_ticket(state: &AppState, user_name: &str) -> Result<String, AppError> {
     let ticket = uuid::Uuid::new_v4().to_string();
     redis::set_ws_ticket(state.get_redis_pool(), &ticket, user_name).await?;

@@ -2,13 +2,13 @@ use crate::{
     repositories::torrents as torrents_repo,
     state::AppState,
     structs::{
-        torrents::{Torrent, TorrentFile},
+        torrents::{Torrent, TorrentFile, TorrentProgressEvent},
         ws::WsEvent,
     },
 };
 use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, ManagedTorrent};
 use std::{sync::Arc, time::Duration};
-use super::manager::{DEFAULT_METADATA_TIMEOUT_SECONDS, INIT_TIMEOUT, MAX_METADATA_ATTEMPTS, POLL_INTERVAL, Slot, max_active, setting};
+use super::manager::{DEFAULT_METADATA_TIMEOUT_SECONDS, INIT_TIMEOUT, MAX_METADATA_ATTEMPTS, POLL_INTERVAL, Slot, live_progress, max_active, setting};
 use super::session::{purge_by_info_hash, remove_from_session};
 
 /// 啟動失敗的分類 —— 讓位還有重試機會，其他錯誤直接判 failed
@@ -285,29 +285,13 @@ async fn watch_torrent(state: AppState, id: i32, handle: Arc<ManagedTorrent>) {
             return;
         }
 
-        let percent = if stats.total_bytes > 0 {
-            (stats.progress_bytes as f64 / stats.total_bytes as f64 * 10000.0).round() / 100.0
-        } else {
-            0.0
-        };
-        if (percent - last_percent).abs() > f64::EPSILON {
-            last_percent = percent;
-            let (down_speed, peers) = stats
-                .live
-                .as_ref()
-                .map(|l| (l.download_speed.to_string(), l.snapshot.peer_stats.live))
-                .unwrap_or_default();
+        let live = live_progress(&stats);
+        if (live.progress - last_percent).abs() > f64::EPSILON {
+            last_percent = live.progress;
             state.broadcast(
                 WsEvent::TorrentProgress,
-                serde_json::json!({
-                    "id": id,
-                    "name": name,
-                    "progress": percent,
-                    "progress_bytes": stats.progress_bytes,
-                    "total_bytes": stats.total_bytes,
-                    "down_speed": down_speed,
-                    "peers": peers,
-                }),
+                serde_json::to_value(TorrentProgressEvent { id, name: &name, live })
+                    .unwrap_or_default(),
             );
         }
 

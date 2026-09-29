@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import adminRequest from "@/libs/adminRequest";
-import type { StockDayAll, StockBuybackPeriod, StockChangePaginatedResponse, PaginatedResponse } from "@/types";
+import type { StockDayAll, StockBuybackPeriod, StockBuybackPriceGap, StockChangePaginatedResponse, PaginatedResponse } from "@/types";
 
 export async function patchStockPendingAction(formData: FormData): Promise<void> {
     const id = Number(formData.get('id'));
@@ -48,9 +48,9 @@ export async function getStockBuybackPeriods(): Promise<StockBuybackPeriod[]> {
     return adminRequest<StockBuybackPeriod[]>({ url: `${process.env.API_URL}/admin/stocks/buyback_periods` });
 }
 
-export async function getUnfinishedBuybackPriceGap(): Promise<unknown> {
-    return adminRequest({
+export async function getUnfinishedBuybackPriceGap(): Promise<StockBuybackPriceGap[]> {
+    const res = await adminRequest<StockBuybackPriceGap[]>({
         url: `${process.env.API_URL}/admin/stocks/buyback_price_gaps`,
-        headers: { "Content-Type": "application/json" },
     });
+    return res ?? [];
 }

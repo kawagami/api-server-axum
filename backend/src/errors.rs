@@ -106,6 +106,12 @@ pub enum AuthError {
     #[error("權限不足")]
     Forbidden,
 
+    /// 同為 403，但帶著給人看的原因（「不可變更自己的角色」這類業務規則）。
+    /// 固定訊息的 `Forbidden` 答不出「為什麼」，而以前這類情況改回 400 `InvalidContent`
+    /// 只為了帶訊息 —— 狀態碼語意就錯了（請求本身沒壞，是這個身分不能做這件事）。
+    #[error("{0}")]
+    ForbiddenAction(String),
+
     #[error("使用者不存在")]
     UserNotFound,
 
@@ -184,6 +190,7 @@ impl AppError {
                 AuthError::InvalidToken => StatusCode::UNAUTHORIZED,
                 AuthError::Unauthorized => StatusCode::UNAUTHORIZED,
                 AuthError::Forbidden => StatusCode::FORBIDDEN,
+                AuthError::ForbiddenAction(_) => StatusCode::FORBIDDEN,
                 AuthError::UserNotFound => StatusCode::UNAUTHORIZED,
                 AuthError::InvalidCredentials => StatusCode::UNAUTHORIZED,
                 AuthError::WebauthnFailed => StatusCode::UNAUTHORIZED,

@@ -44,8 +44,8 @@ pub struct StatusFilter {
 /// 分頁回應的共用形狀 `{ data, total }`。
 ///
 /// `total` 是**套用篩選後、未套 limit/offset 的總筆數**，前端靠它算頁碼。
-/// 全站另有 5 個逐字同形的 `XxxPaginatedResponse`（torrents / gov_tenders / stocks /
-/// messages / blog_comments）待收斂進來 —— **新端點一律用這個，不要再長第 6 個**。
+/// **新端點一律用這個**。形狀相同但沒走這個型別的只剩兩支：`vocab::AdminWordListResponse`
+/// （逐字同形）與 `vocab::MistakesResponse`（多一個 `reviewable`）。
 #[derive(Serialize)]
 pub struct Paginated<T> {
     pub data: Vec<T>,

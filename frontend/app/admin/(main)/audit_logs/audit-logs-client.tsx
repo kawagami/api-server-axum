@@ -18,7 +18,7 @@ const LIMIT = 100;
 const REFRESH_MS = 1_800_000;
 
 interface Filters {
-    user_email: string;
+    actor: string;
     method: HttpMethod | '';
     path: string;
     from: string;
@@ -26,7 +26,7 @@ interface Filters {
     actor_type: AuditActorType | '';
 }
 
-const defaultFilters: Filters = { user_email: '', method: '', path: '', from: '', to: '', actor_type: '' };
+const defaultFilters: Filters = { actor: '', method: '', path: '', from: '', to: '', actor_type: '' };
 
 // datetime-local 是無時區的本地時間字串（2026-07-27T10:30），後端要 RFC3339；
 // 必須在瀏覽器轉才吃得到使用者當地時區，不能丟給 server action 換算
@@ -134,8 +134,8 @@ export default function AuditLogsClient() {
                         <label className="text-xs text-neutral-500 dark:text-neutral-400">操作者</label>
                         <input
                             type="text"
-                            value={filters.user_email}
-                            onChange={e => setFilters(f => ({ ...f, user_email: e.target.value }))}
+                            value={filters.actor}
+                            onChange={e => setFilters(f => ({ ...f, actor: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleSearch()}
                             placeholder="管理員顯示名 / member#1"
                             className={`${ADMIN_FILTER_INPUT} w-48`}
@@ -230,14 +230,14 @@ export default function AuditLogsClient() {
                                             <AdminTd className="text-neutral-500 dark:text-neutral-400 text-xs whitespace-nowrap">
                                                 {formatDateTimeSeconds(log.created_at)}
                                             </AdminTd>
-                                            <AdminTd className="text-xs font-mono truncate hidden md:table-cell" title={log.user_email}>
+                                            <AdminTd className="text-xs font-mono truncate hidden md:table-cell" title={log.actor}>
                                                 {/* 會員與管理員混在同一張表，身分要一眼分得出來 */}
                                                 {log.actor_type === 'member' && (
                                                     <span className="mr-1 px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
                                                         會員
                                                     </span>
                                                 )}
-                                                {log.user_email}
+                                                {log.actor}
                                             </AdminTd>
                                             <AdminTd>
                                                 <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${METHOD_BADGE[log.method] ?? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}`}>

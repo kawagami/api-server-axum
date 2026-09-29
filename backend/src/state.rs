@@ -99,7 +99,7 @@ pub type WsSender = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 pub struct TrackedConnection {
     pub connected_at: std::time::SystemTime,
     pub sender: WsSender,
-    pub user_email: Option<String>,
+    pub user_name: Option<String>,
     pub real_ip: String,
     pub user_agent: String,
 }
@@ -110,7 +110,7 @@ pub struct DisplayTrackedConnection {
     /// ISO-8601 毫秒 UTC 字串（`SystemTime` 預設序列化成 `{secs,nanos}` 物件，前端不好用）。
     /// 固定寬度，字典序 == 時間序，可直接拿來排序。
     pub connected_at: String,
-    pub user_email: Option<String>,
+    pub user_name: Option<String>,
     pub real_ip: String,
     pub user_agent: String,
 }
@@ -333,7 +333,7 @@ impl AppState {
         self.broadcast_filtered(crate::structs::ws::envelope(event.as_str(), data), false);
     }
 
-    /// 只推給已通過 admin 驗證的連線（user_email 有值）— 含 IP/email 等個資的事件走這裡
+    /// 只推給已通過 admin 驗證的連線（user_name 有值）— 含 IP / UA 等個資的事件走這裡
     pub fn broadcast_to_admins(&self, event: WsEvent, data: serde_json::Value) {
         self.broadcast_filtered(crate::structs::ws::envelope(event.as_str(), data), true);
     }
@@ -347,7 +347,7 @@ impl AppState {
                 let conns = connections.lock().await;
                 conns
                     .iter()
-                    .filter(|(_, c)| !admins_only || c.user_email.is_some())
+                    .filter(|(_, c)| !admins_only || c.user_name.is_some())
                     .map(|(addr, c)| (*addr, c.sender.clone()))
                     .collect()
             };

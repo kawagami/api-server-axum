@@ -234,7 +234,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 | `POST /` | `torrent:create` | 收 magnet，回 201；重複 409、格式錯 422、容量滿 507 |
 | `GET /?status=&page=&per_page=` | `torrent:read` | 分頁列表 |
 | `GET /storage` | `torrent:read` | 磁碟剩餘空間（statvfs）+ torrent 配額用量 |
-| `GET /{id}` | `torrent:read` | 詳情；進行中任務附 `live` 即時進度 |
+| `GET /{id}` | `torrent:read` | 詳情；進行中任務附 `live` 即時進度（`structs/torrents.rs::TorrentDetail` / `TorrentLive`；`live` 與 WS `torrent_progress` 共用 `TorrentLive`，由 `manager.rs::live_progress` 單一來源產生 —— 2026-09-29 前兩處各手組一份 `json!`） |
 | `POST /{id}/download_links` | `torrent:read` | 產生短效簽名下載連結（效期 `torrent_link_ttl_minutes`） |
 | `GET /{id}/files/{file_index}?token=` | 簽名 token | 串流下載，支援 Range；**不掛 JWT middleware**，但 token 內嵌發行者 email，下載時即時重查 `torrent:read` 權限 |
 | `PATCH /{id}/pending` | `torrent:create` | failed/completed 重設重跑 |
@@ -259,6 +259,8 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 - 路由命名 RESTful：資源名詞 + HTTP method，不用 `get_*` / `fetch_*` 動詞前綴。**handler 函式名同理**（2026-07-31 已把 24 個 `get_*` 收斂完）：單一資源檔用裸動詞（`list` / `detail` / `create` / `update` / `delete`，見 `routes/portfolio.rs`），需要區分時才加名詞後綴（`list_words` / `delete_message`，見 `routes/admin_vocab.rs`）。**選新名時照該檔既有的命名家族走，不要引入第三種風格**
 - `/tools/*` 是**例外**：`convert_text` 本質是計算工具而非資源，路徑刻意保留動詞，硬套名詞路徑語意更差（同群的 `new_password` 已於 2026-08-30 移除 —— 密碼改由瀏覽器端 `crypto.getRandomValues` 產生，見 `frontend/libs/password.ts`）
 - **錯誤回應只有一種形狀**：`errors.rs` 的 `{ code, message, details?, request_id }`。`fallback`（未知路徑）與 `with_feature`（功能關閉）都回 `AppError::from(RequestError::NotFound)`，不要再寫 `(StatusCode::X, "字串")` 或 `(StatusCode::X, Json(json!(...)))` 這種裸回應——會讓客戶端要 parse 兩種格式，也拿不到 `request_id`。限流的 429 走 `RequestError::TooManyRequests`（2026-07-31 補的 variant；在那之前 `rate_limit` middleware 自組 JSON）。**要回新的狀態碼就先去 `errors.rs` 加 variant**，不要在 middleware 或 handler 裡自己組 body
+- **403 要帶原因時用 `AuthError::ForbiddenAction(String)`**（2026-09-29 加）：固定訊息的 `Forbidden`（「權限不足」）答不出為什麼；以前「不可變更自己的角色」只為了帶訊息而回 400 `InvalidContent`，狀態碼語意是錯的（請求沒壞，是這個身分不能做這件事）。現有用途：改自己的角色、刪自己的帳號（`routes/users.rs`）、指派 super_admin（`services/roles.rs::ensure_assignable`）
+- **刪除走 `DELETE /資源/{id}`，不放 body**：`DELETE /admin/users` 曾經把整個 `User` 放 JSON body（缺 `name` 就 422），2026-09-29 改成 `/admin/users/{id}`；查無此人回 404
 
 ### 「一種形狀」是怎麼守住的（2026-08-09 補完最後兩個破口）
 
@@ -340,9 +342,9 @@ state.broadcast(WsEvent::StockCompleted, serde_json::json!({ "stock_no": "2330" 
 
 ### WS 連線的 admin 身分：一次性 ticket
 
-JWT **不走** WS URL query（會進 access log）。流程：登入中的 admin 打 `POST /ws/ticket`（`authorize_and_load` + **`ws:read` 權限**保護）→ 後端發 UUID ticket 存 Redis `ws:ticket:{ticket}`（value = admin **顯示名 `users.name`**，30 秒 TTL —— admin 登入識別是 name 不是 email，見「身份識別」）→ client 以 `/ws?ticket=` 握手 → 後端 `GETDEL` 一次性消費取回那個 name。⚠️ 程式碼裡這個值沿用 `user_email` 這個舊名（`connections` map、`broadcast_to_admins` payload、`admin_audit_logs.user_email` 都是），**欄位名是 email、內容是 name**。無 ticket / 票失效 = 匿名連線（前台訪客即此路徑）。
+JWT **不走** WS URL query（會進 access log）。流程：登入中的 admin 打 `POST /ws/ticket`（`authorize_and_load` + **`ws:read` 權限**保護）→ 後端發 UUID ticket 存 Redis `ws:ticket:{ticket}`（value = admin **顯示名 `users.name`**，30 秒 TTL —— admin 登入識別是 name 不是 email，見「身份識別」）→ client 以 `/ws?ticket=` 握手 → 後端 `GETDEL` 一次性消費取回那個 name。這個值在程式碼與 wire 上叫 `user_name`（`connections` map、`GET /ws/connections`、`user_joined` / `user_left` payload、`ws` span 的 `user` 欄）。**2026-09-29 前沿用 `user_email` 這個舊名**（欄位名是 email、內容是 name），同日連同 `admin_audit_logs.user_email` → `actor` 一起改掉。無 ticket / 票失效 = 匿名連線（前台訪客即此路徑）。
 
-⚠️ **`/ws/ticket` 的權限門檻必須與 `GET /ws/connections` 一致（同為 `ws:read`）**：ticket 換來的連線會被標成 admin 身分，因此收得到 `broadcast_to_admins` 推的 `user_joined` / `user_left` —— 那兩則的 payload 含 `real_ip` / `user_email` / `user_agent`。少了這道檢查，沒有 `ws:read` 的商家管理員HTTP 端查不到連線清單，卻能改走 WS 即時收到每個訪客的個資（2026-07-31 修）。admin 端點是 `GET /ws/connections`、`POST /ws/messages`、`POST /ws/ticket`；前兩者原本叫 `get_online_connections` / `say_something_to_someone`，同日改成資源路徑（前端同一 commit 已同步）。
+⚠️ **`/ws/ticket` 的權限門檻必須與 `GET /ws/connections` 一致（同為 `ws:read`）**：ticket 換來的連線會被標成 admin 身分，因此收得到 `broadcast_to_admins` 推的 `user_joined` / `user_left` —— 那兩則的 payload 含 `real_ip` / `user_name` / `user_agent`。少了這道檢查，沒有 `ws:read` 的商家管理員HTTP 端查不到連線清單，卻能改走 WS 即時收到每個訪客的個資（2026-07-31 修）。admin 端點是 `GET /ws/connections`、`POST /ws/messages`、`POST /ws/ticket`；前兩者原本叫 `get_online_connections` / `say_something_to_someone`，同日改成資源路徑（前端同一 commit 已同步）。
 
 前端收到格式：`{ "type": "stock_completed", "data": { ... } }`
 
@@ -379,6 +381,7 @@ Server-authoritative 對戰，匿名可玩。**七遊戲**：回合制 2 人 —
 | DB table | `users` | `members` + `member_oauth` |
 | RBAC | 有（roles / permissions） | 無 |
 | token 續期 | `POST /admin/auth/refresh`（Bearer 未過期 → 新 1h token） | `POST /oauth/refresh`（jti rotation） |
+| 登入 / 續期回應 | `{ access_token }`（`structs/auth.rs::AdminTokenResponse`；2026-09-29 前是裸 JSON 字串） | `{ access_token, refresh_token }`（`TokenResponse`） |
 
 **兩套系統完全獨立**，不共用 JWT、middleware、table。
 
@@ -432,6 +435,7 @@ SELECT r.id, r.name FROM role_permissions rp
 ### super_admin
 
 `super_admin` role 自動擁有所有 permissions，不需手動指派。  
+**`super_admin` 角色本身不能透過 API 指派**（`services/roles.rs::ensure_assignable`；建立使用者帶 `role_ids`、`PUT /admin/users/{id}/roles`、預設角色 `new_user_default_roles` 三條路都擋），連 super_admin 自己也不行，回 403 `ForbiddenAction` 帶原因（2026-09-29 前是不帶原因的「權限不足」）。要多一位只能直接改 DB。  
 實作於 `repositories/roles.rs` 的 **`get_user_permission_strings_by_id`**（早期叫 `_by_email`，已改用 user id）：偵測到 `super_admin` role 直接回傳全部 `permissions` table 內容，不看 `role_permissions`。`is_super_admin` 與權限、顯示名一起走身分快取（見下節）。
 
 ### 新增 permission
@@ -707,7 +711,7 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
 `middleware/audit.rs` 掛在 `with_auth` **內層**，對每個帶有效 admin 身分的請求記一筆（**不分讀寫，GET 也記**），180 天保留期由 `jobs/cleanup_observability.rs` 清。查詢走 `GET /admin/audit_logs`（需 `audit:read`）。
 
 - **也記 member 的寫入**（2026-08-09）：`/member/portfolio` 改走 `routes.rs::with_member_auth`（= `authorize_member` + 同一支 audit middleware）。在那之前 `/member/*` 直接掛 `authorize_member`、完全跳過 audit，「會員改了什麼、刪了什麼」零紀錄。
-  - `actor_type` 欄（`admin` / `member`，migration `20260809000000`，舊列 DEFAULT `admin`）區分身分；`user_email` 對 admin 是顯示名、對 member 是 **`member#{id}`** —— member 的名字要多打一次 DB，稽核不值得在請求路徑上加一次查詢。`GET /admin/audit_logs?actor_type=` 可篩。
+  - `actor_type` 欄（`admin` / `member`，migration `20260809000000`，舊列 DEFAULT `admin`）區分身分；`actor` 欄對 admin 是顯示名、對 member 是 **`member#{id}`**（**2026-09-29 前欄名是 `user_email`**，migration `20260929000000` 改名，索引一併改成 `idx_admin_audit_logs_actor`；`GET /admin/audit_logs` 的篩選參數同步改叫 `actor`，`scripts/kawa-logs audit --user` 已跟著改） —— member 的名字要多打一次 DB，稽核不值得在請求路徑上加一次查詢。`GET /admin/audit_logs?actor_type=` 可篩。
   - **member 只記非 GET**：會員讀自己的資料是常態，全記等於用 180 天保留期的表存瀏覽軌跡。admin 維持不分讀寫（那邊「誰查了會員個資」本身就是要稽核的事）。
   - **`vocab` 刻意不掛**：每答一題就是一個 `POST /runs/{id}/answer`，稽核價值近乎零而量最大。
 
@@ -844,7 +848,7 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 - ~~`repositories/{logs,audit_logs,system_metrics,visitors}.rs` 回 `sqlx::Error` / `redis::RedisError`~~（2026-09-24 全改 `AppError`，連同 `repositories/redis.rs` 的 `set_user_login` / `user_login_exists`；`services/stats.rs` 的三層 `map_err` 與 `services/logs.rs`、`services/system_metrics.rs::recent` 的轉型殼一併拆掉）。**刻意留著的兩支**：`redis.rs::get_redis_conn`（連線原語，把 bb8 的 `RunError` 攤平成 `RedisError`，由呼叫端 `?` 轉型）與 `visitors.rs` 私有的 `record_visit_inner`（best-effort，只在本檔 warn）。⚠️ 換成 `AppError` 之後**錯誤要用 `{:?}` 印**：它的 Display 只有「系統錯誤: 資料庫錯誤」，sqlx / redis 的原因在 `#[source]` 裡（`jobs/collect_system_metrics.rs` 的 `{e}` 就是因此改成 `{e:?}`）。
 - ~~5 個帶 `Serialize` 的 API 回應型別長在 `repositories/`~~（2026-08-09 全數搬進 `structs/`，`routes/admin_stats.rs` 的 `VisitorsStats` 一併搬到 `structs/stats.rs`）。**仍待搬**：~~`routes/ws.rs` 的 `pub SendMessageParams`~~（2026-09-24 已搬 `structs/ws.rs` 並改名 `SendMessageRequest`，wire 形狀不變）、`routes/auth.rs` 的 `MeResponse`、`routes/oauth.rs` 的 `OAuthUrlResponse`。
 - ~~`repositories/members.rs` 的 `member_detail` 打 3 次 DB~~（2026-08-09 收成 2 支併發：`members` 一次取齊、`member_oauth` 不依賴前者）。
-- ~~4 個端點有分頁但完全沒有 total~~（2026-08-07 補齊，含 `/admin/audit_logs`、`/members` 與 `/admin/stocks/day_all`）。**吃 `page`/`per_page` 的端點一律回 `{data,total}` 這個形狀**，沒有例外（型別上唯一還沒走 `Paginated<T>` 的是 `/admin/vocab/words` 的 `structs/vocab.rs::AdminWordListResponse` —— 逐字同形，是 2026-08-03 那波收斂之後才長出來的第 6 份，wire 形狀相同故不影響前端）。理由不是對稱：前端 `usePagedList` 是全站唯一的「載入更多」實作，缺 total 時它只能猜「這頁滿了就假設還有下一頁」，於是**所有**清單（含有 total 的那些）都退化用同一套啟發式，最後一頁剛好滿 per_page 就多出一顆按不出東西的按鈕。COUNT 的成本用 `tokio::try_join!` 與 list 併發吸收（範本 `services/logs.rs`），list 與 count 的 WHERE 一律抽成同一個 `XXX_FILTER` 常數，兩邊漂移會讓 total 對不上。
+- ~~4 個端點有分頁但完全沒有 total~~（2026-08-07 補齊，含 `/admin/audit_logs`、`/members` 與 `/admin/stocks/day_all`）。**吃 `page`/`per_page` 的端點一律回 `{data,total}` 這個形狀**，沒有例外（型別上沒走 `Paginated<T>` 的有兩支：`/admin/vocab/words` 的 `structs/vocab.rs::AdminWordListResponse` —— 逐字同形，是 2026-08-03 那波收斂之後才長出來的第 6 份，wire 形狀相同故不影響前端；`/member/vocab/mistakes` 的 `MistakesResponse` 多一個 `reviewable`，所以 `{ data, total, reviewable }`）。⚠️ **錯題本 2026-09-29 前是漏網之魚**：它吃 `limit`/`offset`、回 `{ items, total, reviewable }`，字面上不「吃 `page`/`per_page`」所以沒被這條規則涵蓋，現已改成 `PageQuery` + `data`。理由不是對稱：前端 `usePagedList` 是全站唯一的「載入更多」實作，缺 total 時它只能猜「這頁滿了就假設還有下一頁」，於是**所有**清單（含有 total 的那些）都退化用同一套啟發式，最後一頁剛好滿 per_page 就多出一顆按不出東西的按鈕。COUNT 的成本用 `tokio::try_join!` 與 list 併發吸收（範本 `services/logs.rs`），list 與 count 的 WHERE 一律抽成同一個 `XXX_FILTER` 常數，兩邊漂移會讓 total 對不上。
 - ~~`gov_tenders` / `messages` / `blog_comments` 的 count/list 用順序 `.await`~~（2026-08-09 全改 `tokio::try_join!`；`services/stats.rs` 的三支查詢同時收斂）。
 - ⚠️ **`services/portfolio/math.rs` 的 `compute_latest` / `build_history` 在有股票股利時金額算錯**（尚未修，需先確認語意）：除權（`stock_rate > 0`）時只把 `adjusted_cost` 往下調，`shares` 沒跟著放大 —— 真實部位股數是 `shares × (1 + stock_rate/1000)`，所以 `current_value` 與 `pnl` 兩個**金額**欄位都被低估同一個倍數，而 `pnl_pct` 因為分子分母約掉了反而是對的。「pct 對、金額錯」這個內部矛盾在任何語意下都成立。要決定的是 `shares` 是否預期由使用者自己改。**2026-09-08 更新**：還原因子已收斂成單一 `ex_adjust_factor`（三個呼叫端共用），所以只要改一處；`period_change` 的 `value_change` 也吃同一個 `shares`、同樣被低估。該檔已有 6 測，但全在 `changes` 那組，沒有一個覆蓋這個 bug。
 - ~~`services/email.rs` 每封信重建 `AsyncSmtpTransport`~~（2026-08-09：開 lettre `pool` feature + `static MAILER` 依憑證快取 transport，憑證變了才重建。**兩者缺一都沒用** —— 沒開 pool 就算重用 transport 也是每封一次握手，重建 transport 則等於重建連線池）。

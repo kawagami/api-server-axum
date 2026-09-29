@@ -2,11 +2,12 @@ use crate::{
     errors::{AppError, SystemError},
     repositories::torrents as torrents_repo,
     state::AppState,
+    structs::torrents::{DiskUsage, TorrentQuota, TorrentStorage},
 };
 use super::manager::{DEFAULT_MAX_TOTAL_SIZE_GB, setting};
 
 /// 儲存空間概況：TORRENT_PATH 所在檔案系統的實際剩餘 + torrent 配額用量
-pub async fn storage_stats(state: &AppState) -> Result<serde_json::Value, AppError> {
+pub async fn storage_stats(state: &AppState) -> Result<TorrentStorage, AppError> {
     let manager = state.get_torrents();
     let (disk_total, disk_available) = disk_space(manager.base_path())
         .map_err(|e| SystemError::Internal(format!("statvfs failed: {e}")))?;
@@ -15,16 +16,16 @@ pub async fn storage_stats(state: &AppState) -> Result<serde_json::Value, AppErr
     let max_bytes = setting(state, "torrent_max_total_size_gb", DEFAULT_MAX_TOTAL_SIZE_GB)
         .saturating_mul(1024 * 1024 * 1024);
 
-    Ok(serde_json::json!({
-        "disk": {
-            "total_bytes": disk_total,
-            "available_bytes": disk_available,
+    Ok(TorrentStorage {
+        disk: DiskUsage {
+            total_bytes: disk_total,
+            available_bytes: disk_available,
         },
-        "torrent": {
-            "used_bytes": used,
-            "max_bytes": max_bytes,
+        torrent: TorrentQuota {
+            used_bytes: used,
+            max_bytes,
         },
-    }))
+    })
 }
 
 /// statvfs 查路徑所在檔案系統的 (總容量, 非 root 可用容量)，單位 bytes

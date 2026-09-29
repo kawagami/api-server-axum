@@ -22,8 +22,14 @@ pub async fn ensure_assignable(
     actor: &AuthenticatedUser,
     role_ids: &[i32],
 ) -> Result<(), AppError> {
+    // super_admin 等於全部權限，任何人（含 super_admin 自己）都不能透過 API 指派 ——
+    // 否則一個能指派角色的帳號就能把任何人（包括自己新建的帳號）直接升到頂。
+    // 要多一位 super_admin 只能直接改 DB（deploy/README.md「第一個帳號」同一條路）。
     if roles_repo::contains_super_admin(pool, role_ids).await? {
-        return Err(AuthError::Forbidden.into());
+        return Err(AuthError::ForbiddenAction(
+            "super_admin 無法透過後台指派，需由維運直接在資料庫設定".to_string(),
+        )
+        .into());
     }
     // 指派角色 = 把該角色的整組權限交到對方手上。少了這道，`role:assign` + `user:create`
     // 就等於「挑一個現成的高權角色，掛到我自己新建的帳號上，再登入進去」——
@@ -75,10 +81,6 @@ fn ensure_no_amplification(
 
 pub async fn get_roles(pool: &Pool<Postgres>) -> Result<Vec<RoleWithPermissions>, AppError> {
     roles_repo::get_roles(pool).await
-}
-
-pub async fn get_role(pool: &Pool<Postgres>, role_id: i32) -> Result<RoleWithPermissions, AppError> {
-    roles_repo::get_role_with_permissions(pool, role_id).await
 }
 
 pub async fn create_role(pool: &Pool<Postgres>, new_role: NewRole) -> Result<Role, AppError> {

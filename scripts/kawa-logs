@@ -134,14 +134,16 @@ def request(url, *, token=None, data=None):
 def login(conf):
     payload = json.dumps({"name": conf["KAWA_USER"], "password": conf["KAWA_PASSWORD"]}).encode()
     status, body = request(f"{conf['KAWA_API_URL']}/admin/auth", data=payload)
-    if status != 200 or not isinstance(body, str):
+    # 後端回 {"access_token": "..."}(2026-09-29 前是裸 JSON 字串)
+    token = body.get("access_token") if isinstance(body, dict) else None
+    if status != 200 or not isinstance(token, str):
         die(f"登入失敗({status}): {body}")
     os.makedirs(os.path.dirname(TOKEN_CACHE), exist_ok=True)
     # token 等同 1 小時的憑證,權限比照設定檔
     with open(TOKEN_CACHE, "w") as f:
         os.chmod(TOKEN_CACHE, 0o600)
-        f.write(body)
-    return body
+        f.write(token)
+    return token
 
 
 def api_get(conf, path, params=None):
@@ -281,7 +283,7 @@ def main():
 
     elif args.cmd == "audit":
         rows, total = unwrap(api_get(conf, "/admin/audit_logs", {
-            "user_email": args.user, "path": args.path,
+            "actor": args.user, "path": args.path,
             "from": iso_bound(args.from_), "to": iso_bound(args.to, end_of_day=True),
             "per_page": args.limit,
         }))

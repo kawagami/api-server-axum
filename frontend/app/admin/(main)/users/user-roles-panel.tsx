@@ -3,10 +3,11 @@
 import { useState, useTransition } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { setUserRoles } from '@/app/admin/(main)/roles/actions';
+import ErrorBanner from '@/components/admin/error-banner';
 import type { Role } from '@/types';
 
 interface Props {
-    userId: string;
+    userId: number;
     userName: string;
     initialRoles: Role[];
     allRoles: Role[];
@@ -16,15 +17,24 @@ export default function UserRolesPanel({ userId, userName, initialRoles, allRole
     const [expanded, setExpanded] = useState(false);
     const [assignedIds, setAssignedIds] = useState<number[]>(initialRoles.map(r => r.id));
     const [isPending, startTransition] = useTransition();
+    const [error, setError] = useState<string | null>(null);
 
     function toggle(roleId: number) {
-        const next = assignedIds.includes(roleId)
-            ? assignedIds.filter(id => id !== roleId)
-            : [...assignedIds, roleId];
+        const prev = assignedIds;
+        const next = prev.includes(roleId)
+            ? prev.filter(id => id !== roleId)
+            : [...prev, roleId];
 
+        // 先亮起來再送；被後端擋下（改自己的角色、指派超出自己權限的角色…）就退回原狀，
+        // 不然畫面顯示已指派、實際上什麼都沒改
         setAssignedIds(next);
+        setError(null);
         startTransition(async () => {
-            await setUserRoles(userId, next);
+            const res = await setUserRoles(userId, next);
+            if (!res.ok) {
+                setAssignedIds(prev);
+                setError(res.message ?? '角色變更失敗，請稍後再試');
+            }
         });
     }
 
@@ -59,6 +69,7 @@ export default function UserRolesPanel({ userId, userName, initialRoles, allRole
                     })}
                 </div>
             )}
+            {error && <div className="mt-2"><ErrorBanner message={error} /></div>}
         </div>
     );
 }

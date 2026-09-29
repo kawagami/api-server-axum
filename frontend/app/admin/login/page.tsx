@@ -99,7 +99,11 @@ export default function Login() {
         } catch (e) {
             const err = e as Error & { status?: number };
             if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
-                setPasskeyError(err.status === 401 ? 'Passkey 驗證失敗，請再試一次' : '登入失敗，請稍後再試或改用密碼');
+                setPasskeyError(
+                    err.status === 401 ? 'Passkey 驗證失敗，請再試一次'
+                        : err.status === 429 ? '嘗試次數過多，請稍後再試'
+                            : '登入失敗，請稍後再試或改用密碼',
+                );
             }
         } finally {
             setPasskeyPending(false);

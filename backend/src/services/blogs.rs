@@ -2,7 +2,10 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::{blogs as blogs_repo, images as images_repo},
     structs::auth::AuthenticatedUser,
-    structs::blogs::{AdminBlogFilter, AdminBlogListItem, AdminBlogSort, DbBlog, PutBlog, TagCount},
+    structs::blogs::{
+        AdminBlogFilter, AdminBlogListItem, AdminBlogSort, DbBlog, PublicBlogListItem, PutBlog,
+        TagCount,
+    },
     structs::pagination::{PageQuery, Paginated}
 };
 use regex::Regex;
@@ -47,6 +50,52 @@ fn extract_image_urls(markdown: &str) -> Vec<String> {
 static MD_FENCE_RE: OnceLock<Regex> = OnceLock::new();
 static MD_HEADING_RE: OnceLock<Regex> = OnceLock::new();
 static MD_HEADING_TRAILER_RE: OnceLock<Regex> = OnceLock::new();
+static PLAIN_TEXT_RES: OnceLock<[(Regex, &'static str); 7]> = OnceLock::new();
+
+/// 列表卡片摘要的長度上限（**字元數**）
+const EXCERPT_MAX_CHARS: usize = 120;
+
+/// markdown 粗略轉純文字：移除 code block、圖片、連結網址、行首標題/引用/清單符號、
+/// 粗斜體標記、表格分隔線，連續空白壓成一個。不追求完美渲染，只求卡片上可讀。
+///
+/// 原本是前端 `libs/blog-excerpt.ts` 的 `markdownToPlainText`，隨摘要改由後端產生而
+/// 逐條搬過來（順序有意義：code block 要先剝，否則裡面的 `#` / `*` 會被後面幾條誤處理）。
+fn markdown_to_plain_text(markdown: &str) -> String {
+    let rules = PLAIN_TEXT_RES.get_or_init(|| {
+        let re = |p: &str| Regex::new(p).expect("static regex is always valid");
+        [
+            (re(r"```[\s\S]*?```"), " "),
+            (re(r"!\[[^\]]*\]\([^)]*\)"), " "),
+            (re(r"\[([^\]]*)\]\([^)]*\)"), "$1"),
+            (re(r"(?m)^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+"), ""),
+            (re(r"[*_`~]+"), ""),
+            (re(r"(?m)^\s*\|?[\s:|-]+\|?\s*$"), " "),
+            (re(r"\s+"), " "),
+        ]
+    });
+    let mut text = markdown.to_string();
+    for (re, rep) in rules {
+        text = re.replace_all(&text, *rep).into_owned();
+    }
+    text.trim().to_string()
+}
+
+/// 列表卡片摘要：純文字化後跳過與標題重複的開頭（卡片已單獨顯示標題），
+/// 超過 `EXCERPT_MAX_CHARS` 截斷並補「…」。以字元計，中文不會被切在半個字上。
+pub fn make_excerpt(markdown: &str, title: &str) -> String {
+    let mut text = markdown_to_plain_text(markdown);
+    let plain_title = markdown_to_plain_text(title);
+    if !plain_title.is_empty() {
+        if let Some(rest) = text.strip_prefix(plain_title.as_str()) {
+            text = rest.trim().to_string();
+        }
+    }
+    if text.chars().count() <= EXCERPT_MAX_CHARS {
+        return text;
+    }
+    let cut: String = text.chars().take(EXCERPT_MAX_CHARS).collect();
+    format!("{}…", cut.trim_end())
+}
 
 /// 從 markdown 抽出各級標題文字（`tocs` 欄位、`tocs[0]` 即文章標題）。
 ///
@@ -110,7 +159,7 @@ pub async fn get_blogs(
     author: Option<String>,
     q: Option<String>,
     sort: Option<String>,
-) -> Result<Paginated<DbBlog>, AppError> {
+) -> Result<Paginated<PublicBlogListItem>, AppError> {
     let (per_page, offset) = page.to_limit_offset(10);
     let tag_ref = tag.as_deref();
     let author_ref = author.as_deref();
@@ -122,6 +171,18 @@ pub async fn get_blogs(
         blogs_repo::count_blogs(pool, tag_ref, author_ref, q_ref),
         blogs_repo::get_blogs_with_pagination(pool, per_page, offset, tag_ref, author_ref, q_ref, ascending),
     )?;
+    let data = data
+        .into_iter()
+        .map(|b| PublicBlogListItem {
+            excerpt: make_excerpt(&b.markdown, b.tocs.first().map_or("", String::as_str)),
+            id: b.id,
+            tocs: b.tocs,
+            tags: b.tags,
+            created_at: b.created_at,
+            updated_at: b.updated_at,
+            author_name: b.author_name,
+        })
+        .collect();
     Ok(Paginated::new(data, total))
 }
 
@@ -280,7 +341,31 @@ async fn delete_blog_with_images_inner(pool: &Pool<Postgres>, id: Uuid) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_toc_texts, normalize_tags, validate_search, MAX_SEARCH_LEN};
+    use super::{
+        extract_toc_texts, make_excerpt, normalize_tags, validate_search, EXCERPT_MAX_CHARS,
+        MAX_SEARCH_LEN,
+    };
+
+    #[test]
+    fn excerpt_strips_markdown_and_leading_title() {
+        let md = "# 標題\n\n**粗體**與[連結](https://x.y)\n\n![圖](a.png)\n\n```rs\n# 不是標題\n```\n- 清單";
+        assert_eq!(make_excerpt(md, "標題"), "粗體與連結 清單");
+    }
+
+    #[test]
+    fn excerpt_truncates_by_chars_not_bytes() {
+        let md = "字".repeat(EXCERPT_MAX_CHARS + 5);
+        let out = make_excerpt(&md, "");
+        assert_eq!(out.chars().count(), EXCERPT_MAX_CHARS + 1);
+        assert!(out.ends_with('…'));
+        // 剛好上限不加省略號
+        assert_eq!(make_excerpt(&"字".repeat(EXCERPT_MAX_CHARS), ""), "字".repeat(EXCERPT_MAX_CHARS));
+    }
+
+    #[test]
+    fn excerpt_drops_table_separator() {
+        assert_eq!(make_excerpt("| a | b |\n|---|:-:|\n| 1 | 2 |", ""), "| a | b | | 1 | 2 |");
+    }
 
     fn v(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()

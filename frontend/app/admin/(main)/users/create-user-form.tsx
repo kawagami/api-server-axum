@@ -34,12 +34,12 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
     function submit() {
         setError("");
         startTransition(async () => {
-            try {
-                await createUser({ name, email, password, role_ids: roleIds });
+            const res = await createUser({ name, email, password, role_ids: roleIds });
+            if (res.ok) {
                 reset();
                 setOpen(false);
-            } catch (err) {
-                setError((err as Error).message);
+            } else {
+                setError(res.message ?? "建立失敗，請稍後再試");
             }
         });
     }

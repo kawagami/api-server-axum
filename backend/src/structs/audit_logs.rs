@@ -5,9 +5,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, sqlx::FromRow)]
 pub struct AuditLog {
     pub id: i64,
-    /// `admin` / `member` —— 兩種身分的 `user_email` 語意不同，見 `AuditEntry`
+    /// `admin` / `member` —— 兩種身分的 `actor` 語意不同，見 `AuditEntry`
     pub actor_type: String,
-    pub user_email: String,
+    /// admin 是顯示名（`users.name`）；member 是 `member#{id}`。
+    /// 2026-09-29 前叫 `user_email`（欄位名是 email、內容早已不是）
+    pub actor: String,
     pub method: String,
     pub path: String,
     pub query: Option<String>,
@@ -24,7 +26,8 @@ pub struct AuditLog {
 /// —— 兩邊 WHERE 一旦漂移，`total` 就會與實際筆數對不上（範本同 `structs/logs.rs`）。
 #[derive(Deserialize, Default)]
 pub struct AuditLogQuery {
-    pub user_email: Option<String>,
+    /// 完全比對 `actor`（admin 顯示名 / `member#{id}`）
+    pub actor: Option<String>,
     pub method: Option<String>,
     /// 路徑模糊比對
     pub path: Option<String>,

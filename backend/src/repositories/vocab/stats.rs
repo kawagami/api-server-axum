@@ -18,6 +18,8 @@ pub async fn mistakes(
     pool: &Pool<Postgres>,
     member_id: i64,
     q: &MistakeListQuery,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<MistakeEntry>, AppError> {
     let order_by = q.sort.order_by();
     let rows = sqlx::query_as(&format!(
@@ -31,8 +33,8 @@ pub async fn mistakes(
     .bind(q.language.as_str())
     .bind(q.unmastered)
     .bind(q.search())
-    .bind(q.limit())
-    .bind(q.offset())
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
     Ok(rows)

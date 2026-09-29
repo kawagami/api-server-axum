@@ -53,12 +53,14 @@ export default function ThemePicker({
         previewAttr(next, rotation);
         setSaving(true);
         try {
-            await updateSiteTheme(next);
+            const res = await updateSiteTheme(next);
+            if (!res.ok) {
+                setSetting(prev);
+                previewAttr(prev, rotation);
+                setError(res.message ?? "儲存失敗，請稍後再試");
+                return;
+            }
             router.refresh();
-        } catch (err) {
-            setSetting(prev);
-            previewAttr(prev, rotation);
-            setError((err as Error).message);
         } finally {
             setSaving(false);
         }
@@ -73,12 +75,14 @@ export default function ThemePicker({
         if (setting === AUTO_THEME) previewAttr(AUTO_THEME, next);
         setSaving(true);
         try {
-            await updateThemeRotation(next);
+            const res = await updateThemeRotation(next);
+            if (!res.ok) {
+                setRotation(prev);
+                if (setting === AUTO_THEME) previewAttr(AUTO_THEME, prev);
+                setError(res.message ?? "儲存失敗，請稍後再試");
+                return;
+            }
             router.refresh();
-        } catch (err) {
-            setRotation(prev);
-            if (setting === AUTO_THEME) previewAttr(AUTO_THEME, prev);
-            setError((err as Error).message);
         } finally {
             setSaving(false);
         }

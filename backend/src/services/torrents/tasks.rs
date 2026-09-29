@@ -2,11 +2,15 @@ use crate::{
     errors::{AppError, RequestError},
     repositories::torrents as torrents_repo,
     state::AppState,
-    structs::{auth::AuthenticatedUser, pagination::Paginated, torrents::Torrent},
+    structs::{
+        auth::AuthenticatedUser,
+        pagination::Paginated,
+        torrents::{Torrent, TorrentDetail},
+    },
 };
 use librqbit::Magnet;
 use super::lifecycle::sync_active;
-use super::manager::{DEFAULT_MAX_TOTAL_SIZE_GB, setting};
+use super::manager::{DEFAULT_MAX_TOTAL_SIZE_GB, live_progress, setting};
 use super::session::{purge_by_info_hash, session_delete};
 
 /// 解析 magnet URI，回傳小寫 hex info_hash
@@ -104,33 +108,15 @@ async fn delete_by_id(state: &AppState, id: i32) -> Result<(), AppError> {
 }
 
 /// 任務詳情：DB row + 進行中任務附上即時進度
-pub async fn detail(state: &AppState, actor: &AuthenticatedUser, id: i32) -> Result<serde_json::Value, AppError> {
+pub async fn detail(state: &AppState, actor: &AuthenticatedUser, id: i32) -> Result<TorrentDetail, AppError> {
     ensure_owner(state, actor, id).await?;
     let torrent = torrents_repo::get_by_id(state.get_pool(), id).await?;
-    let mut value = serde_json::to_value(&torrent)?;
-
-    if let Some(handle) = state.get_torrents().get_handle(id).await {
-        let stats = handle.stats();
-        let percent = if stats.total_bytes > 0 {
-            (stats.progress_bytes as f64 / stats.total_bytes as f64 * 10000.0).round() / 100.0
-        } else {
-            0.0
-        };
-        let (down_speed, peers) = stats
-            .live
-            .as_ref()
-            .map(|l| (l.download_speed.to_string(), l.snapshot.peer_stats.live))
-            .unwrap_or_default();
-        value["live"] = serde_json::json!({
-            "progress": percent,
-            "progress_bytes": stats.progress_bytes,
-            "total_bytes": stats.total_bytes,
-            "down_speed": down_speed,
-            "peers": peers,
-        });
-    }
-
-    Ok(value)
+    let live = state
+        .get_torrents()
+        .get_handle(id)
+        .await
+        .map(|handle| live_progress(&handle.stats()));
+    Ok(TorrentDetail { torrent, live })
 }
 
 /// 排程：清除逾期任務（completed 超過保留天數 / failed 同），刪 DB + 磁碟

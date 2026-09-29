@@ -42,13 +42,16 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
         setSaving(prev => ({ ...prev, [key]: true }));
         setErrors(prev => ({ ...prev, [key]: "" }));
         try {
-            const updated = await updateSetting(key, draft);
+            const res = await updateSetting(key, draft);
+            if (!res.ok) {
+                setErrors(prev => ({ ...prev, [key]: res.message ?? "儲存失敗，請稍後再試" }));
+                return;
+            }
+            const updated = res.data;
             setValues(prev => ({ ...prev, [key]: updated.value }));
             setDrafts(prev => ({ ...prev, [key]: updated.value }));
             setSaved(prev => ({ ...prev, [key]: true }));
             setTimeout(() => setSaved(prev => ({ ...prev, [key]: false })), 2000);
-        } catch (err) {
-            setErrors(prev => ({ ...prev, [key]: (err as Error).message }));
         } finally {
             setSaving(prev => ({ ...prev, [key]: false }));
         }

@@ -268,9 +268,9 @@ pub struct MistakeEntry {
     pub last_seen_at: DateTime<Utc>,
 }
 
-/// 錯題本一頁上限;錯題本會隨學習無界成長,端點必須有上限
-pub const MISTAKES_MAX_LIMIT: i64 = 100;
-pub const MISTAKES_DEFAULT_LIMIT: i64 = 50;
+/// 錯題本預設一頁筆數。上限走全站共用的 `pagination::MAX_PER_PAGE`
+/// (錯題本隨學習無界成長,端點必須分頁)
+pub const MISTAKES_DEFAULT_PER_PAGE: i64 = 50;
 
 /// 錯題本排序
 #[derive(Deserialize, Clone, Copy, PartialEq, Default, Debug)]
@@ -301,7 +301,9 @@ impl MistakeSort {
     }
 }
 
-/// GET /member/vocab/mistakes 的 query
+/// GET /member/vocab/mistakes 的篩選條件。分頁走共用 `PageQuery`(handler 併列兩個
+/// extractor,理由見 `structs/pagination.rs`)—— 2026-09-29 前自帶 `limit`/`offset`,
+/// 是全站唯一不吃 `page`/`per_page` 的分頁端點。
 #[derive(Deserialize, Default)]
 pub struct MistakeListQuery {
     #[serde(default)]
@@ -313,8 +315,6 @@ pub struct MistakeListQuery {
     /// 只看未掌握(答錯 > 答對)
     #[serde(default)]
     pub unmastered: bool,
-    pub limit: Option<i64>,
-    pub offset: Option<i64>,
 }
 
 impl MistakeListQuery {
@@ -322,23 +322,16 @@ impl MistakeListQuery {
     pub fn search(&self) -> Option<&str> {
         self.q.as_deref().map(str::trim).filter(|s| !s.is_empty())
     }
-    pub fn limit(&self) -> i64 {
-        self.limit
-            .unwrap_or(MISTAKES_DEFAULT_LIMIT)
-            .clamp(1, MISTAKES_MAX_LIMIT)
-    }
-    pub fn offset(&self) -> i64 {
-        self.offset.unwrap_or(0).max(0)
-    }
 }
 
 /// GET /member/vocab/mistakes 回傳
 ///
+/// `{ data, total }` 與全站 `Paginated<T>` 同形,另多一個 `reviewable`(所以不能直接用 `Paginated`)。
 /// `total` 跟著搜尋/篩選條件走(分頁用),`reviewable` 一律是全部未掌握字數
 /// —— 複習按鈕的數字不能被錯題本的搜尋條件影響。
 #[derive(Serialize)]
 pub struct MistakesResponse {
-    pub items: Vec<MistakeEntry>,
+    pub data: Vec<MistakeEntry>,
     pub total: i64,
     pub reviewable: i64,
 }

@@ -17,7 +17,7 @@ export async function uploadImage(formData: FormData): Promise<Image> {
     });
 }
 
-export async function deleteImage(id: string): Promise<void> {
+export async function deleteImage(id: number): Promise<void> {
     await adminRequest({
         url: `${process.env.API_URL}/admin/images/${id}`,
         method: 'DELETE',

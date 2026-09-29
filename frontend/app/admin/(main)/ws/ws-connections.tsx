@@ -132,7 +132,7 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
                 ...prev.filter((r) => r.addr !== d.addr),
                 {
                     addr: d.addr,
-                    user_email: d.user_email ?? null,
+                    user_name: d.user_name ?? null,
                     real_ip: d.real_ip ?? "",
                     connected_at: d.connected_at ?? new Date().toISOString(),
                     user_agent: d.user_agent ?? "",
@@ -159,8 +159,8 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
         };
     }, [subscribe, unsubscribe, onReconnect, refresh]);
 
-    const loggedInCount = rows.filter((r) => r.user_email).length;
-    const visible = onlyLoggedIn ? rows.filter((r) => r.user_email) : rows;
+    const loggedInCount = rows.filter((r) => r.user_name).length;
+    const visible = onlyLoggedIn ? rows.filter((r) => r.user_name) : rows;
     const selectedOnline = selectedAddr !== null && rows.some((r) => r.addr === selectedAddr);
 
     const selectTarget = (addr: string) => {
@@ -255,7 +255,7 @@ export default function WsConnections({ initial }: { initial: WsConnection[] }) 
                                             {/* wrap-break-word 而非 break-all：break-all 會讓這欄的
                                                 min-content 掉到 1 字寬，鄰欄一擠就把 email 拆成一行一字 */}
                                             <AdminTd className="text-sm wrap-break-word">
-                                                {conn.user_email ?? <span className="text-neutral-400">匿名訪客</span>}
+                                                {conn.user_name ?? <span className="text-neutral-400">匿名訪客</span>}
                                             </AdminTd>
                                             <AdminTd className="hidden sm:table-cell text-sm">
                                                 <span title={conn.user_agent || undefined}>

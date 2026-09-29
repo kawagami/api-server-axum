@@ -62,11 +62,13 @@ export default function WebauthnSettings({ initialRpId, initialRpOrigin }: Props
             const values: Record<string, string> = {};
             if (origin !== saved.rpOrigin) values.webauthn_rp_origin = origin;
             if (id !== saved.rpId) values.webauthn_rp_id = id;
-            await updateSettings(values);
+            const res = await updateSettings(values);
+            if (!res.ok) {
+                setError(res.message ?? "儲存失敗，請稍後再試");
+                return;
+            }
             setSaved({ rpId: id, rpOrigin: origin });
             setSuccess(true);
-        } catch (err) {
-            setError((err as Error).message);
         } finally {
             setSaving(false);
         }

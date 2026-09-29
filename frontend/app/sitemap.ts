@@ -6,6 +6,11 @@ import { getChangelogRepo } from "@/api/github";
 import { resolveEnabledFeatures, isFeatureEnabled } from "@/libs/enabled-features";
 import { TOOLS, GAMES } from "@/libs/site-nav";
 
+/** = 後端 MAX_PER_PAGE */
+const SITEMAP_BLOG_PAGE_SIZE = 200;
+/** 翻頁保險絲：total 異常時不至於無限打後端（200 × 50 = 10,000 篇） */
+const SITEMAP_MAX_BLOG_PAGES = 50;
+
 const BASE = "https://kawa.homes";
 
 // 需登入的會員頁（portfolio / dashboard / profile）不進 sitemap
@@ -55,12 +60,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 文章清單：API 掛掉時只是少了動態項目，不該讓整份 sitemap（與 build）失敗
     if (isFeatureEnabled(enabled, "blog")) {
         try {
-            const { data: blogs } = await getBlogs({ page: 1, per_page: 500 });
-            entries.push(
-                ...blogs.flatMap((blog) =>
-                    entry(`/blogs/${blog.id}`, 0.8, blog.updated_at ?? blog.created_at ?? undefined),
-                ),
-            );
+            // 後端 per_page 上限 200（structs/pagination.rs 的 MAX_PER_PAGE），要多少就得翻頁 ——
+            // 以前一次要 500，被夾成 200 後第 201 篇起就靜默從 sitemap 消失。
+            // 中途失敗時已抓到的頁照樣收進去
+            for (let page = 1, seen = 0; page <= SITEMAP_MAX_BLOG_PAGES; page++) {
+                const { data: blogs, total } = await getBlogs({ page, per_page: SITEMAP_BLOG_PAGE_SIZE });
+                entries.push(
+                    ...blogs.flatMap((blog) =>
+                        entry(`/blogs/${blog.id}`, 0.8, blog.updated_at ?? blog.created_at ?? undefined),
+                    ),
+                );
+                seen += blogs.length;
+                if (blogs.length < SITEMAP_BLOG_PAGE_SIZE || seen >= total) break;
+            }
         } catch {
             // 靜默略過：靜態路徑仍會產出
         }

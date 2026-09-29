@@ -45,7 +45,7 @@ export async function getLogTrace(requestId: string): Promise<Log[]> {
 }
 
 export interface GetAuditLogsParams {
-    user_email?: string;
+    actor?: string;
     method?: HttpMethod | '';
     path?: string;
     from?: string;
@@ -58,7 +58,7 @@ export interface GetAuditLogsParams {
 
 /** `GET /admin/audit_logs` 回 `{ data, total }`（與 `/logs` 同形） */
 export async function getAuditLogs({
-    user_email,
+    actor,
     method,
     path,
     from,
@@ -68,7 +68,7 @@ export async function getAuditLogs({
     per_page = 100,
 }: GetAuditLogsParams = {}): Promise<PaginatedResponse<AuditLog>> {
     const params = new URLSearchParams();
-    if (user_email) params.set('user_email', user_email);
+    if (actor) params.set('actor', actor);
     if (method) params.set('method', method);
     if (path) params.set('path', path);
     if (actor_type) params.set('actor_type', actor_type);

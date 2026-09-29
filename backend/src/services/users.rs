@@ -17,7 +17,7 @@ pub async fn create_user(
     settings: &Settings,
     actor: &AuthenticatedUser,
     mut user: NewUser,
-) -> Result<(), AppError> {
+) -> Result<User, AppError> {
     let role_ids = if user.role_ids.is_empty() {
         default_role_ids(pool, settings).await?
     } else {

@@ -9,32 +9,25 @@ export const metadata: Metadata = {
     description: "執行中的庫藏股與價差",
 };
 
-interface BuybackPriceGapItem {
-    stock_no: string;
-    stock_name: string;
-    start_date: string;
-    end_date: string;
-    price_on_start_date: number;
-    latest_price: number;
-    diff: string;
-    diff_percent: string;
+// 台股慣例：紅漲綠跌（語意色，不走 primary/neutral token）。null（開始日沒有收盤價）不上色
+function changeClass(value: number | null) {
+    if (value == null) return '';
+    return value >= 0
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-green-600 dark:text-green-400';
 }
 
-// 台股慣例：紅漲綠跌（語意色，不走 primary/neutral token）
-function changeClass(value: string) {
-    return parseFloat(value) >= 0
-        ? 'text-green-600 dark:text-green-400'
-        : 'text-red-600 dark:text-red-400';
+function show(value: number | null, suffix = '') {
+    return value == null ? '—' : `${value}${suffix}`;
 }
 
 export default async function Page() {
-    const info = await getUnfinishedBuybackPriceGap() as BuybackPriceGapItem[];
+    const info = await getUnfinishedBuybackPriceGap();
 
-    const totalDiffPercent = info.reduce((sum, item) => {
-        const percent = parseFloat(item.diff_percent);
-        return sum + (isNaN(percent) ? 0 : percent);
-    }, 0);
-    const avgDiffPercent = info.length > 0 ? totalDiffPercent / info.length : 0;
+    // 沒有價差的列（開始日沒有收盤價）不算進總和與平均的分母
+    const percents = info.flatMap(item => (item.diff_percent == null ? [] : [item.diff_percent]));
+    const totalDiffPercent = percents.reduce((sum, p) => sum + p, 0);
+    const avgDiffPercent = percents.length > 0 ? totalDiffPercent / percents.length : 0;
 
     return (
         <div className="w-full flex min-h-0 flex-1 flex-col gap-4">
@@ -66,10 +59,10 @@ export default async function Page() {
                                     <AdminTd>{item.stock_name}</AdminTd>
                                     <AdminTd>{item.start_date}</AdminTd>
                                     <AdminTd>{item.end_date}</AdminTd>
-                                    <AdminTd className="text-right">{item.price_on_start_date}</AdminTd>
-                                    <AdminTd className="text-right">{item.latest_price}</AdminTd>
-                                    <AdminTd className={`text-right ${changeClass(item.diff)}`}>{item.diff}</AdminTd>
-                                    <AdminTd className={`text-right ${changeClass(item.diff_percent)}`}>{item.diff_percent}%</AdminTd>
+                                    <AdminTd className="text-right">{show(item.price_on_start_date)}</AdminTd>
+                                    <AdminTd className="text-right">{show(item.latest_price)}</AdminTd>
+                                    <AdminTd className={`text-right ${changeClass(item.diff)}`}>{show(item.diff)}</AdminTd>
+                                    <AdminTd className={`text-right ${changeClass(item.diff_percent)}`}>{show(item.diff_percent, '%')}</AdminTd>
                                 </AdminRow>
                             ))
                         )}

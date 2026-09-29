@@ -9,6 +9,6 @@ export async function getUsers(): Promise<User[]> {
     });
 }
 
-export async function getUserRoles(userId: string): Promise<Role[]> {
+export async function getUserRoles(userId: number): Promise<Role[]> {
     return adminRequest<Role[]>({ url: `${process.env.API_URL}/admin/users/${userId}/roles` });
 }

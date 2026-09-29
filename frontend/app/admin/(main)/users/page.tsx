@@ -68,7 +68,7 @@ export default async function Users() {
                                     <AdminTd>
                                         <DeleteUserButton
                                             user={{ id: user.id, name: user.name }}
-                                            isSelf={String(user.id) === String(me.id)}
+                                            isSelf={user.id === me.id}
                                         />
                                     </AdminTd>
                                 </AdminRow>

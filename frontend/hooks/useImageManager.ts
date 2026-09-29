@@ -6,9 +6,9 @@ import { compressAndUploadEach } from '@/libs/client-image';
 import { DEFAULT_IMAGE_COMPRESS, type ImageCompressConfig } from '@/libs/image-config';
 
 export interface ManagedImage {
-    name: string;
+    id: number;
     url: string;
-    status?: string;
+    status: string;
 }
 
 export const useImageManager = (
@@ -16,7 +16,7 @@ export const useImageManager = (
     compressConfig: ImageCompressConfig = DEFAULT_IMAGE_COMPRESS,
 ) => {
     const [images, setImages] = useState<ManagedImage[]>(initialImages);
-    const [deletingImage, setDeletingImage] = useState<string | null>(null);
+    const [deletingImage, setDeletingImage] = useState<number | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
@@ -69,7 +69,7 @@ export const useImageManager = (
                 },
                 setUploadProgress,
                 (image, i) => {
-                    setImages((prev) => [...prev, { name: image.id, url: image.url, status: image.status }]);
+                    setImages((prev) => [...prev, { id: image.id, url: image.url, status: image.status }]);
                     // 已成功的移出選取，中途失敗時重按上傳只會送剩下的
                     const original = selectedFiles[i];
                     setSelectedFiles((prev) => prev.filter(f => f !== original));
@@ -86,11 +86,11 @@ export const useImageManager = (
         }
     };
 
-    const handleDelete = async (fileName: string) => {
-        setDeletingImage(fileName);
+    const handleDelete = async (id: number) => {
+        setDeletingImage(id);
         try {
-            await deleteImage(fileName);
-            setImages((prev) => prev.filter((img) => img.name !== fileName));
+            await deleteImage(id);
+            setImages((prev) => prev.filter((img) => img.id !== id));
         } catch (err) {
             console.error('Delete error:', err);
         } finally {
