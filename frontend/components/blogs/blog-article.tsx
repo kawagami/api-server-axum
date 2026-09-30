@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
@@ -6,9 +5,15 @@ import rehypeHighlight from 'rehype-highlight';
 import { getTranslations } from 'next-intl/server';
 import { extractHeadings } from '@/libs/blog-markdown';
 import PageShell from '@/components/page-shell';
+import MarkdownImage from '@/components/blogs/markdown-image';
+import type { ImagePlaceholder } from '@/types';
 import 'highlight.js/styles/github-dark.css';   // 深色高亮主題，配 prose 的深色 pre 底（亮/暗模式皆一致）
 
-export default async function BlogArticle({ markdown, comments }: { markdown: string; comments?: React.ReactNode }) {
+export default async function BlogArticle({ markdown, images, comments }: {
+    markdown: string;
+    images?: Record<string, ImagePlaceholder>;
+    comments?: React.ReactNode;
+}) {
     const headings = extractHeadings(markdown);
     const t = await getTranslations('BlogArticle');
 
@@ -21,15 +26,7 @@ export default async function BlogArticle({ markdown, comments }: { markdown: st
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeSlug, rehypeHighlight]}
                         components={{
-                            img: ({ src, alt }) => (
-                                <Image
-                                    src={typeof src === 'string' ? src : ''}
-                                    alt={alt || ''}
-                                    width={800}
-                                    height={600}
-                                    style={{ width: 'auto', height: 'auto', maxWidth: '100%' }}
-                                />
-                            )
+                            img: ({ src, alt }) => <MarkdownImage src={src} alt={alt} images={images} />
                         }}
                     >
                         {markdown}

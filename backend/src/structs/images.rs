@@ -1,10 +1,23 @@
 use serde::Serialize;
+use sqlx::FromRow;
 
 /// `images` 表的一列，同時是 `GET /admin/images` 的回應型別。
-#[derive(Serialize)]
+/// `width` / `height` / `blur_data_url` 為模糊預覽用，舊圖回填前或 decode 失敗時為 None。
+#[derive(Serialize, FromRow)]
 pub struct ImageRecord {
     pub id: i32,
     pub storage_key: String,
     pub url: String,
     pub status: String,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+    pub blur_data_url: Option<String>,
+}
+
+/// 單張圖的版位與模糊預覽，隨 `GET /blogs/{id}` 以 `images: { url → 此結構 }` 下發。
+#[derive(Debug, Serialize)]
+pub struct ImagePlaceholder {
+    pub width: i32,
+    pub height: i32,
+    pub blur_data_url: Option<String>,
 }

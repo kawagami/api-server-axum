@@ -93,6 +93,7 @@ export default async function BlogPage({ params }: { params: Params }) {
             />
             <BlogArticle
                 markdown={blog.markdown}
+                images={blog.images}
                 comments={<CommentSection blogId={id} isMember={isMember} />}
             />
         </>

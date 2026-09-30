@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,6 +14,7 @@ import { compressAndUploadEach } from '@/libs/client-image';
 import { useMarkdownTextarea } from '@/hooks/useMarkdownTextarea';
 import { useBlogDraft } from './useBlogDraft';
 import TagEditorModal from './tag-editor-modal';
+import MarkdownImage from './markdown-image';
 import type { Blog } from '@/types';
 import type { ImageCompressConfig } from '@/libs/image-config';
 
@@ -185,15 +185,7 @@ export default function BlogComponent({ id, blog, allTags, compressConfig }: Pro
                             rehypePlugins={[rehypeHighlight]}
                             urlTransform={(url) => url.startsWith('blob:') || url.startsWith('https://') || url.startsWith('http://') || url.startsWith('/') ? url : ''}
                             components={{
-                                img: ({ src, alt }) => (
-                                    <Image
-                                        src={typeof src === 'string' ? src : ''}
-                                        alt={alt || ''}
-                                        width={800}
-                                        height={600}
-                                        style={{ width: 'auto', height: 'auto', maxWidth: '100%' }}
-                                    />
-                                )
+                                img: ({ src, alt }) => <MarkdownImage src={src} alt={alt} images={blog.images} />
                             }}
                         >
                             {markdown}

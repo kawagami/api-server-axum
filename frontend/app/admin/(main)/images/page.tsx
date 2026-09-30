@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default async function Images() {
     await requirePermission("image:read");
     const [images, publicSettings] = await Promise.all([getImages(), getPublicSettings()]);
-    const managedImages = images.map(img => ({ id: img.id, url: img.url, status: img.status }));
+    const managedImages = images.map(img => ({ id: img.id, url: img.url, status: img.status, blur_data_url: img.blur_data_url }));
 
     return (
         <div className="w-full">

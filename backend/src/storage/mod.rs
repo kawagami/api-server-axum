@@ -30,4 +30,11 @@ impl Storage {
             Storage::Local(s) => s.delete(key).await,
         }
     }
+
+    /// 讀回已落地的檔案 bytes（目前只有舊圖回填模糊預覽用）。
+    pub async fn read(&self, key: &str) -> Result<Vec<u8>, LocalStorageError> {
+        match self {
+            Storage::Local(s) => s.read(key).await,
+        }
+    }
 }

@@ -4,6 +4,10 @@ export interface Image {
   storage_key: string;
   url: string;
   status: string;
+  /** 以下三個為模糊預覽用；舊圖回填前或 decode 失敗時為 null */
+  width: number | null;
+  height: number | null;
+  blur_data_url: string | null;
 }
 
 // Setting

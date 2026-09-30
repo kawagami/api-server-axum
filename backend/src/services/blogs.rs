@@ -3,9 +3,10 @@ use crate::{
     repositories::{blogs as blogs_repo, images as images_repo},
     structs::auth::AuthenticatedUser,
     structs::blogs::{
-        AdminBlogFilter, AdminBlogListItem, AdminBlogSort, DbBlog, PublicBlogListItem, PutBlog,
-        TagCount,
+        AdminBlogFilter, AdminBlogListItem, AdminBlogSort, BlogDetail, PublicBlogListItem,
+        PutBlog, TagCount,
     },
+    structs::images::ImagePlaceholder,
     structs::pagination::{PageQuery, Paginated}
 };
 use regex::Regex;
@@ -186,8 +187,20 @@ pub async fn get_blogs(
     Ok(Paginated::new(data, total))
 }
 
-pub async fn get_blog(pool: &Pool<Postgres>, id: Uuid) -> Result<DbBlog, AppError> {
-    blogs_repo::get_blog_by_id(pool, id).await
+/// 單篇公開內文，附上內文站內圖片的寬高 + 模糊預覽（前端 next/image 的 placeholder="blur"）。
+pub async fn get_blog(pool: &Pool<Postgres>, id: Uuid) -> Result<BlogDetail, AppError> {
+    let blog = blogs_repo::get_blog_by_id(pool, id).await?;
+    let urls = extract_image_urls(&blog.markdown);
+    let images = if urls.is_empty() {
+        Default::default()
+    } else {
+        images_repo::get_placeholders_by_urls(pool, &urls)
+            .await?
+            .into_iter()
+            .map(|(url, width, height, blur_data_url)| (url, ImagePlaceholder { width, height, blur_data_url }))
+            .collect()
+    };
+    Ok(BlogDetail { blog, images })
 }
 
 /// 後台管理列表（依擁有者過濾；super_admin 傳 None 看全部）。公開列表仍走 get_blogs。

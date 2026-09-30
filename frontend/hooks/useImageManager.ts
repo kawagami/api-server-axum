@@ -9,6 +9,7 @@ export interface ManagedImage {
     id: number;
     url: string;
     status: string;
+    blur_data_url: string | null;
 }
 
 export const useImageManager = (
@@ -69,7 +70,7 @@ export const useImageManager = (
                 },
                 setUploadProgress,
                 (image, i) => {
-                    setImages((prev) => [...prev, { id: image.id, url: image.url, status: image.status }]);
+                    setImages((prev) => [...prev, { id: image.id, url: image.url, status: image.status, blur_data_url: image.blur_data_url }]);
                     // 已成功的移出選取，中途失敗時重按上傳只會送剩下的
                     const original = selectedFiles[i];
                     setSelectedFiles((prev) => prev.filter(f => f !== original));

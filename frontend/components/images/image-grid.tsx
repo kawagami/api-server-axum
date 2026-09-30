@@ -42,7 +42,12 @@ const ImageGrid = ({ images, copiedImage, onRequestDelete, onCopy, emptyHint }: 
                                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                                 src={image.url}
                                 alt={`image ${image.id}`}
-                                className="object-cover transition-transform duration-300 group-hover:scale-105"
+                                placeholder={image.blur_data_url ? 'blur' : 'empty'}
+                                blurDataURL={image.blur_data_url ?? undefined}
+                                // objectFit 走 style 而非 class：next/image 的模糊底圖依 style.objectFit 決定
+                                // 裁切方式，只寫 class 的話底圖會被拉伸成正方形
+                                style={{ objectFit: 'cover' }}
+                                className="transition-transform duration-300 group-hover:scale-105"
                             />
                             {status && (
                                 <span className={`absolute top-2 left-2 text-xs font-semibold px-2 py-0.5 rounded-full ${status.className}`}>

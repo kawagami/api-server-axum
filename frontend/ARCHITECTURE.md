@@ -270,13 +270,13 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 
 現行系統（本地儲存）：
 - `POST /admin/images` — 單檔上傳，multipart 單一 `file` 欄位，回傳 `201` + `{ id, url }`，需 Bearer token
-- `GET /admin/images` — 列表，需認證，回傳 `[{ id, storage_key, url, status }]`（`status`: `active` / `unused`，後端用 cron job 清除 `unused` 圖片）
+- `GET /admin/images` — 列表，需認證，回傳 `[{ id, storage_key, url, status, width, height, blur_data_url }]`（`status`: `active` / `unused`，後端用 cron job 清除 `unused` 圖片；後三者為模糊預覽，舊圖回填前或 decode 失敗時為 `null`）
 - `DELETE /admin/images/:id` — 刪除，需認證，回傳 204 No Content
 - 圖片公開網域一律為 `media.kawa.homes`（nginx 直出磁碟）；URL base 由後端 `app_settings.upload_base_url` 決定（現值 `https://media.kawa.homes`，程式 fallback 同）。**存量舊圖已於 2026-07-28 全數回填成 media 網域**（後端 migration `20260728000000_media_domain_backfill`），DB 內不再有 `axum.kawa.homes/uploads/...`
 
 前端對應：`api/images.ts`（單一整合檔，named exports `getImages` / `uploadImage` / `deleteImage` —— 上傳是**單數**，一張一請求，多張由 `libs/client-image.ts` 的 `compressAndUploadEach` 逐張呼叫）
 
-**圖片顯示**：一律用 `next/image`（`import Image from 'next/image'`），不用原生 `<img>`。自動 WebP 轉換、lazy loading、縮圖。`remotePatterns` 只有 `media.kawa.homes/**`（舊網域 entry 已隨 2026-07-28 回填移除；`next/image` 只驗初始 URL 的 hostname，殘留舊 URL 會被擋成 400 而不是跟隨 301，所以 DB 必須先乾淨）。ReactMarkdown 內覆寫 `img` renderer 套用 `next/image`。例外：`blob:` 預覽與外部 OAuth avatar URL 用原生 `<img>` + eslint-disable（無法經 next/image 最佳化）。
+**圖片顯示**：一律用 `next/image`（`import Image from 'next/image'`），不用原生 `<img>`。自動 WebP 轉換、lazy loading、縮圖。`remotePatterns` 只有 `media.kawa.homes/**`（舊網域 entry 已隨 2026-07-28 回填移除；`next/image` 只驗初始 URL 的 hostname，殘留舊 URL 會被擋成 400 而不是跟隨 301，所以 DB 必須先乾淨）。ReactMarkdown 內覆寫 `img` renderer，一律走 `components/blogs/markdown-image.tsx`（前台文章與後台編輯預覽共用）：`GET /blogs/{id}` 回的 `images`（URL → 寬高 + `blur_data_url`）有該圖時，用真實寬高預留版位 + `placeholder="blur"`，並**必帶 `sizes`**（否則 next/image 依原圖 `width` 出 1x/2x srcset，寬 4000 的圖 1x 就抓 3840w）；外部圖 / 無資料時退回 800×600 + auto。圖庫 `image-grid.tsx` 同樣吃 `blur_data_url`，`objectFit` 要寫在 style（next/image 的模糊底圖看 `style.objectFit` 決定裁切，只寫 class 會被拉伸）。例外：`blob:` 預覽與外部 OAuth avatar URL 用原生 `<img>` + eslint-disable（無法經 next/image 最佳化）。
 
 **圖片上傳行為**：貼上（單張）或點按鈕選擇（支援多張）後立即上傳（immediate），一張一請求（`libs/client-image.ts` 的 `compressAndUploadEach`：上傳第 i 張時同步壓縮第 i+1 張）。後端負責管理圖片生命週期（status 欄位 + cron job），前端不追蹤 blob URL。
 

@@ -9,6 +9,16 @@ export interface Blog {
   created_at?: string;
   updated_at?: string;
   author_name?: string | null;
+  /** 內文站內圖片的版位與模糊預覽（後端 BlogDetail.images，key = markdown 裡的圖片 URL）。
+   *  外部圖、回填前的舊圖不在其中；只有 `GET /blogs/{id}` 會帶 */
+  images?: Record<string, ImagePlaceholder>;
+}
+
+/** 後端 ImagePlaceholder：原圖寬高 + 極小 WebP 的 data URL（給 next/image placeholder="blur"） */
+export interface ImagePlaceholder {
+  width: number;
+  height: number;
+  blur_data_url: string | null;
 }
 
 // 公開列表的一列（`GET /blogs`，後端 PublicBlogListItem）。**沒有 markdown**，

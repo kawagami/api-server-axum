@@ -74,7 +74,7 @@ src/
 │   ├── jobs.rs        # AppJob enum — 所有排程 job 的 variant、cron expression、run() dispatch
 │   ├── pagination.rs  # PageQuery（page/per_page，上限 200）、Paginated<T>、StatusFilter（?status=，跨資源共用）
 │   ├── stats.rs       # DailyVisitorStat / VisitorsQuery / VisitorsStats
-│   ├── images.rs      # ImageRecord
+│   ├── images.rs      # ImageRecord、ImagePlaceholder（模糊預覽）
 │   ├── system_metrics.rs # SystemMetric
 │   └── ws.rs          # WsEvent enum
 └── utils/             # 共用工具（reqwest 包裝、date — 民國日期解析、net — client_ip、redact — query 進 log 前遮罩憑證、text — normalize_optional）
@@ -568,6 +568,11 @@ pub async fn run(state: AppState) {
 - CPU 密集,caller 一律包 `spawn_blocking`（1 核機上同步跑會佔住 async worker,慣例同 auth.rs 的 bcrypt）。目前的 `spawn_blocking` 點:`services/auth.rs` 的 bcrypt 三處、`services/images.rs::process_image`、`services/tools.rs::convert_text` 的 zhconv（2026-07-31 補，2026-08-31 由 route 搬進 service）。**公開端點另外要限輸入長度**——全域 body 上限是 10MB,對單筆計算來說過寬;`convert_text` 限 256KB（實測 zhconv 0.4.1 的 CPU 成本不高:10MB≈28ms、1MB≈2.5ms,所以那個上限主要是擋 1 核 1G 機器上的記憶體,不是 CPU）。**還沒包的**:`services/stocks.rs::parse_buyback_stock_raw_html` 的 regex 走訪（只在排程時發生、非使用者可觸發,故暫留;2026-08-19 前是 `scraper` 的 `Html::parse_document`）
 - multipart 只處理有 `file_name` 的欄位,文字欄位跳過
 
+**模糊預覽（blur-up，2026-09-30）**：`images` 表有 `width` / `height` / `blur_data_url`（migration `20260930000000_images_placeholder`，皆可 NULL）:
+- `process_image` 在 decode 後順手產生（`make_placeholder`）：原圖寬高 + 長邊 16px 的 WebP（q50）轉 `data:image/webp;base64,...`，實測 2000×1333 的照片 ≈ 160 bytes。GIF 取第一幀。小圖編碼失敗不擋上傳（`blur_data_url` = NULL）
+- `GET /blogs/{id}` 回 `BlogDetail` = `DbBlog` 攤平 + `images: { markdown 圖片 URL → { width, height, blur_data_url } }`（`extract_image_urls` 抓 URL，`url = ANY` 比對，只收 `width IS NOT NULL` 的列；外部圖不在其中）。前端 `components/blogs/markdown-image.tsx` 據此給 next/image 真實寬高 + `placeholder="blur"`
+- **舊圖回填**：`services/images.rs::backfill_placeholders` 由 `routes.rs` 在啟動時 spawn 跑一次，依 id 分批、一次 decode 一張（`Storage::read` 讀回原檔）。讀檔 / decode 失敗的列維持 NULL、最後彙總**一筆 WARN**，下次啟動再試 —— 所以每次部署都出現同一筆 WARN = DB 有列但磁碟檔案不見或損毀，要人看一眼。2026-09-30 本機實測：正常圖補齊、缺檔列留 NULL + WARN
+
 ## 環境變數
 
 完整表格見 `README.md`「環境變數」一節（進版控，是唯一可信來源；改 env 要同步改那份）。必填只有 `DATABASE_URL` / `REDIS_URL` / `JWT_SECRET`。
@@ -842,7 +847,7 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 - `services/stocks.rs` 手刻民國年解析，而**同檔已經 import 了 `utils::date::parse_roc_date`** 並在別處用過。反方向（西元→民國）在 `jobs/fetch_buyback_periods.rs` 一份 —— `utils/date` 只有 parse 沒有 format，該補 `to_roc_compact()`（`1911` 這個常數目前散在 3 個檔案：`services/stocks.rs`、`jobs/fetch_buyback_periods.rs`、`utils/date.rs`）。
 - ~~「今天」有三套定義~~（2026-08-06 收斂進 `utils/date.rs` 的 `taipei_offset` / `taipei_now` / `taipei_today`，附 2 測）。**新程式碼一律用這三個，不要用 `Local::now()`**（2026-09-24 起 `clippy.toml` 的 `disallowed-methods` 禁用，CI 紅燈）：`Local` 的結果取決於行程的 `TZ`。生產 image **現在**有設（`Dockerfile` 的 `ENV TZ=Asia/Taipei`，2026-07 併 monorepo 時加的），但那是部署層的規則，拿掉或換掉沒有 tzdata 的基底就悄悄退回 UTC，台北 00:00–08:00 那八小時的「今天」全變昨天，且無任何徵兆。導入這幾支時 image 確實沒設 `TZ`，`services/portfolio.rs` ×3、`services/stocks.rs`、`jobs/fetch_buyback_periods.rs` 都中過。`repositories/visitors.rs::taipei_today` 已移除，改由 utils 提供。
 - `services/gov_tenders.rs` 仍繞過 `utils/reqwest` 的 `get_raw_html_string` / `get_json_data`，**沒有狀態碼檢查**（後果較輕：會噴 Json error 而非靜默回空）。2026-08-11 已改呼叫 `send_retrying`，所以缺的只剩狀態碼檢查那半。
-- `structs/images.rs` 的 `ImageRecord` 沒 derive `sqlx::FromRow`，於是 `repositories/images.rs` 手動 `row.get(...)` 映射貼 4 次 —— 全 repo 只有這支這樣寫。（型別本身已在 2026-08-09 搬進 `structs/`，缺的只剩 derive。）
+- ~~`structs/images.rs` 的 `ImageRecord` 沒 derive `sqlx::FromRow`，`repositories/images.rs` 手動 `row.get(...)` 映射貼 4 次~~（2026-09-30 隨模糊預覽加欄位一併補 derive，欄位清單收成 `RECORD_COLUMNS` const）。
 
 **分層**
 - ~~`repositories/{logs,audit_logs,system_metrics,visitors}.rs` 回 `sqlx::Error` / `redis::RedisError`~~（2026-09-24 全改 `AppError`，連同 `repositories/redis.rs` 的 `set_user_login` / `user_login_exists`；`services/stats.rs` 的三層 `map_err` 與 `services/logs.rs`、`services/system_metrics.rs::recent` 的轉型殼一併拆掉）。**刻意留著的兩支**：`redis.rs::get_redis_conn`（連線原語，把 bb8 的 `RunError` 攤平成 `RedisError`，由呼叫端 `?` 轉型）與 `visitors.rs` 私有的 `record_visit_inner`（best-effort，只在本檔 warn）。⚠️ 換成 `AppError` 之後**錯誤要用 `{:?}` 印**：它的 Display 只有「系統錯誤: 資料庫錯誤」，sqlx / redis 的原因在 `#[source]` 裡（`jobs/collect_system_metrics.rs` 的 `{e}` 就是因此改成 `{e:?}`）。

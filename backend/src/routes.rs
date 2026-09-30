@@ -175,6 +175,14 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         tokio::spawn(crate::services::torrents::sync_active(state.clone()));
     }
 
+    // 舊圖補寬高 + 模糊預覽（一次一張，跑完即結束；沒有缺的列時只多一次查詢）
+    tokio::spawn({
+        let state = state.clone();
+        async move {
+            crate::services::images::backfill_placeholders(state.get_pool(), state.get_storage()).await
+        }
+    });
+
     // 遊戲計時掃描：偵測行棋方時鐘耗盡卻無人走步 → 主動判負（每遊戲一個 watcher）
     for hub in state.games().all() {
         hub.spawn_watcher(state.clone());
