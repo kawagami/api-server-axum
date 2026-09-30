@@ -107,52 +107,6 @@ pub fn process_image(data: &[u8], quality: f32) -> Result<ProcessedImage, AppErr
     Ok(ProcessedImage { bytes: webp.to_vec(), ext: "webp", placeholder })
 }
 
-/// 舊圖回填寬高 + 模糊預覽（欄位是 2026-09-30 才加的）。啟動時由 `routes.rs` spawn 跑一次。
-///
-/// 一次只 decode 一張（`spawn_blocking` 依序等待），1 核 1G 上不會同時堆多份點陣。
-/// 讀檔 / decode 失敗的列維持 NULL（前端退回無 placeholder），最後彙總一筆 WARN；
-/// 下次啟動會再試一次，所以常駐的 WARN = DB 有列但檔案不見或損毀，值得看一眼。
-pub async fn backfill_placeholders(pool: &Pool<Postgres>, storage: &Storage) {
-    const BATCH: i64 = 20;
-    let (mut after_id, mut filled, mut failed) = (0, 0usize, Vec::new());
-    loop {
-        let rows = match images_repo::list_missing_placeholders(pool, after_id, BATCH).await {
-            Ok(rows) => rows,
-            Err(e) => {
-                tracing::warn!("backfill_placeholders 查詢失敗: {e}");
-                return;
-            }
-        };
-        let Some(&(last_id, _)) = rows.last() else { break };
-        after_id = last_id;
-
-        for (id, storage_key) in rows {
-            let result = async {
-                let data = storage
-                    .read(&storage_key)
-                    .await
-                    .map_err(|e| SystemError::Internal(format!("讀檔失敗: {e}")))?;
-                let (img, _) = tokio::task::spawn_blocking(move || decode_limited(&data))
-                    .await
-                    .map_err(|e| SystemError::Internal(format!("decode 任務失敗: {e}")))??;
-                let p = make_placeholder(&img);
-                images_repo::set_placeholder(pool, id, p.width, p.height, p.blur_data_url.as_deref()).await
-            }
-            .await;
-            match result {
-                Ok(()) => filled += 1,
-                Err(e) => failed.push(format!("#{id} {storage_key}: {e}")),
-            }
-        }
-    }
-    if filled > 0 {
-        tracing::info!("backfill_placeholders: 補齊 {filled} 張");
-    }
-    if !failed.is_empty() {
-        tracing::warn!("backfill_placeholders: {} 張失敗（維持無預覽）: {}", failed.len(), failed.join("; "));
-    }
-}
-
 pub async fn get_images(pool: &Pool<Postgres>, owner_id: Option<i64>) -> Result<Vec<ImageRecord>, AppError> {
     images_repo::get_all_images(pool, owner_id).await
 }

@@ -571,7 +571,7 @@ pub async fn run(state: AppState) {
 **模糊預覽（blur-up，2026-09-30）**：`images` 表有 `width` / `height` / `blur_data_url`（migration `20260930000000_images_placeholder`，皆可 NULL）:
 - `process_image` 在 decode 後順手產生（`make_placeholder`）：原圖寬高 + 長邊 16px 的 WebP（q50）轉 `data:image/webp;base64,...`，實測 2000×1333 的照片 ≈ 160 bytes。GIF 取第一幀。小圖編碼失敗不擋上傳（`blur_data_url` = NULL）
 - `GET /blogs/{id}` 回 `BlogDetail` = `DbBlog` 攤平 + `images: { markdown 圖片 URL → { width, height, blur_data_url } }`（`extract_image_urls` 抓 URL，`url = ANY` 比對，只收 `width IS NOT NULL` 的列；外部圖不在其中）。前端 `components/blogs/markdown-image.tsx` 據此給 next/image 真實寬高 + `placeholder="blur"`
-- **舊圖回填**：`services/images.rs::backfill_placeholders` 由 `routes.rs` 在啟動時 spawn 跑一次，依 id 分批、一次 decode 一張（`Storage::read` 讀回原檔）。讀檔 / decode 失敗的列維持 NULL、最後彙總**一筆 WARN**，下次啟動再試 —— 所以每次部署都出現同一筆 WARN = DB 有列但磁碟檔案不見或損毀，要人看一眼。2026-09-30 本機實測：正常圖補齊、缺檔列留 NULL + WARN
+- **舊圖回填**：一次性。`services/images.rs::backfill_placeholders`（啟動時 spawn，`Storage::read` 讀回原檔 decode）於 2026-09-30 部署跑完，production log 無任何失敗 WARN，隨即移除（程式在 commit `1c54ee8`）。之後 `images` 只有上傳一個入口、一定寫入寬高，不會再有 `width IS NULL` 的列；**唯一例外是還原 2026-09-30 前的 DB 備份**，屆時從該 commit 撈回來跑一次。欄位仍保留 nullable：小圖編碼失敗時 `blur_data_url` 為 NULL
 
 ## 環境變數
 

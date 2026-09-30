@@ -62,7 +62,7 @@ pub async fn get_images_by_urls(
         .await?)
 }
 
-/// 已有版位資訊的圖片（回填前 / decode 失敗的列不含），供 blog 內文的模糊預覽。
+/// 有版位資訊的圖片（寬高為 NULL 的列不含），供 blog 內文的模糊預覽。
 pub async fn get_placeholders_by_urls(
     pool: &Pool<Postgres>,
     urls: &[String],
@@ -74,40 +74,6 @@ pub async fn get_placeholders_by_urls(
     .bind(urls)
     .fetch_all(pool)
     .await?)
-}
-
-/// 回填用：取 `id > after_id` 且尚無寬高的圖片 (id, storage_key)，依 id 遞增。
-pub async fn list_missing_placeholders(
-    pool: &Pool<Postgres>,
-    after_id: i32,
-    limit: i64,
-) -> Result<Vec<(i32, String)>, AppError> {
-    Ok(sqlx::query_as(
-        "SELECT id, storage_key FROM images
-         WHERE width IS NULL AND id > $1
-         ORDER BY id LIMIT $2",
-    )
-    .bind(after_id)
-    .bind(limit)
-    .fetch_all(pool)
-    .await?)
-}
-
-pub async fn set_placeholder(
-    pool: &Pool<Postgres>,
-    id: i32,
-    width: i32,
-    height: i32,
-    blur_data_url: Option<&str>,
-) -> Result<(), AppError> {
-    sqlx::query("UPDATE images SET width = $2, height = $3, blur_data_url = $4 WHERE id = $1")
-        .bind(id)
-        .bind(width)
-        .bind(height)
-        .bind(blur_data_url)
-        .execute(pool)
-        .await?;
-    Ok(())
 }
 
 pub async fn mark_images_active_by_urls_in_tx(

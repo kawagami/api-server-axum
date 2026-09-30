@@ -2,7 +2,8 @@ use serde::Serialize;
 use sqlx::FromRow;
 
 /// `images` 表的一列，同時是 `GET /admin/images` 的回應型別。
-/// `width` / `height` / `blur_data_url` 為模糊預覽用，舊圖回填前或 decode 失敗時為 None。
+/// `width` / `height` / `blur_data_url` 為模糊預覽用。上傳一定寫入寬高（欄位 nullable 只因 2026-09-30
+/// 才加欄、舊列已回填）；`blur_data_url` 在小圖編碼失敗時為 None。
 #[derive(Serialize, FromRow)]
 pub struct ImageRecord {
     pub id: i32,

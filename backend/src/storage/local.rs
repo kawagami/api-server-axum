@@ -41,14 +41,6 @@ impl LocalStorage {
         fs::remove_file(path).await?;
         Ok(())
     }
-
-    pub async fn read(&self, key: &str) -> Result<Vec<u8>, LocalStorageError> {
-        if !key_is_valid(key) {
-            return Err(LocalStorageError::InvalidKey(key.to_string()));
-        }
-
-        Ok(fs::read(self.base_path.join(key)).await?)
-    }
 }
 
 // 防止 directory traversal 攻擊，確保 key 只有一層路徑

@@ -7,7 +7,7 @@ import type { ImagePlaceholder } from '@/types';
  * 站內圖有後端下發的版位資訊時：用原圖真實寬高預留版位（免 CLS），並以 `placeholder="blur"`
  * 在原圖載入前顯示模糊小圖。`sizes` 必帶 —— 沒有它 next/image 會依 `width` 出 1x/2x srcset，
  * 寬 4000 的原圖在 1x 就會抓 3840w，比內文欄寬大好幾倍。
- * 外部圖 / 回填前的舊圖沒有版位資訊，維持原本的 800×600 + auto 尺寸。
+ * 外部圖沒有版位資訊，維持原本的 800×600 + auto 尺寸。
  */
 export default function MarkdownImage({ src, alt, images }: {
     src?: string | Blob;

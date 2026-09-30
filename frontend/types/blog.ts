@@ -10,7 +10,7 @@ export interface Blog {
   updated_at?: string;
   author_name?: string | null;
   /** 內文站內圖片的版位與模糊預覽（後端 BlogDetail.images，key = markdown 裡的圖片 URL）。
-   *  外部圖、回填前的舊圖不在其中；只有 `GET /blogs/{id}` 會帶 */
+   *  外部圖不在其中；只有 `GET /blogs/{id}` 會帶 */
   images?: Record<string, ImagePlaceholder>;
 }
 

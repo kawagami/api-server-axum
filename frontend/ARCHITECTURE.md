@@ -270,7 +270,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 
 現行系統（本地儲存）：
 - `POST /admin/images` — 單檔上傳，multipart 單一 `file` 欄位，回傳 `201` + `{ id, url }`，需 Bearer token
-- `GET /admin/images` — 列表，需認證，回傳 `[{ id, storage_key, url, status, width, height, blur_data_url }]`（`status`: `active` / `unused`，後端用 cron job 清除 `unused` 圖片；後三者為模糊預覽，舊圖回填前或 decode 失敗時為 `null`）
+- `GET /admin/images` — 列表，需認證，回傳 `[{ id, storage_key, url, status, width, height, blur_data_url }]`（`status`: `active` / `unused`，後端用 cron job 清除 `unused` 圖片；後三者為模糊預覽，寬高上傳時一定有，`blur_data_url` 在小圖編碼失敗時為 `null`）
 - `DELETE /admin/images/:id` — 刪除，需認證，回傳 204 No Content
 - 圖片公開網域一律為 `media.kawa.homes`（nginx 直出磁碟）；URL base 由後端 `app_settings.upload_base_url` 決定（現值 `https://media.kawa.homes`，程式 fallback 同）。**存量舊圖已於 2026-07-28 全數回填成 media 網域**（後端 migration `20260728000000_media_domain_backfill`），DB 內不再有 `axum.kawa.homes/uploads/...`
 

@@ -141,7 +141,7 @@ pub struct DbBlog {
 }
 
 /// `GET /blogs/{id}` 的回應：文章本體（攤平）+ 內文站內圖片的版位與模糊預覽。
-/// `images` 的 key 是 markdown 裡的圖片 URL；外部圖、回填前的舊圖不在其中，前端要能退回預設。
+/// `images` 的 key 是 markdown 裡的圖片 URL；外部圖不在其中，前端要能退回預設。
 #[derive(Serialize)]
 pub struct BlogDetail {
     #[serde(flatten)]
