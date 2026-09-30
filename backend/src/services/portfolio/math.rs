@@ -9,8 +9,8 @@ pub(super) struct DayClose {
 pub(super) struct ExEvent {
     pub(super) date: NaiveDate,
     pub(super) close_before: f64,
-    pub(super) cash_div: f64,
-    pub(super) stock_rate: f64,
+    /// TWSE 算好的「減除股利參考價」= (除權息前收盤價 - 息值) / (1 + 無償配股率)
+    pub(super) ref_price: f64,
 }
 
 /// `compute_latest` 的結果。欄位一多就不該再用 tuple —— summary 現在要的是
@@ -33,13 +33,12 @@ const MAX_BASE_LOOKBACK_DAYS: i64 = 10;
 
 /// 除權息還原因子：把「除權息前」的價格換算成「除權息後」的可比價格。
 /// 成本調整與前收盤價調整用的是同一個因子，所以抽出來共用。
+///
+/// 直接用 TWSE 的參考價相除，現金股利與無償配股一併涵蓋 —— TWT49U 只給「權值+息值」
+/// 合計，沒有獨立的配股率，自己拆公式拆不出來。刻意不用「除權息參考價」：那個含
+/// 現金增資認購，認購要另外掏錢，不是持有人白拿的報酬。
 fn ex_adjust_factor(ev: &ExEvent) -> Option<f64> {
-    if ev.close_before <= 0.0 {
-        return None;
-    }
-    let numer = ev.close_before - ev.cash_div;
-    let denom = ev.close_before * (1.0 + ev.stock_rate / 1000.0);
-    (denom > 0.0).then_some(numer / denom)
+    (ev.close_before > 0.0 && ev.ref_price > 0.0).then(|| ev.ref_price / ev.close_before)
 }
 
 pub(super) fn compute_latest(
@@ -236,7 +235,7 @@ mod tests {
         // 前一日收 100、配息 5 元，除息日開平收 95：帳面是 -5，實際沒漲沒跌。
         // 少了基準價的還原，這天會顯示 -5%（增減數字最容易騙人的地方）。
         let c = closes(&[("2026-09-04", 100.0), ("2026-09-07", 95.0)]);
-        let ev = vec![ExEvent { date: d("2026-09-07"), close_before: 100.0, cash_div: 5.0, stock_rate: 0.0 }];
+        let ev = vec![ExEvent { date: d("2026-09-07"), close_before: 100.0, ref_price: 95.0 }];
         let day = compute_latest(80.0, 1000, &c, ev).expect("有收盤價").changes.day.expect("有前一交易日");
 
         assert_eq!(day.base_close, 95.0);
@@ -286,5 +285,27 @@ mod tests {
         assert!(ch.changes.day.is_none());
         assert!(ch.changes.week.is_none());
         assert!(ch.changes.month.is_none());
+    }
+
+    #[test]
+    fn stock_dividend_scales_cost_down() {
+        // 無償配股 10%（每股配 0.1 股）：參考價 = 100 / 1.1。持有人股數變多但帳上股數沒動，
+        // 所以要把成本等比例降下來，否則除權日會憑空虧掉一成。
+        let c = closes(&[("2026-09-04", 100.0), ("2026-09-07", 100.0 / 1.1)]);
+        let ev = vec![ExEvent { date: d("2026-09-07"), close_before: 100.0, ref_price: 100.0 / 1.1 }];
+        let latest = compute_latest(100.0, 1000, &c, ev).expect("有收盤價");
+
+        assert!(latest.pnl.abs() < 1e-6, "pnl = {}", latest.pnl);
+        assert!(latest.changes.day.expect("有前一交易日").change.abs() < 1e-9);
+    }
+
+    #[test]
+    fn event_without_prices_is_ignored() {
+        // 參考價缺值（解析成 0）時不能把成本乘成 0
+        let c = closes(&[("2026-09-07", 110.0)]);
+        let ev = vec![ExEvent { date: d("2026-09-07"), close_before: 100.0, ref_price: 0.0 }];
+        let latest = compute_latest(80.0, 1000, &c, ev).expect("有收盤價");
+
+        assert_eq!(latest.pnl, 30_000.0);
     }
 }

@@ -15,11 +15,30 @@ use tokio::sync::Semaphore;
 
 static TWSE_SEMAPHORE: LazyLock<Semaphore> = LazyLock::new(|| Semaphore::new(1));
 
-/// 通用 TWSE JSON 回應（stat + 二維字串表格）
+/// 通用 TWSE JSON 回應（stat + 欄名 + 二維字串表格）
 #[derive(Deserialize)]
 pub struct TwseResponse {
     pub stat: String,
+    /// 欄名。解析時依名稱找索引，TWSE 改欄位順序才會被發現，而不是靜默讀錯欄
+    #[serde(default)]
+    pub fields: Vec<String>,
     pub data: Option<Vec<Vec<String>>>,
+}
+
+impl TwseResponse {
+    /// 依欄名取索引；任一欄不存在回 None（= 上游改版，呼叫端要當成失敗而非「沒資料」）
+    pub fn field_indices<const N: usize>(&self, names: [&str; N]) -> Option<[usize; N]> {
+        let mut out = [0; N];
+        for (slot, name) in out.iter_mut().zip(names) {
+            *slot = self.fields.iter().position(|f| f.trim() == name)?;
+        }
+        Some(out)
+    }
+
+    /// TWSE 查無資料時 stat 不是 "OK" 而是這句話 —— 它是正常的「確認過沒有」，不是錯誤
+    pub fn is_no_data(&self) -> bool {
+        self.stat.contains("沒有符合條件的資料")
+    }
 }
 
 fn headers() -> HashMap<String, String> {

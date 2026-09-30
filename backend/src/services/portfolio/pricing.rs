@@ -9,11 +9,11 @@ use crate::{
         portfolio::{HistoryRecord, PortfolioSummaryEntry},
         stocks::{NewStockClosingPrice, StockExRight},
     },
-    utils::date::parse_roc_date,
+    utils::date::{parse_roc_cjk_date, parse_roc_date},
 };
 use bb8::Pool as RedisPool;
 use bb8_redis::RedisConnectionManager;
-use chrono::{Datelike, Months, NaiveDate};
+use chrono::{Datelike, Days, Months, NaiveDate};
 use futures::stream::{self, StreamExt, TryStreamExt};
 use reqwest::Client;
 use sqlx::{Pool, Postgres};
@@ -25,12 +25,13 @@ use tokio::time::{Duration, Instant};
 use uuid::Uuid;
 use super::math::{DayClose, ExEvent, build_history, compute_latest};
 
-// TWT49U field indices — adjust here if TWSE changes column order
-const EX_IDX_CODE: usize = 0;
-const EX_IDX_DATE: usize = 2;
-const EX_IDX_CLOSE_BEFORE: usize = 3;
-const EX_IDX_STOCK_RATE: usize = 4;
-const EX_IDX_CASH_DIV: usize = 5;
+/// 除權息一次向 TWSE 查多長。TWT49U 沒有個股篩選、回的是全市場：實測一年約 250 KB / 5 秒，
+/// 四年多就要 25 秒、逼近 client 的 30 秒 timeout —— 長區間一定要切段。
+const EX_RIGHTS_CHUNK_DAYS: u64 = 365;
+/// 已涵蓋到今天的紀錄多久後重查今天：當天的除權息可能是在上次查詢之後才公告。
+const EX_RIGHTS_RECHECK_HOURS: i64 = 6;
+/// Redis 只擋同一小時內的重複 DB 查詢；真正的新鮮度由 `EX_RIGHTS_RECHECK_HOURS` 決定。
+const EX_RIGHTS_CACHE_TTL_SECS: u64 = 3600;
 
 use crate::services::twse::{self, TwseResponse};
 
@@ -328,110 +329,240 @@ async fn fetch_ex_events(
     to: NaiveDate,
     budget: &UpstreamBudget,
 ) -> Result<Vec<ExEvent>, AppError> {
-    let start_str = from.format("%Y%m%d").to_string();
-    let end_str = to.format("%Y%m%d").to_string();
-    let cache_key = format!("twse:exright:{}:{}", stock_code, start_str);
+    // key 帶 `to`：隔天自然 miss，才會回頭去 DB 看涵蓋範圍、往後補新的除權息
+    let cache_key = format!(
+        "twse:exright:v2:{}:{}:{}",
+        stock_code,
+        from.format("%Y%m%d"),
+        to.format("%Y%m%d")
+    );
 
-    // 1. Redis
+    // 1. Redis（只存「已涵蓋到 to」的完整結果）
     if let Ok(Some(cached)) = redis_repo::cache_get(redis_pool, &cache_key).await {
-        if let Ok(rows) = serde_json::from_str::<Vec<(String, f64, f64, f64)>>(&cached) {
+        if let Ok(rows) = serde_json::from_str::<Vec<(String, f64, f64)>>(&cached) {
             let events: Vec<ExEvent> = rows
                 .into_iter()
-                .filter_map(|(d, cb, cd, sr)| {
-                    NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok().map(|date| ExEvent {
-                        date,
-                        close_before: cb,
-                        cash_div: cd,
-                        stock_rate: sr,
-                    })
+                .filter_map(|(d, close_before, ref_price)| {
+                    NaiveDate::parse_from_str(&d, "%Y-%m-%d")
+                        .ok()
+                        .map(|date| ExEvent { date, close_before, ref_price })
                 })
                 .collect();
             return Ok(events);
         }
     }
 
-    // 2. DB (ex-rights rows)
-    let db_rows = get_ex_rights_by_range(pool, stock_code, from, to).await?;
-    if !db_rows.is_empty() {
-        let events: Vec<ExEvent> = db_rows
-            .iter()
-            .map(|r| ExEvent { date: r.ex_date, close_before: r.close_before, cash_div: r.cash_div, stock_rate: r.stock_rate })
-            .collect();
+    // 2. DB 已向 TWSE 確認到哪一天。從那天（含）接著往後查：那天可能是在當日公告前查的。
+    //    舊設計是「DB 有任何一筆就直接用」，於是買進後第一次配息之後的每一次配息都補不進來。
+    let mut next = match find_ex_rights_checked(pool, stock_code, from).await? {
+        Some((until, checked_at))
+            if until >= to && (chrono::Utc::now() - checked_at).num_hours() < EX_RIGHTS_RECHECK_HOURS =>
+        {
+            None
+        }
+        Some((until, _)) => Some(until.min(to)),
+        None => Some(from),
+    };
+    let mut complete = next.is_none();
+
+    // 3. TWSE，由舊到新分段（與收盤價相反：還原因子要從買進日一路累乘，缺舊的整段都錯，
+    //    而進度記在 covered_until，下次請求從斷點接著查，不會重打已確認的段）
+    while let Some(start) = next {
+        let end = start
+            .checked_add_days(Days::new(EX_RIGHTS_CHUNK_DAYS - 1))
+            .map_or(to, |d| d.min(to));
+
+        // 逾預算必須在寫 checked 之前停 —— 那筆紀錄代表「這段已確認過」，沒真的問就寫等於騙自己
+        if !budget.try_take() {
+            tracing::debug!("portfolio 上游預算已用盡，{stock_code} 的除權息停在 {start}，下次接著查");
+            break;
+        }
+        let Some(events) = fetch_ex_chunk(client, stock_code, start, end).await else { break };
+
+        if !events.is_empty() {
+            let rows: Vec<StockExRight> = events
+                .iter()
+                .map(|e| StockExRight {
+                    stock_no: stock_code.to_string(),
+                    ex_date: e.date,
+                    close_before: e.close_before,
+                    ref_price: e.ref_price,
+                })
+                .collect();
+            if let Err(e) = upsert_ex_rights(pool, &rows).await {
+                tracing::warn!("upsert_ex_rights failed {}: {}", stock_code, e);
+                break;
+            }
+        }
+        if let Err(e) = upsert_ex_rights_checked(pool, stock_code, from, end).await {
+            tracing::warn!("upsert_ex_rights_checked failed {}: {}", stock_code, e);
+            break;
+        }
+
+        if end >= to {
+            complete = true;
+            break;
+        }
+        next = end.succ_opt();
+    }
+
+    // 4. 結果一律從 DB 讀：中途停下時就是「已確認那段」的部分結果，下次請求接著補
+    let events: Vec<ExEvent> = get_ex_rights_by_range(pool, stock_code, from, to)
+        .await?
+        .into_iter()
+        .map(|r| ExEvent { date: r.ex_date, close_before: r.close_before, ref_price: r.ref_price })
+        .collect();
+
+    // 5. Redis：部分結果不快取，否則會蓋住下次請求的補抓
+    if complete {
         cache_ex_events(redis_pool, &cache_key, &events).await;
-        return Ok(events);
     }
-
-    // 2.5. DB (checked table) — confirmed no ex-rights within 30 days
-    if let Ok(Some(checked_at)) = find_ex_rights_checked(pool, stock_code, from).await {
-        let age_days = (chrono::Utc::now() - checked_at).num_days();
-        if age_days < 30 {
-            cache_ex_events(redis_pool, &cache_key, &[]).await;
-            return Ok(vec![]);
-        }
-    }
-
-    // 3. TWSE（同一份請求預算）。
-    // 逾預算必須在這裡就回，不能往下走 —— 下面 4.5 的 `upsert_ex_rights_checked` 代表
-    // 「已向 TWSE 確認過這 30 天沒有除權息」，沒真的問就寫等於騙了自己 30 天。
-    if !budget.try_take() {
-        tracing::debug!("portfolio 上游預算已用盡，跳過 {stock_code} 的除權息查詢");
-        return Ok(vec![]);
-    }
-    let resp: TwseResponse = match twse::fetch_ex_rights(client, &start_str, &end_str).await {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::warn!("TWSE TWT49U fetch failed {}/{}-{}: {}", stock_code, start_str, end_str, e);
-            return Ok(vec![]);
-        }
-    };
-
-    let events: Vec<ExEvent> = if resp.stat == "OK" {
-        resp.data
-            .unwrap_or_default()
-            .iter()
-            .filter_map(|row| {
-                let min_len = EX_IDX_CASH_DIV + 1;
-                if row.len() < min_len { return None; }
-                if row[EX_IDX_CODE].trim() != stock_code { return None; }
-                let date = parse_roc_date(&row[EX_IDX_DATE])?;
-                let close_before = twse::parse_f64(&row[EX_IDX_CLOSE_BEFORE]).unwrap_or(0.0);
-                let stock_rate = twse::parse_f64(&row[EX_IDX_STOCK_RATE]).unwrap_or(0.0);
-                let cash_div = twse::parse_f64(&row[EX_IDX_CASH_DIV]).unwrap_or(0.0);
-                Some(ExEvent { date, close_before, cash_div, stock_rate })
-            })
-            .collect()
-    } else {
-        vec![]
-    };
-
-    // 4. Write DB
-    if !events.is_empty() {
-        let rows: Vec<StockExRight> = events
-            .iter()
-            .map(|e| StockExRight { stock_no: stock_code.to_string(), ex_date: e.date, close_before: e.close_before, cash_div: e.cash_div, stock_rate: e.stock_rate })
-            .collect();
-        if let Err(e) = upsert_ex_rights(pool, &rows).await {
-            tracing::warn!("upsert_ex_rights failed {}: {}", stock_code, e);
-        }
-    }
-
-    // 4.5. Write checked record (regardless of result, marks TWSE was queried)
-    if let Err(e) = upsert_ex_rights_checked(pool, stock_code, from).await {
-        tracing::warn!("upsert_ex_rights_checked failed {}: {}", stock_code, e);
-    }
-
-    // 5. Write Redis
-    cache_ex_events(redis_pool, &cache_key, &events).await;
 
     Ok(events)
 }
 
+/// 查一段期間的除權息。回 `None` = 這段**不能**當成已確認（上游失敗或回應格式變了），
+/// 呼叫端不得寫 checked。
+async fn fetch_ex_chunk(
+    client: &Client,
+    stock_code: &str,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> Option<Vec<ExEvent>> {
+    let start_str = start.format("%Y%m%d").to_string();
+    let end_str = end.format("%Y%m%d").to_string();
+    let resp = match twse::fetch_ex_rights(client, &start_str, &end_str).await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!("TWSE TWT49U fetch failed {}/{}-{}: {}", stock_code, start_str, end_str, e);
+            return None;
+        }
+    };
+    let parsed = parse_ex_rights(&resp, stock_code);
+    if parsed.is_none() {
+        // 這條以前是靜默的：解析不到就當「沒有除權息」並標記已確認，整整壞了好幾個月沒人發現
+        tracing::warn!(
+            "TWT49U 回應無法解析，不標記已確認 {}/{}-{} stat={} fields={:?}",
+            stock_code,
+            start_str,
+            end_str,
+            resp.stat,
+            resp.fields
+        );
+    }
+    parsed
+}
+
+/// 從 TWT49U（全市場）回應挑出單一股票的除權息。純函式。
+///
+/// 回 `None` 表示回應不可信：stat 非 OK（查無資料除外）、找不到必要欄名、或代號對上了
+/// 日期卻解析不出來 —— 這些都是上游改版的徵兆，**不能**當成「確認過沒有」。
+fn parse_ex_rights(resp: &TwseResponse, stock_code: &str) -> Option<Vec<ExEvent>> {
+    if resp.is_no_data() {
+        return Some(vec![]);
+    }
+    if resp.stat != "OK" {
+        return None;
+    }
+    let [i_date, i_code, i_close, i_ref] =
+        resp.field_indices(["資料日期", "股票代號", "除權息前收盤價", "減除股利參考價"])?;
+
+    let mut events = Vec::new();
+    for row in resp.data.as_deref().unwrap_or_default() {
+        if row.get(i_code).map(|c| c.trim()) != Some(stock_code) {
+            continue;
+        }
+        let date = parse_roc_cjk_date(row.get(i_date)?)?;
+        // 價格是 "--"（例如只有現金增資、沒有配股配息）= 沒有要還原的，跳過這筆而不是整段作廢，
+        // 否則那檔股票每次請求都會重打同一段上游
+        let (Some(close_before), Some(ref_price)) = (
+            row.get(i_close).and_then(|s| twse::parse_f64(s)),
+            row.get(i_ref).and_then(|s| twse::parse_f64(s)),
+        ) else {
+            continue;
+        };
+        events.push(ExEvent { date, close_before, ref_price });
+    }
+    Some(events)
+}
+
 async fn cache_ex_events(redis_pool: &RedisPool<RedisConnectionManager>, key: &str, events: &[ExEvent]) {
-    let v: Vec<(String, f64, f64, f64)> = events
+    let v: Vec<(String, f64, f64)> = events
         .iter()
-        .map(|e| (e.date.format("%Y-%m-%d").to_string(), e.close_before, e.cash_div, e.stock_rate))
+        .map(|e| (e.date.format("%Y-%m-%d").to_string(), e.close_before, e.ref_price))
         .collect();
     if let Ok(json) = serde_json::to_string(&v) {
-        cache_set_logged(redis_pool, key, &json, 86400).await;
+        cache_set_logged(redis_pool, key, &json, EX_RIGHTS_CACHE_TTL_SECS).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIELDS: [&str; 11] = [
+        "資料日期", "股票代號", "股票名稱", "除權息前收盤價", "除權息參考價", "權值+息值",
+        "權/息", "漲停價格", "跌停價格", "開盤競價基準", "減除股利參考價",
+    ];
+
+    fn resp(stat: &str, fields: &[&str], rows: &[&[&str]]) -> TwseResponse {
+        TwseResponse {
+            stat: stat.to_string(),
+            fields: fields.iter().map(|s| s.to_string()).collect(),
+            data: Some(rows.iter().map(|r| r.iter().map(|s| s.to_string()).collect()).collect()),
+        }
+    }
+
+    // 2026-09 實際打 TWT49U 取回的列（截到「減除股利參考價」）
+    const TSMC: &[&str] = &[
+        "114年09月16日", "2330", "台積電", "1,255.00", "1,249.99", "5.000017",
+        "息", "1,370.00", "1,125.00", "1,250.00", "1,249.99",
+    ];
+    const OTHER: &[&str] = &[
+        "115年09月29日", "2109", "華豐", "15.00", "14.50", "0.500000",
+        "息", "16.50", "13.50", "14.50", "14.50",
+    ];
+
+    #[test]
+    fn picks_only_the_requested_stock() {
+        let ev = parse_ex_rights(&resp("OK", &FIELDS, &[OTHER, TSMC]), "2330").expect("可解析");
+
+        assert_eq!(ev.len(), 1);
+        assert_eq!(ev[0].date, NaiveDate::from_ymd_opt(2025, 9, 16).expect("日期"));
+        assert_eq!(ev[0].close_before, 1255.0);
+        assert_eq!(ev[0].ref_price, 1249.99);
+    }
+
+    #[test]
+    fn no_data_stat_is_a_confirmed_empty_result() {
+        let r = TwseResponse { stat: "很抱歉，沒有符合條件的資料!".into(), fields: vec![], data: None };
+        assert_eq!(parse_ex_rights(&r, "2330").map(|v| v.len()), Some(0));
+    }
+
+    #[test]
+    fn unknown_stat_is_not_trusted() {
+        // 被擋、維護中之類的回應：不能當成「確認過沒有」
+        assert!(parse_ex_rights(&resp("查詢日期大於今日", &FIELDS, &[]), "2330").is_none());
+    }
+
+    #[test]
+    fn missing_field_name_is_not_trusted() {
+        // 上游改版拿掉或改名欄位 —— 舊版依固定索引讀，正是這樣靜默讀錯欄好幾個月
+        let fields: Vec<&str> = FIELDS.iter().copied().filter(|f| *f != "減除股利參考價").collect();
+        assert!(parse_ex_rights(&resp("OK", &fields, &[TSMC]), "2330").is_none());
+    }
+
+    #[test]
+    fn unparseable_date_on_matching_row_is_not_trusted() {
+        let mut row = TSMC.to_vec();
+        row[0] = "114/09/16";
+        assert!(parse_ex_rights(&resp("OK", &FIELDS, &[&row]), "2330").is_none());
+    }
+
+    #[test]
+    fn row_without_reference_price_is_skipped() {
+        let mut row = TSMC.to_vec();
+        row[10] = "--";
+        assert_eq!(parse_ex_rights(&resp("OK", &FIELDS, &[&row]), "2330").map(|v| v.len()), Some(0));
     }
 }

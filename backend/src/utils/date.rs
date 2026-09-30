@@ -40,6 +40,18 @@ pub fn parse_roc_date(s: &str) -> Option<NaiveDate> {
     NaiveDate::from_ymd_opt(year + 1911, month, day)
 }
 
+/// 解析中文民國日期（如 "115年09月29日"，TWT49U 的「資料日期」欄）為西元 NaiveDate
+pub fn parse_roc_cjk_date(s: &str) -> Option<NaiveDate> {
+    let (year, rest) = s.trim().split_once('年')?;
+    let (month, rest) = rest.split_once('月')?;
+    let day = rest.strip_suffix('日')?;
+    NaiveDate::from_ymd_opt(
+        year.trim().parse::<i32>().ok()? + 1911,
+        month.trim().parse().ok()?,
+        day.trim().parse().ok()?,
+    )
+}
+
 /// 解析無分隔民國日期（如 "1150625" = 115/06/25）為西元 NaiveDate。
 /// 末 4 碼為 MMDD，其餘為民國年。
 pub fn parse_roc_compact_date(s: &str) -> Option<NaiveDate> {
@@ -79,6 +91,19 @@ mod tests {
             parse_roc_compact_date("1150625"),
             NaiveDate::from_ymd_opt(2026, 6, 25)
         );
+    }
+
+    #[test]
+    fn parses_cjk_roc_date() {
+        assert_eq!(parse_roc_cjk_date("115年09月29日"), NaiveDate::from_ymd_opt(2026, 9, 29));
+        assert_eq!(parse_roc_cjk_date("99年1月5日"), NaiveDate::from_ymd_opt(2010, 1, 5));
+    }
+
+    #[test]
+    fn rejects_malformed_cjk_roc_date() {
+        assert_eq!(parse_roc_cjk_date("115/09/29"), None);
+        assert_eq!(parse_roc_cjk_date("115年09月29"), None);
+        assert_eq!(parse_roc_cjk_date("115年13月01日"), None);
     }
 
     #[test]

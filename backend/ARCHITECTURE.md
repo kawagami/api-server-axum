@@ -709,7 +709,12 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
 - **DB 那面也有上限**（2026-08-22 加）：summary 的持股改用 `stream::buffered(SUMMARY_CONCURRENCY = 4)`，不再 `try_join_all` 無界 fan-out —— 每筆持股要跑收盤價 + 除權息兩個查詢，20 檔就是瞬間 40 個查詢搶 PG 連線池，`acquire_timeout(3s)` 一到整個請求 5xx。`buffered` 是「併發執行、依序產出」，回傳順序仍是持股清單順序。股名另外一次 `get_stock_names_by_codes`（`DISTINCT ON` + `code = ANY`，走既有的 `(stock_code, trade_date DESC)` 索引）批次取，原本是每檔一發。
 - ⚠️ **月份是由新到舊抓**：預算有限時額度要先花在最新的月（summary 的現價、history 最右端都取 `closes.last()`）。由舊到新會把額度耗在最舊的月份、反而讓現價變 `None`。最後統一 `sort_by_key`，順序對呼叫端不可見 —— **改這個迴圈時不要「順手」改回正序**。
 - **summary 另回三個期間的增減**（2026-09-08）：`PortfolioSummaryEntry.changes` = `{ day, week, month }`，每個是 `PeriodChange`（`base_date` / `base_close` / `change` / `change_pct` / `value_change`）或 `null`。目標日**用日曆算**（「近一週」＝七天前，不是七個交易日前），基準日取**最後一個不晚於目標日的交易日**（休市自然往前落）；期間內的除權息會還原到基準價上，否則除息日會被算成一次大跌。基準比目標日早超過 `MAX_BASE_LOOKBACK_DAYS`(10) 就回 `None` —— 上游預算逾額的月份是整段沒資料，拿三個月前的價格謊稱「近一週」比顯示「-」更糟。還原因子是三處共用的 `ex_adjust_factor`（`compute_latest` / `build_history` / `period_change`），改公式只改那一支。前端型別在 `frontend/types/portfolio.ts`，期間切換是**純前端**（`portfolio/period-tabs.tsx`，歷史表格也用它收斂區間），端點沒有 `period` 參數。
-- ⚠️ **除權息的預算檢查必須在 `upsert_ex_rights_checked` 之前 return**：那筆記錄代表「已向 TWSE 確認過這 30 天沒有除權息」，沒真的問就寫等於騙自己 30 天。
+- **除權息（2026-10-01 重寫；在那之前從未成功過）**：TWT49U 現行欄位是「資料日期、股票代號、股票名稱、除權息前收盤價…」、日期格式 `115年09月29日`，舊版依固定索引讀（索引 0 當代號，實際是日期）、日期又用 `/` 分隔解析 —— 每一列都被濾掉，`stock_ex_rights` 永遠是空的，卻照樣寫 `stock_ex_rights_checked`「確認過沒有」，**持股損益、歷史、期間增減從來沒做過除權息還原**，沒有任何 log。migration `20261001000000` 清掉那批假紀錄並改 schema。現行規則：
+  - **欄位依名稱找**（`TwseResponse::field_indices`），找不到欄名 / stat 非 OK / 代號對上但日期解析不出來 → `parse_ex_rights` 回 `None`，WARN 並**不標記已確認**。查無資料（stat = 「很抱歉，沒有符合條件的資料!」）才是確認過沒有。
+  - **還原因子 = 減除股利參考價 / 除權息前收盤價**（`math.rs::ex_adjust_factor`），現金股利與無償配股都涵蓋；TWT49U 只給「權值+息值」合計、沒有獨立配股率，所以不自己拆。刻意不用「除權息參考價」：它含現金增資認購，那要另外掏錢。
+  - **`stock_ex_rights_checked.covered_until` = 已向 TWSE 確認到哪天（含）**，每次從那天接著往後查。舊設計是「DB 有任何一筆就直接用 + checked 30 天內可信」，參數對了也會在第一次配息之後再也補不進新的配息。涵蓋到今天的紀錄 `EX_RIGHTS_RECHECK_HOURS`(6) 後重查今天（當天可能是公告前查的）；Redis key 帶 `to` 日期、TTL 1 小時，**只快取完整涵蓋的結果**（部分結果快取會蓋住下次補抓）。
+  - **分段、由舊到新**：TWT49U 沒有個股篩選、回全市場，實測一年 ≈ 250 KB / 5 秒、四年多 ≈ 25 秒，逼近 client 30 秒 timeout，所以切 `EX_RIGHTS_CHUNK_DAYS`(365) 一段、每段吃一次 `UpstreamBudget`。方向與收盤價（由新到舊）**相反**：還原因子要從買進日一路累乘，缺舊段整條都錯；進度存在 `covered_until`，逾預算下次請求從斷點接著查。
+  - ⚠️ **`upsert_ex_rights_checked` 只能寫在該段 `upsert_ex_rights` 成功之後、且預算檢查必須在它之前 return**：那筆紀錄代表「這段 DB 裡沒有的就是真的沒有」，沒真的問、或問了沒存進去就寫，等於騙自己。
 
 ## 操作稽核（admin_audit_logs）
 

@@ -116,8 +116,8 @@ pub struct StockExRight {
     pub stock_no: String,
     pub ex_date: NaiveDate,
     pub close_before: f64,
-    pub cash_div: f64,
-    pub stock_rate: f64,
+    /// TWT49U 的「減除股利參考價」（不含現金增資）
+    pub ref_price: f64,
 }
 
 #[derive(Debug, FromRow, Serialize)]
