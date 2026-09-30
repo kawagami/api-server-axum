@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
 import ErrorBanner, { DELETE_FAILED } from "@/components/admin/error-banner";
 import { deleteUser } from "./actions";
@@ -35,12 +35,19 @@ export default function DeleteUserButton({ user, isSelf }: Props) {
 
         setIsDeleting(true);
         setError(null);
-        const res = await deleteUser(user.id);
-        setIsDeleting(false);
-        if (res.ok) {
-            router.refresh();
-        } else {
-            setError(res.message ?? DELETE_FAILED);
+        try {
+            const res = await deleteUser(user.id);
+            if (res.ok) {
+                router.refresh();
+            } else {
+                setError(res.message ?? DELETE_FAILED);
+            }
+        } catch (e) {
+            // 401 的導頁是 Next 的 redirect error，要重丟；其餘是 Server Action 本身沒送達（網路中斷）
+            unstable_rethrow(e);
+            setError(DELETE_FAILED);
+        } finally {
+            setIsDeleting(false);
         }
     };
 

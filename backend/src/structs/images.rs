@@ -16,9 +16,17 @@ pub struct ImageRecord {
 }
 
 /// 單張圖的版位與模糊預覽，隨 `GET /blogs/{id}` 以 `images: { url → 此結構 }` 下發。
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, FromRow)]
 pub struct ImagePlaceholder {
     pub width: i32,
     pub height: i32,
     pub blur_data_url: Option<String>,
+}
+
+/// `repositories::images::get_placeholders_by_urls` 的一列：URL + 該圖的版位資訊
+#[derive(FromRow)]
+pub struct UrlPlaceholder {
+    pub url: String,
+    #[sqlx(flatten)]
+    pub placeholder: ImagePlaceholder,
 }

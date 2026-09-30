@@ -6,7 +6,6 @@ use crate::{
         AdminBlogFilter, AdminBlogListItem, AdminBlogSort, BlogDetail, PublicBlogListItem,
         PutBlog, TagCount,
     },
-    structs::images::ImagePlaceholder,
     structs::pagination::{PageQuery, Paginated}
 };
 use regex::Regex;
@@ -197,7 +196,7 @@ pub async fn get_blog(pool: &Pool<Postgres>, id: Uuid) -> Result<BlogDetail, App
         images_repo::get_placeholders_by_urls(pool, &urls)
             .await?
             .into_iter()
-            .map(|(url, width, height, blur_data_url)| (url, ImagePlaceholder { width, height, blur_data_url }))
+            .map(|row| (row.url, row.placeholder))
             .collect()
     };
     Ok(BlogDetail { blog, images })

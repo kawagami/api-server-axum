@@ -17,7 +17,7 @@ export interface MemberTokens {
 }
 
 /** `cookies()`（Route Handler）與 `NextResponse.cookies` 都滿足這個形狀 */
-interface CookieWriter {
+export interface CookieWriter {
     set(name: string, value: string, options: {
         httpOnly: boolean;
         secure: boolean;

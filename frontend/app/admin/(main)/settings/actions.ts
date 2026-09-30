@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import adminRequest from "@/libs/adminRequest";
-import { toActionFailure, type ActionResult } from "@/libs/api-error";
+import { runAction, type ActionResult } from "@/libs/api-error";
 import type { Setting, SettingsResponse } from "@/types";
 
 export async function getSettings(): Promise<SettingsResponse> {
@@ -14,7 +14,7 @@ export async function getSettings(): Promise<SettingsResponse> {
 // production 會被剝成通用訊息（見 libs/api-error.ts 的 ActionFailure）。
 
 export async function updateSetting(key: string, value: string): Promise<ActionResult<Setting>> {
-    try {
+    return runAction(async () => {
         const response = await adminRequest<Setting>({
             url: `${process.env.API_URL}/admin/settings/${key}`,
             method: "PATCH",
@@ -22,10 +22,8 @@ export async function updateSetting(key: string, value: string): Promise<ActionR
             body: JSON.stringify({ value }),
         });
         revalidatePath("/admin/settings");
-        return { ok: true, data: response };
-    } catch (e) {
-        return toActionFailure(e);
-    }
+        return response;
+    });
 }
 
 /**
@@ -34,7 +32,7 @@ export async function updateSetting(key: string, value: string): Promise<ActionR
  * 後端會擋（如 webauthn_rp_id / webauthn_rp_origin 整組換網域）。
  */
 export async function updateSettings(values: Record<string, string>): Promise<ActionResult<Setting[]>> {
-    try {
+    return runAction(async () => {
         const response = await adminRequest<Setting[]>({
             url: `${process.env.API_URL}/admin/settings`,
             method: "PATCH",
@@ -42,10 +40,8 @@ export async function updateSettings(values: Record<string, string>): Promise<Ac
             body: JSON.stringify({ values }),
         });
         revalidatePath("/admin/settings");
-        return { ok: true, data: response };
-    } catch (e) {
-        return toActionFailure(e);
-    }
+        return response;
+    });
 }
 
 /** 寫入一個影響全站渲染的 key，成功才失效整站 layout cache（讓 getPublicSettings 立即重抓） */

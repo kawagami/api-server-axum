@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { uploadImage } from '@/api/images';
 import { deleteImage } from '@/api/images';
-import { uploadErrorMessage, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
+import { unwrapUpload, uploadErrorMessage, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressAndUploadEach } from '@/libs/client-image';
 import { DEFAULT_IMAGE_COMPRESS, type ImageCompressConfig } from '@/libs/image-config';
 
@@ -66,7 +66,7 @@ export const useImageManager = (
                 (file) => {
                     const formData = new FormData();
                     formData.append('file', file);
-                    return withUploadTimeout(uploadImage(formData));
+                    return withUploadTimeout(unwrapUpload(uploadImage(formData)));
                 },
                 setUploadProgress,
                 (image, i) => {
@@ -90,7 +90,12 @@ export const useImageManager = (
     const handleDelete = async (id: number) => {
         setDeletingImage(id);
         try {
-            await deleteImage(id);
+            const res = await deleteImage(id);
+            if (!res.ok) {
+                // 失敗就留在列表上（例如非擁有者的 404），不要讓畫面以為已刪除
+                console.error('Delete error:', res.status, res.message);
+                return;
+            }
             setImages((prev) => prev.filter((img) => img.id !== id));
         } catch (err) {
             console.error('Delete error:', err);

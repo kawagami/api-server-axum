@@ -220,6 +220,7 @@ pub fn unprocessable(msg: impl Into<String>) -> AppError {
 /// 「沒帶票 / 票過期」這類日常 401 —— 記 debug。
 ///
 /// 反過來說，留在 WARN 的是**帶著身分卻被擋下**的那些：`Forbidden`（權限不足）、
+/// `ForbiddenAction`（業務規則擋下：改自己的角色、刪自己、指派 super_admin）、
 /// `InvalidCredentials`（登入失敗）、`WebauthnFailed`、
 /// `UserNotFound`（token 有效但帳號已刪 —— 撤銷沒撤乾淨的徵兆）。那幾種每一筆
 /// 都值得看，且可以用 `request_id` 對回 `admin_audit_logs` 查是誰。

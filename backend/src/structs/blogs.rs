@@ -89,7 +89,7 @@ pub struct AdminBlogListItem {
 ///
 /// **不含 `markdown`，改帶 `excerpt`** —— 列表卡片只需要一段摘要，但以前整篇全文照送、
 /// 由前端 `makeExcerpt` 自己截；一頁 10 篇（sitemap 200 篇）的全文就這樣進 SSR payload。
-/// 摘要規則見 `services::blogs::make_excerpt`。單篇內文仍走 `DbBlog`。
+/// 摘要規則見 `services::blogs::make_excerpt`。單篇內文走 `BlogDetail`（全文 + 圖片版位）。
 #[derive(Serialize)]
 pub struct PublicBlogListItem {
     pub id: Uuid,

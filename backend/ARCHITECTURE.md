@@ -259,7 +259,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 - 路由命名 RESTful：資源名詞 + HTTP method，不用 `get_*` / `fetch_*` 動詞前綴。**handler 函式名同理**（2026-07-31 已把 24 個 `get_*` 收斂完）：單一資源檔用裸動詞（`list` / `detail` / `create` / `update` / `delete`，見 `routes/portfolio.rs`），需要區分時才加名詞後綴（`list_words` / `delete_message`，見 `routes/admin_vocab.rs`）。**選新名時照該檔既有的命名家族走，不要引入第三種風格**
 - `/tools/*` 是**例外**：`convert_text` 本質是計算工具而非資源，路徑刻意保留動詞，硬套名詞路徑語意更差（同群的 `new_password` 已於 2026-08-30 移除 —— 密碼改由瀏覽器端 `crypto.getRandomValues` 產生，見 `frontend/libs/password.ts`）
 - **錯誤回應只有一種形狀**：`errors.rs` 的 `{ code, message, details?, request_id }`。`fallback`（未知路徑）與 `with_feature`（功能關閉）都回 `AppError::from(RequestError::NotFound)`，不要再寫 `(StatusCode::X, "字串")` 或 `(StatusCode::X, Json(json!(...)))` 這種裸回應——會讓客戶端要 parse 兩種格式，也拿不到 `request_id`。限流的 429 走 `RequestError::TooManyRequests`（2026-07-31 補的 variant；在那之前 `rate_limit` middleware 自組 JSON）。**要回新的狀態碼就先去 `errors.rs` 加 variant**，不要在 middleware 或 handler 裡自己組 body
-- **403 要帶原因時用 `AuthError::ForbiddenAction(String)`**（2026-09-29 加）：固定訊息的 `Forbidden`（「權限不足」）答不出為什麼；以前「不可變更自己的角色」只為了帶訊息而回 400 `InvalidContent`，狀態碼語意是錯的（請求沒壞，是這個身分不能做這件事）。現有用途：改自己的角色、刪自己的帳號（`routes/users.rs`）、指派 super_admin（`services/roles.rs::ensure_assignable`）
+- **403 要帶原因時用 `AuthError::ForbiddenAction(String)`**（2026-09-29 加）：固定訊息的 `Forbidden`（「權限不足」）答不出為什麼；以前「不可變更自己的角色」只為了帶訊息而回 400 `InvalidContent`，狀態碼語意是錯的（請求沒壞，是這個身分不能做這件事）。現有用途：改自己的角色、刪自己的帳號（`services/users.rs`，2026-09-30 由 route 搬進 service，理由同「分層鐵律」的擁有者檢查）、指派 super_admin（`services/roles.rs::ensure_assignable`）
 - **刪除走 `DELETE /資源/{id}`，不放 body**：`DELETE /admin/users` 曾經把整個 `User` 放 JSON body（缺 `name` 就 422），2026-09-29 改成 `/admin/users/{id}`；查無此人回 404
 
 ### 「一種形狀」是怎麼守住的（2026-08-09 補完最後兩個破口）
@@ -663,7 +663,7 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
 2026-08-08 用生產實測資料重訂（當時 14 天內 89 筆 WARN+，其中 **76% 是兩條噪音**）：
 
 - **WS 收訊/送出失敗記 debug 不記 warn**（`services/ws/socket.rs`、`state.rs` 的 `send_many`/`broadcast`）：40 筆全是 `Connection reset without closing handshake` —— 關分頁、手機睡眠、NAT 逾時都會產生，是公開網站的常態，而且斷線後清理照常走完，沒有任何要人介入的事。
-- **`AuthError` 分兩級**（`errors.rs::is_routine_auth`）：`MissingToken` / `TokenExpired` / `InvalidToken` / `InvalidHeader` / `Unauthorized` → debug（前端 token 只有 1 小時、`kawa-logs` CLI 也是 401 才續期，這是客戶端常態）；`Forbidden` / `InvalidCredentials` / `WebauthnFailed` / `UserNotFound` → warn（帶著身分卻被擋下，每一筆都值得看，且能用 `request_id` 對回 `admin_audit_logs` 查是誰）。
+- **`AuthError` 分兩級**（`errors.rs::is_routine_auth`）：`MissingToken` / `TokenExpired` / `InvalidToken` / `InvalidHeader` / `Unauthorized` → debug（前端 token 只有 1 小時、`kawa-logs` CLI 也是 401 才續期，這是客戶端常態）；`Forbidden` / `ForbiddenAction` / `InvalidCredentials` / `WebauthnFailed` / `UserNotFound` → warn（帶著身分卻被擋下，每一筆都值得看，且能用 `request_id` 對回 `admin_audit_logs` 查是誰）。
 - **`RequestError` 同樣分兩級**（`errors.rs::is_routine_request`，2026-08-09）：`UnprocessableContent` / `Conflict` / `InsufficientStorage` / `MultipartError` / `InvalidContent` / `Rejection` → **warn**；`NotFound`、`TooManyRequests` 與 `PathRejection` 留 debug。在那之前整個 `RequestError` 都是 debug，而落地門檻是 WARN，於是**所有 4xx 在 `logs` 表零紀錄** —— 使用者回報最多的「按了沒反應 / 存不進去」正是 422 與 409。
   - `NotFound` 的理由同 `TokenExpired`：爬蟲掃站與 `with_feature` 關閉功能都走這條。
   - ⚠️ **`TooManyRequests` 刻意不提上來**：被擋下的請求本來就是連續一整串，每筆一列等於讓攻擊者決定 `logs` 表的寫入量（實測連打 25 次會落 5 列）。

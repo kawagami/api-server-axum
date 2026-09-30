@@ -56,7 +56,9 @@ types/index.ts        ← 後端 API 共用型別（Blog、User、Stock 等）
 ### 認證
 
 - **身份中文命名**：`user`（後台 RBAC 帳號，有 roles/permissions）面向使用者一律稱 **「管理員」**；`member`（OAuth 前台使用者）一律稱 **「會員」**；`role` 稱「角色」。程式碼變數、API 路徑、cookie 名稱維持英文不動，命名共識只套用在中文文案
-- Admin JWT 存在 `session` cookie；member OAuth token 存在 `access_token` cookie
+- Admin JWT 存在 `session` cookie；member OAuth token 存在 `access_token`（1 小時）+ `refresh_token`（30 天）兩個 cookie，效期與旗標的唯一設定來源是 `libs/member-session.ts`（admin 的是 `libs/admin-session.ts`）
+- **會員 token 自動續期在 `proxy.ts`**（2026-09-29）：`access_token` 沒了或離過期 < 60 秒、且有未過期的 `refresh_token` 時，proxy 先打後端 `POST /oauth/refresh` 換新的一組，寫回 Set-Cookie，**並讓同一次 render 就讀到新 token**（否則這次會以未登入身分跑，會員頁被 `memberRequest` 的 401 導去登入頁）。router prefetch 不續期、續期失敗不刪 `refresh_token`（後端每次輪換 jti，平行請求的後到者必敗，刪了會蓋掉先到者剛寫的新 token），理由都寫在 `refreshMemberTokens` 註解。
+  - ⚠️ **「同一次 render 讀到新 token」靠的是 Next 內部 header**：response 由 next-intl 產生，無法走官方的 `NextResponse.next({ request: { headers } })`，所以 `forwardRequestCookies` 直接寫 `x-middleware-override-headers` / `x-middleware-request-cookie`（官方 API 底層就是這兩個，見 `node_modules/next/dist/server/web/spec-extension/response.js`）。**這不是公開 API，每次升 Next 都要驗**：會員登入後刪掉 `access_token` cookie（或等 1 小時），直接開 `/{locale}/portfolio` —— 應該正常顯示、且 response 帶新的 Set-Cookie；被導去登入頁 = 內部 header 改名了
 - **Admin passkey 登入（WebAuthn）**：密碼登入的可選升級（密碼永遠保留）。登入頁（`app/admin/login/page.tsx`）三入口——Conditional UI（name 欄 `autoComplete="username webauthn"`，掛載即發起 discoverable 挑戰，autofill 選 passkey 即登入）、「使用 Passkey 登入」按鈕（modal 模式）、密碼登入成功後的升級提示卡（無 passkey 且未略過時顯示；略過寫 `localStorage.passkey_prompt_dismissed_at`，30 天內不再問）。登入前挑戰走同源代理 `app/api/auth/passkey/login/{begin,finish}/route.ts`（finish 成功寫 session cookie，比照 login）；登入後的註冊/列表/刪除走 `api/auth.ts` server actions（`beginPasskeyRegistration`/`finishPasskeyRegistration`/`getPasskeys`/`deletePasskey`）。管理頁 `/admin/passkeys`（nav「設定」群）。ceremony 用 `@simplewebauthn/browser`，`optionsJSON` 一律傳後端回傳物件的 **`.publicKey` 內層**；`AbortError`/`NotAllowedError` 是取消不是錯誤（StrictMode double-effect 也會觸發）要吞掉
 - `proxy.ts` 保護 `/admin/*` 與 `/{locale}/` 下的 `dashboard`、`profile`、`portfolio`（`memberPaths` 共 3 條。**沒有獨立的 `/settings`** —— 功能的設定子頁由所屬 prefix 涵蓋，不另列）；admin 未登入 → `/admin/login`，member 未登入 → `/{locale}/login`
 - 401 回應由 `adminRequest` / `memberRequest` 統一處理並 redirect 到對應 login
@@ -220,7 +222,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 - `GET /blogs/` — 文章列表（分頁），params: `page`(預設1)、`per_page`(預設10，上限 200)、`tag` / `author` / `q` / `sort`(可選)，回傳 `{ data: PublicBlogListItem[], total }`（後端 `Paginated<T>` 只有這兩欄，**不回 `page` / `per_page`**）。**列表項沒有 `markdown`，改帶後端算好的 `excerpt`**（2026-09-29 起；原本整篇全文照送、由前端 `libs/blog-excerpt.ts` 自己截，該檔已刪除，規則搬到後端 `services/blogs.rs::make_excerpt`）。要全文走 `GET /blogs/:id`
 - `GET /blogs/tags` — 所有 tags 字串陣列（去重、字母排序），無需認證
 - `GET /blogs/tags/counts` — 每個 tag 附文章數（`TagCount[]`），無需認證；公開列表側欄的 tag 篩選用（`api/blogs.ts` 的 `getBlogTagCounts`，與 `getBlogTags` 同吃 `tags:['blogs']` 快取標籤）
-- `GET /blogs/:id` — 單篇文章
+- `GET /blogs/:id` — 單篇文章，回 `Blog` 全文另帶 `images`：`{ [markdown 圖片 URL]: { width, height, blur_data_url } }`（2026-09-30 起，給 `components/blogs/markdown-image.tsx` 的模糊預覽用；外部圖不在其中）
 - `PUT /admin/blogs/:id` — 新建或更新（upsert），需 `blog:update` 權限，body: `{ markdown, tags }`，回傳 204 無 body
 - `DELETE /admin/blogs/:id` — 刪除，需 `blog:delete` 權限，回傳 204 無 body
 - `GET /admin/auth/me` — 目前登入管理員，回 `{ id, name, permissions, is_super_admin }`（`libs/admin-permissions.ts` 的 `getCurrentAdmin` 以 `cache()` 去重，同一次請求只打一次）
@@ -269,7 +271,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 舊 `/firebase` 路由已棄用（原代理至 FastAPI + Firebase）。舊的多檔端點 `POST /admin/images/upload_multiple` 已移除，改為單檔（前端本就一張一請求，見下方「圖片上傳行為」）。
 
 現行系統（本地儲存）：
-- `POST /admin/images` — 單檔上傳，multipart 單一 `file` 欄位，回傳 `201` + `{ id, url }`，需 Bearer token
+- `POST /admin/images` — 單檔上傳，multipart 單一 `file` 欄位，回傳 `201` + 完整 `Image`（與列表同形；2026-09-29 前只回 `{ id, url }`，併進列表時缺 `status` 會讓 active / unused 統計漏算），需 Bearer token
 - `GET /admin/images` — 列表，需認證，回傳 `[{ id, storage_key, url, status, width, height, blur_data_url }]`（`status`: `active` / `unused`，後端用 cron job 清除 `unused` 圖片；後三者為模糊預覽，寬高上傳時一定有，`blur_data_url` 在小圖編碼失敗時為 `null`）
 - `DELETE /admin/images/:id` — 刪除，需認證，回傳 204 No Content
 - 圖片公開網域一律為 `media.kawa.homes`（nginx 直出磁碟）；URL base 由後端 `app_settings.upload_base_url` 決定（現值 `https://media.kawa.homes`，程式 fallback 同）。**存量舊圖已於 2026-07-28 全數回填成 media 網域**（後端 migration `20260728000000_media_domain_backfill`），DB 內不再有 `axum.kawa.homes/uploads/...`
@@ -284,7 +286,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 
 **錯誤形狀**：`adminRequest` / `memberRequest` 用 `response.text()` 統一讀 body，空字串回 `null`，parse 失敗也回 `null`，正確處理 204 空 body。失敗時丟 `Error`（message: `API {status}: {statusText}`），並附 `.status`（number）與 `.errorData`。**`fetchApi` 2026-08-07 起也附這兩個欄位**，型別與取值 helper 收在 `libs/api-error.ts`（`ApiError` / `apiErrorStatus` / `apiErrorMessage`）——在那之前 `fetchApi` 不帶 status，`contact/actions.ts` 只能用 `msg.includes("429")` 比對錯誤訊息字串判狀態碼（改文案就靜默失效）。**新的 catch 區塊用 helper，不要再 inline cast**（既有 4 處 `err as Error & { status?: number; ... }` 尚未收斂（2026-09-29 重數），改到時順手換掉；數字與下方「已知的技術債」那條同一份，改一邊要同步）。
 
-**client 元件直接呼叫的 Server Action 一律回 `ActionResult`，不 throw**（`libs/api-error.ts` 的 `ActionResult<T>` / `toActionFailure`）：Server Action **丟出**的錯誤在 production 會被 Next 剝掉 `status` / `errorData`，client 只拿到通用訊息加 digest —— `e.status === 409`、`(err as Error).message` 這類分流在 dev 看起來正常、上線就只剩「發生錯誤」。後端 4xx 的 `message` 本來就是給人看的原因（「不可變更自己的角色」「授出了自己沒有的權限」），要靠回傳值帶過邊界。`toActionFailure` 會先 `unstable_rethrow`，所以 401 的 redirect 照常生效。2026-09-29 收齊的有 auth（改密碼 / passkey 註冊）、roster、users、roles、settings；torrents 另有一份同形的 `toErrorResult`。
+**client 元件直接呼叫的 Server Action 一律回 `ActionResult`，不 throw**（`libs/api-error.ts` 的 `ActionResult<T>` / `toActionFailure`）：Server Action **丟出**的錯誤在 production 會被 Next 剝掉 `status` / `errorData`，client 只拿到通用訊息加 digest —— `e.status === 409`、`(err as Error).message` 這類分流在 dev 看起來正常、上線就只剩「發生錯誤」。後端 4xx 的 `message` 本來就是給人看的原因（「不可變更自己的角色」「授出了自己沒有的權限」），要靠回傳值帶過邊界。`toActionFailure` 會先 `unstable_rethrow`，所以 401 的 redirect 照常生效。**寫法一律 `return runAction(async () => { … })`**（同檔的 helper，2026-09-30 起；在那之前 12 支各自手寫同一段 try/catch）。2026-09-29 收齊的有 auth（改密碼 / passkey 註冊）、roster、users、roles、settings，**images（上傳 / 刪除）2026-09-30 補上** —— 漏掉那天 `uploadErrorMessage` 的 `status === 413` 判斷在 production 永遠不成立、後端 400 的原因也到不了畫面。上傳管線（`compressAndUploadEach`）靠 throw 中止後續張數，所以 client 端用 `libs/upload-limits.ts` 的 `unwrapUpload` 把失敗結果轉回帶 `status` / `serverMessage` 的錯誤。torrents 另有一份同形的 `toErrorResult`。**呼叫端要自己處理 Server Action 沒送達的情況**（網路中斷時 action 本身會 throw）：手動管 busy 旗標的要包 `try/finally`，`startTransition` 裡呼叫的不用。
 
 ---
 

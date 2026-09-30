@@ -9,7 +9,7 @@ import { Loader2, Bold, Italic, Code, Link2, Heading2, Quote, List, Plus, X } fr
 import 'highlight.js/styles/github-dark.css';
 import { putBlog } from '@/api/blogs';
 import { uploadImage } from '@/api/images';
-import { uploadErrorMessage, uploadProgressLabel, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
+import { unwrapUpload, uploadErrorMessage, uploadProgressLabel, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressAndUploadEach } from '@/libs/client-image';
 import { useMarkdownTextarea } from '@/hooks/useMarkdownTextarea';
 import { useBlogDraft } from './useBlogDraft';
@@ -70,7 +70,7 @@ export default function BlogComponent({ id, blog, allTags, compressConfig }: Pro
                 (file) => {
                     const formData = new FormData();
                     formData.append('file', file);
-                    return withUploadTimeout(uploadImage(formData));
+                    return withUploadTimeout(unwrapUpload(uploadImage(formData)));
                 },
                 setUploadProgress,
                 (image) => insertAtCursor(`![image](${image.url})\n`),

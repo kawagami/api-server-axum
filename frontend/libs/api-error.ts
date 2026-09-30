@@ -40,7 +40,7 @@ export interface ActionFailure {
     message?: string;
 }
 
-export type ActionResult<T = undefined> = { ok: true; data: T } | ActionFailure;
+export type ActionResult<T = void> = { ok: true; data: T } | ActionFailure;
 
 /**
  * 把 catch 到的錯誤轉成 `ActionFailure`。只能在 server 端（Server Action 內）呼叫。
@@ -49,4 +49,16 @@ export type ActionResult<T = undefined> = { ok: true; data: T } | ActionFailure;
 export function toActionFailure(e: unknown): ActionFailure {
     unstable_rethrow(e);
     return { ok: false, status: apiErrorStatus(e), message: (e as ApiError | null)?.errorData?.message };
+}
+
+/**
+ * Server Action 的標準包裝：`fn` 成功 → `{ ok: true, data }`，丟錯 → `toActionFailure`
+ * （401 的 redirect 照常重丟）。client 直接呼叫的 Server Action 一律用它，不要自己寫 try/catch。
+ */
+export async function runAction<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
+    try {
+        return { ok: true, data: await fn() };
+    } catch (e) {
+        return toActionFailure(e);
+    }
 }

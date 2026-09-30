@@ -1,6 +1,6 @@
 use crate::extract::{Json, Path};
 use crate::{
-    errors::{AppError, AuthError},
+    errors::AppError,
     services::users as users_service,
     state::AppState,
     structs::{
@@ -56,15 +56,7 @@ async fn delete_user(
     Path(user_id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::UserDelete)?;
-    // 不可刪自己：刪掉的瞬間這張 token 就不代表任何人，而且可能刪掉最後一個能登入的管理員。
-    // 前端雖然對自己那列不顯示刪除鈕，但那只是 UI，這裡才是真正的把關。
-    if user_id == auth_user.id {
-        return Err(AuthError::ForbiddenAction(
-            "不可刪除自己的帳號，請由其他管理員操作".to_string(),
-        )
-        .into());
-    }
-    users_service::delete_user(state.get_pool(), state.get_redis_pool(), user_id).await?;
+    users_service::delete_user(state.get_pool(), state.get_redis_pool(), &auth_user, user_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -84,14 +76,6 @@ async fn set_user_roles(
     Json(body): Json<SetUserRoles>,
 ) -> Result<StatusCode, AppError> {
     auth_user.require_permission(Perm::RoleAssign)?;
-    // 不可改自己的角色：否則有 role:assign 的人可以自行加掛任何角色（自我提權）。
-    // 要調整自己的權限得請另一位管理員操作。
-    if user_id == auth_user.id {
-        return Err(AuthError::ForbiddenAction(
-            "不可變更自己的角色，請由其他管理員操作".to_string(),
-        )
-        .into());
-    }
     users_service::set_user_roles(
         state.get_pool(),
         state.get_redis_pool(),

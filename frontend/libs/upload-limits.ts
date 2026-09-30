@@ -1,3 +1,5 @@
+import type { ActionResult } from '@/libs/api-error';
+
 // 單檔大小上限,對齊 server 端的三道：backend RequestBodyLimitLayer、nginx
 // client_max_body_size 10m、Next server action bodySizeLimit 10mb —— **三者現在都是
 // 10*1024*1024**（後端曾是 decimal 的 10*1000*1000，落在兩者之間的檔案會由 nginx 放行、
@@ -18,6 +20,16 @@ export function withUploadTimeout<T>(promise: Promise<T>): Promise<T> {
         }, UPLOAD_TIMEOUT_MS);
         promise.then(resolve, reject).finally(() => clearTimeout(timer));
     });
+}
+
+/**
+ * `uploadImage` 回的是 `ActionResult`，但上傳管線（`compressAndUploadEach`）靠 throw 中止後續張數 ——
+ * 失敗結果在這裡轉回錯誤，帶著 status / 後端訊息交給 `uploadErrorMessage`。
+ */
+export async function unwrapUpload<T>(pending: Promise<ActionResult<T>>): Promise<T> {
+    const res = await pending;
+    if (res.ok) return res.data;
+    throw Object.assign(new Error(res.message ?? 'upload failed'), { status: res.status, serverMessage: res.message });
 }
 
 function formatMB(bytes: number): string {
@@ -50,5 +62,8 @@ export function uploadErrorMessage(err: unknown): string {
     if ((err as { mark?: string }).mark === TIMEOUT_MARK) return '上傳逾時（網路可能中斷），請再試一次';
     const status = (err as { status?: number }).status;
     if (status === 413) return '圖片總大小超過伺服器限制，請分批上傳';
+    // 後端 4xx 的 message 本來就是給人看的原因（「不是有效的圖片」「圖片像素過大」）
+    const serverMessage = (err as { serverMessage?: string }).serverMessage;
+    if (serverMessage) return serverMessage;
     return '圖片上傳失敗，請再試一次';
 }

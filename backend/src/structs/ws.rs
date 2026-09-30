@@ -42,7 +42,6 @@ impl WsEvent {
     }
 }
 
-/// `POST /ws/messages` 的 body（admin 點對點直送；前身是 `routes/ws.rs` 的 `SendMessageParams`）。
 /// `POST /ws/messages` 的回應。失敗一律走非 2xx，所以成功時恆為 `true`
 #[derive(serde::Serialize)]
 pub struct SendMessageResponse {
@@ -55,6 +54,7 @@ pub struct WsTicketResponse {
     pub ticket: String,
 }
 
+/// `POST /ws/messages` 的 body（admin 點對點直送；前身是 `routes/ws.rs` 的 `SendMessageParams`）。
 #[derive(serde::Deserialize)]
 pub struct SendMessageRequest {
     pub addr: String,

@@ -1,7 +1,7 @@
 "use server";
 
 import adminRequest from "@/libs/adminRequest";
-import { toActionFailure, type ActionResult } from "@/libs/api-error";
+import { runAction, type ActionResult } from "@/libs/api-error";
 import type { AuthUser, PasskeyItem } from "@/types";
 import type {
     PublicKeyCredentialCreationOptionsJSON,
@@ -20,17 +20,14 @@ export async function getMe(): Promise<AuthUser> {
 
 /** 回結果而不 throw：client 要靠 status 分辨「目前密碼錯誤（422）」，throw 的話 production 會被剝掉 */
 export async function postChangePassword(body: ChangePasswordBody): Promise<ActionResult> {
-    try {
+    return runAction(async () => {
         await adminRequest<void>({
             url: `${process.env.API_URL}/admin/auth/change_password`,
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         });
-        return { ok: true, data: undefined };
-    } catch (e) {
-        return toActionFailure(e);
-    }
+    });
 }
 
 /** passkey 註冊挑戰；ceremony 本體在瀏覽器跑，前端取回傳的 publicKey 內層餵 startRegistration */
@@ -46,17 +43,14 @@ export async function finishPasskeyRegistration(
     credential: RegistrationResponseJSON,
     label: string,
 ): Promise<ActionResult> {
-    try {
+    return runAction(async () => {
         await adminRequest<void>({
             url: `${process.env.API_URL}/admin/auth/passkeys/register/finish`,
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ label, credential }),
         });
-        return { ok: true, data: undefined };
-    } catch (e) {
-        return toActionFailure(e);
-    }
+    });
 }
 
 export async function getPasskeys(): Promise<PasskeyItem[]> {

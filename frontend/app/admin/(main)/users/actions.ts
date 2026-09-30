@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import adminRequest from "@/libs/adminRequest";
-import { toActionFailure, type ActionResult } from "@/libs/api-error";
+import { runAction, type ActionResult } from "@/libs/api-error";
 import type { User } from "@/types";
 
 // 兩支都由 client 元件直接呼叫，所以回結果而不 throw：
@@ -22,7 +22,7 @@ export async function createUser(input: {
         role_ids: input.role_ids,
         ...(input.email ? { email: input.email } : {}),
     };
-    try {
+    return runAction(async () => {
         const user = await adminRequest<User>({
             url: `${process.env.API_URL}/admin/users`,
             method: "POST",
@@ -30,21 +30,16 @@ export async function createUser(input: {
             body: JSON.stringify(body),
         });
         revalidatePath("/admin/users");
-        return { ok: true, data: user };
-    } catch (e) {
-        return toActionFailure(e);
-    }
+        return user;
+    });
 }
 
 export async function deleteUser(id: number): Promise<ActionResult> {
-    try {
+    return runAction(async () => {
         await adminRequest<void>({
             url: `${process.env.API_URL}/admin/users/${id}`,
             method: "DELETE",
         });
         revalidatePath("/admin/users");
-        return { ok: true, data: undefined };
-    } catch (e) {
-        return toActionFailure(e);
-    }
+    });
 }

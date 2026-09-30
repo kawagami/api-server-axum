@@ -90,6 +90,9 @@ const REQUEST_HEADER_PREFIX = 'x-middleware-request-';
  * 這次 render 會以未登入身分跑（會員頁被 memberRequest 的 401 導去登入頁）。
  * 官方做法是 `NextResponse.next({ request: { headers } })`，但 response 由 intl middleware
  * 產生，所以把那組覆寫 header 算出來併進去 —— 與 intl 自己設的覆寫取聯集，不蓋掉它的。
+ *
+ * ⚠️ 兩個 header 名稱是 Next 內部實作（非公開 API），**每次升 Next 都要驗**，步驟見
+ * ARCHITECTURE.md「認證」的會員續期一節。改名時不會報錯，只會讓過期會員被導去登入頁。
  */
 function forwardRequestCookies(res: NextResponse, req: NextRequest): void {
     const carrier = NextResponse.next({ request: { headers: req.headers } });

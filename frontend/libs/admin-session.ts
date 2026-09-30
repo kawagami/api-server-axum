@@ -1,3 +1,5 @@
+import type { CookieWriter } from "@/libs/member-session";
+
 /**
  * admin session cookie 的唯一設定來源。密碼登入、passkey 登入、續期三支 Route Handler
  * 都從這裡寫（比照 `libs/member-session.ts`），效期 / 旗標才不會三份各自漂移。
@@ -11,17 +13,6 @@ const SESSION_MAX_AGE = 60 * 60;
 /** 後端 `POST /admin/auth`、`/admin/auth/passkeys/login/finish`、`/admin/auth/refresh` 的回應（`AdminTokenResponse`） */
 export interface AdminTokens {
     access_token: string;
-}
-
-/** `cookies()`（Route Handler）與 `NextResponse.cookies` 都滿足這個形狀 */
-interface CookieWriter {
-    set(name: string, value: string, options: {
-        httpOnly: boolean;
-        secure: boolean;
-        sameSite: "lax";
-        path: string;
-        maxAge: number;
-    }): unknown;
 }
 
 export function setAdminSessionCookie(cookies: CookieWriter, tokens: AdminTokens): void {

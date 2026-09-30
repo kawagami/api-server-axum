@@ -1,5 +1,5 @@
 use crate::errors::{AppError, RequestError};
-use crate::structs::images::ImageRecord;
+use crate::structs::images::{ImageRecord, UrlPlaceholder};
 use sqlx::{PgConnection, Pool, Postgres};
 
 const RECORD_COLUMNS: &str = "id, storage_key, url, status, width, height, blur_data_url";
@@ -66,7 +66,7 @@ pub async fn get_images_by_urls(
 pub async fn get_placeholders_by_urls(
     pool: &Pool<Postgres>,
     urls: &[String],
-) -> Result<Vec<(String, i32, i32, Option<String>)>, AppError> {
+) -> Result<Vec<UrlPlaceholder>, AppError> {
     Ok(sqlx::query_as(
         "SELECT url, width, height, blur_data_url FROM images
          WHERE url = ANY($1) AND width IS NOT NULL AND height IS NOT NULL",
