@@ -4,6 +4,7 @@ pub mod audit_logs;
 pub mod auth;
 pub mod blog_comments;
 pub mod blogs;
+pub mod food_log;
 pub mod gov_tenders;
 pub mod images;
 pub mod logs;

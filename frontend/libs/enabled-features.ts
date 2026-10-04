@@ -14,6 +14,7 @@ export const BACKEND_FEATURES = [
     { key: "torrents", label: "Torrent 下載" },
     { key: "gov_tenders", label: "政府標案" },
     { key: "message", label: "訪客留言" },
+    { key: "food_log", label: "飲食紀錄" },
 ] as const;
 
 export type BackendFeatureKey = (typeof BACKEND_FEATURES)[number]["key"];

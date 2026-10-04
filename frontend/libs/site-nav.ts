@@ -18,6 +18,7 @@ import {
     Wallet,
     ReceiptText,
     Ticket,
+    Utensils,
     type LucideIcon,
 } from "lucide-react";
 
@@ -55,6 +56,7 @@ export const MEMBER_LINKS: readonly SiteNavItem[] = [
     { key: "profile", href: "/profile", labelKey: "profile", icon: User },
     { key: "notifications", href: "/dashboard/notifications", labelKey: "notifications", icon: Bell },
     { key: "portfolio", href: "/portfolio", labelKey: "portfolio", icon: TrendingUp, feature: "portfolio" },
+    { key: "foodLog", href: "/food-log", labelKey: "foodLog", icon: Utensils, feature: "food_log" },
 ] as const;
 
 /** 依 instance 功能開關過濾導航項目（enabled 來自 resolveEnabledFeatures，null = 全開） */

@@ -5,6 +5,7 @@ pub mod config;
 pub mod blog_comments;
 pub mod blogs;
 pub mod features;
+pub mod food_log;
 pub mod gov_tenders;
 pub mod images;
 pub mod jobs;

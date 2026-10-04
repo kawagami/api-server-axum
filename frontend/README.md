@@ -34,6 +34,7 @@
 | `/{locale}/dashboard` | 個人儀表板（需登入） |
 | `/{locale}/dashboard/notifications` | 通知列表（需登入） |
 | `/{locale}/portfolio` | 投資組合追蹤，記錄持股並查看每日漲跌盈虧（需登入） |
+| `/{locale}/food-log` | 飲食紀錄，吃過的品項一鍵帶入、時間軸、今日 / 本週 / 本月花費（需登入） |
 | `/{locale}/profile` | 個人資料（需登入） |
 | `/{locale}/changelog` | 更新紀錄，直接讀 GitHub commits（來源 repo 由 `GITHUB_REPO` 決定，設成空字串＝關閉此頁） |
 | `/{locale}/about` | 關於頁面 |
@@ -50,7 +51,7 @@
 - **i18n**：next-intl v4，支援 zh-TW / zh-CN / en
 - **Markdown**：react-markdown（rehype-highlight 程式碼高亮、rehype-slug 標題錨點 + 自動目錄 TOC）
 - **圖片**：next/image（自動 WebP 轉換、lazy loading、縮圖）；公開網域 `media.kawa.homes`（nginx 直出 VPS 上的 `/srv/kawa/uploads`），`remotePatterns` 只放行這一個 host
-- **認證**：JWT（`jose`），`proxy.ts`（Next 16 起 middleware 改名）保護 `/admin/*` 與 `/{locale}/dashboard|profile|portfolio`（`proxy.ts` 的 `memberPaths`；各功能的設定子頁由所屬 prefix 涵蓋，沒有獨立的 `/{locale}/settings`）
+- **認證**：JWT（`jose`），`proxy.ts`（Next 16 起 middleware 改名）保護 `/admin/*` 與 `/{locale}/dashboard|profile|portfolio|food-log`（`proxy.ts` 的 `memberPaths`；各功能的設定子頁由所屬 prefix 涵蓋，沒有獨立的 `/{locale}/settings`）
 - **後端 API**：`https://api.kawa.homes`（Rust Axum；舊名 `axum.kawa.homes` 仍為有效 alias）
 - **WebSocket**：`wss://api.kawa.homes`
 - **部署**：Docker multi-stage build，standalone output

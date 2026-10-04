@@ -1,6 +1,7 @@
 // 後端 API 共用型別 — 依資源拆檔，此檔只做 barrel re-export（既有 `@/types` import 不受影響）
 export * from './pagination';
 export * from './portfolio';
+export * from './food-log';
 export * from './blog';
 export * from './blog-comment';
 export * from './stock';

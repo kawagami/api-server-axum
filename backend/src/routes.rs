@@ -10,6 +10,7 @@ mod admin_blogs;
 mod audit_logs;
 mod auth;
 mod blogs;
+mod food_log;
 mod logs;
 mod images;
 mod members;
@@ -194,6 +195,7 @@ pub async fn app(log_rx: mpsc::Receiver<LogEntry>) -> Router {
         .nest("/members", members::new(state.clone()))
         .nest("/messages", with_feature(state.clone(), Feature::Message, messages::new(state.clone())))
         .nest("/member/portfolio", with_feature(state.clone(), Feature::Portfolio, portfolio::new(state.clone())))
+        .nest("/member/food_log", with_feature(state.clone(), Feature::FoodLog, food_log::new(state.clone())))
         .nest("/member/vocab", with_feature(state.clone(), Feature::Vocab, vocab::new(state.clone())))
         .nest("/oauth", oauth::new(state.clone()))
         .nest("/logs", logs::new(state.clone()))

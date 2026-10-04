@@ -60,7 +60,7 @@ src/
 │   ├── admin_stats.rs    # /admin/stats/visitors — GET 每日不重複到訪（需 stat:read；today 即時 PFCOUNT + last_n_days_unique 跨日去重 + history 歷史）
 │   ├── admin_blogs.rs    # /admin/blogs — GET 分頁列表（需 blog:read；`?tag=&q=&sort=`，回 AdminBlogListItem＝**不含 markdown**；擁有者只由 session 決定、不吃 author 參數）、PUT（需 blog:update，body 只收 { markdown, tags }；tocs 由後端解析）、DELETE（需 blog:delete）；另有 tag 批次操作 PATCH /tags（改名合併，body { from, to }）與 DELETE /tags?tag=（全站移除該 tag），兩支都需 blog:update、回 { affected } 受影響文章數，且只動自己的文章（super_admin 全站）
 │   └── app_settings.rs   # /admin/settings — GET（需 setting:read）、PATCH /:key（需 setting:update）
-├── services/          # 業務邏輯（26 支：app_settings, audit_logs, auth, blog_comments, blogs, email, gov_tenders, images, logs, members, messages, oauth, portfolio, roles, roster, stats, stocks, system_metrics, tools, torrents, twse, users, vocab, vocab_ja, webauthn, ws；`roster` 是純函式零 IO 的排班演算法，附 13 測）
+├── services/          # 業務邏輯（27 支：app_settings, audit_logs, auth, blog_comments, blogs, email, food_log, gov_tenders, images, logs, members, messages, oauth, portfolio, roles, roster, stats, stocks, system_metrics, tools, torrents, twse, users, vocab, vocab_ja, webauthn, ws；`roster` 是純函式零 IO 的排班演算法，附 13 測）
 │   ├── auth.rs        # 登入/JWT + `load_identity`（顯示名/super_admin/權限的**唯一**載入點，Redis 命中＝零 DB）
 │   ├── twse.rs        # TWSE API 共用層 — headers、parse、全域 semaphore(1) 防 rate limit
 │   ├── stats.rs       # 到訪統計（今日 PFCOUNT + 跨日去重 + 歷史，三支併發）與 WS 採集入口
@@ -178,7 +178,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 
 每套部署可開關的功能（instance-per-merchant 產品化基礎），設計定案見 `docs/2026-07-19-enabled-features-plan.md`。
 
-- **key 權威 = `structs/features.rs` 的 `Feature` enum**（10 個：blog / tools / roster / games / stocks / portfolio / vocab / torrents / gov_tenders / message）。核心永不受控：admin 基礎、members/oauth、ws 基礎連線、logs/metrics、uploads。
+- **key 權威 = `structs/features.rs` 的 `Feature` enum**（11 個：blog / tools / roster / games / stocks / portfolio / vocab / torrents / gov_tenders / message / food_log）。核心永不受控：admin 基礎、members/oauth、ws 基礎連線、logs/metrics、uploads。
 - 設定值：`all` = 全開（本站預設，未來新功能自動開）；JSON 字串陣列 = 白名單（商家 instance，新功能預設關）。PATCH 嚴格驗證（未知 key / 重複 / `portfolio` 未帶 `stocks` 皆 422）。
 - **平台保留 key**（`services/app_settings.rs` 的 `RESERVED_KEYS`，目前 **4 個**：`enabled_features`、`webauthn_rp_id`、`webauthn_rp_origin`、`new_user_default_roles`——最後一個決定「新建管理員預設掛哪些角色」，那是平台層的權限決策，不該只要 `setting:update` 就能改，否則等於另開一條指派角色的門）：GET `/admin/settings` 無 `platform:read` 者直接濾掉、PATCH 需 `platform:update`（一般 key 仍走 `setting:update`）。商家管理員拿 `setting:*` 管日常設定，碰不到保留 key；前端專頁 `/admin/platform`。新增保留 key = `RESERVED_KEYS` 加一項。
 - 檢查是 sync set lookup：`Settings::reload()` 時 parse 成 `Option<HashSet<Feature>>`（None = 全開），`state.get_settings().feature_enabled(Feature::X)`。熱更新即時生效、不重啟。
@@ -715,6 +715,17 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
   - **`stock_ex_rights_checked.covered_until` = 已向 TWSE 確認到哪天（含）**，每次從那天接著往後查。舊設計是「DB 有任何一筆就直接用 + checked 30 天內可信」，參數對了也會在第一次配息之後再也補不進新的配息。涵蓋到今天的紀錄 `EX_RIGHTS_RECHECK_HOURS`(6) 後重查今天（當天可能是公告前查的）；Redis key 帶 `to` 日期、TTL 1 小時，**只快取完整涵蓋的結果**（部分結果快取會蓋住下次補抓）。
   - **分段、由舊到新**：TWT49U 沒有個股篩選、回全市場，實測一年 ≈ 250 KB / 5 秒、四年多 ≈ 25 秒，逼近 client 30 秒 timeout，所以切 `EX_RIGHTS_CHUNK_DAYS`(365) 一段、每段吃一次 `UpstreamBudget`。方向與收盤價（由新到舊）**相反**：還原因子要從買進日一路累乘，缺舊段整條都錯；進度存在 `covered_until`，逾預算下次請求從斷點接著查。
   - ⚠️ **`upsert_ex_rights_checked` 只能寫在該段 `upsert_ex_rights` 成功之後、且預算檢查必須在它之前 return**：那筆紀錄代表「這段 DB 裡沒有的就是真的沒有」，沒真的問、或問了沒存進去就寫，等於騙自己。
+
+## 飲食紀錄（food_log）
+
+`/member/food_log`（2026-10-04），取代會員手寫的每日飲食紀錄：吃了什麼、在哪買、花多少、評分與心得。重點是金額與日記，**不記熱量**（要加就補一個可空 `kcal` 欄）。
+
+- **兩張表**（migration `20261004000000`）：`food_log_entries`（一筆一品項；`meal` 是 `breakfast/lunch/dinner/snack/late_night/other` 加 CHECK、`amount` 是**該行總價**的台幣整數且可 NULL＝點數兌換 / 請客、`meal_label` 是餐別之外的情境）與 `food_log_days`（當天的非飲食備註，PK `(member_id, day)`，沒寫就沒有列；PUT 空白＝刪除）。日期一律台北日 `DATE`。
+- **刻意沒有食物目錄表**：「常吃 / 最近」選項（`GET /suggestions`）直接對近 `SUGGESTION_LOOKBACK_DAYS`(365) 天的紀錄依 `(store, item)` 聚合，帶最近一次的數量 / 金額與**各餐別次數**（`meal_counts`），前端切餐別時自己重排、不再打 API。打錯字的品項改那一筆紀錄就從選項消失，不必另外維護目錄。`store` 為 NULL 的自成一組，JOIN 用 `IS NOT DISTINCT FROM`。
+- **餐別順序只有一份**：`Meal::ALL`，SQL 端用 `array_position($n::text[], meal)` 綁這份清單排序；前端 `food-log/model.ts` 的 `MEALS` 是同順序的顯示用複本。
+- 驗證是純函式（`FoodLogEntryRequest::validate(today)`、`FoodLogDaysQuery::resolve(today)`，`structs/food_log.rs`，附測）：日期不早於 2000-01-01 且不晚於台北今日、長度以**字元**計（中文 3 bytes，用 `len()` 會把上限砍成三分之一）、`GET /days` 單次最多 `MAX_DAYS_SPAN`(92) 天。依日分組（含只有備註的日子）是 `services/food_log.rs::group_days`。
+- 走 `with_member_auth`：寫入進 `admin_audit_logs`（audit 只記 path / query、不記 body，所以心得內容不會進稽核表）。
+- **背景**：2026-09-11 砍掉的記帳本（`ledger_entries`，commit `26b9b45`）是通用收支記帳，砍的原因是**太少使用**。這個功能的輸入設計因此以「吃過的點一下就記好」為主（前端快速記錄區），沒吃過的才開表單；別把它做回表單為主的記帳 UI。
 
 ## 操作稽核（admin_audit_logs）
 

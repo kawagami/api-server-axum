@@ -15,6 +15,7 @@ pub enum Feature {
     Torrents,
     GovTenders,
     Message,
+    FoodLog,
 }
 
 impl Feature {
@@ -29,6 +30,7 @@ impl Feature {
         Feature::Torrents,
         Feature::GovTenders,
         Feature::Message,
+        Feature::FoodLog,
     ];
 
     pub fn as_str(&self) -> &'static str {
@@ -43,6 +45,7 @@ impl Feature {
             Feature::Torrents => "torrents",
             Feature::GovTenders => "gov_tenders",
             Feature::Message => "message",
+            Feature::FoodLog => "food_log",
         }
     }
 

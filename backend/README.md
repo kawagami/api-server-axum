@@ -50,6 +50,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/oauth` | member OAuth 登入（Google / GitHub / LINE）、token refresh |
 | `/members` | member 管理 |
 | `/member/portfolio` | member 投資組合 CRUD、即時損益總覽（含今日 / 近一週 / 近一月增減）、歷史價格 / 還原成本（需 Bearer token） |
+| `/member/food_log` | member 飲食紀錄：品項 CRUD、時間軸（`GET /days?from=&to=`，依日依餐別分組含當日合計與備註）、當日備註（`PUT /days/{date}`）、一鍵帶入選項（`GET /suggestions`）、今日 / 本週 / 本月花費（`GET /summary`）（需 Bearer token） |
 | `/member/vocab` | 單字闖關開局 / 答題 / 提早結束（`POST /runs/{id}/finish`）/ 個人統計 / 錯題清單（`GET /mistakes`）/ 週期排行榜（en / ja） |
 | `/settings/public` | 公開設定（白名單，如 `site_theme`，無認證） |
 | `/blogs` | 部落格查詢（列表 / tags / tags 計數（`GET /tags/counts`）/ 單篇 / 單篇留言，公開；列表、單篇、兩支 tags 帶 `Cache-Control: s-maxage=60`，`?q=` 關鍵字上限 100 字） |
