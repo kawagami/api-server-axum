@@ -622,6 +622,7 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
 - **例外:webauthn-rs 硬依賴 OpenSSL ≥3.0**,故 openssl crate 開 `vendored` feature（隨原始碼編譯靜態連結,不吃系統/基底 image 的 libssl;本機 WSL 1.1.1 也能編）
 - C 依賴可用:aws-lc-sys（librqbit）0.43 起走 **cc builder,不需要 cmake**（2026-08-28 已從 Dockerfile 移除那行 apt-get;證據:本機 WSL 無 cmake 卻編出 `target/release/build/aws-lc-sys-*/out/libaws_lc_0_43_0_crypto.a`,同一個 target triple `x86_64-unknown-linux-gnu`。若哪天 build 掛在 aws-lc-sys 找不到 cmake,把那行加回來即可）、libwebp-sys（webp crate）走 cc、vendored openssl 需 perl/make（基底內建 gcc/make/perl）
 - 最終 image 無 shell,`docker exec` 進不去;debug 靠 log
+- **Rust 版本釘在 `backend/rust-toolchain.toml`**（2026-10-05 起，現為 1.99.0），`Dockerfile` 的 `FROM rust:X.Y-bookworm` 與 `.github/workflows/backend.yml` 的 `toolchain:` 三處同步。在此之前 Dockerfile 釘 1.98、CI 的 clippy 吃浮動 stable：1.99 發佈後把 `AtomicUsize::fetch_update` 標成 deprecated（改名 `try_update`），沒改任何程式碼 CI 就紅燈、部署被擋，而 image 照樣用 1.98 編過。升版是主動的事：改這三處、跑一次 clippy 修掉新 lint 再 push
 
 ## 政府採購網標案追蹤（gov_tenders）
 

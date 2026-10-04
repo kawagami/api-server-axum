@@ -81,9 +81,9 @@ impl UpstreamBudget {
         if Instant::now() >= self.deadline {
             return false;
         }
-        // fetch_update：額度歸零後不再往下減，避免 wrap
+        // try_update：額度歸零後不再往下減，避免 wrap（1.99 前叫 fetch_update，已 deprecated）
         self.remaining
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
                 (n > 0).then(|| n - 1)
             })
             .is_ok()

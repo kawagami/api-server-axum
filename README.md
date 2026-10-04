@@ -70,7 +70,7 @@ deploy/ ──CI rsync──▶ VPS ~/kawa-deploy(compose + nginx + certbot)
 
 **前置需求**
 
-- Rust stable(Dockerfile 用 1.98)
+- Rust 1.99.0(由 `backend/rust-toolchain.toml` 釘住,rustup 進 `backend/` 會自動切換;升版要同步 `backend/Dockerfile` 與 `.github/workflows/backend.yml`)
 - Node 24;pnpm 版本由 `package.json` 的 `packageManager` 釘住,`corepack enable` 即可
 - 後端需先有 **PostgreSQL** 與 **Redis/Valkey** 可連(連不上 Redis 會直接 panic)
 - **migration 於後端啟動時自動執行**(`sqlx::migrate!`),不需手動跑

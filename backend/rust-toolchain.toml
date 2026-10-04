@@ -1,0 +1,7 @@
+# 本機 / CI / Docker 的 Rust 版本唯一基準。升版時同步改：
+#   backend/Dockerfile 的 `FROM rust:X.Y-bookworm`
+#   .github/workflows/backend.yml 的 `toolchain:`
+# 不用浮動的 stable：新版 stable 的 lint 會在沒改程式碼時讓 CI 的 clippy（-D warnings）紅燈。
+[toolchain]
+channel = "1.99.0"
+components = ["clippy", "rustfmt"]
