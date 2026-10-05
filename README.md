@@ -13,6 +13,7 @@
 ├── backend/            # Rust / Axum API 伺服器
 ├── frontend/           # Next.js 前台 + 後台
 ├── deploy/             # VPS 部署編排(compose / nginx / certbot),詳見 deploy/README.md
+├── protocol/           # 跨前後端協定文件(games-wire.md:對戰遊戲 WS 協定權威)
 ├── scripts/            # 維運 / 資料匯入腳本(kawa-logs 查 production log、單字題庫匯入)
 └── .github/
     ├── dependabot.yml  # cargo / npm / actions / docker 基底 image 依賴更新 PR
@@ -22,7 +23,7 @@
         └── deploy.yml    # 編排 CI:paths 過濾 deploy/**,PR 驗 nginx -t;push 驗證後 rsync 到 VPS 並套用
 ```
 
-各子專案的細節見各自目錄下的說明;本 README 只講整體與整合。
+各子專案的細節見各自目錄下的 `README.md` 與 `ARCHITECTURE.md`(架構 / 不變式 / 技術債);本 README 只講整體與整合。
 
 ## 技術棧
 
@@ -37,15 +38,15 @@
 
 - **部落格**:文章 CRUD、標籤、Markdown 閱讀頁 + TOC、文章留言
 - **後台管理**:RBAC 權限(user/role/permission)、passkey 登入(WebAuthn)、稽核紀錄、站台設定熱更新、主題切換、平台設定頁(`platform:read`,instance 功能開關)
-- **會員系統**:OAuth 登入(Google / GitHub / LINE)、投資組合、單字闖關、即時通知(`/{locale}/dashboard/notifications`,走 WebSocket)
+- **會員系統**:OAuth 登入(Google / GitHub / LINE)、投資組合、單字闖關、飲食紀錄(`/{locale}/food-log`,依日依餐別記錄、花費統計)、即時通知(`/{locale}/dashboard/notifications`,走 WebSocket)
 - **單字闖關**:英文 / 日文生存模式、學習進度、週期排行榜
 - **對戰遊戲平台**(WebSocket):象棋、五子棋、暗棋、西洋棋、圍棋、阿瓦隆、農場經營;另有單機 wasm 的越南大戰(Bevy)
 - **股票**:庫藏股追蹤、股價變動追蹤、每日行情
-- **觀測**:應用日誌、系統指標時間序列、操作稽核、不重複到訪統計(後台 `/admin/logs`、`/admin/metrics`)
+- **觀測**:應用日誌、系統指標時間序列、操作稽核、不重複到訪統計(後台 `/admin/logs`、`/admin/metrics`、`/admin/audit_logs`、`/admin/stats`)
 - **工具**:排班(環狀 pattern 演算法,公開無認證)、計時三合一、文字繁簡轉換、密碼產生、聯絡表單(訪客留言給站長,僅後台可見)
 - **後台工具**:Torrent 下載、政府採購網標案追蹤
 - **圖片**:上傳即轉 WebP,由 `media.kawa.homes` 靜態提供;後台可管理
-- **Email 通知**:torrent 下載完成、標案新公告
+- **Email 通知**:torrent 下載完成、標案新公告、新庫藏股公告
 - **更新紀錄**:`/{locale}/changelog` 直接讀 GitHub commits(不經後端)
 
 ## 三個部分如何串接
@@ -89,8 +90,8 @@ cd frontend && pnpm install && pnpm dev
 
 - **Path-based CI**:改 `backend/**` 只觸發 `backend.yml`、改 `frontend/**` 只觸發 `frontend.yml`、改 `deploy/**` 只觸發 `deploy.yml`(同步編排設定,不重 build image),互不重複執行。改 workflow 檔本身也會觸發該條。
 - **PR 只跑驗證**:前後端 PR 只跑 `test`、`deploy.yml` 的 PR 只跑 `nginx -t`(自簽憑證);不推 image、不碰 VPS。Dependabot PR 靠這段驗證。
-- 前後端 workflow 拆成 `test`(後端 clippy + cargo test、前端 tsc --noEmit)、`build`(build+push image)與 `deploy`(SSH VPS)三段。**`build` 刻意不掛 `needs: test`,與 test 並行**(build 是全新 runner、用不到 test 的產物,並行省掉整個 test 的時間);閘門掛在 `deploy: needs: [test, build]` —— **test 不過不會部署,但 image 仍會被推上 Docker Hub**,所以 `:latest` 有可能指向沒過測試的 commit,手動 `docker pull :latest` 前要留意。三條的 `deploy` 共用 `concurrency: vps-deploy`,**build 並行、部署序列化**,避免同時動 VPS 撞車。
-- `deploy.yml` push 流程:上傳到 VPS staging 目錄 → `docker compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → 一次性容器跑 `nginx -t` → 重建 nginx 容器 → 打 `https://api.kawa.homes/health` 冒煙檢查。
+- 前後端 workflow 拆成 `test`(後端 layering 檢查 + clippy + cargo test、前端 tsc --noEmit + eslint + 慣例檢查腳本)、`build`(build+push image)與 `deploy`(SSH VPS)三段。**`build` 刻意不掛 `needs: test`,與 test 並行**(build 是全新 runner、用不到 test 的產物,並行省掉整個 test 的時間);閘門掛在 `deploy: needs: [test, build]` —— **test 不過不會部署,但 image 仍會被推上 Docker Hub**,所以 `:latest` 有可能指向沒過測試的 commit,手動 `docker pull :latest` 前要留意。三條的 `deploy` 共用 `concurrency: vps-deploy`,**build 並行、部署序列化**,避免同時動 VPS 撞車。
+- `deploy.yml` push 流程:上傳到 VPS staging 目錄 → `docker compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `docker compose up -d` → 一次性容器跑 `nginx -t` → 重建 nginx 容器 → 打 `https://api.kawa.homes/health` 冒煙檢查。
 - image 同時推 `:latest`(部署契約)與 `:<commit sha>`(回滾用)。
 - **push `master` = 直接上 production**(test 與 build image 並行 → 兩者都過才 SSH VPS → pull + 重啟)。
 - 環境變數一律 **runtime 注入**,image 內不烤設定值;秘密值只存在 VPS `/srv/kawa/env/`(範例見 `deploy/env.example/`)。
