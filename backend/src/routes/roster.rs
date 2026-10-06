@@ -70,7 +70,7 @@ mod tests {
         assert_eq!(value["warnings"].as_array().unwrap().len(), 0);
     }
 
-    /// 警告碼的字面是契約：前端 `tools/roster/page.tsx` 的 `WARNING_KEYS` 靠它查 i18n
+    /// 警告碼的字面是契約：前端 `tools/roster/roster-result.tsx` 的 `WARNING_KEYS` 靠它查 i18n
     #[tokio::test]
     async fn warning_codes_are_stable_snake_case() {
         let Json(response) = calculate_roster(Json(payload(2, 7))).await.unwrap();

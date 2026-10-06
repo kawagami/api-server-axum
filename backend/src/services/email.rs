@@ -53,7 +53,7 @@ pub async fn send_to(
     };
 
     // 總嘗試次數（含第一次）。理由同 `utils::reqwest::send_retrying`：這台機器對外連線
-    // 偶爾會在 connect 階段抖一下，而通知信失敗的代價是「使用者不知道自己中獎」。
+    // 偶爾會在 connect 階段抖一下，而通知信失敗的代價是「新標案 / 庫藏股公告沒人知道」。
     const ATTEMPTS: u32 = 3;
     const BACKOFF_MS: u64 = 300;
 
@@ -90,7 +90,7 @@ pub async fn send_to(
 /// 只有「**連線階段**」的失敗才重試。
 ///
 /// 訊息一旦進了 SMTP 對話（對方回了狀態碼、或連線在 DATA 之後斷掉），重試就可能讓
-/// 同一封信寄兩次 —— 對中獎通知來說那比慢一輪更糟。判斷方式是往 source chain 找
+/// 同一封信寄兩次 —— 對通知信來說那比慢一輪更糟。判斷方式是往 source chain 找
 /// `io::Error`，只認那幾種「還沒接上」的 kind（`is_timeout` 也是這樣實作的）。
 fn is_connection_failure(err: &anyhow::Error) -> bool {
     let mut source: Option<&(dyn std::error::Error + 'static)> = Some(err.as_ref());
@@ -112,8 +112,8 @@ fn is_connection_failure(err: &anyhow::Error) -> bool {
 
 /// 已建好的 transport（帶 lettre 的連線池，見 Cargo.toml 的 `pool` feature）。
 ///
-/// 每封信重建一個 transport＝每封信一次完整的 TCP + STARTTLS + AUTH 握手，而中獎/標案
-/// 通知都是「一個收件人一封」的迴圈；憑證沒變就重用同一個，池才留得住連線。
+/// 每封信重建一個 transport＝每封信一次完整的 TCP + STARTTLS + AUTH 握手，而標案 /
+/// 庫藏股 / torrent 完成通知可能同一輪接連寄出；憑證沒變就重用同一個，池才留得住連線。
 ///
 /// 用 `std::sync::Mutex` 而非 tokio 的：臨界區只有 clone 與 build，都是同步的，
 /// **不跨 `.await`**（`send` 拿到 clone 之後才 await，鎖早已釋放）。

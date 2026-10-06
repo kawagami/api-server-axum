@@ -9,7 +9,7 @@ const LOG_COLUMNS: &str = "id, level, message, target, file, line, request_id, f
 
 /// list 與 count 共用的篩選條件。**兩邊的 bind 順序必須一致**（$1..$6），
 /// 加參數要同時改 `get_logs` 與 `count_logs` 的 bind ——
-/// 條件寫兩份就是 total 與 data 對不上的來源（範本同 `repositories/vocab.rs::ADMIN_FILTER`）。
+/// 條件寫兩份就是 total 與 data 對不上的來源（範本同 `repositories/vocab/admin.rs::ADMIN_FILTER`）。
 ///
 /// `q` 一併掃 `fields::text`：錯誤細節現在存在 fields 裡（`?self`），只搜 message
 /// 會搜不到有用的東西。這張表只收 WARN+ 故量小，無索引的 ILIKE 可接受；

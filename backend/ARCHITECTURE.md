@@ -236,7 +236,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 | `GET /storage` | `torrent:read` | 磁碟剩餘空間（statvfs）+ torrent 配額用量 |
 | `GET /{id}` | `torrent:read` | 詳情；進行中任務附 `live` 即時進度（`structs/torrents.rs::TorrentDetail` / `TorrentLive`；`live` 與 WS `torrent_progress` 共用 `TorrentLive`，由 `manager.rs::live_progress` 單一來源產生 —— 2026-09-29 前兩處各手組一份 `json!`） |
 | `POST /{id}/download_links` | `torrent:read` | 產生短效簽名下載連結（效期 `torrent_link_ttl_minutes`） |
-| `GET /{id}/files/{file_index}?token=` | 簽名 token | 串流下載，支援 Range；**不掛 JWT middleware**，但 token 內嵌發行者 email，下載時即時重查 `torrent:read` 權限 |
+| `GET /{id}/files/{file_index}?token=` | 簽名 token | 串流下載，支援 Range；**不掛 JWT middleware**，但 token 的 `sub` 內嵌發行者 user id，下載時走 `load_identity` 即時重查 `torrent:read` 權限 |
 | `PATCH /{id}/pending` | `torrent:create` | failed/completed 重設重跑 |
 | `DELETE /{id}` | `torrent:delete` | 停任務 + 刪 DB + 刪磁碟 |
 
@@ -291,7 +291,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 ## WebSocket 推送
 
 `AppState::broadcast(event, data)` 廣播事件給所有連線中的 WS 客戶端。
-`AppState::broadcast_to_admins(event, data)` 只推給已通過 admin 驗證的連線 —— **含個資（IP / email）的事件一律走這個**（目前 `user_joined` / `user_left`）。
+`AppState::broadcast_to_admins(event, data)` 只推給已通過 admin 驗證的連線 —— **含個資（IP / UA / 管理員名）的事件一律走這個**（目前 `user_joined` / `user_left`）。
 
 ```rust
 state.broadcast(WsEvent::StockCompleted, serde_json::json!({ "stock_no": "2330" }));
@@ -321,7 +321,7 @@ state.broadcast(WsEvent::StockCompleted, serde_json::json!({ "stock_no": "2330" 
 
 - **為什麼是 INFO 不是 debug**：生產的 `RUST_LOG` 天花板是 `info`，WS 這邊原本清一色 `debug!`，於是在生產**根本不存在**（EnvFilter 就擋掉，stdout 與 `logs` 表兩邊都沒有）——「一群人同時掉線」事後完全無跡可循。量級是每條連線一行；要落 `logs` 表仍需把 `log_db_level` 調到 INFO，但 stdout 一定有。
 - **逐則收訊/送出失敗維持 debug 不變**（理由見上面的分級判準，那是關分頁的常態）。摘要不是取代它們，是補上「這條連線整體怎麼收場」。
-- **`handle_socket` 掛在一條 `ws` span 上**（`conn` / `ip` / `email` / `request_id`，`instrument` 顯式帶過去 —— `on_upgrade` 的 future 由 hyper 在另一個 task 驅動，span context 不會自己跟）。在此之前 upgrade 之後的所有 WS log 既沒 request_id（task-local 留在握手那個 task）也沒結構化欄位，`logs` 表裡只剩一段夾著 SocketAddr 的字串，對不回任何連線或握手請求。
+- **`handle_socket` 掛在一條 `ws` span 上**（`conn` / `ip` / `user` / `request_id`，`instrument` 顯式帶過去 —— `on_upgrade` 的 future 由 hyper 在另一個 task 驅動，span context 不會自己跟）。在此之前 upgrade 之後的所有 WS log 既沒 request_id（task-local 留在握手那個 task）也沒結構化欄位，`logs` 表裡只剩一段夾著 SocketAddr 的字串，對不回任何連線或握手請求。
 
 **為什麼不能只靠 send 失敗**：對端消失但 TCP 沒斷（拔網路、手機睡眠、NAT 逾時）時寫入會先進 kernel buffer 而「成功」，可能好幾分鐘才回報錯誤。期間那條連線會一直掛在 `connections` map（後台連線列表看得到）與遊戲桌位上（對手在等一個永遠不會來的走步）。瀏覽器的 WS 實作會自動回 Pong，所以收不到就是真的沒人在了。
 
@@ -350,7 +350,7 @@ JWT **不走** WS URL query（會進 access log）。流程：登入中的 admin
 
 ### 統一信封
 
-所有送出端走 `structs/ws.rs` 的 `envelope(type, data)`（通知）／`game_envelope(game, type, data)`（遊戲）序列化，杜絕格式長歪。應用層訊息一律 `{ type, data, game? }`（`game` 僅遊戲訊息帶）。`process_message` 收到非 JSON / 未知訊息**一律忽略**（無 echo）。admin 點對點直送 = `{ type: "admin_message", data: { content, from } }`（`from` = 管理員 email，型別走 `WsEvent::AdminMessage`）。
+所有送出端走 `structs/ws.rs` 的 `envelope(type, data)`（通知）／`game_envelope(game, type, data)`（遊戲）序列化，杜絕格式長歪。應用層訊息一律 `{ type, data, game? }`（`game` 僅遊戲訊息帶）。`process_message` 收到非 JSON / 未知訊息**一律忽略**（無 echo）。admin 點對點直送 = `{ type: "admin_message", data: { content, from } }`（`from` = 管理員顯示名 `users.name`，型別走 `WsEvent::AdminMessage`）。
 
 ## 對戰遊戲框架（複用 `/ws`，點對點）
 
@@ -583,7 +583,7 @@ pub async fn run(state: AppState) {
 
 ## 本機端到端驗證（起一套拋棄式環境）
 
-`cargo test` 只有純函式測試，任何「這支端點真的擋住了嗎」都得起真的服務。本機有 docker，配方如下（2026-08-01 實跑過）：
+`cargo test` 只有純函式測試（外加 `repositories/redis.rs` 需要真 Redis 的整合測試，CI 有 valkey service），任何「這支端點真的擋住了嗎」都得起真的服務。本機有 docker，配方如下（2026-08-01 實跑過）：
 
 ```bash
 # 1. DB + Redis。valkey 映射到哪個 port 都行，REDIS_URL 帶得動（2026-08-01 起；
@@ -786,7 +786,7 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
     的重試在 job 層（`run_with_retries`，退避 **3600 秒**），重新 resolve 其實只要 250ms。
 - `services/email.rs` —— 同樣的形狀，但判斷條件是往 source chain 找 `io::Error` 的 kind
   （`AddrNotAvailable` / `ConnectionRefused` / `NetworkUnreachable` / `HostUnreachable` / `TimedOut`）。
-  **信一旦進了 SMTP 對話就不重試** —— 重試會讓同一封中獎通知寄兩次，那比慢一輪更糟。
+  **信一旦進了 SMTP 對話就不重試** —— 重試會讓同一封通知信寄兩次，那比慢一輪更糟。
 - 兩者都會在重試前記一筆 WARN，所以「有抖動但撐過去了」在 `logs` 表看得到，不會變成靜默。
   ⚠️ reqwest 那筆走 `error_chain()` 印**整條 source chain** —— `reqwest::Error` 的 Display
   只有 `error sending request for url (…)`，errno 全在底下。08-09 追這個問題時就是卡在這裡：
@@ -844,12 +844,12 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 
 ## 待清理 / 已知技術債
 
-2026-07-31 全後端盤點（當時 `routes/` 32 檔、`services/` 27、`repositories/` 28、13 job、7 遊戲、29 migration）的結果。**2026-09-11 重數：`routes/` 28、`services/` 26、`repositories/` 25、11 job、7 遊戲、36 migration** —— 該日移除記帳／發票／樂透三個功能（2026-09-03 曾記 `services/` 31、migration 35、`routes/` 32、`repositories/` 28、13 job）。下列都**已確認存在、有具體落點**，不必再重新調查。
+2026-07-31 全後端盤點（當時 `routes/` 32 檔、`services/` 27、`repositories/` 28、13 job、7 遊戲、29 migration）的結果。**2026-09-11 重數：`routes/` 28、`services/` 26、`repositories/` 25、11 job、7 遊戲、36 migration** —— 該日移除記帳／發票／樂透三個功能（2026-09-03 曾記 `services/` 31、migration 35、`routes/` 32、`repositories/` 28、13 job）。**2026-10-06 重數：`routes/` 29、`services/` 27、`repositories/` 30、11 job、7 遊戲、40 migration**（food_log 的 route / service / repository 各 +1；`repositories/vocab.rs` 拆成目錄 +4 檔）。下列都**已確認存在、有具體落點**，不必再重新調查。
 
 **原有項**
 - `tools`、`roster` 完全公開（無 JWT）。`roster` 為刻意設計；兩者共用同一組 Redis rate limit（20 req/60s per IP）。
   **排班演算法在 `services/roster.rs`**（純函式、13 測）：組一份長度等於人數的環狀 pattern，第 i 位第 d 天讀 `pattern[(i + d) % 人數]` —— 每天所有人讀到的位置正好是 pattern 的一個排列，所以**每日各班人數恆等於 pattern 裡的張數**，覆蓋洞構造上不可能發生。pattern 內「早班在前、晚班在後、段間插休假（Bresenham 平均散開）」負責兩條硬約束（晚班不接隔日早班、連續上班上限）；段組成全同會產生短週期（= 有人班表逐日相同），偵測到就把首尾段互換一個早／晚打散。人力不足時**覆蓋優先**，另回 `RosterWarning`（`understaffed` / `shift_uncovered` / `night_to_morning` / `max_consecutive_exceeded`）。**警告碼刻意不帶中文文案**（後端訊息全是寫死繁中，前端 i18n 才能給 en / zh-CN），字面是前端契約。
-- **sqlx 全走 runtime query**（`sqlx::query(` / `query_scalar(` / `query_as::<>`，零 `query!` 巨集）＝**SQL 沒有編譯期驗證**，改欄位名或型別要到 runtime 才炸。取捨是不必在 build 時連 DB；要補的話走 `cargo sqlx prepare` 的 offline 模式（CI 已經有 DB service 的基礎設施）。
+- **sqlx 全走 runtime query**（`sqlx::query(` / `query_scalar(` / `query_as::<>`，零 `query!` 巨集）＝**SQL 沒有編譯期驗證**，改欄位名或型別要到 runtime 才炸。取捨是不必在 build 時連 DB；要補的話走 `cargo sqlx prepare` 的 offline 模式（`.sqlx/` 進版控、編譯時 `SQLX_OFFLINE=true`，CI 與 Docker build 都不必連 DB；⚠️ CI 只有 valkey service，**沒有** PG）。
 - ~~無 `[profile.release]`~~ **已實測，決定維持現況不加**（2026-08-19，本機 4 核 WSL，各單次冷編譯 540 個 dep crate）：baseline 276s / 32.55 MiB / 增量 53s；`lto="thin"` 454s / **33.17 MiB（體積反而 +1.9%**，inline 複製壓過死碼消除）/ 增量 99s；`lto="thin"` + `codegen-units=1` 358s / 28.16 MiB(-13.5%) / **增量 142s(+168%)**。體積收益幾乎全來自 `codegen-units=1`，但每次 push 都付重編代價，而後端瓶頸在 I/O（等 PG / Redis / 外部 HTTP），CPU 收益用不到。執行期效能未量測。**要再提這件事請直接引這組數字，不要重跑**（一輪約 20 分鐘）。⚠️ `panic = "abort"` **永久不能加** —— `routes.rs` 用 `CatchPanicLayer`，abort 會讓 handler panic 殺掉整個 process 而不是回 500。Dockerfile 已有 `strip -s`，故 `strip = true` 對產出無差異。
 - ~~`sqlx` 開了用不到的 `any` feature~~（2026-08-19 commit `a9353e7` 已砍）。
 - **`tokio-cron-scheduler` 可換成自寫排程，省 10 個 crate**（獨占 `tokio-cron-scheduler` / `croner` / `chrono-tz` / `derive_builder`×3 / `num-derive` / `phf`×2 / `siphasher`）。可行的原因：11 個 job 的 cron 秒數**全部是 0**，形狀只有三種（每分鐘 / 每小時 `:mm` / 每日 UTC `hh:mm`），所以 `cron_expression()` 可換成 enum + 「睡到下一個整分再問每個 job 要不要跑」的迴圈，next-fire 計算變成可單測的純函式（現在 cron 正確性完全外包給 crate、零測試）。**沒做的理由**：動的是全部 11 個 job 的觸發機制，而失敗形式是「某個 job 靜默不跑」，單元測試證明不了真的準時觸發（要本機拿假 schedule 實跑 + 上線觀察一天）。搬過去時這三件現有語意不能掉：`tokio::spawn(...).await` 接 panic（自寫迴圈更需要，panic 會殺掉那條 loop task 讓 job 永久消失）、feature 開關**每次觸發時**檢查（熱更新即時生效）、防重疊跳過時記 WARN。
@@ -872,9 +872,9 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 - ~~`repositories/members.rs` 的 `member_detail` 打 3 次 DB~~（2026-08-09 收成 2 支併發：`members` 一次取齊、`member_oauth` 不依賴前者）。
 - ~~4 個端點有分頁但完全沒有 total~~（2026-08-07 補齊，含 `/admin/audit_logs`、`/members` 與 `/admin/stocks/day_all`）。**吃 `page`/`per_page` 的端點一律回 `{data,total}` 這個形狀**，沒有例外（型別上沒走 `Paginated<T>` 的有兩支：`/admin/vocab/words` 的 `structs/vocab.rs::AdminWordListResponse` —— 逐字同形，是 2026-08-03 那波收斂之後才長出來的第 6 份，wire 形狀相同故不影響前端；`/member/vocab/mistakes` 的 `MistakesResponse` 多一個 `reviewable`，所以 `{ data, total, reviewable }`）。⚠️ **錯題本 2026-09-29 前是漏網之魚**：它吃 `limit`/`offset`、回 `{ items, total, reviewable }`，字面上不「吃 `page`/`per_page`」所以沒被這條規則涵蓋，現已改成 `PageQuery` + `data`。理由不是對稱：前端 `usePagedList` 是全站唯一的「載入更多」實作，缺 total 時它只能猜「這頁滿了就假設還有下一頁」，於是**所有**清單（含有 total 的那些）都退化用同一套啟發式，最後一頁剛好滿 per_page 就多出一顆按不出東西的按鈕。COUNT 的成本用 `tokio::try_join!` 與 list 併發吸收（範本 `services/logs.rs`），list 與 count 的 WHERE 一律抽成同一個 `XXX_FILTER` 常數，兩邊漂移會讓 total 對不上。
 - ~~`gov_tenders` / `messages` / `blog_comments` 的 count/list 用順序 `.await`~~（2026-08-09 全改 `tokio::try_join!`；`services/stats.rs` 的三支查詢同時收斂）。
-- ⚠️ **`services/portfolio/math.rs` 的 `compute_latest` / `build_history` 在有股票股利時金額算錯**（尚未修，需先確認語意）：除權（`stock_rate > 0`）時只把 `adjusted_cost` 往下調，`shares` 沒跟著放大 —— 真實部位股數是 `shares × (1 + stock_rate/1000)`，所以 `current_value` 與 `pnl` 兩個**金額**欄位都被低估同一個倍數，而 `pnl_pct` 因為分子分母約掉了反而是對的。「pct 對、金額錯」這個內部矛盾在任何語意下都成立。要決定的是 `shares` 是否預期由使用者自己改。**2026-09-08 更新**：還原因子已收斂成單一 `ex_adjust_factor`（三個呼叫端共用），所以只要改一處；`period_change` 的 `value_change` 也吃同一個 `shares`、同樣被低估。該檔已有 6 測，但全在 `changes` 那組，沒有一個覆蓋這個 bug。
+- ⚠️ **`services/portfolio/math.rs` 的 `compute_latest` / `build_history` 在有無償配股時金額算錯**（尚未修，需先確認語意）：`ex_adjust_factor`（三個呼叫端共用）只把 `adjusted_cost` 往下調，`shares` 沒跟著放大 —— 配股後真實股數是 `shares × (1 + 配股率)`，所以 `current_value` 與 `pnl` 兩個**金額**欄位都被低估同一個倍數（`period_change` 的 `value_change` 吃同一個 `shares`，同樣被低估），而 `pnl_pct` 因為分子分母約掉了反而是對的。「pct 對、金額錯」這個內部矛盾在任何語意下都成立。要決定的是 `shares` 是否預期由使用者自己改。**2026-10-01 後更難修**：因子改成「減除股利參考價 / 除權息前收盤價」（見「持股損益」），`stock_ex_rights` 的 `stock_rate` / `cash_div` 欄已隨 migration `20261001000000` 刪掉，而 TWT49U 只給權值+息值合計 —— 要放大股數得另找配股率來源。該檔現有 8 測，`stock_dividend_scales_cost_down` 只驗除權當日 `pnl ≈ 0`（股價剛好等於參考價時低估量為 0），沒有覆蓋這個 bug。
 - ~~`services/email.rs` 每封信重建 `AsyncSmtpTransport`~~（2026-08-09：開 lettre `pool` feature + `static MAILER` 依憑證快取 transport，憑證變了才重建。**兩者缺一都沒用** —— 沒開 pool 就算重用 transport 也是每封一次握手，重建 transport 則等於重建連線池）。
-- `routes/oauth.rs` 是 28 個模組裡唯一在自己內部提前 `.with_state(state)` 的（其他都回無 state 的 `Router<AppState>` 由 `routes.rs` 統一注入）。
+- `routes/oauth.rs` 是 29 個模組裡唯一在自己內部提前 `.with_state(state)` 的（其他都回無 state 的 `Router<AppState>` 由 `routes.rs` 統一注入）。
 
 **拆檔**（比照 `repositories/stocks/` 這個好範本）—— ~~2026-09-24 全數完成~~，做法一致：`<name>.rs` 改成 `<name>/mod.rs` + 子模組 + `pub use 子模組::*`，**呼叫端路徑完全不變**、函式內容逐字搬移；子模組之間互用的私有 item 開成 `pub(super)`（只對同一個父模組可見），從定義處直接 `use super::<子模組>::x`。
 - `services/vocab/`（原 982 行）：`engine`（全部純函式 + 全部測試）/ `question` / `run` / `answer` / `stats` / `admin`
@@ -885,7 +885,7 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 
 **測試空缺**
 - ~~`services/portfolio.rs`（557 行，**0 測**）、還原公式逐字複製兩份~~（2026-09-08 隨期間增減一併處理：公式收斂成單一 `ex_adjust_factor`（`compute_latest` / `build_history` / `period_change` 共用），並補 6 個純函式測試 —— 全在 `changes` 那組（前一交易日基準、單日無增減、除息日不算大跌、週/月取不晚於目標日的最近交易日、太新的持股回 `None`、基準過舊寧可回 `None`））。**仍缺的是 `build_history` 自己的測試**（逐日還原成本那條路徑目前零覆蓋），以及下面那條金額算錯的 bug。
-- `games/common/room.rs`(380) + `common/service.rs`(520) —— 7 個遊戲共用的 900 行框架 **0 測試**，而本檔逐一列出 7 個 engine 的 76 個測試。框架已用 `outbox: Vec<(SocketAddr,String)>` 把 IO 隔離掉，測試不需要真 WS。**一個 bug 在這裡 = 7 個遊戲一起壞。**
+- `games/common/room.rs`(413) + `common/service.rs`(523) —— 7 個遊戲共用的 ~940 行框架 **0 測試**，而本檔逐一列出 7 個 engine 的 76 個測試。框架已用 `outbox: Vec<(SocketAddr,String)>` 把 IO 隔離掉，測試不需要真 WS。**一個 bug 在這裡 = 7 個遊戲一起壞。**
 - ~~`structs/pagination.rs::to_limit_offset`~~（2026-08-03 補了 4 個 clamp / page 邊界測試）；`structs/roles.rs` 的 `Perm::as_str`（缺 `Feature` 那種 round-trip 測試，permission string 打錯字 = **靜默 403**）；`services/twse.rs`；`services/vocab/engine.rs` 的 `pick_kind` 與 `resolve_duration_minutes`（同檔其他 8 個純函式有測 —— `exp_for_level` / `level_for_exp` / `answer_exp` / `difficulty_window` / `clamped_window` / `mask_sentence` / `period_start` / `streak_from_days`，這兩個漏）。
 
 **其他觀察**
@@ -895,10 +895,10 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 - `state.rs` 三次 `write()` 不是原子的，設定更新瞬間可能讀到混合狀態（影響輕微，設定更新極罕見）。~~`AppStateInner` 13 個欄位宣告 `pub`~~（2026-09-24 struct 與欄位全改私有；`AppState` 的 tuple 欄位本來就私有，所以封裝其實一直由編譯器守著，這次只是拿掉誤導的 `pub`）。
 - ~~job panic 不致命但**無痕**~~（已修：`scheduler.rs` 把 `job.run` 包在自己的 `tokio::spawn` 裡再 `await`，`e.is_panic()` 時把 payload 取出記 `error!` —— tokio-cron-scheduler 自己不 join handle，不包這層的話 panic 就只剩 runtime 預設 hook 印的那行 stderr，不進 tracing，而生產 image 無 shell。防重疊的 `running` guard 是 `MutexGuard`，unwind 時正常 drop，**不會卡死後續 tick**。）
 - `migrations/20260713000000_logs_retention.up.sql` 的註解寫「清理 job 見 `jobs/cleanup_logs.rs`」，該檔早已改名 `cleanup_observability.rs`。**不能改** —— sqlx 會驗已套用 migration 的 checksum，改了下次啟動直接失敗。已套用的 migration 內容（含註解）一律不可動。
-- `20260728000000_media_domain_backfill` 的 down 是**刻意 no-op**（註解說明反向替換會連新圖一起改壞），是 36 個 migration 中唯一一個 —— `sqlx migrate revert` 跑它會「成功」但什麼都沒回退。**此 migration 不可 revert，要回退請從備份還原。**
-- migration 命名有兩套：34 個是手寫整點時間戳（`HHMMSS` = `000000`/`100000`…），但 `20260710155453_vocab_seed_ja_pilot` 與 `20260710162925_vocab_seed_ja_n5n4` 是 `sqlx migrate add` 生成的真實秒級時間戳。功能無害（排序仍正確），但下一位開發者不知道該用哪種。
+- `20260728000000_media_domain_backfill` 的 down 是**刻意 no-op**（註解說明反向替換會連新圖一起改壞），是 40 個 migration 中唯一一個 —— `sqlx migrate revert` 跑它會「成功」但什麼都沒回退。**此 migration 不可 revert，要回退請從備份還原。**
+- migration 命名有兩套：38 個是手寫整點時間戳（`HHMMSS` = `000000`/`100000`…），但 `20260710155453_vocab_seed_ja_pilot` 與 `20260710162925_vocab_seed_ja_n5n4` 是 `sqlx migrate add` 生成的真實秒級時間戳。功能無害（排序仍正確），但下一位開發者不知道該用哪種。
 
 **已查證「不是問題」，別再動**
-- `AppStateInner` 封裝零違反；sync `RwLock` 跨 `.await` 零違反（三個 getter 都在同一 expression 內取完釋放，`get_settings()` 只 clone Arc）；Redis TTL 遺漏零筆（`cache_set` 把 `ttl_secs` 設成必填參數，型別層就不可能忘）；handler 內零 inline SQL；11 個 job 的四層註冊全對；7 個遊戲的 engine 測試數與本檔聲稱**完全相符**（2026-08-17 複驗，2026-09-11 重數仍是 76）；36 個 migration up/down 100% 成對；vocab 多語言 language 零遺漏。
+- `AppStateInner` 封裝零違反；sync `RwLock` 跨 `.await` 零違反（三個 getter 都在同一 expression 內取完釋放，`get_settings()` 只 clone Arc）；Redis TTL 遺漏零筆（`cache_set` 把 `ttl_secs` 設成必填參數，型別層就不可能忘）；handler 內零 inline SQL；11 個 job 的四層註冊全對；7 個遊戲的 engine 測試數與本檔聲稱**完全相符**（2026-08-17 複驗，2026-09-11 重數仍是 76）；40 個 migration up/down 100% 成對（2026-10-06 重數）；vocab 多語言 language 零遺漏。
 - **`#[serde(flatten)] PageQuery` 行不通**，別再嘗試（詳見 `structs/pagination.rs` 的註解）。
 - **直接依賴沒有「完全沒用到」的了**（2026-08-19 逐一掃過 41 個）：當時只揪出 `tokio-util`（src 零引用）、`futures-util`（與 `futures` 重複）、`reqwest` 的 `multipart` feature（multipart 只發生在 axum 收上傳那側），已於 commit `f205d7f` 砍掉；`scraper` 改 regex（`83d66fa`）。其餘全部有實際 `use`。⚠️ **`openssl` 是唯一「src 零引用但必留」的** —— 它存在只為替 `webauthn-rs-core` 的 transitive openssl 開 `vendored`，砍掉會回頭吃系統 libssl（見上面「依賴約束」）。⚠️ **刪 manifest 條目不等於少編一個 crate**：`tokio-util` / `futures-util` 被 redis / librqbit / axum / bb8 各自拉，那次三項合計 crate 數 **0 減少**（純 manifest 噪音）；真正減量要看「獨占 crate 數」（`scraper` -28、`tokio-cron-scheduler` -10）。

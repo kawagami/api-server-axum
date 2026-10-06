@@ -93,7 +93,7 @@ pub struct CreateTorrent {
 pub struct TorrentDownloadClaims {
     pub exp: usize,
     pub purpose: String,
-    /// 發行者 email — 下載時即時重查權限，權限被拔掉連結立即失效
+    /// 發行者 user id — 下載時即時重查權限，權限被拔掉連結立即失效
     pub sub: String,
     pub torrent_id: i32,
     pub file_index: usize,
