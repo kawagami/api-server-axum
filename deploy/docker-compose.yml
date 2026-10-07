@@ -157,7 +157,9 @@ services:
     <<: [*logging-quiet, *hardening]
     # 刻意不掛 volume：資料全在記憶體，重啟即清空。
     # ⚠ 代價是 member refresh token（TTL 30 天）也會沒了 → valkey 重啟等於把所有會員登出，
-    #   需重新登入。其餘 key（權限快取 / oauth state / ws ticket）TTL 短，掉了會自動重算。
+    #   需重新登入；admin 的登入 session（user:login:{id}）同樣在這裡，後台也會立刻被登出。
+    #   其餘 key（權限快取 / 闖關 run / passkey challenge / oauth state / ws ticket）TTL 短，
+    #   掉了頂多中斷一次進行中的操作。完整清單見 deploy/README.md「邊界原則」。
     #
     # ⚠ 也**刻意沒有 env_file**，而這正是上面「改 kawa.env 會重建容器」那條的保護傘：
     #   valkey 不吃 kawa.env、也不 depends_on 任何人，所以改 env 的部署不會重建它，
@@ -210,6 +212,10 @@ services:
     #   由 `utils/reqwest.rs::send_retrying` 的重試（會重新 resolve）處理。
     #   推導見 deploy/INCIDENTS.md 的「對外連線偶發 connect 失敗」。
     #
+    # ⚠ **08-09 dockerd 那列的歸因也在 08-12 被推翻**：關掉宿主機 IPv6 之後 `docker pull`
+    #   照樣中（dockerd 是 Go，不套 AI_ADDRCONFIG，AAAA 照撥，只是 errno 換成 ENETUNREACH）。
+    #   沒有根治手段，靠 backend.yml / frontend.yml 的 `docker pull` 重試 3 次止血。
+    #
     # 這兩行留著的理由只剩「這個 netns 的 IPv6 確實不可用，關掉是正確的衛生」。
     # 宿主機關掉之後它們就是多餘的，但無害，也擋得住宿主機設定被還原的情況。
     sysctls:
@@ -255,7 +261,9 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      # AppState 建 redis pool 連不上會直接 panic，所以不能賭 valkey 先起來
+      # 只是排啟動順序。valkey 沒起來 backend 也**不會** panic：state.rs 的 bb8 pool 沒設
+      # min_idle，build() 不預先連線（只有 REDIS_URL 沒設或格式錯才會 panic）；症狀會是登入 /
+      # 驗證類請求逐一失敗，直到 valkey 可連。
       valkey:
         condition: service_started
 

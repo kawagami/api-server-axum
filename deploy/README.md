@@ -31,8 +31,11 @@
 這是有意識的取捨，代價要知道：
 
 - **member refresh token（TTL 30 天）也會沒了 → valkey 重啟等於把所有會員登出**，下次操作需重新登入。
-  後台 / 前台使用者都一樣。
-- 其餘 key 掉了無感：權限快取（1h）、oauth state（5m）、ws ticket（30s）都會自動重算。
+- **後台也一樣，而且是立刻**：admin 的登入 session（`user:login:{id}`，TTL 1h）是 `middleware::auth`
+  每個請求都查的唯一判斷，`/admin/auth/refresh` 本身也在認證牆後 —— key 沒了下一個請求就 401。
+- 會中斷但不登出：進行中的單字闖關（run 狀態，30m）、進行到一半的 passkey 登入 / 註冊（challenge，5m）、
+  oauth state（5m）、ws ticket（30s），重來一次即可。
+- 掉了無感：身分 / 權限快取（1h）、持股的月收盤價與除權息快取，會自動回頭查 DB（或重抓 TWSE）重建。
 
 所以 `docker compose restart valkey`、整機重開、image 更新都會踢人。哪天覺得代價太大，
 就掛 `/srv/kawa/valkey:/data` + `--appendonly yes`。
@@ -193,8 +196,9 @@ curl -sI https://api.kawa.homes/blogs -H 'Cookie: a=b' | grep -i x-cache-status 
 ## 主機 IPv6：必須整台關掉（2026-08-09）
 
 這台 VPS（以及任何同型新機）**沒有可用的 IPv6，但 IPv6 stack 開著**（`ip -6 addr` 只有 `fe80::`、
-`ip -6 route` 沒有 `::/0`）。glibc / Go 因此以為有 v6，對外連線先試 AAAA 再撞牆 —— SMTP 寄信、
-OAuth、`docker pull` 都中過。現行這台已於 2026-08-09 08:46 (UTC) 關閉。
+`ip -6 route` 沒有 `::/0`）。glibc / Go 因此以為有 v6，對外連線先試 AAAA 再撞牆 —— SMTP 寄信中過。
+（當時一併歸因的 OAuth 與 `docker pull` 事後查明關 IPv6 修不到：前者見下節「DNS 抖動」、後者見下方
+「關了也還在的東西」。）現行這台已於 2026-08-09 08:46 (UTC) 關閉。
 
 ### 修法與**不可顛倒的順序**
 
@@ -268,7 +272,7 @@ sudo systemctl restart docker   # daemon 的 IPv6 能力是行程啟動時探測
 
 - 新 VPS：建使用者 + SSH 金鑰、裝 docker（含 compose plugin）與 rsync、使用者加入 `docker` 群組
 - **檢查 IPv6**：`ip -6 route | grep '^default'` 沒東西就照「主機 IPv6」節整台關掉，否則對外連線
-  （OAuth / SMTP / `docker pull`）會間歇失敗
+  （SMTP 等走 glibc 的路徑）會間歇失敗；`docker pull` 關了也還是會偶發，靠 CI 重試
 - Cloudflare DNS：`kawa.homes`、`*.kawa.homes`、以及各子網域單獨那幾筆（`api` / `axum` / `media`）
   指向新機 IP；SSL/TLS 模式 **Full (Strict)**（憑證是 `kawa.homes` + `*.kawa.homes` wildcard，
   新增子網域不用重簽，但橘雲要單獨開一筆 record）
