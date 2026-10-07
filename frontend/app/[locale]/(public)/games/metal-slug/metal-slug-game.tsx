@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, Gamepad2, AlertTriangle } from "lucide-react";
 
-// Bevy wasm-bindgen (--target web) 產物固定路徑（見 docs/bevy-game-spec.md §3.2）
+// Bevy wasm-bindgen (--target web) 產物（game.js + game_bg.wasm + assets/）固定路徑，
 // 放在 public/games/metal-slug/，瀏覽器直接 fetch，不經 bundler。
 const GLUE_URL = "/games/metal-slug/game.js";
 const CANVAS_ID = "bevy-canvas";

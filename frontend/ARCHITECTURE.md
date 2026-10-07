@@ -51,7 +51,7 @@ types/index.ts        ← 後端 API 共用型別（Blog、User、Stock 等）
 - `process.env.WS_URL`：WebSocket URL（server-side 讀，經 WsProvider 的 `wsUrl` prop 傳給 client；**不用 NEXT_PUBLIC_**，避免 build 時烤進 bundle）
 - `process.env.JWT_SECRET`：JWT 驗證用，不暴露前端
 - `process.env.GITHUB_REPO`：`/changelog` 的資料來源 repo（`owner/name`）。**沒設時 fallback `kawagami/api-server-axum`**（本站自己的 repo，本地與 production 零設定就能用）；設成**空字串 = 關閉這頁**（`/changelog` 404、`/about` 不顯示入口、sitemap 不收錄）—— 商家 instance 共用同一份 image，不該顯示 kawa 的 commit 紀錄
-- 三者皆 runtime 注入（docker-compose `env_file`），image 內不烤 .env
+- 以上全部 runtime 注入（docker-compose `env_file`），image 內不烤 .env
 
 ### 認證
 
@@ -99,7 +99,7 @@ types/index.ts        ← 後端 API 共用型別（Blog、User、Stock 等）
 - Transition：**禁止全域 `* { transition: all }`**，互動元素個別掛 `transition-colors` / `transition-shadow`
 - Hover scale：只用在塊級卡片/按鈕（上限 `hover:scale-105`），文字連結用變色 + underline，不縮放
 - Loading：統一 `Loader2`（lucide）spin + `animate-pulse` skeleton，不再有自訂 CSS loader。**前台資料頁一律要有自己的 `loading.tsx`**，用 `components/loading/public-page-skeleton.tsx` 的 `<PublicPageSkeleton width nav variant rows />`（variant：`list` / `cards` / `form`），參數要對齊該頁的 `PageShell`
-- **一次性提示**：用 `components/toast.tsx` 的 `useToast()` + `<Toast toast={toast} />`（固定底部置中、`role="status"`）。**前後台通用** —— 該檔只吃 message 字串、不碰 i18n，所以沒有 `NextIntlClientProvider` 的 admin 也能直接用（`tag-manager` / `blog-action-buttons` 就是）。**不要用 `alert()`**，也不要各頁自刻覆蓋層。破壞性操作的 `confirm()` 確認保留（刪除持股）。分工：清單列的行內動作回饋（塞不進塊狀元素）與成功訊息走 Toast，頁面層級的「載入／操作失敗」走 `ErrorBanner`
+- **一次性提示**：用 `components/toast.tsx` 的 `useToast()` + `<Toast toast={toast} />`（固定底部置中、`role="status"`）。**前後台通用** —— 該檔只吃 message 字串、不碰 i18n，所以沒有 `NextIntlClientProvider` 的 admin 也能直接用（`tag-manager` 就是）。**不要用 `alert()`**，也不要各頁自刻覆蓋層。破壞性操作的確認：前台保留原生 `confirm()`（刪除持股、刪除飲食紀錄）；後台用 `components/admin/confirm-dialog.tsx` 的 `<ConfirmDialog>`（不用 `window.confirm` 的理由寫在檔頭），還沒換過去的見「已知的技術債」。分工：清單列的行內動作回饋（塞不進塊狀元素）與成功訊息走 Toast，頁面層級的「載入／操作失敗」走 `ErrorBanner`
 - 換頁淡入由 `components/page-transition.tsx` 統一提供（掛在 `(public)/layout.tsx`），**不要只給單一區塊做轉場**
 - Tailwind CSS，深色模式用 `dark:` prefix
 - RWD 斷點：`sm:` 開始展開，行動優先
@@ -172,10 +172,10 @@ app/
   auth/               # OAuth callback（無 locale）
 components/
   [feature]/          # 被多個頁面共用的功能性元件放子目錄
-  loading/            # 共用 skeleton（BorderedTableSkeleton / ListTableSkeleton），loading.tsx 引用
+  loading/            # 共用 skeleton（table / form / chart-page / public-page 四支），loading.tsx 與 Suspense fallback 引用
   modal.tsx           # 置中對話框外殼（背景遮罩 + a11y），見「樣式慣例」
 api/
-  {resource}.ts       # 一個資源一檔（blogs / portfolio / images / members / users / roles / logs / tools / ws / auth / github（外部 API，見上））
+  {resource}.ts       # 一個資源一檔（blogs / portfolio / images / members / users / roles / logs / tools / ws / auth / food-log … / github（外部 API，見上）；共 22 檔）
 i18n/
   routing.ts          # locales 定義（zh-TW / zh-CN / en）、defaultLocale
   request.ts          # getRequestConfig，載入對應 messages
@@ -231,7 +231,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 - `GET /oauth/{provider}` — OAuth 登入 URL 取得
 - `POST /oauth/{provider}/exchange` — OAuth code 換 token，body: `{ code, state }`
 - `POST /admin/users` — 建立使用者，回傳 201 + `User`（2026-09-29 前無 body）；`DELETE /admin/users/:id` — 刪除，204（**2026-09-29 前是 `DELETE /admin/users` 把 `{ id, name }` 放 body**；刪自己回 403、查無此人 404）。`PUT /admin/users/:id/roles` 改自己的角色回 **403**（原為 400）。users / roles / settings 的寫入 action 全部回 `ActionResult`（見「錯誤形狀」）
-- `POST /roster` — 排班計算。body `{ names, days, rule, morning_slots?, night_slots?, max_consecutive? }`（`rule` 是後端 enum，未知值 422；slots 兩者同給或同省），回 `{ status, data, plan, warnings }`。**`warnings` 是機器碼**（`understaffed` / `shift_uncovered` / `night_to_morning` / `max_consecutive_exceeded`），文案在 `Roster` namespace 的 `warn*` key（`tools/roster/page.tsx` 的 `WARNING_KEYS`）。純函式與上限鏡射在 `libs/roster.ts`（`MAX_NAMES` / `MAX_NAME_LEN` / `MAX_DAYS` 要與 `backend/src/structs/roster.rs` 同步）
+- `POST /roster` — 排班計算。body `{ names, days, rule, morning_slots?, night_slots?, max_consecutive? }`（`rule` 是後端 enum，未知值 422；slots 兩者同給或同省），回 `{ status, data, plan, warnings }`。**`warnings` 是機器碼**（`understaffed` / `shift_uncovered` / `night_to_morning` / `max_consecutive_exceeded`），文案在 `Roster` namespace 的 `warn*` key（`tools/roster/roster-result.tsx` 的 `WARNING_KEYS`）。純函式與上限鏡射在 `libs/roster.ts`（`MAX_NAMES` / `MAX_NAME_LEN` / `MAX_DAYS` 要與 `backend/src/structs/roster.rs` 同步）
 - `GET /members` — 會員列表，需認證（`member:read` permission），回 `{ data, total }`
 - `GET /members/:id` — 會員詳細 + OAuth providers，需認證
 - `GET /ws/connections` — 線上連線列表，需認證（`ws:read` permission）。**2026-07-31 從 `get_online_connections` 改名**（動詞路徑 → 資源路徑）
@@ -306,7 +306,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 - 全站用 `libs/ws-context.tsx` 的 `WsProvider`（layout 注入），建立單一 WS 連線
 - **admin 身分連線走一次性 ticket**：root layout 只傳 `hasSession` 布林（token 不進 RSC payload），client 連線前打同源 `POST /api/auth/ws-ticket`（server 端用 session cookie 向後端 `POST /ws/ticket` 換 30 秒一次性票），再以 `?ticket=` 連 WS；票是一次性的，**每次重連都換新票**，換票失敗退回匿名連線。JWT 不出現在 WS URL / access log
 - 後端 `user_joined` / `user_left` 事件（含 `real_ip`/`user_name`）**只推給 admin 連線**，匿名訪客收不到（`user_name` 與 `GET /ws/connections` 的同名欄位 2026-09-29 前叫 `user_email`，內容一直是 admin 顯示名）
-- 訊息格式：`{ type: WsEventType, data: unknown }`。`types/ws.ts` 的 `WsEventType` 與後端 `structs/ws.rs` 的 `WsEvent` enum **一一對應**（新增事件兩邊同步加）；`WsNotifyEventType` 是「會彈 toast / 進通知列表」的子集（排除 `torrent_*`，那些只有後台 torrents 頁在看、每秒推一次）
+- 訊息格式：`{ type, data, game? }`（`libs/ws-context.tsx` 的 `WsMessage`；`game` 只有對戰遊戲用）。`types/ws.ts` 的 `WsEventType` 與後端 `structs/ws.rs` 的 `WsEvent` enum **一一對應**（新增事件兩邊同步加）；`WsNotifyEventType` 是「會彈 toast / 進通知列表」的子集（排除 `torrent_*`，那些只有後台 torrents 頁在看、每秒推一次）
 - 訂閱用 `useWsContext()` 的 `subscribe(type, fn)` / `unsubscribe(type, fn)`（listener 第二參數拿到整則 `WsMessage`，含 `game` 欄供分流）；上行用 `send(type, data?, game?)`（連線未開時暫存，onopen flush；`game` 為對戰遊戲框架信封欄，一般 WS 訊息省略）
 - `app/[locale]/(public)/dashboard/notifications/` — notification feed 頁（`components/ws/notification-feed.tsx`），訂閱所有 event type 即時顯示，入口在 header 會員下拉／dashboard。**原本另有一支無導航入口的 `/ws` 孤兒頁 render 同一個元件，且未被 `proxy.ts` 保護，已於 2026-07-31 刪除** —— 要再開 debug 頁記得同時加進 `memberPaths`
 - 全站 toast 是 `components/ws/ws-toast.tsx`（掛在 `(public)/layout.tsx`，每個語系都會彈，文案走 `Ws` namespace，**不要寫死中文**）
@@ -321,7 +321,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
   - **時鐘**：`_shared/Clock.tsx` 改吃 `baseMs` + `baseAt`（收到 server 時鐘的本地時間），每 tick 用 `Date.now()` **重算**而非累減 —— 背景分頁的 timer 被節流到 ≥1 秒，累減會把少扣的時間永久留在畫面上。重設也不再靠父層 `key` 重新掛載。⚠️ 計算放在 effect 裡：render 期呼叫 `Date.now()` 會被 `react-hooks/purity` 判為不純（`useGameRoom` 的 WS handler 同理，包了一層模組層 `nowMs()`）。
   - **走步被拒有話說**：`room.moveError`（i18n key）顯示在狀態列（`aria-live="polite"`），4 秒後自動消失。server 早就回 `illegal_move.reason`，原本前端只抖一下丟掉。reason → key 走 `useGameRoom` 的 `ILLEGAL_KEYS` 白名單（同 `KNOWN_ERR` 的理由：引擎新增 reason code 不該在畫面上變成 next-intl 缺 key 訊息），文案在 `GameLobby.illegal_*` / `illegalGeneric`。
   - **pending 有逾時**：送出 move 後 6 秒沒有任何回覆就解鎖盤面並提示 `moveTimeout`。原本封包掉了就永久停在 `pending=true`，盤面鎖死且畫面沒有任何說明，只能重整。
-  - **結束畫面**：勝負／原因之外加了手數（`movesCount`）、耗時（`duration`）與最後幾手（`lastMoves`，`useGameRoom` 收 `formatMove` 回傳的短記譜，保留最後 6 手）。
+  - **結束畫面**：勝負／原因之外加了手數（`room.moveCount`）、耗時（`room.durationMs`）與最後幾手（`room.moveLog`：`useGameRoom` 收各遊戲 `formatMove` 回傳的短記譜，保留最後 6 手），由 `GameFrame` 渲染，文案 key 是 `movesCount` / `duration` / `lastMoves`。
   - 新增的共用檔：`_shared/pointer.ts`（座標換算 + 觸控判定）、`_shared/useBoardCursor.ts`（鍵盤游標）。新增 2 人對戰遊戲＝這三檔 + page + i18n namespace + `libs/site-nav.ts` GAMES 一行（header 下拉與 `/games` index 頁共用，另補 `GamesHub.items` 描述）+ `GameId` union。信封 `{ game, type, data }`，`game` 必填、上行帶下行過濾。server 權威裁判，前端不複刻規則（含合法步提示），收 `move_made` 才更新盤面。**協定看 monorepo 根 `protocol/games-wire.md`（唯一準，進版控，含各遊戲差異）；象棋棋規以後端引擎為準**
 - `app/[locale]/(public)/games/avalon/` — **阿瓦隆**（5–10 人社交推理），**不走 `_shared` 2 人框架**（無大廳/桌位/Fischer），但底層機械邏輯共用 `_shared/useRoomBase`。自成一套：`useAvalonRoom`（N 人房狀態機 + 私有角色 + 階段機 team_building/team_vote/quest/assassinate）、`AvalonLobby`/`AvalonRoom`/`AvalonPlay`/`AvalonChat`。⚠️**私有角色（`role_assigned`）只存本地、絕不外送/不渲染給他人**；切頁送 `leave_room`。協定看 `protocol/games-wire.md`「三、阿瓦隆」
 - `app/[locale]/(public)/games/farm/` — **農場經營**（2–4 人 worker-placement，完全資訊）。同 avalon 的 N 人房模型（`useFarmRoom`/`FarmLobby`/`FarmRoom`/`FarmPlay`）；**每動作後 server 廣播完整 `state`，前端整盤重繪**（無私有狀態、無 delta）。盤面抽象（phase-1 無逐格座標，用數量+圖示）。複合動作 `sow`/`build_rooms`/`fences` 有 input 表單。`state`/`room_update` 逐人帶 `your_seat`（判輪到我 `current_player===your_seat`、推 host `your_seat===host_seat`）。協定看 `protocol/games-wire.md`「四、農場經營」
@@ -330,7 +330,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 
 ## 已知的技術債（2026-07-31 全前端盤點，刻意未做）
 
-盤過 82 個 components / 71 個 page / 23 個 api 檔的結果（**2026-09-11 重數：components 51 檔、page 56、api 21** —— 該日移除記帳／發票／樂透三個功能，對不上不代表這些項目消失，各條下方的計數才是現值）。下列都**已確認存在、有具體落點**，不必再重新調查：
+盤過 82 個 components / 71 個 page / 23 個 api 檔的結果（**2026-10-06 重數：components 52 檔、page 57、api 22**；2026-09-11 移除記帳／發票／樂透後是 51 / 56 / 21。對不上不代表這些項目消失，各條下方的計數才是現值）。下列都**已確認存在、有具體落點**，不必再重新調查：
 
 ### 跨模組可抽共用
 - **`libs/fetchApi.ts` 與 `libs/createAuthRequest.ts` 的核心該合併**。剩下三個關鍵分歧：timeout（10s vs 30s）、空 body（`res.json()` 直接 throw vs `text()` 後回 null）、401 處理（2026-09-29 起只有 401 導登入頁，403 照一般錯誤丟出）。**錯誤物件那一項已在 2026-08-07 收斂** —— 兩邊都附 `status` / `errorData`（見上方「錯誤形狀」），`contact/actions.ts` 也已改用 `apiErrorStatus(e)`，不再字串比對 `429`。`adminRequest` / `memberRequest` 本身已是 `createAuthRequest` 的薄組態，重複早就消除了。
@@ -350,10 +350,11 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 - 拆完後除 `vocab-client.tsx` 本身外，最大的是 `admin/(main)/vocab/vocab-admin-client.tsx`（356）與 `components/header.tsx`（342），都還在單一關注點內，未動。
 
 ### UI 一致性
-- ~~**admin 表格外框分裂**~~（2026-08-17：手刻 wrapper 已歸零）、~~**卡片底色打架**~~（2026-08-30：`bg-white dark:bg-neutral-800` 的 29 處卡片全改成 `-900`，對齊 `AdminTableContainer`；admin-only 但住在 `components/blogs` / `components/images` 的 3 支 modal 也隨 `<Modal surface="admin">` 一起改過來）。**後台卡片底色現在只有一個值：`bg-white dark:bg-neutral-900`。** 沒被改的 `dark:bg-neutral-800` 是別的角色，別順手一起改：表頭 `bg-neutral-100 dark:bg-neutral-800`（11 處，要比卡片淺一階才看得出表頭）、篩選列底 `bg-neutral-50 dark:bg-neutral-800/50`（7 處）、停用狀態的 chip、sidebar 的半透明底。
+- ~~**admin 表格外框分裂**~~（2026-08-17：手刻 wrapper 已歸零）、~~**卡片底色打架**~~（2026-08-30：`bg-white dark:bg-neutral-800` 的 29 處卡片全改成 `-900`，對齊 `AdminTableContainer`；admin-only 但住在 `components/blogs` / `components/images` 的 3 支 modal 也隨 `<Modal surface="admin">` 一起改過來）。**後台卡片底色現在只有一個值：`bg-white dark:bg-neutral-900`。** 沒被改的 `dark:bg-neutral-800` 是別的角色，別順手一起改：表頭 `bg-neutral-100 dark:bg-neutral-800`（11 處，要比卡片淺一階才看得出表頭）、篩選列底 `bg-neutral-50 dark:bg-neutral-800/50`（6 處）、停用狀態的 chip、sidebar 的半透明底。
 - ~~**15 處手寫 `fixed inset-0` modal 殼**，`useDialog` 只有 8 個檔案在用~~（2026-08-30：`components/modal.tsx` 收掉 9 個置中彈窗，**其中 4 個原本完全沒有 focus trap／背景捲動鎖／Esc**（`HowToPlay`、`stock-history-table`、vocab 編輯框等）。用法與「為什麼不收抽屜類」見「樣式慣例」）。`fixed inset-0` 現在剩 7 個檔案 / 8 處：`components/modal.tsx` 自己一處，其餘是刻意不收的非置中浮層（抽屜／header 手機選單／命令面板／遊戲結局遮罩）。
 - **admin 11 個 `loading.tsx` 沒用 `components/loading/*`**（2026-09-05 重數；2026-09-04 移除收盤價查詢頁後由 12 降為 11），其中 4 個 stocks 的內容幾乎相同、3 個（`games` / `ws` / `members/[id]`）手抄了 `table-skeleton.tsx` 的 `<table className="w-full border-collapse …">`（＝**後台**僅剩的手寫 `<table>`；前台另有 3 支 `portfolio/stock-history-table.tsx`、`tools/roster/roster-table.tsx`、`roster-stats.tsx`，那是**列明例外** —— `components/admin/table.tsx` 是後台專用的視覺規格，前台套上去反而不一致）。
-- **`games/page.tsx` 與 `tools/page.tsx` 完全同構**（diff 只有 8 行：`GAMES`↔`TOOLS`、namespace、路徑），可抽 `<NavHubPage>`。
+- **`games/page.tsx` 與 `tools/page.tsx` 完全同構**（diff 只有 8 處、每處一行：`GAMES`↔`TOOLS`、namespace、路徑），可抽 `<NavHubPage>`。
+- **後台還有 5 處破壞性確認用原生 `confirm()`**（users / messages / passkeys / blog-comments / torrents，2026-10-06 數），`<ConfirmDialog>` 只有 blogs 清單與 `tag-manager` 兩個消費點。理由見該元件檔頭（停用原生對話框時 `confirm()` 直接回 `false`，按刪除完全沒反應）。
 - `useFilterUrl` 只有 5 個消費點（logs / audit_logs / gov_tenders / vocab / blogs），但 `messages-client` / `blog-comments-client` / `metrics-audit-panel` 也有 filter 卻沒同步 URL（覆蓋不足，非重複）。
 - `admin/` 28 個 page **完全沒有 error boundary**（2026-09-05 重數；前台只有 2 個 `error.tsx`）。
 - **`(public)/loading.tsx` 是裸的 `Loader2` spinner，不是骨架**（2026-08-30）。它是整個前台的 fallback ——沒有自帶 `loading.tsx` 的頁全吃它，等於違反「前台資料頁一律用 `PublicPageSkeleton`」那條自家規則。`blogs/` 那 3 支自訂骨架則是**列明例外**（檔頭有註解：要對齊 blog 卡片／文章版面，`list`/`cards`/`form` 三種 variant 都套不上），別把它們一起改掉。
@@ -363,10 +364,10 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 - **avalon 的 `iAmHost` 用本地 `useState` 是正確的**，不是偷懶。後端 `games/common/room.rs` 依 `K::SEAT_IN_ROOM_UPDATE` 決定要不要逐人注入 `your_seat`，farm 設 `true`、avalon 吃預設 `false`；avalon 的 seat 從私有 `role_assigned` 拿，開局前只需要 host 旗標。而且 `room.rs` 的 `leave_room` 是 **host 離開＝解散房間**（`host_left`），所以「重整後回到房內但看不到開始按鈕」的情境不存在 —— 重整後根本沒有房可以回。farm 需要 `your_seat` 是因為它要判 `myTurn`（`current_player === mySeat`）且沒有私有訊息可夾帶。**兩邊的差異是設計，不是疏漏。**
 - i18n 三語系 key 完全同步（**875 / 875 / 875，39 個 namespace**，2026-10-04 加飲食紀錄後重數；2026-09-13 首頁補「最新文章」後是 822 / 38；2026-09-11 移除記帳／發票／樂透後是 819 / 38；2026-09-09 是 1050 / 42、2026-08-30 是 1045 / 42、2026-08-26 是 1027 / 42、2026-08-17 是 883 / 40、2026-07-31 是 865 / 39），namespace 與 code 中的用量雙向吻合，沒有孤兒 namespace。**靜態掃描會誤報約 152 個「沒人用」的 key，那些是 30 處動態組 key（`t(\`items.${key}\`)` 之類）**，刪之前務必逐一確認。
 - `types/` 的 barrel 是 100% 遵守的（`from '@/types/xxx'` 零命中）。
-- `api/` 21 檔全部有 `"use server"`、全部 named exports；手寫 `fetch(` 只有 `api/github.ts` 一支，那是刻意的（打 GitHub 公開 API，套不上 `fetchApi`，理由見上方「API 請求分層」）。
+- `api/` 22 檔全部有 `"use server"`、全部 named exports；手寫 `fetch(` 只有 `api/github.ts` 一支，那是刻意的（打 GitHub 公開 API，套不上 `fetchApi`，理由見上方「API 請求分層」）。
 - `usePagedList` 的 9 個消費點用法一致（2026-09-11 重數，移除記帳／發票／樂透前是 12），沒有頁面自己手刻「載入更多」。
 - `next/image` 慣例乾淨：5 處原生 `<img>` 全部帶 eslint-disable 且全部是列明例外（blob 預覽 / 外部 avatar）。
 - `gray` / `slate` / `zinc` / `indigo` 全庫 0 命中。
 - **`useAlarm` 與 `useTimer` 的倒數狀態機早就抽好了** —— `hooks/useCountdownCore.ts`（對齊秒邊界的 tick、剩餘秒數、到點轉響鈴、暫停／清除），兩支都用它。舊版技術債清單曾把它列成「可抽 `useCountdownTo`」，那條在 2026-08-30 確認過期並刪除，別再提案。
-- **`components/loading/*` 的 4 支骨架都有多個消費點**，不是為抽而抽（`PublicPageSkeleton` 前台全用、`table-skeleton` 的兩支後台 11 檔、`form-skeleton` 4 檔、`chart-page-skeleton` 2 檔）。
+- **`components/loading/*` 的 4 支骨架都有多個消費點**，不是為抽而抽（`PublicPageSkeleton` 前台全用、`table-skeleton` 的兩支後台 17 檔（loading.tsx 11 + page 的 Suspense fallback 6）、`form-skeleton` 3 檔、`chart-page-skeleton` 2 檔，2026-10-06 重數）。
 - **全庫沒有孤兒模組**：`components` / `libs` / `hooks` / `api` / `types` 逐檔掃 alias + 相對路徑 import，零死碼（2026-08-30）。

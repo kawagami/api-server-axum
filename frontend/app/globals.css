@@ -43,7 +43,7 @@
   }
 }
 
-/* 象棋非法走步抖動提示（ChessGame animate-[shake_0.4s]） */
+/* 對戰遊戲非法走步抖動提示（_shared/GameFrame 的 animate-[shake_0.4s]，五個盤面共用） */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-7px); }
@@ -132,7 +132,7 @@ html {
   box-shadow: 0 1px 0 rgb(var(--neutral-300));
 }
 
-/* darkMode: 'selector' → .dark 掛在 <html> 上 */
+/* 深色模式：.dark 掛在 <html> 上（同檔的 @custom-variant dark） */
 .dark .admin-shell .admin-sticky-head thead th {
   box-shadow: 0 1px 0 rgb(var(--neutral-700));
 }
@@ -162,7 +162,7 @@ html {
   padding-right: 0.5rem;
 }
 
-/* ===== 主題色階（RGB 三元組，供本檔 @theme 的 rgb(var(--x) / alpha) 引用；
+/* ===== 主題色階（RGB 三元組，供本檔 @theme 的 rgb(var(--x)) 引用，opacity modifier 由 v4 的 color-mix 處理；
    Tailwind v4 起沒有 tailwind.config.js） =====
    換主題：<html data-theme="ocean">（值來自後端 app_settings 的 site_theme，
    root layout 經 getPublicSettings() 設定；admin settings 頁可切換，不是 cookie）

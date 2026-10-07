@@ -108,8 +108,8 @@ GITHUB_REPO=kawagami/api-server-axum
 
 ## 部署
 
-push `master` 即自動部署：GitHub Actions type check（`tsc --noEmit`）與 build + push image（`kawagami77/my-next-blog`，`:latest` + `:<commit sha>` 供回滾）**並行**，兩者都過才 SSH 進 VPS pull + 重啟（monorepo 根 `.github/workflows/frontend.yml`）。**type check 沒過不會部署，但 image 仍會被推上 Docker Hub。**
+push `master` 即自動部署：GitHub Actions 的 test（`tsc --noEmit` + `pnpm lint` + `scripts/check-conventions.sh`）與 build + push image（`kawagami77/my-next-blog`，`:latest` + `:<commit sha>` 供回滾）**並行**，兩者都過才 SSH 進 VPS pull + 重啟（monorepo 根 `.github/workflows/frontend.yml`）。**test 沒過不會部署，但 image 仍會被推上 Docker Hub。**
 
 - image 不含任何 env/secrets，設定由 VPS `/srv/kawa/env/` 的 env 檔經 compose `env_file` 於 runtime 注入（見 `deploy/`）
 - multi-stage build（deps → builder → Node Alpine runner，non-root、standalone output）
-- 本機驗證 image：`docker build -t blog-next . && docker run --env-file .env -p 3000:3000 blog-next`
+- 本機驗證 image：`docker build -t blog-next . && docker run --env-file .env.local -p 3000:3000 blog-next`

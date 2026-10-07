@@ -214,7 +214,7 @@ export default function LogsClient() {
 
             <div className={`flex min-h-0 flex-1 flex-col transition-opacity ${isPending ? 'opacity-60' : ''}`}>
                 <AdminTableContainer stickyHead fill>
-                    {/* table-fixed：全後台只有這張表用。auto layout 下訊息欄的 min-content
+                    {/* table-fixed（同 audit_logs / gov_tenders / messages / blogs）。auto layout 下訊息欄的 min-content
                         會被 break 掉的字元拉到 1 字寬，而來源模組／檔案的長 token 不可斷、
                         反過來把寬度全吃走 —— 最該讀的欄位變最窄。固定配寬讓訊息吃剩下全部。 */}
                     <AdminTable className="text-sm table-fixed">

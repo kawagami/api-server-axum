@@ -15,7 +15,7 @@ export type RoomPhase = 'connecting' | 'lobby' | 'queued' | 'hosting' | 'playing
 const KNOWN_ERR = new Set([
     'already_committed', 'bad_table_id', 'table_not_found',
     'table_full', 'cannot_join_self', 'not_in_game', 'game_ended',
-    // 資源上限與連線防護（後端 common/service.rs MAX_TABLES、services/ws.rs 令牌桶）
+    // 資源上限與連線防護（後端 common/service.rs MAX_TABLES、services/ws/guard.rs 令牌桶）
     'too_many_tables', 'rate_limited',
     // instance 功能開關關掉 games 時，dispatch_game 的回覆
     'feature_disabled',

@@ -17,7 +17,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 不烤任何 .env 進 image：所有設定（API_URL / WS_URL / JWT_SECRET）都是 server-side
+# 不烤任何 .env 進 image：所有設定（API_URL / WS_URL / JWT_SECRET 等，清單見 .env.example）都是 server-side
 # runtime 讀取，由 docker-compose 的 env_file 注入
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build

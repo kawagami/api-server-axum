@@ -4,7 +4,7 @@ import { getMe } from "@/api/auth";
 import type { AuthUser } from "@/types";
 
 /**
- * 目前登入管理員（email + permissions，super_admin 含全部）。
+ * 目前登入管理員（id / name / permissions / is_super_admin，super_admin 的 permissions 含全部）。
  * 以 React cache() 去重：同一次請求內 layout + 各頁 guard/頁面只實際打一次 /admin/auth/me。
  */
 export const getCurrentAdmin = cache(async (): Promise<AuthUser> => getMe());
