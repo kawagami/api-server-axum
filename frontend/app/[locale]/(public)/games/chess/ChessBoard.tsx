@@ -4,7 +4,8 @@ import { useId, useRef, useState } from 'react';
 import { sound } from '../_shared/sound';
 import { useBoardCursor } from '../_shared/useBoardCursor';
 import { isTouchPointer, toViewBox } from '../_shared/pointer';
-import { BOARD_INK, PieceShadow, WoodDefs, WoodSurface } from '../_shared/BoardWood';
+import { BOARD_INK, WoodDefs, WoodSurface } from '../_shared/BoardWood';
+import { KAI_FONT, XiangqiPiece, XiangqiPieceDefs } from '../_shared/XiangqiPiece';
 import { useRemovedPieces } from '../_shared/useRemovedPieces';
 import type { HintsData } from '../_shared/wire';
 import { key, pieceChar, type Board as BoardModel, type Piece, type Side, type Square } from './chess-logic';
@@ -14,9 +15,6 @@ const MARGIN = 36;
 const W = 8 * CELL + 2 * MARGIN;
 const H = 9 * CELL + 2 * MARGIN;
 const R = 26; // 棋子半徑
-// 楷書優先，沒有就退回系統襯線字；棋子字與河界共用
-const KAI_FONT = '"BiauKai", "DFKai-SB", "KaiTi", "STKaiti", "Kaiti TC", serif';
-const INK = { red: '#a8231a', black: '#1f1a14' } as const;
 
 const moveId = (from: Square, to: Square) => `${from.join(',')}>${to.join(',')}`;
 
@@ -158,19 +156,8 @@ export function ChessBoard({
     const riverY = (riverY4 + project(4, 5, myColor)[1]) / 2;
     const dragging = board.get(drag ? key(drag.from[0], drag.from[1]) : '');
 
-    // 木頭棋子：陰影 → 木面 → 外緣 → 內圈刻線 → 字。lift 是浮起高度（選中、拖曳）
     const renderPiece = (x: number, y: number, p: Piece, lift = 0) => (
-        <>
-            <PieceShadow id={id} x={x} y={y} r={R} lift={lift} />
-            <g transform={lift ? `translate(0 ${-lift})` : undefined}>
-                <circle cx={x} cy={y} r={R} fill={`url(#${id('piece')})`} stroke="#8a6232" strokeWidth={1.5} />
-                <circle cx={x} cy={y} r={R - 4.5} fill="none" stroke={INK[p.side]} strokeOpacity={0.7} strokeWidth={1.3} />
-                <text x={x} y={y + 1} textAnchor="middle" dominantBaseline="central" fill={INK[p.side]}
-                    style={{ fontSize: 29, fontWeight: 700, fontFamily: KAI_FONT }}>
-                    {pieceChar(p)}
-                </text>
-            </g>
-        </>
+        <XiangqiPiece id={id} x={x} y={y} r={R} side={p.side} char={pieceChar(p)} lift={lift} />
     );
 
     return (
@@ -180,11 +167,7 @@ export function ChessBoard({
             role="group" aria-label={boardLabel}>
             <defs>
                 <WoodDefs id={id} />
-                <radialGradient id={id('piece')} cx="0.38" cy="0.32" r="0.75">
-                    <stop offset="0" stopColor="#fbedcc" />
-                    <stop offset="0.6" stopColor="#ecd29e" />
-                    <stop offset="1" stopColor="#d2ab68" />
-                </radialGradient>
+                <XiangqiPieceDefs id={id} />
             </defs>
 
             <WoodSurface id={id} w={W} h={H} />

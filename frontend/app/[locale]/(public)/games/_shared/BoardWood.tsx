@@ -1,4 +1,4 @@
-// 木紋棋盤與棋子陰影的共用 SVG 素材（圍棋、象棋）。
+// 木紋棋盤與棋子陰影的共用 SVG 素材（圍棋、五子棋、象棋、暗棋、西洋棋）。
 // 只放 defs 與底層 rect；格線、棋子各盤面自己畫。id 由呼叫端的 useId 產生，避免同頁多盤撞 id。
 
 /// 格線、星位、河界字共用的墨色
@@ -26,6 +26,24 @@ export function WoodDefs({ id }: { id: (name: string) => string }) {
             <radialGradient id={id('shadow')}>
                 <stop offset="0.55" stopColor="#1c1006" stopOpacity="0.5" />
                 <stop offset="1" stopColor="#1c1006" stopOpacity="0" />
+            </radialGradient>
+        </>
+    );
+}
+
+/// 圍棋／五子棋的黑白子：左上高光的放射漸層，fill 用 url(#id('black' | 'white'))
+export function StoneDefs({ id }: { id: (name: string) => string }) {
+    return (
+        <>
+            <radialGradient id={id('black')} cx="0.36" cy="0.3" r="0.75">
+                <stop offset="0" stopColor="#6e6e6e" />
+                <stop offset="0.28" stopColor="#2b2b2b" />
+                <stop offset="1" stopColor="#060606" />
+            </radialGradient>
+            <radialGradient id={id('white')} cx="0.36" cy="0.3" r="0.8">
+                <stop offset="0" stopColor="#ffffff" />
+                <stop offset="0.45" stopColor="#f3f1eb" />
+                <stop offset="1" stopColor="#bdb8ac" />
             </radialGradient>
         </>
     );

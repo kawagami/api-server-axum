@@ -1,17 +1,22 @@
 "use client";
 
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { sound } from '../_shared/sound';
 import { useBoardCursor } from '../_shared/useBoardCursor';
 import { isTouchPointer, toViewBox } from '../_shared/pointer';
+import { BOARD_INK, WoodDefs, WoodSurface } from '../_shared/BoardWood';
+import { useRemovedPieces } from '../_shared/useRemovedPieces';
+import { XiangqiPiece, XiangqiPieceBack, XiangqiPieceDefs } from '../_shared/XiangqiPiece';
 import type { HintsData } from '../_shared/wire';
-import { COLS, ROWS, key, kindChar, type BBoard, type BColor, type Cell } from './banqi-logic';
+import { COLS, ROWS, key, kindChar, type BBoard, type BCell, type BColor, type Cell } from './banqi-logic';
 
 const CELL = 74;
 const MARGIN = 12;
 const W = COLS * CELL + 2 * MARGIN;
 const H = ROWS * CELL + 2 * MARGIN;
 const R = 31; // 棋子半徑
+
+const moveId = (from: Cell, to: Cell) => `${from.join(',')}>${to.join(',')}`;
 
 export type BanqiIntent =
     | { action: 'flip'; at: Cell }
@@ -46,14 +51,21 @@ export function BanqiBoard({
     const [confirmFlip, setConfirmFlip] = useState<Cell | null>(null);
     const [drag, setDrag] = useState<{ from: Cell; x: number; y: number } | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
+    // 拖曳放下的那一步：子已經在目標格了，不再播「從起點滑過去」的動畫
+    const [dropped, setDropped] = useState<string | null>(null);
+    const uid = useId();
+    const id = (name: string) => `${uid}-${name}`;
+    // 被吃淡出；翻子時舊的「背面」也會被當成移除，剛好在翻開的子底下淡掉
+    const ghosts = useRemovedPieces(board, (a, b) => a.hidden === b.hidden && a.color === b.color && a.kind === b.kind);
 
     // 選到子時 server 給的合法目標。flips 不另外標示 —— 所有蓋著的格都能翻，畫了只是噪音
     const targets: Cell[] = selected
         ? (hints?.moves?.[key(selected[0], selected[1])] as Cell[] | undefined) ?? []
         : [];
 
-    const commitMove = (from: Cell, to: Cell) => {
+    const commitMove = (from: Cell, to: Cell, viaDrag = false) => {
         if (from[0] === to[0] && from[1] === to[1]) return;
+        setDropped(viaDrag ? moveId(from, to) : null);
         onMove({ action: 'move', from, to });
         setSelected(null);
     };
@@ -108,7 +120,7 @@ export function BanqiBoard({
         const [x, y] = toViewBox(e, svgRef.current, W, H);
         const to = unproject(x, y);
         setDrag(null);
-        if (to) commitMove(drag.from, to);
+        if (to) commitMove(drag.from, to, true);
     };
 
     const dragOver = drag ? unproject(drag.x, drag.y) : null;
@@ -130,26 +142,43 @@ export function BanqiBoard({
     const isSel = (c: number, r: number) => !!selected && selected[0] === c && selected[1] === r;
     const isLast = (c: number, r: number) => lastCells.some(([lc, lr]) => lc === c && lr === r);
 
+    const renderCell = (cx: number, cy: number, cell: BCell, lift = 0) => cell.hidden || !cell.color || !cell.kind
+        ? <XiangqiPieceBack id={id} x={cx} y={cy} r={R} />
+        : <XiangqiPiece id={id} x={cx} y={cy} r={R} side={cell.color} char={kindChar(cell.color, cell.kind)} lift={lift} />;
+
+    // 最後一手：翻子時 lastCells = [at]，走子時 = [from, to]
+    const flipped = lastCells.length === 1 ? lastCells[0] : null;
+    const moved = lastCells.length === 2 ? { from: lastCells[0], to: lastCells[1] } : null;
+
     return (
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width={W} height={H}
             onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={() => setDrag(null)}
-            className="max-h-full max-w-full touch-manipulation select-none rounded-lg bg-amber-100 dark:bg-neutral-900 shadow-sm"
+            className="max-h-full max-w-full touch-manipulation select-none rounded-lg shadow-lg shadow-amber-950/30"
             role="group" aria-label={boardLabel}>
+            <defs>
+                <WoodDefs id={id} />
+                <XiangqiPieceDefs id={id} />
+            </defs>
+
+            <WoodSurface id={id} w={W} h={H} />
+
             {/* 格線 */}
-            {Array.from({ length: COLS * ROWS }, (_, idx) => {
-                const c = idx % COLS;
-                const r = Math.floor(idx / COLS);
-                const [x, y] = cellXY(c, r);
-                const over = !!dragOver && dragOver[0] === c && dragOver[1] === r;
-                return (
-                    <g key={`g${idx}`}>
-                        <rect x={x} y={y} width={CELL} height={CELL}
-                            className="fill-none stroke-neutral-400 dark:stroke-neutral-600" strokeWidth={1} />
-                        {over && <rect x={x + 1} y={y + 1} width={CELL - 2} height={CELL - 2}
-                            className="fill-none stroke-primary-500/80" strokeWidth={3} />}
-                    </g>
-                );
-            })}
+            <g stroke={BOARD_INK} strokeOpacity={0.75} strokeWidth={1.2} fill="none">
+                <rect x={MARGIN} y={MARGIN} width={COLS * CELL} height={ROWS * CELL} strokeWidth={2} />
+                {Array.from({ length: COLS - 1 }, (_, i) => (
+                    <line key={`v${i}`} x1={MARGIN + (i + 1) * CELL} y1={MARGIN} x2={MARGIN + (i + 1) * CELL} y2={MARGIN + ROWS * CELL} />
+                ))}
+                {Array.from({ length: ROWS - 1 }, (_, i) => (
+                    <line key={`h${i}`} x1={MARGIN} y1={MARGIN + (i + 1) * CELL} x2={MARGIN + COLS * CELL} y2={MARGIN + (i + 1) * CELL} />
+                ))}
+            </g>
+
+            {/* 拖曳落點 */}
+            {dragOver && (() => {
+                const [x, y] = cellXY(dragOver[0], dragOver[1]);
+                return <rect x={x + 1.5} y={y + 1.5} width={CELL - 3} height={CELL - 3}
+                    className="fill-none stroke-primary-500/80" strokeWidth={3} />;
+            })()}
 
             {/* 合法步提示（server 給的） */}
             {targets.map(([c, r], i) => {
@@ -161,37 +190,48 @@ export function BanqiBoard({
                     : <circle key={`ht${i}`} cx={x + CELL / 2} cy={y + CELL / 2} r={10} className="fill-emerald-500/45" />;
             })}
 
+            {ghosts.map(([k, cell]) => {
+                const [c, r] = k.split(',').map(Number);
+                const [x, y] = cellXY(c, r);
+                return <g key={`gh${k}`} className="piece-capture" pointerEvents="none">{renderCell(x + CELL / 2, y + CELL / 2, cell)}</g>;
+            })}
+
             {/* 棋子 */}
             {Array.from(board.entries()).map(([k, cell]) => {
                 const [c, r] = k.split(',').map(Number);
                 const [x, y] = cellXY(c, r);
                 const cx = x + CELL / 2;
                 const cy = y + CELL / 2;
+                if (cell.hidden) {
+                    const pendingFlip = !!confirmFlip && confirmFlip[0] === c && confirmFlip[1] === r;
+                    return (
+                        <g key={`${k}:h`}>
+                            {renderCell(cx, cy, cell)}
+                            {/* 觸控待確認的翻子 */}
+                            {pendingFlip && <circle cx={cx} cy={cy} r={R + 4} className="fill-none stroke-amber-400" strokeWidth={3} />}
+                        </g>
+                    );
+                }
                 const sel = isSel(c, r);
                 const last = isLast(c, r);
-                const pendingFlip = !!confirmFlip && confirmFlip[0] === c && confirmFlip[1] === r;
                 const isDragSrc = !!drag && drag.from[0] === c && drag.from[1] === r;
-                return cell.hidden ? (
-                    <g key={k}>
-                        <circle cx={cx} cy={cy} r={R} className="fill-primary-600 dark:fill-primary-800 stroke-primary-800 dark:stroke-primary-950" strokeWidth={2} />
-                        <circle cx={cx} cy={cy} r={R - 8} className="fill-none stroke-primary-300/50" strokeWidth={2} />
-                        {/* 觸控待確認的翻子 */}
-                        {pendingFlip && <circle cx={cx} cy={cy} r={R + 4} className="fill-none stroke-amber-400" strokeWidth={3} />}
-                    </g>
-                ) : (
-                    <g key={k} opacity={isDragSrc ? 0.35 : 1}>
-                        <circle cx={cx} cy={cy} r={R} className="fill-neutral-50 dark:fill-neutral-800" />
-                        <circle cx={cx} cy={cy} r={R}
-                            className={sel ? 'fill-none stroke-primary-500'
-                                : last ? 'fill-none stroke-primary-400/70'
-                                    : cell.color === 'red' ? 'fill-none stroke-red-600/70'
-                                        : 'fill-none stroke-neutral-700 dark:stroke-neutral-300'}
-                            strokeWidth={sel ? 3 : last ? 2.5 : 1.5} strokeDasharray={last && !sel ? '4 3' : undefined} />
-                        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
-                            className={cell.color === 'red' ? 'fill-red-700 dark:fill-red-400' : 'fill-neutral-900 dark:fill-neutral-100'}
-                            style={{ fontSize: 34, fontWeight: 700 }}>
-                            {cell.color && cell.kind ? kindChar(cell.color, cell.kind) : ''}
-                        </text>
+                // 剛翻開的子播翻面；剛走到的子從起點滑過來（拖曳放下的不滑）。
+                // key 帶 color：翻開（h → 有色）與被回吃（換色）都會換元素，動畫才會重播
+                const flip = !!flipped && flipped[0] === c && flipped[1] === r;
+                const slide = !!moved && moved.to[0] === c && moved.to[1] === r && dropped !== moveId(moved.from, moved.to);
+                let slideStyle: React.CSSProperties | undefined;
+                if (slide) {
+                    const [fx, fy] = cellXY(moved.from[0], moved.from[1]);
+                    slideStyle = { '--dx': `${fx - x}px`, '--dy': `${fy - y}px` } as React.CSSProperties;
+                }
+                const lift = sel && !isDragSrc ? 3 : 0;
+                return (
+                    <g key={`${k}:${cell.color}`} className={flip ? 'piece-flip' : slide ? 'piece-slide' : undefined}
+                        style={slideStyle} opacity={isDragSrc ? 0.35 : 1}>
+                        {renderCell(cx, cy, cell, lift)}
+                        {sel && <circle cx={cx} cy={cy - lift} r={R + 1.5} fill="none" strokeWidth={3} className="stroke-primary-500" />}
+                        {last && !sel && <circle cx={cx} cy={cy} r={R + 4} fill="none" strokeWidth={2.5}
+                            strokeDasharray="4 3" className="stroke-primary-400/80" />}
                     </g>
                 );
             })}
@@ -200,20 +240,13 @@ export function BanqiBoard({
             {lastCells.map(([c, r], i) => {
                 if (board.has(key(c, r))) return null;
                 const [x, y] = cellXY(c, r);
-                return <circle key={`le${i}`} cx={x + CELL / 2} cy={y + CELL / 2} r={6}
-                    className="fill-primary-400/50" />;
+                return <circle key={`le${i}`} cx={x + CELL / 2} cy={y + CELL / 2} r={R + 4} fill="none" strokeWidth={2.5}
+                    strokeDasharray="4 3" className="stroke-primary-400/80" />;
             })}
 
             {/* 跟著指標走的拖曳子 */}
             {drag && dragging && !dragging.hidden && (
-                <g pointerEvents="none">
-                    <circle cx={drag.x} cy={drag.y} r={R} className="fill-neutral-50/90 dark:fill-neutral-800/90 stroke-primary-500" strokeWidth={2} />
-                    <text x={drag.x} y={drag.y} textAnchor="middle" dominantBaseline="central"
-                        className={dragging.color === 'red' ? 'fill-red-700 dark:fill-red-400' : 'fill-neutral-900 dark:fill-neutral-100'}
-                        style={{ fontSize: 34, fontWeight: 700 }}>
-                        {dragging.color && dragging.kind ? kindChar(dragging.color, dragging.kind) : ''}
-                    </text>
-                </g>
+                <g pointerEvents="none">{renderCell(drag.x, drag.y, dragging, 6)}</g>
             )}
 
             {/* 命中層（全 32 格）：鍵盤可聚焦 + 指標按下 */}

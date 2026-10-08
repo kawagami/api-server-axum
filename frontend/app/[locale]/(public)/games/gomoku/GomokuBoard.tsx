@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { sound } from '../_shared/sound';
 import { useBoardCursor } from '../_shared/useBoardCursor';
 import { isTouchPointer } from '../_shared/pointer';
+import { BOARD_INK, PieceShadow, StoneDefs, WoodDefs, WoodSurface } from '../_shared/BoardWood';
 import { key, SIZE, type Cell, type GBoard } from './gomoku-logic';
 
 const CELL = 36;
@@ -55,6 +56,9 @@ export function GomokuBoard({
         },
     });
 
+    const uid = useId();
+    const id = (name: string) => `${uid}-${name}`;
+
     const lines: React.ReactNode[] = [];
     for (let i = 0; i < SIZE; i++) {
         const [hx1, hy1] = xy(0, i);
@@ -67,14 +71,21 @@ export function GomokuBoard({
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-            className="max-h-full max-w-full touch-manipulation select-none rounded-lg bg-amber-50 dark:bg-neutral-900 shadow-sm"
+            className="max-h-full max-w-full touch-manipulation select-none rounded-lg shadow-lg shadow-amber-950/30"
             role="group" aria-label={boardLabel}>
-            <g className="stroke-neutral-400 dark:stroke-neutral-600" strokeWidth={1.2} fill="none">{lines}</g>
+            <defs>
+                <WoodDefs id={id} />
+                <StoneDefs id={id} />
+            </defs>
+
+            <WoodSurface id={id} w={W} h={H} />
+
+            <g stroke={BOARD_INK} strokeOpacity={0.75} strokeWidth={1.2} fill="none">{lines}</g>
 
             {/* 星位 */}
             {STARS.map(([c, r], i) => {
                 const [x, y] = xy(c, r);
-                return <circle key={`s${i}`} cx={x} cy={y} r={3.5} className="fill-neutral-400 dark:fill-neutral-600" />;
+                return <circle key={`s${i}`} cx={x} cy={y} r={3.5} fill={BOARD_INK} />;
             })}
 
             {/* 棋子 */}
@@ -82,15 +93,13 @@ export function GomokuBoard({
                 const [c, r] = k.split(',').map(Number);
                 const [x, y] = xy(c, r);
                 const isLast = !!lastMove && lastMove[0] === c && lastMove[1] === r;
+                // 只有最後一手播落子動畫：新子 mount 時帶 class 才會播；中途進場／重連只有一顆會動
                 return (
-                    <g key={k}>
-                        <circle cx={x} cy={y} r={R}
-                            className={color === 'black'
-                                ? 'fill-neutral-900 stroke-neutral-700'
-                                : 'fill-neutral-50 stroke-neutral-400'}
-                            strokeWidth={1} />
-                        {isLast && <circle cx={x} cy={y} r={4}
-                            className={color === 'black' ? 'fill-primary-400' : 'fill-primary-500'} />}
+                    <g key={k} className={isLast ? 'piece-drop' : undefined}>
+                        <PieceShadow id={id} x={x} y={y} r={R} />
+                        <circle cx={x} cy={y} r={R} fill={`url(#${id(color)})`} />
+                        {isLast && <circle cx={x} cy={y} r={R * 0.4} fill="none" strokeWidth={1.8}
+                            stroke={color === 'black' ? '#f5f5f4' : '#1c1917'} />}
                     </g>
                 );
             })}
@@ -100,8 +109,7 @@ export function GomokuBoard({
                 const [x, y] = xy(confirm[0], confirm[1]);
                 return (
                     <g pointerEvents="none">
-                        <circle cx={x} cy={y} r={R} opacity={0.45}
-                            className={myColor === 'black' ? 'fill-neutral-900' : 'fill-neutral-50 stroke-neutral-400'} />
+                        <circle cx={x} cy={y} r={R} opacity={0.5} fill={`url(#${id(myColor)})`} />
                         <circle cx={x} cy={y} r={R + 4} className="fill-none stroke-amber-400" strokeWidth={2.5} />
                     </g>
                 );

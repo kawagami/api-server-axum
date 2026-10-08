@@ -4,7 +4,7 @@ import { useId, useState } from 'react';
 import { sound } from '../_shared/sound';
 import { useBoardCursor } from '../_shared/useBoardCursor';
 import { isTouchPointer } from '../_shared/pointer';
-import { BOARD_INK, PieceShadow, WoodDefs, WoodSurface } from '../_shared/BoardWood';
+import { BOARD_INK, PieceShadow, StoneDefs, WoodDefs, WoodSurface } from '../_shared/BoardWood';
 import { useRemovedPieces } from '../_shared/useRemovedPieces';
 import type { HintsData } from '../_shared/wire';
 import { SIZE, STARS, key, type Cell, type GBoard, type GColor } from './go-logic';
@@ -86,16 +86,7 @@ export function GoBoard({
             role="group" aria-label={boardLabel}>
             <defs>
                 <WoodDefs id={id} />
-                <radialGradient id={id('black')} cx="0.36" cy="0.3" r="0.75">
-                    <stop offset="0" stopColor="#6e6e6e" />
-                    <stop offset="0.28" stopColor="#2b2b2b" />
-                    <stop offset="1" stopColor="#060606" />
-                </radialGradient>
-                <radialGradient id={id('white')} cx="0.36" cy="0.3" r="0.8">
-                    <stop offset="0" stopColor="#ffffff" />
-                    <stop offset="0.45" stopColor="#f3f1eb" />
-                    <stop offset="1" stopColor="#bdb8ac" />
-                </radialGradient>
+                <StoneDefs id={id} />
             </defs>
 
             <WoodSurface id={id} w={W} h={H} />
