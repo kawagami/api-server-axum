@@ -6,6 +6,7 @@ import { Hand } from 'lucide-react';
 import { GameFrame } from '../_shared/GameFrame';
 import { useGameRoom } from '../_shared/useGameRoom';
 import { sound } from '../_shared/sound';
+import { BLACK_DOT, WHITE_DOT } from '../_shared/dots';
 import { GoBoard } from './GoBoard';
 import { applyPlay, emptyBoard, type Cell, type GBoard, type GColor } from './go-logic';
 
@@ -47,7 +48,7 @@ export default function GoGame() {
             rules={t.raw('rules') as string[]}
             sides={SIDES}
             sideLabel={(s) => t(s)}
-            sideDotClass={(s) => (s === 'black' ? 'bg-neutral-900 dark:ring-1 dark:ring-neutral-400' : 'bg-white border border-neutral-400')}
+            sideDotClass={(s) => (s === 'black' ? BLACK_DOT : WHITE_DOT)}
             reasonLabel={(r) => t(`reason_${r}`)}
             extraControls={
                 <button

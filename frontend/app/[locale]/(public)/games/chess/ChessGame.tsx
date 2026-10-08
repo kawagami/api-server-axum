@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { GameFrame } from '../_shared/GameFrame';
 import { useGameRoom } from '../_shared/useGameRoom';
 import { sound } from '../_shared/sound';
+import { BLACK_DOT } from '../_shared/dots';
 import { ChessBoard } from './ChessBoard';
 import {
     applyMove, initialBoard, key,
@@ -56,7 +57,7 @@ export default function ChessGame() {
             rules={t.raw('rules') as string[]}
             sides={SIDES}
             sideLabel={(s) => t(s)}
-            sideDotClass={(s) => (s === 'red' ? 'bg-red-600' : 'bg-neutral-900 dark:ring-1 dark:ring-neutral-400')}
+            sideDotClass={(s) => (s === 'red' ? 'bg-red-600' : BLACK_DOT)}
             reasonLabel={(r) => t(`reason_${r}`)}
             extraStatus={checkSide && room.phase === 'playing'
                 ? <span className="ml-2 font-semibold text-red-500">{t('check')}</span>

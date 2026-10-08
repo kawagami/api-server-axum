@@ -265,7 +265,7 @@ export function ChessBoard({
                 const r = Math.floor(idx / 9);
                 const [x, y] = project(c, r, myColor);
                 return <circle key={`hit${idx}`} cx={x} cy={y} r={CELL / 2 - 2}
-                    fill="transparent" className={interactive ? 'cursor-pointer focus:outline-2 focus:outline-primary-500' : ''}
+                    fill="transparent" className={interactive ? 'cursor-pointer' : ''}
                     onPointerDown={onDown(c, r)} {...cellProps(c, r)} />;
             })}
         </svg>

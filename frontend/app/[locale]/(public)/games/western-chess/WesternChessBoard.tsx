@@ -200,7 +200,7 @@ export function WesternChessBoard({
                     const r = Math.floor(idx / SIZE);
                     const [x, y] = origin(c, r, myColor);
                     return <rect key={`hit${idx}`} x={x} y={y} width={CELL} height={CELL}
-                        fill="transparent" className={interactive ? 'cursor-pointer focus:outline-2 focus:outline-primary-500' : ''}
+                        fill="transparent" className={interactive ? 'cursor-pointer' : ''}
                         onPointerDown={onDown(c, r)} {...cellProps(c, r)} />;
                 })}
             </svg>

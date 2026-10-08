@@ -118,8 +118,8 @@ export function GomokuBoard({
                 return <circle key={`hit${idx}`} cx={x} cy={y} r={CELL / 2 - 1}
                     fill="transparent"
                     className={interactive && !board.has(key(c, r))
-                        ? 'cursor-pointer focus:outline-2 focus:outline-primary-500'
-                        : 'focus:outline-2 focus:outline-primary-500'}
+                        ? 'cursor-pointer'
+                        : undefined}
                     onPointerDown={(e) => { sound.warmup(); play(c, r, isTouchPointer(e)); }}
                     {...cellProps(c, r)} />;
             })}

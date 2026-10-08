@@ -33,7 +33,7 @@ forbid 'types/ 一律從 barrel `@/types` 引入' "from ['\"]@/types/"
 
 # --- 樣式 ---
 forbid '色名只用 primary-* / neutral-*（語意色另有列管）' '\b(bg|text|border|ring|from|to|via|fill|stroke)-(gray|slate|zinc|indigo)-[0-9]'
-forbid '焦點樣式走 globals.css 的全域 :focus-visible，元件不要自寫' '\bfocus:(ring|outline-none|border)'
+forbid '焦點樣式走 globals.css 的全域 :focus-visible，元件不要自寫' '\bfocus:(ring|outline|border)'
 forbid '`admin-sticky-head` 只能出現在 AdminTableContainer（用 stickyHead / fill prop）' \
     'admin-sticky-head' '^components/admin/admin-table-container\.tsx:'
 

@@ -222,7 +222,7 @@ export function BanqiBoard({
                 const r = Math.floor(idx / COLS);
                 const [x, y] = cellXY(c, r);
                 return <rect key={`hit${idx}`} x={x} y={y} width={CELL} height={CELL}
-                    fill="transparent" className={interactive ? 'cursor-pointer focus:outline-2 focus:outline-primary-500' : ''}
+                    fill="transparent" className={interactive ? 'cursor-pointer' : ''}
                     onPointerDown={onDown(c, r)} {...cellProps(c, r)} />;
             })}
         </svg>

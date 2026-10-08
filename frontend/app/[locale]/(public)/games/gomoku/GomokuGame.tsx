@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { GameFrame } from '../_shared/GameFrame';
 import { useGameRoom } from '../_shared/useGameRoom';
 import { sound } from '../_shared/sound';
+import { BLACK_DOT, WHITE_DOT } from '../_shared/dots';
 import { GomokuBoard } from './GomokuBoard';
 import { emptyBoard, placeStone, type Cell, type GBoard, type GColor } from './gomoku-logic';
 
@@ -43,8 +44,8 @@ export default function GomokuGame() {
             sides={SIDES}
             sideLabel={(s) => t(s)}
             sideDotClass={(s) => (s === 'black'
-                ? 'bg-neutral-900 dark:ring-1 dark:ring-neutral-400'
-                : 'bg-white border border-neutral-400')}
+                ? BLACK_DOT
+                : WHITE_DOT)}
             reasonLabel={(r) => t(`reason_${r}`)}
             board={
                 <GomokuBoard
