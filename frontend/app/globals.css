@@ -52,6 +52,24 @@
   80% { transform: translateX(5px); }
 }
 
+/* 棋子動畫（圍棋、象棋盤面共用）：落子、被吃淡出、走子滑動（--dx/--dy 由盤面給起點偏移）。
+   transform-box 讓 scale 以棋子本身為中心，不是以 svg 原點 */
+@keyframes piece-drop {
+  0% { opacity: 0; transform: translateY(-7px) scale(1.18); }
+  65% { opacity: 1; transform: translateY(0) scale(0.97); }
+  100% { transform: none; }
+}
+@keyframes piece-capture {
+  to { opacity: 0; transform: scale(0.6); }
+}
+@keyframes piece-slide {
+  from { transform: translate(var(--dx), var(--dy)); }
+}
+.piece-drop, .piece-capture { transform-box: fill-box; transform-origin: center; }
+.piece-drop { animation: piece-drop 0.22s ease-out; }
+.piece-capture { animation: piece-capture 0.3s ease-in forwards; }
+.piece-slide { animation: piece-slide 0.25s cubic-bezier(0.2, 0.8, 0.3, 1); }
+
 /* 單字闖關答題回饋特效 */
 @keyframes vocab-pop {
   0% { transform: scale(1); }
@@ -69,8 +87,8 @@
 
 /* 尊重使用者的減量動態設定 */
 @media (prefers-reduced-motion: reduce) {
-  .fx-shake, .fx-pop, .fx-float { animation: none; }
-  .fx-float { display: none; }
+  .fx-shake, .fx-pop, .fx-float, .piece-drop, .piece-slide { animation: none; }
+  .fx-float, .piece-capture { display: none; }
 }
 
 /* 日文內容字型:日文漢字字形與中文不同(食、直、令),

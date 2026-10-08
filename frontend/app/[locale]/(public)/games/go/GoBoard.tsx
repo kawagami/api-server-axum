@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { sound } from '../_shared/sound';
 import { useBoardCursor } from '../_shared/useBoardCursor';
 import { isTouchPointer } from '../_shared/pointer';
+import { BOARD_INK, PieceShadow, WoodDefs, WoodSurface } from '../_shared/BoardWood';
+import { useRemovedPieces } from '../_shared/useRemovedPieces';
 import type { HintsData } from '../_shared/wire';
 import { SIZE, STARS, key, type Cell, type GBoard, type GColor } from './go-logic';
 
@@ -30,6 +32,9 @@ export function GoBoard({
     onMove: (data: { at: Cell }) => void;
 }) {
     const [confirm, setConfirm] = useState<Cell | null>(null);
+    const uid = useId();
+    const id = (name: string) => `${uid}-${name}`;
+    const ghosts = useRemovedPieces(board, (a, b) => a === b); // 提子淡出
 
     const forbidden = hints?.forbidden ?? [];
     const isForbidden = (c: number, r: number) => forbidden.some(([fc, fr]) => fc === c && fr === r);
@@ -68,28 +73,56 @@ export function GoBoard({
         lines.push(<line key={`v${i}`} x1={vx1} y1={vy1} x2={vx2} y2={vy2} />);
     }
 
+    const stone = (x: number, y: number, color: GColor) => (
+        <>
+            <PieceShadow id={id} x={x} y={y} r={R} />
+            <circle cx={x} cy={y} r={R} fill={`url(#${id(color)})`} />
+        </>
+    );
+
     return (
         <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-            className="max-h-full max-w-full touch-manipulation select-none rounded-lg bg-amber-100 dark:bg-neutral-800 shadow-sm"
+            className="max-h-full max-w-full touch-manipulation select-none rounded-lg shadow-lg shadow-amber-950/30"
             role="group" aria-label={boardLabel}>
-            <g className="stroke-neutral-500 dark:stroke-neutral-500" strokeWidth={1} fill="none">{lines}</g>
+            <defs>
+                <WoodDefs id={id} />
+                <radialGradient id={id('black')} cx="0.36" cy="0.3" r="0.75">
+                    <stop offset="0" stopColor="#6e6e6e" />
+                    <stop offset="0.28" stopColor="#2b2b2b" />
+                    <stop offset="1" stopColor="#060606" />
+                </radialGradient>
+                <radialGradient id={id('white')} cx="0.36" cy="0.3" r="0.8">
+                    <stop offset="0" stopColor="#ffffff" />
+                    <stop offset="0.45" stopColor="#f3f1eb" />
+                    <stop offset="1" stopColor="#bdb8ac" />
+                </radialGradient>
+            </defs>
+
+            <WoodSurface id={id} w={W} h={H} />
+
+            <g stroke={BOARD_INK} strokeOpacity={0.75} strokeWidth={1} fill="none">{lines}</g>
 
             {STARS.map(([c, r], i) => {
                 const [x, y] = xy(c, r);
-                return <circle key={`s${i}`} cx={x} cy={y} r={3} className="fill-neutral-500" />;
+                return <circle key={`s${i}`} cx={x} cy={y} r={3} fill={BOARD_INK} />;
+            })}
+
+            {ghosts.map(([k, color]) => {
+                const [c, r] = k.split(',').map(Number);
+                const [x, y] = xy(c, r);
+                return <g key={`g${k}`} className="piece-capture" pointerEvents="none">{stone(x, y, color)}</g>;
             })}
 
             {Array.from(board.entries()).map(([k, color]) => {
                 const [c, r] = k.split(',').map(Number);
                 const [x, y] = xy(c, r);
                 const isLast = !!lastMove && lastMove[0] === c && lastMove[1] === r;
+                // 只有最後一手播落子動畫：新子 mount 時帶 class 才會播；中途進場／重連只有一顆會動
                 return (
-                    <g key={k}>
-                        <circle cx={x} cy={y} r={R}
-                            className={color === 'black' ? 'fill-neutral-900 stroke-neutral-700' : 'fill-neutral-50 stroke-neutral-400'}
-                            strokeWidth={1} />
-                        {isLast && <circle cx={x} cy={y} r={3.5}
-                            className={color === 'black' ? 'fill-neutral-50' : 'fill-neutral-900'} />}
+                    <g key={k} className={isLast ? 'piece-drop' : undefined}>
+                        {stone(x, y, color)}
+                        {isLast && <circle cx={x} cy={y} r={R * 0.42} fill="none" strokeWidth={1.6}
+                            stroke={color === 'black' ? '#f5f5f4' : '#1c1917'} />}
                     </g>
                 );
             })}
@@ -111,8 +144,7 @@ export function GoBoard({
                 const [x, y] = xy(confirm[0], confirm[1]);
                 return (
                     <g pointerEvents="none">
-                        <circle cx={x} cy={y} r={R} opacity={0.45}
-                            className={myColor === 'black' ? 'fill-neutral-900' : 'fill-neutral-50 stroke-neutral-400'} />
+                        <circle cx={x} cy={y} r={R} opacity={0.5} fill={`url(#${id(myColor)})`} />
                         <circle cx={x} cy={y} r={R + 3.5} className="fill-none stroke-amber-400" strokeWidth={2} />
                     </g>
                 );
