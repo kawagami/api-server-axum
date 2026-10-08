@@ -110,6 +110,12 @@
   outline-offset: 2px;
 }
 
+/* SVG 裡的可聚焦元素（對戰盤面的命中層）：瀏覽器內建樣式在 SVG 元素取得焦點時就畫預設焦點框，
+   滑鼠點一下也算，盤面會殘留黑白方框。只在「非鍵盤取得焦點」時拿掉，鍵盤操作仍走上面那條 :focus-visible。 */
+svg [tabindex]:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* 跳至主要內容：平常隱藏，鍵盤 Tab 到才浮出（前台 layout 的第一個可聚焦元素） */
 .skip-link {
   position: fixed;
