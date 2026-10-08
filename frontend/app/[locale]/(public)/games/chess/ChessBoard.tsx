@@ -153,7 +153,9 @@ export function ChessBoard({
         lines.push(<line key={`p${i}`} x1={x1} y1={y1} x2={x2} y2={y2} />);
     });
 
-    const [riverX, riverY] = project(4, 4, myColor);
+    // 河界在第 4、5 列正中間；取兩列中點，不要用「第 4 列 ± 半格」—— 翻轉視角時方向會反
+    const [riverX, riverY4] = project(4, 4, myColor);
+    const riverY = (riverY4 + project(4, 5, myColor)[1]) / 2;
     const dragging = board.get(drag ? key(drag.from[0], drag.from[1]) : '');
 
     // 木頭棋子：陰影 → 木面 → 外緣 → 內圈刻線 → 字。lift 是浮起高度（選中、拖曳）
@@ -189,7 +191,7 @@ export function ChessBoard({
 
             <g stroke={BOARD_INK} strokeOpacity={0.75} strokeWidth={1.5} fill="none">{lines}</g>
 
-            <text x={riverX} y={riverY + CELL / 2} textAnchor="middle" dominantBaseline="middle"
+            <text x={riverX} y={riverY} textAnchor="middle" dominantBaseline="middle"
                 fill={BOARD_INK} fillOpacity={0.6} style={{ fontSize: 26, letterSpacing: 10, fontFamily: KAI_FONT }}>
                 楚河　漢界
             </text>

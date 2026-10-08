@@ -43,7 +43,7 @@ export default function GomokuGame() {
             sides={SIDES}
             sideLabel={(s) => t(s)}
             sideDotClass={(s) => (s === 'black'
-                ? 'bg-neutral-900 dark:bg-neutral-50'
+                ? 'bg-neutral-900 dark:ring-1 dark:ring-neutral-400'
                 : 'bg-white border border-neutral-400')}
             reasonLabel={(r) => t(`reason_${r}`)}
             board={

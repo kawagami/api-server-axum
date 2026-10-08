@@ -48,7 +48,7 @@ export default function WesternChessGame() {
             rules={t.raw('rules') as string[]}
             sides={SIDES}
             sideLabel={(s) => t(s)}
-            sideDotClass={(s) => (s === 'white' ? 'bg-white border border-neutral-400' : 'bg-neutral-900 dark:bg-neutral-50')}
+            sideDotClass={(s) => (s === 'white' ? 'bg-white border border-neutral-400' : 'bg-neutral-900 dark:ring-1 dark:ring-neutral-400')}
             reasonLabel={(r) => t(`reason_${r}`)}
             extraStatus={checkSide && room.phase === 'playing'
                 ? <span className="ml-2 font-semibold text-red-500">{t('check')}</span>

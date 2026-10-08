@@ -31,14 +31,15 @@ export function WoodDefs({ id }: { id: (name: string) => string }) {
     );
 }
 
-/// 底色 → 木紋 → 邊緣暗角 → 深色模式壓暗一層
+/// 底色 → 木紋 → 邊緣暗角 → 深色模式壓暗一層。
+/// 壓暗用深胡桃褐不用純黑：純黑會連飽和度一起壓掉，盤面變成灰卡其色、不像木頭
 export function WoodSurface({ id, w, h }: { id: (name: string) => string; w: number; h: number }) {
     return (
         <>
             <rect width={w} height={h} fill={`url(#${id('wood')})`} />
             <rect width={w} height={h} filter={`url(#${id('grain')})`} opacity={0.45} />
             <rect width={w} height={h} fill={`url(#${id('vignette')})`} />
-            <rect width={w} height={h} className="fill-black opacity-0 dark:opacity-30" />
+            <rect width={w} height={h} fill="#2a1405" className="opacity-0 dark:opacity-[0.22]" />
         </>
     );
 }
