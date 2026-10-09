@@ -408,8 +408,9 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
                 </div>
                 {/* 回饋期間整塊可點 = 立刻續題 */}
                 <div className={`relative ${fxClass}`} onClick={feedback ? advance : undefined}>
-                    {/* key = 題號:換題時重新掛載,播一次滑入 */}
-                    <div key={question.number} className="fx-slide-in">
+                    {/* key = 題號:換題時重新掛載,播一次滑入。
+                        key 一定要帶前綴:跟下面連對字樣同一層,純數字會撞(第 5 題剛好 5 連對 → 兩個 key="5",舊卡片殘留) */}
+                    <div key={`q${question.number}`} className="fx-slide-in">
                     {question.kind === "choice" ? (
                         <ChoiceCard question={question} feedback={feedback} busy={busy} ja={ja} t={t}
                             canTts={canTts} onSpeak={say}
@@ -428,7 +429,7 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
                         </span>
                     )}
                     {feedback?.correct && isComboMilestone(combo) && (
-                        <span key={combo} className="fx-combo pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 whitespace-nowrap text-3xl font-extrabold text-orange-500 drop-shadow-[0_2px_6px_rgba(249,115,22,0.5)]">
+                        <span key={`combo${combo}`} className="fx-combo pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 whitespace-nowrap text-3xl font-extrabold text-orange-500 drop-shadow-[0_2px_6px_rgba(249,115,22,0.5)]">
                             {t("comboMilestone", { count: combo })}
                         </span>
                     )}
