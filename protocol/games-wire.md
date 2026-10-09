@@ -434,7 +434,7 @@ game_over     : 揭露全角色
 | `room_created` | `{ room_id }` | host | |
 | `room_update` | `{ room_id, name, host_seat, players:[{seat,name}], options, can_start }` | 房內成員 | 有人進出/可否開局 |
 | `room_closed` | `{ reason }` | 房內其餘成員 | host 離開 / 對局中止（`host_left`/`aborted`） |
-| **`role_assigned`** | `{ your_seat, your_role, known:[seat,...], n, sizes:[5], players:[{seat,name}] }` | **逐人私有** | 開局時，各人不同 |
+| **`role_assigned`** | `{ your_seat, your_role, known:[seat,...], n, sizes:[5], fails_required:[5], players:[{seat,name}] }` | **逐人私有** | 開局時，各人不同。`fails_required[i]` = 第 i 輪需幾張失敗票任務才失敗（7 人以上第 4 輪為 2，其餘 1），整局固定，前端只用來顯示 |
 | `phase_changed` | `{ phase, leader, round, quest_size, results:[bool], rejects, team:[seat,...] }` | 全房 | 階段轉換 |
 | `team_proposed` | `{ team:[seat,...], leader }` | 全房 | 隊長提名了 |
 | `vote_result` | `{ votes:[{seat,approve}], approved }` | 全房 | 組隊投票**公開**結果 |
@@ -459,7 +459,7 @@ game_over     : 揭露全角色
 ```jsonc
 // → 梅林那位收到
 { "game":"avalon", "type":"role_assigned",
-  "data":{ "your_seat":0, "your_role":"merlin", "known":[3,4], "n":5, "sizes":[2,3,2,3,3],
+  "data":{ "your_seat":0, "your_role":"merlin", "known":[3,4], "n":5, "sizes":[2,3,2,3,3], "fails_required":[1,1,1,1,1],
            "players":[{"seat":0,"name":""},{"seat":1,"name":"阿明"}, /*…*/ ] } }
 // ← 全房
 { "game":"avalon", "type":"phase_changed",

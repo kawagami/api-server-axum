@@ -50,6 +50,8 @@ fn announce_start(room: &Room, outbox: &mut Vec<(SocketAddr, String)>) {
     let n = room.players.len();
     let players: Vec<Value> = room.names.iter().enumerate()
         .map(|(i, name)| json!({ "seat": i, "name": name })).collect();
+    // 各輪需幾張失敗票才算任務失敗（7 人以上第 4 輪 = 2）；整局固定，跟 sizes 一起開局給，前端只拿來顯示
+    let fails_required: Vec<usize> = (0..st.sizes.len()).map(|r| roles::fails_required(n, r)).collect();
     for seat in 0..n {
         let role = st.roles[seat];
         let known = roles::known_seats(&st.roles, seat);
@@ -61,6 +63,7 @@ fn announce_start(room: &Room, outbox: &mut Vec<(SocketAddr, String)>) {
                 "known": known,
                 "n": n,
                 "sizes": st.sizes,
+                "fails_required": fails_required,
                 "players": players,
             })),
         ));

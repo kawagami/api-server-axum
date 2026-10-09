@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useWsContext } from '@/libs/ws-context';
 import { useRoomBase } from '../_shared/useRoomBase';
+import { sound } from '../_shared/sound';
 import {
     GAME,
     type RoomSummary, type RoomListData, type RoomUpdateData, type RoomClosedData,
@@ -69,10 +70,14 @@ export function useAvalonRoom(): UseAvalonRoom {
     const [iAmHost, setIAmHost] = useState(false);
 
     const chatSeq = useRef(0);
+    // 自己的座位：只給 handler 判斷「這則聊天是不是自己發的」（自己的不響）
+    const mySeatRef = useRef<number | null>(null);
+    const lastPhaseRef = useRef<string | null>(null);
 
     // 房內狀態全清（room_closed / 重連 / 回大廳共用）
     const resetRoom = useCallback(() => {
         setRoom(null); setRole(null); setGamePhase(null); setGameOver(null); setIAmHost(false);
+        mySeatRef.current = null; lastPhaseRef.current = null;
     }, []);
 
     const { notice, setNotice } = useRoomBase({
@@ -97,23 +102,29 @@ export function useAvalonRoom(): UseAvalonRoom {
             },
             role_assigned: d => {
                 setRole(d as RoleAssignedData);
+                mySeatRef.current = (d as RoleAssignedData).your_seat;
                 setProposedTeam(null); setVoteResult(null); setQuestResult(null);
                 setGameOver(null); setVoted(false); setCardPlayed(false);
                 setUiPhase('playing');
             },
             phase_changed: d => {
-                setGamePhase(d as PhaseChangedData);
+                const p = d as PhaseChangedData;
+                // 音效不放進 setState updater（StrictMode 會呼叫兩次）；上一個階段另存 ref
+                if (p.phase === 'assassinate' && lastPhaseRef.current !== 'assassinate') sound.assassinPhase();
+                lastPhaseRef.current = p.phase;
+                setGamePhase(p);
                 setVoted(false); setCardPlayed(false);
             },
             team_proposed: d => {
                 setProposedTeam(d as TeamProposedData);
                 setVoteResult(null); setQuestResult(null);
             },
-            vote_result: d => setVoteResult(d as VoteResultData),
+            vote_result: d => { sound.voteReveal(); setVoteResult(d as VoteResultData); },
             quest_result: d => setQuestResult(d as QuestResultData),
             game_over: d => setGameOver(d as GameOverData),
             chat: d => {
                 const c = d as ChatData;
+                if (c.seat !== mySeatRef.current) sound.chat();
                 setChat(prev => [...prev, { ...c, id: ++chatSeq.current }].slice(-200));
             },
         },

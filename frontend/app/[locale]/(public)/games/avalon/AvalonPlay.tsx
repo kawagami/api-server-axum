@@ -2,108 +2,136 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Crown, Check, X, Swords, Skull, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
+import { Swords, ThumbsUp, ThumbsDown, Volume2, VolumeX } from 'lucide-react';
+import { sound } from '../_shared/sound';
 import { AvalonChat } from './AvalonChat';
-import { EVIL_ROLES, GOOD_ROLES } from './avalon-types';
+import { AvalonGameOver } from './AvalonGameOver';
+import { AvalonQuestReveal } from './AvalonQuestReveal';
+import { RoleIntro, RolePeek } from './AvalonRoleCard';
+import { AvalonTable, type SeatMode } from './AvalonTable';
+import { EVIL_ROLES, GOOD_ROLES, type QuestResultData, type RoleAssignedData } from './avalon-types';
+import { useActionAlert } from './useActionAlert';
 import type { UseAvalonRoom } from './useAvalonRoom';
 
 export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
     const t = useTranslations('Avalon');
-    const { role, gamePhase, proposedTeam, voteResult, questResult, gameOver, chat, actions } = room;
+    const tl = useTranslations('GameLobby');
+    const { role, gamePhase, proposedTeam, voteResult, questResult, gameOver, chat, voted, cardPlayed, actions } = room;
 
     const phase = gamePhase?.phase;
-
-    if (!role) return null;
-    const mySeat = role.your_seat;
-    const myRole = role.your_role;
-    const isGood = GOOD_ROLES.has(myRole);
-    const seatName = (s: number) => role.players.find(p => p.seat === s)?.name || t('playerN', { n: s + 1 });
-
+    const mySeat = role?.your_seat ?? -1;
+    const myRole = role?.your_role;
+    const isGood = !!myRole && GOOD_ROLES.has(myRole);
+    const isLeader = gamePhase?.leader === mySeat;
     const team = proposedTeam?.team ?? gamePhase?.team ?? [];
+    const onTeam = team.includes(mySeat);
+    const isAssassin = myRole === 'assassin';
+    const seatName = (s: number) => role?.players.find(p => p.seat === s)?.name || t('playerN', { n: s + 1 });
 
-    // 角色提示
+    const [muted, setMuted] = useState(() => sound.isMuted());
+
+    // 隊長挑的隊員／刺客挑的目標：階段、隊長或輪次換了就清空（render 中調整 state，不用 effect）
+    const phaseKey = `${phase}-${gamePhase?.leader}-${gamePhase?.round}`;
+    const [selKey, setSelKey] = useState(phaseKey);
+    const [picked, setPicked] = useState<number[]>([]);
+    const [target, setTarget] = useState<number | null>(null);
+    if (selKey !== phaseKey) {
+        setSelKey(phaseKey);
+        setPicked([]);
+        setTarget(null);
+    }
+
+    // 開局身分揭示：每次 role_assigned 看一次
+    const [introDone, setIntroDone] = useState<RoleAssignedData | null>(null);
+    // 任務卡揭曉：每個 quest_result 播一次；播的時候結局遮罩先等著
+    const [revealDone, setRevealDone] = useState<QuestResultData | null>(null);
+    const revealing = !!questResult && questResult !== revealDone && !!role;
+
+    // 輪到自己行動的提醒
+    const alertKind = phase === 'team_building' && isLeader ? 'leader'
+        : phase === 'team_vote' && !voted ? 'vote'
+            : phase === 'quest' && onTeam && !cardPlayed ? 'quest'
+                : phase === 'assassinate' && isAssassin ? 'assassin' : null;
+    useActionAlert(
+        alertKind && gamePhase ? `${alertKind}-${gamePhase.round}-${gamePhase.leader}-${gamePhase.rejects}` : null,
+        alertKind ? t(`alert_${alertKind}`) : null,
+    );
+
+    if (!role || !myRole) return null;
+
     const knownNames = role.known.map(seatName).join('、');
     const knownHint = myRole === 'merlin' ? t('known_merlin', { names: knownNames })
         : myRole === 'percival' ? t('known_percival', { names: knownNames })
             : EVIL_ROLES.has(myRole) && myRole !== 'oberon' ? t('known_evil', { names: knownNames || t('knownNoneInline') })
                 : t('known_none');
 
+    const mode: SeatMode = phase === 'team_building' && isLeader ? 'team'
+        : phase === 'assassinate' && isAssassin ? 'assassin' : null;
+    const onSeat = (s: number) => {
+        sound.warmup();
+        if (mode === 'team') {
+            const size = gamePhase?.quest_size ?? 0;
+            setPicked(prev => prev.includes(s) ? prev.filter(x => x !== s) : prev.length >= size ? prev : [...prev, s]);
+        } else if (mode === 'assassin') {
+            setTarget(s);
+        }
+    };
+
+    const toggleMute = () => {
+        const next = !muted;
+        setMuted(next);
+        sound.setMuted(next);
+    };
+
+    // 階段轉場橫幅文字
+    const banner = !gamePhase || phase === 'game_over' ? null
+        : phase === 'team_building' ? t('banner_team_building', { n: gamePhase.round + 1, name: seatName(gamePhase.leader) })
+            : t(`banner_${phase}`);
+
     return (
         <div className="mx-auto flex h-[calc(100svh-120px)] w-full max-w-5xl flex-col gap-3 py-3 lg:flex-row">
             {/* 左：對局 */}
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-                {/* 角色橫幅（只用自己的 role_assigned） */}
-                <div className={`rounded-lg border-l-4 p-3 ${isGood ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-red-500 bg-red-50 dark:bg-red-950'}`}>
-                    <p className="font-bold text-neutral-800 dark:text-neutral-100">
-                        {t('youAre')}：{t(`role_${myRole}`)}
-                        <span className={`ml-2 text-xs ${isGood ? 'text-primary-600' : 'text-red-600'}`}>（{isGood ? t('sideGood') : t('sideEvil')}）</span>
+                <div className="flex items-center justify-between">
+                    <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                        {gamePhase && phase !== 'game_over' && <>{t('questN', { n: gamePhase.round + 1 })} · {t('leaderIs', { name: seatName(gamePhase.leader) })}</>}
                     </p>
-                    <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">{knownHint}</p>
+                    <button type="button" onClick={toggleMute} aria-label={muted ? tl('soundOn') : tl('soundOff')}
+                        className="flex items-center rounded-lg border border-neutral-300 p-2 text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800">
+                        {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                    </button>
                 </div>
 
-                {/* 任務軌 */}
-                <div className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2 dark:border-neutral-700">
-                    <div className="flex gap-2">
-                        {role.sizes.map((sz, i) => {
-                            const done = gamePhase && i < gamePhase.results.length;
-                            const success = done ? gamePhase!.results[i] : null;
-                            const current = gamePhase?.round === i && phase !== 'game_over';
-                            return (
-                                <div key={i} className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold ${success === true ? 'border-green-500 bg-green-500 text-white'
-                                    : success === false ? 'border-red-500 bg-red-500 text-white'
-                                        : current ? 'border-primary-500 text-primary-600 dark:text-primary-300'
-                                            : 'border-neutral-300 text-neutral-400 dark:border-neutral-600'}`}>
-                                    {sz}
-                                </div>
-                            );
-                        })}
-                    </div>
-                    <div className="text-right text-xs text-neutral-500 dark:text-neutral-400">
-                        <div>{t('rejects', { n: gamePhase?.rejects ?? 0 })}</div>
-                        {gamePhase && phase !== 'game_over' && <div>{t('leaderIs', { name: seatName(gamePhase.leader) })}</div>}
-                    </div>
-                </div>
-
-                {/* 玩家列 */}
-                <div className="flex flex-wrap gap-2">
-                    {role.players.map(p => {
-                        const leader = gamePhase?.leader === p.seat;
-                        const inTeam = team.includes(p.seat);
-                        const me = p.seat === mySeat;
-                        return (
-                            <span key={p.seat} className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm ${inTeam ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-neutral-200 dark:border-neutral-700'}`}>
-                                {leader && <Crown className="h-3.5 w-3.5 text-amber-500" />}
-                                <span className={me ? 'font-bold text-primary-700 dark:text-primary-300' : 'text-neutral-700 dark:text-neutral-200'}>
-                                    {seatName(p.seat)}{me && `（${t('youTag')}）`}
-                                </span>
-                                {inTeam && <Check className="h-3.5 w-3.5 text-primary-600" />}
-                            </span>
-                        );
-                    })}
-                </div>
-
-                {/* 階段面板（key 隨階段/隊長/輪次重掛載，重置本地選擇） */}
-                <ActionPanel key={`${phase}-${gamePhase?.leader}-${gamePhase?.round}`} room={room} seatName={seatName} />
-
-                {/* 投票 / 任務結果 */}
-                {voteResult && (
-                    <div className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-700">
-                        <p className="font-medium">{voteResult.approved ? t('teamApproved') : t('teamRejected')}</p>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                            {voteResult.votes.map(v => (
-                                <span key={v.seat} className="flex items-center gap-1 text-xs">
-                                    {v.approve ? <Check className="h-3.5 w-3.5 text-green-600" /> : <X className="h-3.5 w-3.5 text-red-600" />}
-                                    {seatName(v.seat)}
-                                </span>
-                            ))}
+                <div className="relative">
+                    <AvalonTable
+                        players={role.players} mySeat={mySeat} leader={gamePhase?.leader ?? null}
+                        team={phase === 'team_building' ? [] : team} picked={picked} target={target} votes={voteResult}
+                        phase={phase} round={gamePhase?.round ?? 0} results={gamePhase?.results ?? []}
+                        sizes={role.sizes} failsRequired={role.fails_required ?? []} rejects={gamePhase?.rejects ?? 0}
+                        mode={mode} seatName={seatName} onSeat={onSeat} />
+                    {/* 階段轉場：key 換了就重播一次淡入淡出 */}
+                    {banner && (
+                        <div key={phaseKey} aria-hidden="true"
+                            className="avalon-banner pointer-events-none absolute inset-0 flex items-center justify-center">
+                            <span className="rounded-lg bg-neutral-900/85 px-4 py-2 text-lg font-bold text-white shadow-xl">{banner}</span>
                         </div>
+                    )}
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                    <RolePeek role={myRole} knownHint={knownHint} />
+                    <div className="flex flex-1 flex-col gap-3">
+                        <ActionPanel room={room} picked={picked} target={target} onPropose={() => actions.proposeTeam(picked)} seatName={seatName} />
+                        {(voteResult || questResult) && (
+                            <div className="rounded-lg border border-neutral-200 p-3 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+                                {voteResult && <p>{voteResult.approved ? t('teamApproved') : t('teamRejected')}</p>}
+                                {questResult && !revealing && (
+                                    <p>{t('questOutcome', { round: questResult.round + 1, result: questResult.success ? t('questSuccess') : t('questFail'), fails: questResult.fails })}</p>
+                                )}
+                            </div>
+                        )}
                     </div>
-                )}
-                {questResult && (
-                    <div className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-700">
-                        {t('questOutcome', { round: questResult.round + 1, result: questResult.success ? t('questSuccess') : t('questFail'), fails: questResult.fails })}
-                    </div>
-                )}
+                </div>
             </div>
 
             {/* 右：聊天 */}
@@ -111,37 +139,25 @@ export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
                 <AvalonChat chat={chat} onSend={actions.sendChat} />
             </div>
 
-            {/* 結局遮罩 */}
-            {gameOver && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/80 p-4 backdrop-blur-xs">
-                    <div className="flex w-full max-w-md flex-col gap-3 rounded-lg bg-white p-5 dark:bg-neutral-800">
-                        <h2 className="text-center text-2xl font-bold text-neutral-800 dark:text-neutral-100">
-                            {gameOver.winner === 'good' ? t('goodWins') : gameOver.winner === 'evil' ? t('evilWins') : t('draw')}
-                        </h2>
-                        <p className="text-center text-sm text-neutral-500 dark:text-neutral-400">{t(`reason_${gameOver.reason}`)}</p>
-                        <ul className="flex flex-col gap-1 text-sm">
-                            {gameOver.roles.map(r => (
-                                <li key={r.seat} className="flex justify-between rounded-sm px-2 py-1 odd:bg-neutral-100 dark:odd:bg-neutral-700">
-                                    <span>{seatName(r.seat)}</span>
-                                    <span className={EVIL_ROLES.has(r.role) ? 'text-red-600 dark:text-red-400' : 'text-primary-600 dark:text-primary-300'}>{t(`role_${r.role}`)}</span>
-                                </li>
-                            ))}
-                        </ul>
-                        <button onClick={actions.backToLobby} className="flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white transition-colors hover:bg-primary-700">
-                            <RotateCcw className="h-4 w-4" />{t('backToLobby')}
-                        </button>
-                    </div>
-                </div>
+            {introDone !== role && <RoleIntro role={myRole} knownHint={knownHint} onDone={() => setIntroDone(role)} />}
+
+            {revealing && questResult && (
+                <AvalonQuestReveal key={questResult.round} round={questResult.round} size={role.sizes[questResult.round] ?? 0}
+                    fails={questResult.fails} success={questResult.success} onDone={() => setRevealDone(questResult)} />
+            )}
+
+            {gameOver && !revealing && (
+                <AvalonGameOver gameOver={gameOver} isGood={isGood} mySeat={mySeat} seatName={seatName} onBack={actions.backToLobby} />
             )}
         </div>
     );
 }
 
-function ActionPanel({ room, seatName }: { room: UseAvalonRoom; seatName: (s: number) => string }) {
+function ActionPanel({ room, picked, target, onPropose, seatName }: {
+    room: UseAvalonRoom; picked: number[]; target: number | null; onPropose: () => void; seatName: (s: number) => string;
+}) {
     const t = useTranslations('Avalon');
     const { role, gamePhase, proposedTeam, voted, cardPlayed, actions } = room;
-    const [picked, setPicked] = useState<number[]>([]);
-    const [target, setTarget] = useState<number | null>(null);
 
     if (!role || !gamePhase) return null;
     const phase = gamePhase.phase;
@@ -152,24 +168,12 @@ function ActionPanel({ room, seatName }: { room: UseAvalonRoom; seatName: (s: nu
     const onTeam = team.includes(mySeat);
     const isAssassin = role.your_role === 'assassin';
 
-    const togglePick = (s: number) => setPicked(prev =>
-        prev.includes(s) ? prev.filter(x => x !== s)
-            : prev.length >= gamePhase.quest_size ? prev : [...prev, s]);
-
     return (
         <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
             {phase === 'team_building' && (isLeader ? (
                 <div className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">{t('youAreLeader', { size: gamePhase.quest_size })}</p>
-                    <div className="flex flex-wrap gap-2">
-                        {role.players.map(p => (
-                            <button key={p.seat} onClick={() => togglePick(p.seat)}
-                                className={`rounded-full border px-3 py-1 text-sm transition-colors ${picked.includes(p.seat) ? 'border-primary-500 bg-primary-600 text-white' : 'border-neutral-300 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800'}`}>
-                                {seatName(p.seat)}
-                            </button>
-                        ))}
-                    </div>
-                    <button onClick={() => actions.proposeTeam(picked)} disabled={picked.length !== gamePhase.quest_size}
+                    <p className="text-sm font-medium">{t('pickOnTable', { n: picked.length, size: gamePhase.quest_size })}</p>
+                    <button onClick={onPropose} disabled={picked.length !== gamePhase.quest_size}
                         className="self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-40">
                         {t('proposeTeam')}（{picked.length}/{gamePhase.quest_size}）
                     </button>
@@ -207,15 +211,9 @@ function ActionPanel({ room, seatName }: { room: UseAvalonRoom; seatName: (s: nu
 
             {phase === 'assassinate' && (isAssassin ? (
                 <div className="flex flex-col gap-2">
-                    <p className="flex items-center gap-1.5 text-sm font-medium text-red-600"><Skull className="h-4 w-4" />{t('assassinPrompt')}</p>
-                    <div className="flex flex-wrap gap-2">
-                        {role.players.filter(p => p.seat !== mySeat).map(p => (
-                            <button key={p.seat} onClick={() => setTarget(p.seat)}
-                                className={`rounded-full border px-3 py-1 text-sm transition-colors ${target === p.seat ? 'border-red-500 bg-red-600 text-white' : 'border-neutral-300 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800'}`}>
-                                {seatName(p.seat)}
-                            </button>
-                        ))}
-                    </div>
+                    <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                        {t('assassinPrompt')} · {target !== null ? seatName(target) : t('assassinPickOnTable')}
+                    </p>
                     <button onClick={() => target !== null && actions.assassinate(target)} disabled={target === null}
                         className="flex items-center gap-1.5 self-start rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40">
                         <Swords className="h-4 w-4" />{t('confirmAssassinate')}

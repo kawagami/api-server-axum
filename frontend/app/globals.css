@@ -75,6 +75,15 @@
 .piece-slide { animation: piece-slide 0.25s cubic-bezier(0.2, 0.8, 0.3, 1); }
 .piece-flip { animation: piece-flip 0.28s ease-out; }
 
+/* 阿瓦隆階段轉場橫幅：淡入、停留、淡出，結束後保持透明（forwards），不擋操作（pointer-events-none 在元件上） */
+@keyframes avalon-banner {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  12% { opacity: 1; transform: none; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.avalon-banner { animation: avalon-banner 2.2s ease-out forwards; }
+
 /* 單字闖關答題回饋特效 */
 @keyframes vocab-pop {
   0% { transform: scale(1); }
@@ -93,7 +102,7 @@
 /* 尊重使用者的減量動態設定 */
 @media (prefers-reduced-motion: reduce) {
   .fx-shake, .fx-pop, .fx-float, .piece-drop, .piece-slide, .piece-flip { animation: none; }
-  .fx-float, .piece-capture { display: none; }
+  .fx-float, .piece-capture, .avalon-banner { display: none; }
 }
 
 /* 日文內容字型:日文漢字字形與中文不同(食、直、令),

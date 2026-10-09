@@ -32,6 +32,8 @@ export interface RoomClosedData { reason: string; }
 export interface RoleAssignedData {
     your_seat: number; your_role: AvalonRole; known: number[];
     n: number; sizes: number[]; players: PlayerInfo[];
+    /// 各輪需幾張失敗票任務才失敗（7 人以上第 4 輪 = 2）；舊後端沒有這欄 → 視為全 1
+    fails_required?: number[];
 }
 export interface PhaseChangedData {
     phase: AvalonPhase; leader: number; round: number; quest_size: number;
