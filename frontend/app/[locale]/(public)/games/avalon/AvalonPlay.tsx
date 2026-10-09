@@ -89,7 +89,7 @@ export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
             : t(`banner_${phase}`);
 
     return (
-        <div className="mx-auto flex h-[calc(100svh-120px)] w-full max-w-5xl flex-col gap-3 py-3 md:flex-row">
+        <div className="mx-auto flex h-[calc(100svh-120px)] w-full max-w-5xl flex-col gap-3 px-2 py-3 sm:px-3 md:flex-row">
             {/* 左：對局 */}
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
                 <div className="flex items-center justify-between">

@@ -99,7 +99,6 @@ export function AvalonTable({
                 const vote = votes?.votes.find(v => v.seat === p.seat);
                 const selectable = mode === 'team' || (mode === 'assassin' && !me);
                 const name = seatName(p.seat);
-                const initial = p.name ? [...p.name][0] : String(p.seat + 1);
                 const label = [
                     name, me ? `（${t('youTag')}）` : '',
                     isLeader ? ` ${t('seatLeader')}` : '', inTeam || isPicked ? ` ${t('seatInTeam')}` : '',
@@ -116,7 +115,8 @@ export function AvalonTable({
                             : inTeam ? 'border-primary-500 ring-4 ring-primary-400/40'
                                 : isPicked ? 'border-dashed border-primary-500'
                                     : 'border-neutral-300 dark:border-neutral-600'}`}>
-                            {initial}
+                            {/* 頭像放座位號：沒填暱稱時後端預設「玩家N」，取首字會全變成「玩」；號碼也方便聊天時互相指稱 */}
+                            {p.seat + 1}
                             {isLeader && <Crown className="absolute -top-3.5 left-1/2 h-5 w-5 -translate-x-1/2 fill-amber-400 text-amber-600" />}
                             {(inTeam || isPicked) && (
                                 <Shield className={`absolute -bottom-1.5 -left-1.5 h-5 w-5 fill-primary-500 text-primary-800 ${isPicked && !inTeam ? 'opacity-60' : ''}`} />
