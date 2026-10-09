@@ -8,9 +8,13 @@ import type { ChatEntry } from './avalon-types';
 export function AvalonChat({ chat, onSend }: { chat: ChatEntry[]; onSend: (text: string) => void }) {
     const t = useTranslations('Avalon');
     const [text, setText] = useState('');
-    const endRef = useRef<HTMLDivElement>(null);
+    const listRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [chat]);
+    // 只捲聊天框自己：scrollIntoView 會連外層頁面一起捲，一進對局整頁就被拉到底、桌子上半部被切掉
+    useEffect(() => {
+        const el = listRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+    }, [chat]);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -22,7 +26,7 @@ export function AvalonChat({ chat, onSend }: { chat: ChatEntry[]; onSend: (text:
 
     return (
         <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-neutral-200 dark:border-neutral-700">
-            <div className="min-h-0 flex-1 overflow-y-auto p-2 text-sm">
+            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-2 text-sm">
                 {chat.length === 0 ? (
                     <p className="text-neutral-400">{t('chatEmpty')}</p>
                 ) : chat.map(c => (
@@ -31,7 +35,6 @@ export function AvalonChat({ chat, onSend }: { chat: ChatEntry[]; onSend: (text:
                         <span className="text-neutral-700 dark:text-neutral-200">：{c.text}</span>
                     </p>
                 ))}
-                <div ref={endRef} />
             </div>
             <form onSubmit={submit} className="flex gap-1 border-t border-neutral-200 p-2 dark:border-neutral-700">
                 <input

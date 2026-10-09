@@ -39,7 +39,7 @@ export function AvalonTable({
     const assassinating = phase === 'assassinate';
 
     return (
-        <div className="relative mx-auto aspect-square w-full max-w-[460px]">
+        <div className="relative mx-auto aspect-square w-full max-w-[min(460px,58svh)]">
             {/* 桌面：木紋圓桌，刺殺階段整張壓暗泛紅 */}
             <div className={`absolute inset-[17%] overflow-hidden rounded-full shadow-xl shadow-amber-950/40 transition-shadow ${assassinating ? 'shadow-red-900/70' : ''}`}>
                 <svg viewBox={`0 0 ${TABLE_PX} ${TABLE_PX}`} className="block h-full w-full" aria-hidden="true">

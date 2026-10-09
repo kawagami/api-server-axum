@@ -89,7 +89,7 @@ export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
             : t(`banner_${phase}`);
 
     return (
-        <div className="mx-auto flex h-[calc(100svh-120px)] w-full max-w-5xl flex-col gap-3 py-3 lg:flex-row">
+        <div className="mx-auto flex h-[calc(100svh-120px)] w-full max-w-5xl flex-col gap-3 py-3 md:flex-row">
             {/* 左：對局 */}
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
                 <div className="flex items-center justify-between">
@@ -135,7 +135,7 @@ export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
             </div>
 
             {/* 右：聊天 */}
-            <div className="flex h-56 flex-col lg:h-auto lg:w-80">
+            <div className="flex h-56 flex-col md:h-auto md:w-72 lg:w-80">
                 <AvalonChat chat={chat} onSend={actions.sendChat} />
             </div>
 
