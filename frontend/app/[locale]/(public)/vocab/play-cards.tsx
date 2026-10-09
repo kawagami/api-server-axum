@@ -2,21 +2,34 @@
 
 import type { VocabQuestion, VocabRunMode } from "@/types";
 import { BookOpenCheck, Check, Clock, Flame, Heart, X } from "lucide-react";
-import { type Feedback, hasLives, hasTimer } from "./model";
+import { type Feedback, diffMarks, hasLives, hasTimer } from "./model";
 import { SpeakButton, type T, fmtTime } from "./ui";
 
-export function PlayHeader({ mode, lives, combo, runExp, number, remaining, t }: {
-    mode: VocabRunMode; lives: number; combo: number; runExp: number; number: number; remaining: number; t: T;
+/** 連對分級:5 / 10 / 20 連各換一次火焰樣式 */
+const COMBO_TIER = [
+    "text-primary-600 dark:text-primary-400",
+    "text-orange-500 scale-110",
+    "text-orange-500 scale-125 drop-shadow-[0_0_6px_rgba(249,115,22,0.7)]",
+    "text-red-500 scale-125 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-pulse",
+];
+function comboTier(combo: number) {
+    return combo >= 20 ? 3 : combo >= 10 ? 2 : combo >= 5 ? 1 : 0;
+}
+
+export function PlayHeader({ mode, lives, combo, runExp, number, remaining, timeTotal, t }: {
+    mode: VocabRunMode; lives: number; combo: number; runExp: number; number: number; remaining: number; timeTotal: number; t: T;
 }) {
+    const timePct = timeTotal > 0 ? Math.min(100, (remaining / timeTotal) * 100) : 0;
     return (
+        <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3">
                 {hasLives(mode) && (
                     <div className="flex gap-1" role="img" aria-label={t("livesLeft", { count: lives })}>
-                        {[0, 1, 2].map(i => (
-                            <Heart key={i} size={20} aria-hidden
-                                className={i < lives ? "text-red-500 fill-red-500" : "text-neutral-300 dark:text-neutral-600"} />
-                        ))}
+                        {/* key 帶滿／空:扣命那一顆換元素,碎裂動畫只播一次 */}
+                        {[0, 1, 2].map(i => i < lives
+                            ? <Heart key={`${i}f`} size={20} aria-hidden className="text-red-500 fill-red-500" />
+                            : <Heart key={`${i}e`} size={20} aria-hidden className="fx-heart-break text-neutral-300 dark:text-neutral-600" />)}
                     </div>
                 )}
                 {hasTimer(mode) && (
@@ -33,12 +46,20 @@ export function PlayHeader({ mode, lives, combo, runExp, number, remaining, t }:
             </span>
             <div className="flex items-center gap-3">
                 {combo > 1 && (
-                    <span className="flex items-center gap-1 text-primary-600 dark:text-primary-400 font-semibold text-sm">
-                        <Flame size={16} aria-hidden />{t("comboLabel", { count: combo })}
+                    <span className={`flex items-center gap-1 font-semibold text-sm transition-transform ${COMBO_TIER[comboTier(combo)]}`}>
+                        <Flame size={16} aria-hidden className={comboTier(combo) >= 2 ? "fill-current" : ""} />{t("comboLabel", { count: combo })}
                     </span>
                 )}
                 <span className="text-sm font-semibold">{runExp} EXP</span>
             </div>
+        </div>
+        {/* 倒數條:最後 30 秒變紅閃爍 */}
+        {hasTimer(mode) && timeTotal > 0 && (
+            <div className="h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-700 overflow-hidden" aria-hidden>
+                <div className={`h-full rounded-full transition-[width] duration-500 ease-linear ${remaining <= 30 ? "bg-red-500 animate-pulse" : "bg-primary-500"}`}
+                    style={{ width: `${timePct}%` }} />
+            </div>
+        )}
         </div>
     );
 }
@@ -167,6 +188,11 @@ export function SpellingCard({ question, feedback, busy, ja, canTts, value, onCh
                 <span className="text-xs text-neutral-400 dark:text-neutral-500">
                     {t(ja ? "spellingHintJa" : "spellingHint", { letter: question.hint_first_letter ?? "?", length: question.hint_length ?? 0 })}
                 </span>
+                {/* 英文才畫字母格:日文的 hint_length 是「拍數」,拗音（きゃ）兩個字算一拍,格數會對不上 */}
+                {!ja && !feedback && (question.hint_length ?? 0) > 0 && (
+                    <LetterSlots value={value} length={question.hint_length ?? 0} hint={question.hint_first_letter}
+                        onClick={() => inputRef.current?.focus()} />
+                )}
             </div>
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
                 <input ref={inputRef} value={value} onChange={(e) => onChange(e.target.value)}
@@ -186,6 +212,7 @@ export function SpellingCard({ question, feedback, busy, ja, canTts, value, onCh
             {feedback && (
                 <div className="flex flex-col items-center gap-1">
                     <FeedbackBanner feedback={feedback} t={t} />
+                    {feedback.correctText && <AnswerDiff feedback={feedback} ja={ja} t={t} />}
                     {feedback.correctText && (
                         <span className={`flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400 ${ja ? "font-ja" : ""}`}
                             lang={ja ? "ja" : undefined}>
@@ -198,6 +225,63 @@ export function SpellingCard({ question, feedback, busy, ja, canTts, value, onCh
                     <ContinueHint t={t} />
                 </div>
             )}
+        </div>
+    );
+}
+
+/** 拼字輸入的字母格(英文):逐格顯示已打的字,第一格空著時淡淡標出提示字母,超出長度的格標紅 */
+function LetterSlots({ value, length, hint, onClick }: { value: string; length: number; hint?: string; onClick: () => void }) {
+    const chars = Array.from(value);
+    const count = Math.max(length, chars.length);
+    return (
+        <div className="flex flex-wrap justify-center gap-1 cursor-text" onClick={onClick} aria-hidden>
+            {Array.from({ length: count }, (_, i) => {
+                const ch = chars[i];
+                const over = i >= length;
+                const cursor = i === chars.length;
+                return (
+                    <span key={i} className={`flex h-9 w-7 items-center justify-center rounded-md border-2 font-mono text-lg font-semibold sm:h-10 sm:w-8 ${over
+                        ? "border-red-400 text-red-500"
+                        : cursor ? "border-primary-500" : ch ? "border-neutral-400 dark:border-neutral-500" : "border-neutral-200 dark:border-neutral-600"}`}>
+                        {ch ?? (i === 0 && hint ? <span className="text-neutral-300 dark:text-neutral-600">{hint}</span> : "")}
+                    </span>
+                );
+            })}
+        </div>
+    );
+}
+
+/** 作答後的逐字對照:答對整排翻綠;答錯分兩排,你的答案標出打錯的字、正解標出漏掉的字 */
+function AnswerDiff({ feedback, ja, t }: { feedback: Feedback; ja: boolean; t: T }) {
+    const correct = feedback.correctText ?? "";
+    const tile = "flex h-8 min-w-7 items-center justify-center rounded-md border-2 px-1 text-base font-semibold sm:h-9 sm:min-w-8";
+    const font = ja ? "font-ja" : "font-mono";
+    if (feedback.correct || !feedback.answer) {
+        return (
+            <div className={`flex flex-wrap justify-center gap-1 ${font}`} lang={ja ? "ja" : undefined} aria-hidden>
+                {Array.from(correct).map((ch, i) => (
+                    <span key={i} style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
+                        className={`piece-flip ${tile} ${feedback.correct
+                            ? "border-green-500 bg-green-500 text-white"
+                            : "border-neutral-300 dark:border-neutral-600"}`}>{ch}</span>
+                ))}
+            </div>
+        );
+    }
+    const marks = diffMarks(feedback.answer, correct);
+    const row = (text: string, ok: boolean[], bad: string) => Array.from(text).map((ch, i) => (
+        <span key={i} className={`${tile} ${ok[i] ? "border-green-500/60 text-green-700 dark:text-green-300" : bad}`}>{ch === " " ? " " : ch}</span>
+    ));
+    return (
+        <div className={`flex flex-col items-center gap-1.5 text-sm ${font}`} lang={ja ? "ja" : undefined}>
+            <div className="flex flex-wrap items-center justify-center gap-1">
+                <span className="mr-1 font-sans text-xs text-neutral-500 dark:text-neutral-400">{t("yourAnswer")}</span>
+                {row(feedback.answer, marks.answer, "border-red-500 bg-red-50 text-red-600 line-through dark:bg-red-950 dark:text-red-300")}
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-1">
+                <span className="mr-1 font-sans text-xs text-neutral-500 dark:text-neutral-400">{t("rightAnswer")}</span>
+                {row(correct, marks.correct, "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300")}
+            </div>
         </div>
     );
 }

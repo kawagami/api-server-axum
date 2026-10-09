@@ -2,8 +2,9 @@
 
 import type { VocabMe } from "@/types";
 import { Link } from "@/i18n/navigation";
-import { Flame, GraduationCap, LogIn, Volume2, VolumeX } from "lucide-react";
+import { Flame, GraduationCap, LogIn, Speech, Volume2, VolumeX } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
 import type { GuestStats } from "./prefs";
 import PageTitle from "@/components/page-title";
 
@@ -62,6 +63,48 @@ export function MuteButton({ muted, onToggle, t }: { muted: boolean; onToggle: (
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
         </button>
     );
+}
+
+/** 自動發音開關(偏好存本機);關掉時圖示變淡,不另外換圖 */
+export function AutoSpeakButton({ on, onToggle, t }: { on: boolean; onToggle: () => void; t: T }) {
+    return (
+        <button
+            onClick={onToggle}
+            aria-pressed={on}
+            aria-label={t("autoSpeak")}
+            title={on ? t("autoSpeakOn") : t("autoSpeakOff")}
+            className={`shrink-0 p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors ${on
+                ? "text-primary-500"
+                : "text-neutral-300 dark:text-neutral-600 hover:text-primary-500"}`}
+        >
+            <Speech size={18} />
+        </button>
+    );
+}
+
+/** 數字從 0 跳到目標值(結算卡用);減少動態效果時直接顯示終值 */
+function useCountUp(target: number, ms = 800) {
+    const [value, setValue] = useState(0);
+    useEffect(() => {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || target <= 0) {
+            const id = requestAnimationFrame(() => setValue(target));
+            return () => cancelAnimationFrame(id);
+        }
+        const start = performance.now();
+        let id = 0;
+        const step = (now: number) => {
+            const p = Math.min(1, (now - start) / ms);
+            setValue(Math.round(target * (1 - Math.pow(1 - p, 3)))); // ease-out cubic
+            if (p < 1) id = requestAnimationFrame(step);
+        };
+        id = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(id);
+    }, [target, ms]);
+    return value;
+}
+
+export function CountUp({ value }: { value: number }) {
+    return <>{useCountUp(value)}</>;
 }
 
 // 標題規格走全站共用的 PageTitle，只是把圖示塞進 title 裡
@@ -140,11 +183,11 @@ export function LevelCard({ me, t }: { me: VocabMe; t: T }) {
     );
 }
 
-export function Stat({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
+export function Stat({ label, value, suffix, animate = false }: { label: string; value: number; suffix?: string; animate?: boolean }) {
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-2xl font-bold">
-                {value}{suffix && <span className="text-sm font-normal ml-0.5">{suffix}</span>}
+            <span className="text-2xl font-bold tabular-nums">
+                {animate ? <CountUp value={value} /> : value}{suffix && <span className="text-sm font-normal ml-0.5">{suffix}</span>}
             </span>
             <span className="text-xs text-neutral-500 dark:text-neutral-400">{label}</span>
         </div>

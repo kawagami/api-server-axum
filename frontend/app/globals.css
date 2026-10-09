@@ -95,14 +95,43 @@
   15% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-32px); }
 }
+/* 連對里程碑字樣:彈出放大後上飄淡出。水平置中交給元件的 -translate-x-1/2
+   (Tailwind v4 用獨立的 translate 屬性,這裡再寫 translateX 會疊加成偏一倍) */
+@keyframes vocab-combo {
+  0% { opacity: 0; transform: scale(0.5); }
+  20% { opacity: 1; transform: scale(1.15); }
+  35% { transform: scale(1); }
+  100% { opacity: 0; transform: translateY(-40px); }
+}
+/* 扣命:愛心放大、左右甩、再縮回(變灰由元件 class 給) */
+@keyframes vocab-heart-break {
+  0% { transform: scale(1.5); color: #ef4444; }
+  30% { transform: scale(1.2) rotate(-15deg); }
+  55% { transform: scale(0.9) rotate(12deg); }
+  100% { transform: none; }
+}
+/* 換題:從右側滑入 */
+@keyframes vocab-slide-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+/* 結算彩帶:落下、旋轉、橫向飄移(--drift 由元件給),結束後透明 */
+@keyframes vocab-confetti {
+  0% { opacity: 1; transform: translate(0, -10px) rotate(0); }
+  100% { opacity: 0; transform: translate(var(--drift, 0), 320px) rotate(540deg); }
+}
+.fx-combo { animation: vocab-combo 1.1s ease-out forwards; }
+.fx-heart-break { animation: vocab-heart-break 0.5s ease-out; }
+.fx-slide-in { animation: vocab-slide-in 0.22s ease-out; }
+.fx-confetti { animation: vocab-confetti 1.8s ease-in forwards; }
 .fx-shake { animation: shake 0.4s; }
 .fx-pop { animation: vocab-pop 0.32s ease-out; }
 .fx-float { animation: vocab-float 0.9s ease-out forwards; }
 
 /* 尊重使用者的減量動態設定 */
 @media (prefers-reduced-motion: reduce) {
-  .fx-shake, .fx-pop, .fx-float, .piece-drop, .piece-slide, .piece-flip { animation: none; }
-  .fx-float, .piece-capture, .avalon-banner { display: none; }
+  .fx-shake, .fx-pop, .fx-float, .fx-heart-break, .fx-slide-in, .piece-drop, .piece-slide, .piece-flip { animation: none; }
+  .fx-float, .piece-capture, .avalon-banner, .fx-combo, .fx-confetti { display: none; }
 }
 
 /* 日文內容字型:日文漢字字形與中文不同(食、直、令),

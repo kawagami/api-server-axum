@@ -11,6 +11,8 @@ export interface VocabPrefs {
     duration: number;
     /** 上次玩的模式,入口畫面標「上次」用 */
     lastMode: VocabRunMode | null;
+    /** 出題時自動唸單字(選擇題出題時、拼字題作答後);靜音時不唸 */
+    autoSpeak: boolean;
 }
 
 /**
@@ -52,6 +54,7 @@ export function loadPrefs(fallbackDuration: number): VocabPrefs {
     return {
         duration: typeof saved?.duration === "number" ? saved.duration : fallbackDuration,
         lastMode: saved?.lastMode ?? null,
+        autoSpeak: typeof saved?.autoSpeak === "boolean" ? saved.autoSpeak : true,
     };
 }
 

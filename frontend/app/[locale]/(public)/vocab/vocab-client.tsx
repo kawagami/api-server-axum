@@ -12,10 +12,10 @@ import { addGuestRun, loadGuestStats, loadPrefs, savePrefs, type GuestStats } fr
 import { DURATIONS, FEEDBACK_MS, MISTAKE_PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "./config";
 import { LeaderboardCard } from "./leaderboard-card";
 import { MistakeBook } from "./mistake-book";
-import { DEFAULT_MISTAKE_QUERY, type Feedback, type MistakeQuery, type Pending, type Phase, hasTimer } from "./model";
+import { DEFAULT_MISTAKE_QUERY, type Feedback, type MistakeQuery, type Pending, type Phase, hasTimer, isComboMilestone } from "./model";
 import { ChoiceCard, PlayHeader, ReviewHeader, SpellingCard } from "./play-cards";
 import { ReviewResultCard, ScoredResultCard } from "./result-cards";
-import { ErrorNote, GuestBanner, GuestStatsCard, LevelCard, ModeButton, MuteButton, VocabHeading } from "./ui";
+import { AutoSpeakButton, ErrorNote, GuestBanner, GuestStatsCard, LevelCard, ModeButton, MuteButton, VocabHeading } from "./ui";
 
 export default function VocabClient({ initialMe, initialMistakes, initialLeaderboard, isMember, language = "en" }: {
     initialMe: VocabMe | null; initialMistakes: VocabMistakesPage | null;
@@ -52,11 +52,13 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
     const [runExp, setRunExp] = useState(0);
     const [total, setTotal] = useState(0);
     const [remaining, setRemaining] = useState(0);
+    const [timeTotal, setTimeTotal] = useState(0); // 限時模式開局時的總秒數(倒數條用)
     const [question, setQuestion] = useState<VocabQuestion | null>(null);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const [result, setResult] = useState<VocabRunResult | null>(null);
     const [spellInput, setSpellInput] = useState("");
     const [muted, setMutedState] = useState(false);
+    const [autoSpeak, setAutoSpeak] = useState(true);
 
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +83,7 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
         const prefs = loadPrefs(10);
         setDurationMin(prefs.duration);
         setLastMode(prefs.lastMode);
+        setAutoSpeak(prefs.autoSpeak);
         if (!isMember) setGuest(loadGuestStats(language));
     }, [isMember, language]);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -91,9 +94,15 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
         vocabSound.setMuted(next);
     }
 
+    function toggleAutoSpeak() {
+        const next = !autoSpeak;
+        setAutoSpeak(next);
+        savePrefs({ duration: durationMin, lastMode, autoSpeak: next });
+    }
+
     function pickDuration(d: number) {
         setDurationMin(d);
-        savePrefs({ duration: d, lastMode });
+        savePrefs({ duration: d, lastMode, autoSpeak });
     }
 
     const say = useCallback((text: string | null | undefined) => {
@@ -194,8 +203,7 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
         setSpellInput("");
         if (next.finished && next.result) {
             // 本題結束對局:一定顯示結算(endedRef 已設,不可用來擋這裡)
-            if (next.leveledUp) vocabSound.levelUp();
-            settle(next.result);
+            settle(next.result); // 升級／新紀錄的音效由結算卡掛載時播(倒數結束的路徑也一樣)
         } else if (!endedRef.current && next.question) {
             // 未結束才換下一題;若期間被倒數結束則不動,交給 timeUp 的結算
             setQuestion(next.question);
@@ -227,6 +235,20 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
             inputRef.current?.focus();
         }
     }, [phase, question, feedback]);
+
+    // 自動發音:選擇題出題時唸題目;拼字題要等作答後才唸正解(先唸等於報答案)。靜音時不唸
+    const speakNow = canTts && autoSpeak && !muted && phase === "playing";
+    useEffect(() => {
+        if (speakNow && question?.kind === "choice" && !feedback) say(question.word);
+    }, [speakNow, question, feedback, say]);
+    useEffect(() => {
+        if (speakNow && question?.kind === "spelling" && feedback?.correctText) say(feedback.correctText);
+    }, [speakNow, question, feedback, say]);
+
+    // 倒數最後 10 秒每秒輕敲一聲(remaining 同值不會重 render,所以一秒只響一次)
+    useEffect(() => {
+        if (phase === "playing" && hasTimer(mode) && remaining > 0 && remaining <= 10) vocabSound.tick();
+    }, [phase, mode, remaining]);
 
     // 限時模式:本地倒數,歸零呼叫 finish 結算
     useEffect(() => {
@@ -261,6 +283,7 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
             setLives(res.lives);
             setTotal(res.total ?? 0);
             setRemaining(res.remaining_secs ?? 0);
+            setTimeTotal(res.remaining_secs ?? 0);
             setCombo(0);
             setRunExp(0);
             setQuestion(res.question);
@@ -269,7 +292,7 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
             setSpellInput("");
             setPhase("playing");
             setLastMode(res.mode);
-            savePrefs({ duration: durationMin, lastMode: res.mode });
+            savePrefs({ duration: durationMin, lastMode: res.mode, autoSpeak });
         } catch {
             setError(true);
         } finally {
@@ -297,7 +320,13 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
         try {
             const res = await answerVocabRun(runIdRef.current, input);
             if (res.finished) endedRef.current = true; // 立即封鎖倒數,避免重複結算
-            if (res.correct) vocabSound.correct(); else vocabSound.wrong();
+            if (res.correct) {
+                if (isComboMilestone(res.combo)) vocabSound.comboMilestone(); else vocabSound.correct(res.combo);
+            } else if (res.lives < lives) {
+                vocabSound.lifeLost();
+            } else {
+                vocabSound.wrong();
+            }
             setLives(res.lives);
             setCombo(res.combo);
             setRunExp(res.run_exp);
@@ -308,10 +337,10 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
                 correctText: res.correct_text ?? null,
                 reading: res.reading ?? null,
                 gainedExp: res.gained_exp,
+                answer: input.text ?? null,
             });
             pendingRef.current = {
                 finished: res.finished,
-                leveledUp: res.result?.leveled_up ?? false,
                 result: res.result ?? null,
                 question: res.question ?? null,
             };
@@ -372,12 +401,15 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
                         {mode === "review"
                             ? <ReviewHeader number={question.number} total={total} t={t} />
                             : <PlayHeader mode={mode} lives={lives} combo={combo} runExp={runExp}
-                                number={question.number} remaining={remaining} t={t} />}
+                                number={question.number} remaining={remaining} timeTotal={timeTotal} t={t} />}
                     </div>
+                    {canTts && <AutoSpeakButton on={autoSpeak} onToggle={toggleAutoSpeak} t={t} />}
                     <MuteButton muted={muted} onToggle={toggleMute} t={t} />
                 </div>
                 {/* 回饋期間整塊可點 = 立刻續題 */}
                 <div className={`relative ${fxClass}`} onClick={feedback ? advance : undefined}>
+                    {/* key = 題號:換題時重新掛載,播一次滑入 */}
+                    <div key={question.number} className="fx-slide-in">
                     {question.kind === "choice" ? (
                         <ChoiceCard question={question} feedback={feedback} busy={busy} ja={ja} t={t}
                             canTts={canTts} onSpeak={say}
@@ -389,9 +421,15 @@ export default function VocabClient({ initialMe, initialMistakes, initialLeaderb
                             composingRef={composingRef}
                             onSubmit={() => { if (spellInput.trim()) submit({ text: spellInput }); }} />
                     )}
+                    </div>
                     {feedback?.correct && feedback.gainedExp > 0 && (
                         <span className="fx-float pointer-events-none absolute left-1/2 -translate-x-1/2 top-1 text-primary-500 font-bold text-lg">
                             +{feedback.gainedExp} EXP
+                        </span>
+                    )}
+                    {feedback?.correct && isComboMilestone(combo) && (
+                        <span key={combo} className="fx-combo pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 whitespace-nowrap text-3xl font-extrabold text-orange-500 drop-shadow-[0_2px_6px_rgba(249,115,22,0.5)]">
+                            {t("comboMilestone", { count: combo })}
                         </span>
                     )}
                 </div>

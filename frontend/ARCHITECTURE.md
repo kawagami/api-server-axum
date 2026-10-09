@@ -95,6 +95,7 @@ types/index.ts        ← 後端 API 共用型別（Blog、User、Stock 等）
 - 元件用色一律 `primary-*`（品牌色）與 `neutral-*`（中性灰），**不用** `gray` / `stone` / `blue` / `indigo` 等具體色名
 - 語意色保留：紅=錯誤、`libs/badge-styles.ts` 的 HTTP method / log level 色、股票紅漲綠跌（台股慣例）、**橘／琥珀 = 警示或未知值**（`say-something-form` / `webauthn-settings` 的提醒、`tools/roster/shift-badge.tsx` 的班別與 default 班別）、**遊戲資產色**（棋盤木色 `bg-amber-*`、farm 農作物）。這些不算違規，換成 `primary-*` 會失去語意
 - body 背景：`bg-gradient-to-b from-primary-50 to-neutral-100`（dark: `from-primary-950 to-neutral-900`），背景粒子特效在 `components/theme-background.tsx`（forest=落葉、ocean=氣泡、sky=雲朵橫飄、sunset=餘燼、sakura=花瓣、grape=紫氣泡、mono=灰雲，色走 var，含 `prefers-reduced-motion` 關閉）
+- **單字闖關的回饋特效（2026-10-09）**：動畫 class 都在 `globals.css`（`fx-pop`/`fx-shake`/`fx-float` 答題回饋、`fx-combo` 連對里程碑 5/10/20/之後每 10、`fx-heart-break` 扣命、`fx-slide-in` 換題、`fx-confetti` 結算彩帶），`prefers-reduced-motion` 下全關。⚠️ 元件若用 Tailwind 的 `-translate-x-1/2` 置中，keyframes 裡**不要再寫 `translateX`** —— Tailwind v4 用獨立的 `translate` 屬性，跟 `transform` 會疊加。音效全在 `vocab/sound.ts`（合成、無音檔；答對音隨連對升半音、生存模式扣命另一個音、最後 10 秒每秒輕敲）。自動發音是本機偏好 `prefs.autoSpeak`（預設開、靜音時不唸）：選擇題出題時唸、**拼字題只在作答後唸**（先唸等於報答案）。拼字答錯的逐字對照用 `model.ts` 的 `diffMarks`（LCS 對齊，漏打一字不會整串錯位）；字母格只畫英文 —— 日文 `hint_length` 是拍數，拗音兩字一拍，格數對不上。升級／新紀錄音效在結算卡掛載時播（倒數結束的路徑也會響）
 - Logo：`components/kawa-logo.tsx`（inline SVG 吃 var 跟主題變色）；favicon `app/icon.svg` 固定 forest 色
 - Transition：**禁止全域 `* { transition: all }`**，互動元素個別掛 `transition-colors` / `transition-shadow`
 - Hover scale：只用在塊級卡片/按鈕（上限 `hover:scale-105`），文字連結用變色 + underline，不縮放
