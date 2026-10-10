@@ -43,7 +43,7 @@
   }
 }
 
-/* 對戰遊戲非法走步抖動提示（_shared/GameFrame 的 animate-[shake_0.4s]，五個盤面共用） */
+/* 抖動提示：對戰遊戲非法走步（_shared/GameFrame 的 animate-[shake_0.4s]，五個盤面共用）與單字闖關答錯（下方 .fx-shake） */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-7px); }
