@@ -67,8 +67,8 @@ unicode-normalization = "0.1.25"
 # 圖片上傳處理：image 負責 decode 驗證，webp（libwebp/C，靜態連結）負責 lossy 編碼
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
 webp = { version = "0.3.1", default-features = false }
-# 模糊預覽的 data URL 編碼；0.22 已被既有依賴拉進 lock，無新增 crate
-base64 = "0.22"
+# 模糊預覽的 data URL 編碼；0.23 已被既有依賴（bcrypt / lettre）拉進 lock，無新增 crate
+base64 = "0.23"
 # passkey 登入：danger-allow-state-serialisation 讓挑戰狀態可序列化存 Redis（server 端一次性消費，無 client 重放面）；
 # conditional-ui 提供 discoverable authentication（登入頁 autofill 免輸帳號）
 webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation", "conditional-ui"] }

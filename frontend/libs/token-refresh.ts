@@ -6,6 +6,7 @@ async function doRefresh(): Promise<void> {
         const res = await fetch('/api/auth/refresh', { method: 'POST' });
         if (!res.ok) {
             stopTokenRefresh();
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- session 已失效，刻意整頁重載清掉 client 端狀態
             window.location.href = '/admin/login';
         }
     } catch {

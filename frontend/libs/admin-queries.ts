@@ -32,6 +32,7 @@ async function adminGet<T>(path: string, params: Params = {}): Promise<T> {
     // 這裡改成自己導頁（與 adminRequest 的 401 行為一致：帶 redirect 回原頁）。
     const res = await fetch(url, { cache: "no-store", redirect: "manual" });
     if (res.type === "opaqueredirect") {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- session 已失效，刻意整頁重載清掉 client 端狀態
         window.location.assign(`/admin/login?redirect=${encodeURIComponent(window.location.pathname)}`);
         // 導頁中：不 resolve 也不 reject，呼叫端不會閃一下「載入失敗」
         return new Promise<T>(() => {});

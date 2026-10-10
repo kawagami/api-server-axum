@@ -40,6 +40,7 @@ export default function ChangePasswordPage() {
         if (!state.success) return;
         formRef.current?.reset();
         const timer = setTimeout(() => {
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- session 已失效，刻意整頁重載清掉 client 端狀態
             window.location.href = "/admin/login?redirect=/admin";
         }, 1500);
         return () => clearTimeout(timer);
