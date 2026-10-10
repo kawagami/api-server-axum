@@ -109,19 +109,30 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                                             </AdminTd>
                                             <AdminTd className="align-top text-neutral-800 dark:text-neutral-200">
                                                 {long ? (
-                                                    <button
-                                                        onClick={() => toggleExpand(m.id)}
-                                                        aria-expanded={isExpanded}
-                                                        title={isExpanded ? '收合' : '展開全文'}
-                                                        className="flex w-full items-start gap-1.5 text-left"
-                                                    >
-                                                        <Chevron className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                                                    // 內文不包在 <button> 裡：按鈕內的文字拖不出選取（Firefox 完全不行），
+                                                    // 而且放開滑鼠就觸發 click 把整段收合，複製去翻譯會很痛苦。
+                                                    // 展開／收合交給箭頭鈕；收合時點內文也能展開，但有選取就不動作。
+                                                    <div className="flex items-start gap-1.5">
+                                                        <button
+                                                            onClick={() => toggleExpand(m.id)}
+                                                            aria-expanded={isExpanded}
+                                                            title={isExpanded ? '收合' : '展開全文'}
+                                                            aria-label={isExpanded ? '收合' : '展開全文'}
+                                                            className="mt-0.5 shrink-0 rounded-sm text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                                                        >
+                                                            <Chevron className="h-3.5 w-3.5" aria-hidden="true" />
+                                                        </button>
                                                         {/* line-clamp 需要 display:-webkit-box，直接掛在 <td> 上會把
                                                             cell 從 table-cell 拔掉、整個表格排版壞掉，所以一定要有內層元素 */}
-                                                        <span className={`grow min-w-0 whitespace-pre-wrap wrap-break-word ${isExpanded ? '' : 'line-clamp-3'}`}>
+                                                        <span
+                                                            onClick={isExpanded ? undefined : () => {
+                                                                if (window.getSelection()?.isCollapsed !== false) toggleExpand(m.id);
+                                                            }}
+                                                            className={`grow min-w-0 whitespace-pre-wrap wrap-break-word ${isExpanded ? '' : 'line-clamp-3 cursor-pointer'}`}
+                                                        >
                                                             {m.content}
                                                         </span>
-                                                    </button>
+                                                    </div>
                                                 ) : (
                                                     <div className="flex items-start gap-1.5">
                                                         <span className="w-3.5 shrink-0" aria-hidden="true" />
