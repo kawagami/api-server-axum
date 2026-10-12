@@ -124,7 +124,7 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 修法是把會誤中的路徑拉出獨立 location、只掛 `general`。目前已這樣處理的（都在 `conf.d/kawa.homes.conf`）：
 
 - `location /_next/`：image 最佳化 + static 資產全段
-- `location /admin/`（2026-10-12）：後台篩選列把 `q` 寫進網址（`hooks/useFilterUrl.ts`），而 Next 的
+- `location /admin`（2026-10-12；**結尾不可加斜線**，`/admin/` 會與 Next 的去尾斜線互轉成無限迴圈，10-13 踩過）：後台篩選列把 `q` 寫進網址（`hooks/useFilterUrl.ts`），而 Next 的
   server action 是 POST 到**目前頁面網址**，於是帶著關鍵字後的翻頁、開 trace、輪詢全被當搜尋計數，
   連續操作約第 7 次起 429。DevTools 實測確認。未登入的請求在 `proxy.ts` 就被擋，拉出來不會變成繞過搜尋限流的門。
 **日後前端新增任何帶 `q=` 卻不是搜尋的路徑，要照這個模式再開一個 location**，
