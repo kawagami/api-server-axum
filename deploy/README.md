@@ -126,7 +126,7 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 - `location /_next/`：image 最佳化 + static 資產全段
 - `location /admin`（2026-10-12；**結尾不可加斜線**，`/admin/` 會與 Next 的去尾斜線互轉成無限迴圈，10-13 踩過）：後台篩選列把 `q` 寫進網址（`hooks/useFilterUrl.ts`），而 Next 的
   server action 是 POST 到**目前頁面網址**，於是帶著關鍵字後的翻頁、開 trace、輪詢全被當搜尋計數，
-  連續操作約第 7 次起 429。DevTools 實測確認。未登入的請求在 `proxy.ts` 就被擋，拉出來不會變成繞過搜尋限流的門。
+  連點十次上下就開始 200 / 429 交錯（burst 5 用完後每 3 秒才補 1 次）。DevTools 實測確認。未登入的請求在 `proxy.ts` 就被擋，拉出來不會變成繞過搜尋限流的門。
 **日後前端新增任何帶 `q=` 卻不是搜尋的路徑，要照這個模式再開一個 location**，
 否則症狀是靜默的 429 破圖，不會有錯誤訊息。拉出來的 location 別自帶 `add_header` /
 `proxy_set_header`（會整組覆蓋掉 server 層那些）。
