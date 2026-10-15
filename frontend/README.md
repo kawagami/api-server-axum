@@ -29,7 +29,6 @@
 | `/{locale}/games/banqi` | 線上暗棋（翻棋），即時連線對戰（共用大廳框架） |
 | `/{locale}/games/avalon` | 線上阿瓦隆，5–10 人社交推理（私有角色／投票／任務／刺殺／房內聊天） |
 | `/{locale}/games/farm` | 農場經營，2–4 人 worker-placement（完全資訊，每動作後整盤廣播） |
-| `/{locale}/games/metal-slug` | 越南大戰，Bevy wasm 動作遊戲 |
 | `/{locale}/vocab` · `/{locale}/vocab-ja` | 單字闖關（英文 / 日文），生存模式 + 排行榜 |
 | `/{locale}/dashboard` | 個人儀表板（需登入） |
 | `/{locale}/dashboard/notifications` | 通知列表（需登入） |

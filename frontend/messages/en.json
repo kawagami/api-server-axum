@@ -51,7 +51,6 @@
     "gameBanqi": "Online Banqi",
     "gameAvalon": "Online Avalon",
     "gameFarm": "Farm Manager",
-    "gameMetalSlug": "Metal Slug",
     "blog": "Blog",
     "colorModeLight": "Light mode (click for dark)",
     "colorModeDark": "Dark mode (click to follow site default)",
@@ -306,13 +305,6 @@
     "stockNo": "Stock code: {no}",
     "adminMessage": "Admin message",
     "disconnected": "Connection lost, reconnecting… If it does not recover, please refresh the page"
-  },
-  "Games": {
-    "metalSlugTitle": "Metal Slug (WIP)",
-    "metalSlugDescription": "A 2D side-scrolling action game built with Bevy",
-    "loading": "Loading game…",
-    "error": "Failed to load the game, please try again later",
-    "hint": "Keyboard controls — click the canvas first to focus"
   },
   "GameLobby": {
     "howToPlay": "How to play",
@@ -805,8 +797,7 @@
       "go": "The classic game of Go — surround territory and capture stones.",
       "banqi": "Half-board Xiangqi variant with hidden, flip-to-reveal pieces.",
       "avalon": "Social deduction for 5–10 players — good versus evil mind games.",
-      "farm": "Worker-placement farm management for 2–4 players.",
-      "metalSlug": "A 2D side-scrolling action game built with Bevy (prototype)."
+      "farm": "Worker-placement farm management for 2–4 players."
     }
   },
   "Vocab": {

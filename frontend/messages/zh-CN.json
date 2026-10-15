@@ -51,7 +51,6 @@
     "gameBanqi": "在线暗棋",
     "gameAvalon": "在线阿瓦隆",
     "gameFarm": "农场经营",
-    "gameMetalSlug": "越南大战",
     "blog": "文章",
     "colorModeLight": "浅色模式（点击切深色）",
     "colorModeDark": "深色模式（点击改跟随网站预设）",
@@ -306,13 +305,6 @@
     "stockNo": "股票代号：{no}",
     "adminMessage": "管理员消息",
     "disconnected": "连接中断，正在重新连接…若持续未恢复请刷新页面"
-  },
-  "Games": {
-    "metalSlugTitle": "越南大战（试作）",
-    "metalSlugDescription": "Bevy 制作的 2D 横向卷轴动作游戏",
-    "loading": "加载游戏中…",
-    "error": "游戏加载失败，请稍后再试",
-    "hint": "键盘操作，先点一下画面获取焦点"
   },
   "GameLobby": {
     "howToPlay": "怎么玩",
@@ -805,8 +797,7 @@
       "go": "黑白围地吃子，经典围棋对弈。",
       "banqi": "翻棋斗智、比大小的象棋变体。",
       "avalon": "5–10 人社交推理，正邪阵营的心理战。",
-      "farm": "2–4 人工人放置农场经营。",
-      "metalSlug": "Bevy 制作的 2D 横向卷轴动作游戏（试作）。"
+      "farm": "2–4 人工人放置农场经营。"
     }
   },
   "Vocab": {

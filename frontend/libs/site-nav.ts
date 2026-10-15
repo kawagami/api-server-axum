@@ -10,7 +10,6 @@ import {
     EyeOff,
     Castle,
     Wheat,
-    Crosshair,
     LayoutDashboard,
     User,
     Bell,
@@ -48,7 +47,6 @@ export const GAMES: readonly SiteNavItem[] = [
     { key: "banqi", href: "/games/banqi", labelKey: "gameBanqi", icon: EyeOff, feature: "games" },
     { key: "avalon", href: "/games/avalon", labelKey: "gameAvalon", icon: Castle, feature: "games" },
     { key: "farm", href: "/games/farm", labelKey: "gameFarm", icon: Wheat, feature: "games" },
-    { key: "metalSlug", href: "/games/metal-slug", labelKey: "gameMetalSlug", icon: Crosshair, feature: "games" },
 ] as const;
 
 export const MEMBER_LINKS: readonly SiteNavItem[] = [

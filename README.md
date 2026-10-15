@@ -40,7 +40,7 @@
 - **後台管理**:RBAC 權限(user/role/permission)、passkey 登入(WebAuthn)、稽核紀錄、站台設定熱更新、主題切換、平台設定頁(`platform:read`,instance 功能開關)
 - **會員系統**:OAuth 登入(Google / GitHub / LINE)、投資組合、單字闖關、飲食紀錄(`/{locale}/food-log`,依日依餐別記錄、花費統計)、即時通知(`/{locale}/dashboard/notifications`,走 WebSocket)
 - **單字闖關**:英文 / 日文生存模式、學習進度、週期排行榜
-- **對戰遊戲平台**(WebSocket):象棋、五子棋、暗棋、西洋棋、圍棋、阿瓦隆、農場經營;另有單機 wasm 的越南大戰(Bevy)
+- **對戰遊戲平台**(WebSocket):象棋、五子棋、暗棋、西洋棋、圍棋、阿瓦隆、農場經營
 - **股票**:庫藏股追蹤、股價變動追蹤、每日行情
 - **觀測**:應用日誌、系統指標時間序列、操作稽核、不重複到訪統計(後台 `/admin/logs`、`/admin/metrics`、`/admin/audit_logs`、`/admin/stats`)
 - **工具**:排班(環狀 pattern 演算法,公開無認證)、計時三合一、文字繁簡轉換、密碼產生、聯絡表單(訪客留言給站長,僅後台可見)

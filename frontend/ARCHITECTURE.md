@@ -197,7 +197,7 @@ libs/           # 工具函式庫（.ts）
 ### 檔名與擺放（2026-07-31 統一）
 
 - **檔名一律 kebab-case**（`blog-action-buttons.tsx`）。例外只有兩類：hook 檔用 camelCase（`hooks/usePagedList.ts`、`components/blogs/useBlogDraft.ts`），以及 **`games/**` 維持 PascalCase**（自成子系統、內部一致，改名會擴散到 `_shared` 全部 import）。元件識別字本身仍是 PascalCase，只有檔名走 kebab。
-- **只被單一 route 用的元件 colocate 在該 route 目錄**，用相對路徑 `./xxx` import（`tools/timers/`、`tools/roster/`、`portfolio/`、`games/metal-slug/`、`contact/`、`vocab/` 都是）。被多頁共用的才留 `components/`。
+- **只被單一 route 用的元件 colocate 在該 route 目錄**，用相對路徑 `./xxx` import（`tools/timers/`、`tools/roster/`、`portfolio/`、`contact/`、`vocab/` 都是）。被多頁共用的才留 `components/`。
 - **metadata 擺放看 page 是不是 client component**：server page → `page.tsx` 直接 export；client page → 同目錄 `layout.tsx`（`tools/convert-text`、`new-password`、`roster` 的 pass-through layout 是必要 workaround，不是重複，別想合併）。
 - **例外：admin-only 元件仍留在 `components/`**（`roles/`、`images/`、`stocks/`、`blogs/` 的編輯器那幾支）。`components/blogs/` 混著前台用的 `blog-article` / `blog-list` / `show-client-time`，要拆得先逐支判歸屬，本輪刻意沒動。
 - **Server Actions 的擺放沒有統一規範**（2026-08-30 盤點）：頂層 `actions/` 只有 `auth.ts` 一支，其餘 8 支都是 colocate 在 route 下的 `actions.ts`。`actions/auth.ts` 是被多個 route 共用才提上去的 —— 新增時照這條判斷：**單一 route 用就 colocate，跨 route 共用才放頂層 `actions/`**；純資料存取一律進 `api/{resource}.ts`，不要開新的頂層 action 檔。
