@@ -1,15 +1,16 @@
 // 農場畫面的純展示常數：圖示、行動格分組、座位色。不含規則（規則鏡射在 farm-rules.ts）。
+// ⚠️ emoji 只用 Emoji 11 以前的：Windows 10 的 Segoe UI Emoji 不認得 13 代（🪵🪨🛖），會顯示成方框。
 
 export const RES_KEYS = ['wood', 'clay', 'reed', 'stone', 'grain', 'veg', 'food'] as const;
 export const ANIMAL_KEYS = ['sheep', 'boar', 'cattle'] as const;
 
 export const RES_ICON: Record<(typeof RES_KEYS)[number] | (typeof ANIMAL_KEYS)[number], string> = {
-    wood: '🪵', clay: '🧱', reed: '🎋', stone: '🪨', grain: '🌾', veg: '🥕', food: '🍲',
+    wood: '🌳', clay: '🧱', reed: '🎋', stone: '⛰️', grain: '🌾', veg: '🥕', food: '🍲',
     sheep: '🐑', boar: '🐗', cattle: '🐄',
 };
 
 export const ACTION_ICON: Record<string, string> = {
-    forest: '🌲', clay_pit: '🧱', reed: '🎋', quarry: '🪨', river: '🎣',
+    forest: '🌲', clay_pit: '🧱', reed: '🎋', quarry: '⛏️', river: '🎣',
     sheep_pen: '🐑', boar_pen: '🐗', cattle_pen: '🐄',
     grain_seeds: '🌾', veg_seeds: '🥕', plow: '🚜', sow: '🌱', fences: '🌿',
     build_rooms: '🏠', renovate: '🔨', family_growth: '👶',
@@ -31,7 +32,7 @@ export const ACTION_GROUPS: { key: string; actions: string[] }[] = [
     { key: 'other', actions: ['day_labor', 'start_player'] },
 ];
 
-export const HOUSE_ICON: Record<string, string> = { wood: '🛖', clay: '🏠', stone: '🏰' };
+export const HOUSE_ICON: Record<string, string> = { wood: '🏡', clay: '🏠', stone: '🏰' };
 
 /** 座位色（遊戲資產色，同棋子色寫死；seat 0–3） */
 export const SEAT_COLORS = [
