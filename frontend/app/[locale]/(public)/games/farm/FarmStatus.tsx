@@ -6,6 +6,7 @@ import { cn } from '@/libs/cn';
 import { HARVEST_ROUNDS, TOTAL_ROUNDS, type FarmState, type PlayerState } from './farm-types';
 import { feedingOutlook, nextHarvest } from './farm-rules';
 import { seatColor } from './farm-ui';
+import { ResourceChips } from './FarmBoard';
 
 const ICON_BTN = 'flex items-center gap-1.5 rounded-lg border border-neutral-300 p-2 text-sm text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800';
 
@@ -60,6 +61,13 @@ export function FarmStatus({
             <RoundTrack round={state.round} />
 
             {me && state.phase === 'placing' && <FeedLine round={state.round} me={me} />}
+
+            {/* 手機版自己的面板在行動板下方、常不在畫面內：橫幅放一排自己的資源（也是飛行動畫的落點） */}
+            {me && mySeat !== null && (
+                <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-sm lg:hidden">
+                    <ResourceChips p={me} seat={mySeat} />
+                </div>
+            )}
 
             {narration && (
                 <p className="rounded-md bg-neutral-100 px-2.5 py-1.5 text-sm text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200" aria-live="polite">

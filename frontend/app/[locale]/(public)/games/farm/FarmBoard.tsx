@@ -66,6 +66,20 @@ function FarmGrid({ p, size }: { p: PlayerState; size: 'lg' | 'sm' }) {
     );
 }
 
+/// 資源 + 牲畜一排。`data-farm-res` 是拿資源飛行動畫的落點（useFlyingResources）
+export function ResourceChips({ p, seat }: { p: PlayerState; seat: number }) {
+    const t = useTranslations('Farm');
+    return (<>
+        {[...RES_KEYS, ...ANIMAL_KEYS].map(k => (
+            <span key={k} data-farm-res={`${seat}:${k}`} className={cn('flex items-center gap-0.5', p[k] === 0 && 'opacity-35')}
+                title={k === 'sheep' || k === 'boar' || k === 'cattle' ? t(`animal_${k}`) : t(`res_${k}`)}>
+                <span aria-hidden="true">{RES_ICON[k]}</span>
+                <span className="font-mono font-medium">{p[k]}</span>
+            </span>
+        ))}
+    </>);
+}
+
 /// 單一玩家的農場面板：自己（lg）放大、其他人（sm）精簡。
 export function PlayerPanel({
     p, seat, name, isMe, isCurrent, workersLeft, score, size,
@@ -87,7 +101,7 @@ export function PlayerPanel({
                 </span>
                 <span className="flex items-center gap-2">
                     {/* 工人：實心＝本輪還沒放 */}
-                    <span className="flex gap-0.5" title={t('workersLeft', { n: workersLeft })} aria-label={t('workersLeft', { n: workersLeft })}>
+                    <span className="flex gap-0.5" data-farm-workers={seat} title={t('workersLeft', { n: workersLeft })} aria-label={t('workersLeft', { n: workersLeft })}>
                         {Array.from({ length: p.family }, (_, i) => (
                             <span key={i} className={cn('text-base leading-none', i < workersLeft ? '' : 'opacity-25 grayscale')} aria-hidden="true">👤</span>
                         ))}
@@ -100,16 +114,10 @@ export function PlayerPanel({
                 </span>
             </header>
 
-            <FarmGrid p={p} size={size} />
+            <div data-farm-grid={seat}><FarmGrid p={p} size={size} /></div>
 
             <div className={cn('flex flex-wrap gap-x-2.5 gap-y-1', size === 'lg' ? 'text-sm' : 'text-xs')}>
-                {[...RES_KEYS, ...ANIMAL_KEYS].map(k => (
-                    <span key={k} className={cn('flex items-center gap-0.5', p[k] === 0 && 'opacity-35')}
-                        title={k === 'sheep' || k === 'boar' || k === 'cattle' ? t(`animal_${k}`) : t(`res_${k}`)}>
-                        <span aria-hidden="true">{RES_ICON[k]}</span>
-                        <span className="font-mono font-medium">{p[k]}</span>
-                    </span>
-                ))}
+                <ResourceChips p={p} seat={seat} />
             </div>
 
             {p.begging > 0 && <p className="text-xs font-semibold text-red-600 dark:text-red-400">{t('begging', { n: p.begging })}</p>}

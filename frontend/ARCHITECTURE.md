@@ -334,6 +334,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
   - **行動紀錄與語音事件由前端推得**：`useFarmRoom` 的 `state` handler 比對前後兩則 state 產生 `FarmEvent`（`action` 讀 server 的 `last_action`、`harvest` 看換輪前是否收穫輪並算 `begging` 增量、`round`）。每則 state 有序號 `stateSeq`，同一則推出的事件 seq 相同；語音只念 `seq === stateSeq` 那批
   - **語音導覽**：`narration.ts` 組台詞（純函式：最新事件 + 輪到誰；輪到自己且本輪末收穫時報糧食狀況；**只講狀態不給策略建議**；自己剛做的不念）。`useFarmVoice` 走 `libs/speech.ts`（vocab 發音同一支），語系用 `Farm.speechLang`；自動念可關（`localStorage.farm_voice_off`），「再聽一次」關掉自動念也能用；第一次點擊呼叫 `unlockSpeech()` 解 iOS 自動念的鎖
   - 頁面改由 body 捲動（拿掉原本的 `h-[calc(100svh-120px)] overflow-y-auto` 內捲區），橫幅 `sticky top-12.5` 貼在 header 下
+  - **拿資源飛行動畫**（`useFlyingResources`）：每則新 state 依 `last_action` 把取得物沿弧線從行動格飛到該玩家的資源格 / 農場格 / 工人列，落地彈一下浮 `+N`；自己與別人的動作都播。純 DOM（Web Animations API、元素掛 `document.body`），不經 React state。起終點靠 data 屬性 `data-farm-action` / `data-farm-res="<seat>:<res>"` / `data-farm-grid` / `data-farm-workers` 找 —— **改 `PlayerPanel` / `ActionCard` 結構時別把這些屬性弄掉**，動畫會靜默消失（找不到元素就不播）。行動→落點對照在 `farm-ui.ts` 的 `ACTION_GAIN`。自己的資源有兩份落點（面板 + 手機版橫幅 `lg:hidden` 那排），挑當下在視窗內的；`prefers-reduced-motion` 或起終點不在畫面內 → 不飛只彈數字
   - **斷線重連（avalon 同）**：協定不支援對局重連（server 端任一人斷線即中止），前端 WS 自動重連後 `onReconnectReset` 會回大廳；若原本在房內 / 對局中，先設 notice `closed_disconnected` 明講原因（2026-10-16 之前是無聲跳回大廳）。注意 client 端先察覺斷線時，server 要等 pong 逾時（最長約 90 秒）才清房，期間大廳仍會看到該房「進行中」
 
 ---

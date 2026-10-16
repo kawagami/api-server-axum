@@ -43,3 +43,20 @@ export const SEAT_COLORS = [
 ] as const;
 
 export const seatColor = (seat: number) => SEAT_COLORS[seat % SEAT_COLORS.length];
+
+/** 行動的「收穫」飛到哪：資源格（飛 n 個該資源圖示；n 省略＝用累積量）、農場格或工人列（飛行動圖示 1 個） */
+export type ActionGain =
+    | { kind: 'res'; res: keyof typeof RES_ICON; n?: number }
+    | { kind: 'grid' }
+    | { kind: 'workers' };
+
+export const ACTION_GAIN: Record<string, ActionGain> = {
+    ...Object.fromEntries(Object.entries(ACCUM_RES).map(([a, res]) => [a, { kind: 'res', res }])),
+    grain_seeds: { kind: 'res', res: 'grain', n: 1 },
+    veg_seeds: { kind: 'res', res: 'veg', n: 1 },
+    day_labor: { kind: 'res', res: 'food', n: 2 },
+    start_player: { kind: 'res', res: 'food', n: 1 },
+    plow: { kind: 'grid' }, sow: { kind: 'grid' }, fences: { kind: 'grid' },
+    build_rooms: { kind: 'grid' }, renovate: { kind: 'grid' },
+    family_growth: { kind: 'workers' },
+};

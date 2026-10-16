@@ -8,6 +8,7 @@ import { sound } from '../_shared/sound';
 import { useActionAlert } from '../_shared/useActionAlert';
 import type { UseFarmRoom } from './useFarmRoom';
 import { useFarmVoice } from './useFarmVoice';
+import { useFlyingResources } from './useFlyingResources';
 import { composeNarration } from './narration';
 import { FarmStatus } from './FarmStatus';
 import { FarmActionBoard } from './FarmActionBoard';
@@ -57,6 +58,8 @@ export function FarmPlay({ farm }: { farm: UseFarmRoom }) {
         spokenGameOver.current = gameOver;
         auto(t('voice_gameOver', { score: gameOver.scores[mySeat], rank }));
     }, [gameOver, mySeat, rank, auto, t]);
+
+    useFlyingResources(log, stateSeq);
 
     useActionAlert(
         myTurn && state ? `${state.round}-${state.workers_left[mySeat!]}` : null,

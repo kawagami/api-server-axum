@@ -73,7 +73,7 @@ function ActionCard({
     const t = useTranslations('Farm');
     const accum = ACCUMULATION_ACTIONS.has(action);
     return (
-        <button type="button" onClick={onClick} disabled={!clickable}
+        <button type="button" onClick={onClick} disabled={!clickable} data-farm-action={action}
             className={cn('relative flex min-h-16 items-start gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors',
                 clickable ? 'border-primary-300 bg-primary-50 hover:bg-primary-100 dark:border-primary-700 dark:bg-primary-950 dark:hover:bg-primary-900'
                     : 'cursor-not-allowed border-neutral-200 dark:border-neutral-700',
