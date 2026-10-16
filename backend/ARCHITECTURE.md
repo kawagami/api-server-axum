@@ -357,7 +357,7 @@ JWT **不走** WS URL query（會進 access log）。流程：登入中的 admin
 Server-authoritative 對戰，匿名可玩。**七遊戲**：回合制 2 人 — **象棋 chess / 五子棋 gomoku / 暗棋 banqi / 西洋棋 western_chess / 圍棋 go**；N 人獨立子系統 — **阿瓦隆 avalon**（社交推理）、**農場經營 farm**（worker-placement，完全資訊）。**WS 協定以 monorepo 根 `protocol/games-wire.md` 為準**（進版控；2 人通用流程 + 共通信封 + 各遊戲差異 + 阿瓦隆 / 農場完整協定，2026-09-25 由原本不進版控的 `docs/old/` 四份整合而來）。改協定＝同一個 commit 改前後端與該檔。
 
 - **共用框架在 `src/games/common/`**：`GameEngine` trait（`initial`/`turn`/`side_label`/`try_move`/`status`/`hints`）+ 泛型 `HubInner<E>`/`service::*`。大廳/桌位/配對/Fischer 計時/斷線/timeout_watcher **全泛型**，新遊戲只寫純引擎 + adapter（`impl GameEngine`），零 glue。
-- 各遊戲：純引擎 `games/<game>/engine.rs`（零 WS）+ **測試在 `games/<game>/engine/tests.rs` 子模組**（每個遊戲都有，不在 engine.rs 內）+ adapter `games/<game>/game.rs`。chess 14 測 / gomoku 6 測 / banqi 12 測 / western_chess 10 測 / go 9 測 / avalon 13 測 / farm 12 測，合計 **76**（2026-08-17 核對相符）。
+- 各遊戲：純引擎 `games/<game>/engine.rs`（零 WS）+ **測試在 `games/<game>/engine/tests.rs` 子模組**（每個遊戲都有，不在 engine.rs 內）+ adapter `games/<game>/game.rs`。chess 14 測 / gomoku 6 測 / banqi 12 測 / western_chess 10 測 / go 9 測 / avalon 13 測 / farm 13 測，合計 **77**（2026-08-17 核對相符；farm 2026-10-15 +1）。
 - **註冊表收斂**：`games/registry.rs` 的 `AnyHub` enum（每遊戲一 variant）+ `GameRegistry`（`HashMap<&str, AnyHub>`）。`AppState.games` 只存一個 `GameRegistry`，重啟＝全對局丟失。enum match 各臂具體型別→單型化呼叫泛型 `service::*`，**無 dyn / 無 async-trait**。
 - 每遊戲 hub = `GameHub<E>`（`Arc<Mutex<HubInner<E>>>`：queue / tables / conn_table / lobby）。`Table` 兩態 `Waiting{host}` / `Playing(Game)`；一條連線同時只能在 {queue, table} 其一。
 - 兩種進場：**大廳自選桌**（建桌 / 挑等待桌）＋ **快速隨機配對**（單一佇列），並存。多局並發，不限桌數。

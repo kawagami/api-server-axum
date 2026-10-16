@@ -10,7 +10,7 @@ import { AvalonQuestReveal } from './AvalonQuestReveal';
 import { RoleIntro, RolePeek } from './AvalonRoleCard';
 import { AvalonTable, type SeatMode } from './AvalonTable';
 import { EVIL_ROLES, GOOD_ROLES, type QuestResultData, type RoleAssignedData } from './avalon-types';
-import { useActionAlert } from './useActionAlert';
+import { useActionAlert } from '../_shared/useActionAlert';
 import type { UseAvalonRoom } from './useAvalonRoom';
 
 export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
@@ -55,6 +55,7 @@ export function AvalonPlay({ room }: { room: UseAvalonRoom }) {
     useActionAlert(
         alertKind && gamePhase ? `${alertKind}-${gamePhase.round}-${gamePhase.leader}-${gamePhase.rejects}` : null,
         alertKind ? t(`alert_${alertKind}`) : null,
+        '⚔',
     );
 
     if (!role || !myRole) return null;

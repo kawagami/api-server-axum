@@ -1,52 +1,106 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { RotateCcw, Trophy } from 'lucide-react';
-import {
-    ACCUMULATION_ACTIONS, COMPOUND_ACTIONS, HARVEST_ROUNDS,
-    type FarmState, type PlayerState,
-} from './farm-types';
+import { unlockSpeech } from '@/libs/speech';
+import { sound } from '../_shared/sound';
+import { useActionAlert } from '../_shared/useActionAlert';
 import type { UseFarmRoom } from './useFarmRoom';
-
-const RES_KEYS = ['wood', 'clay', 'reed', 'stone', 'grain', 'veg', 'food'] as const;
-const ANIMAL_KEYS = ['sheep', 'boar', 'cattle'] as const;
+import { useFarmVoice } from './useFarmVoice';
+import { composeNarration } from './narration';
+import { FarmStatus } from './FarmStatus';
+import { FarmActionBoard } from './FarmActionBoard';
+import { PlayerPanel } from './FarmBoard';
+import { FarmLog } from './FarmLog';
 
 export function FarmPlay({ farm }: { farm: UseFarmRoom }) {
     const t = useTranslations('Farm');
-    const { state, room, mySeat, gameOver, actions } = farm;
-    if (!state) return null;
+    const { state, room, mySeat, gameOver, notice, log, stateSeq, actions } = farm;
+    const voice = useFarmVoice(t('speechLang'));
+    const [muted, setMuted] = useState(() => sound.isMuted());
 
     const seatName = (s: number) => room?.players.find(p => p.seat === s)?.name || t('playerN', { n: s + 1 });
-    const myTurn = state.phase === 'placing' && state.current_player === mySeat;
+    const myTurn = !!state && state.phase === 'placing' && state.current_player !== null && state.current_player === mySeat;
+
+    // 語音台詞＝最新一批事件 + 現在輪到誰（字幕與「再聽一次」同一段）
+    const narration = useMemo(
+        () => (state ? composeNarration(t, state, log.filter(e => e.seq === stateSeq), mySeat, seatName) : ''),
+        // seatName 每次 render 都是新函式，但只依賴 room.players
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [t, state, log, stateSeq, mySeat, room?.players],
+    );
+
+    // 每則新 state 自動念一次（以序號判斷，台詞相同也照念）
+    const spokenSeq = useRef(0);
+    const { auto } = voice;
+    useEffect(() => {
+        if (!state || stateSeq === spokenSeq.current) return;
+        spokenSeq.current = stateSeq;
+        if (narration) auto(narration);
+    }, [state, stateSeq, narration, auto]);
+
+    // 動作被 server 拒絕：念出原因（ref 記已念過的，切語音開關不會重念舊錯誤）
+    const spokenNotice = useRef<string | null>(null);
+    useEffect(() => {
+        if (notice === spokenNotice.current) return;
+        spokenNotice.current = notice;
+        if (notice?.startsWith('err_')) auto(t(notice));
+    }, [notice, auto, t]);
+
+    // 結算：念名次與分數（同上，只念一次）
+    const rank = gameOver && mySeat !== null
+        ? gameOver.scores.filter(s => s > gameOver.scores[mySeat]).length + 1 : null;
+    const spokenGameOver = useRef<unknown>(null);
+    useEffect(() => {
+        if (!gameOver || gameOver === spokenGameOver.current || mySeat === null || rank === null) return;
+        spokenGameOver.current = gameOver;
+        auto(t('voice_gameOver', { score: gameOver.scores[mySeat], rank }));
+    }, [gameOver, mySeat, rank, auto, t]);
+
+    useActionAlert(
+        myTurn && state ? `${state.round}-${state.workers_left[mySeat!]}` : null,
+        myTurn ? t('yourTurn') : null,
+        '🌾',
+    );
+
+    if (!state) return null;
+    const me = mySeat !== null ? state.players[mySeat] ?? null : null;
+
+    const toggleMute = () => {
+        const next = !muted;
+        setMuted(next);
+        sound.setMuted(next);
+    };
 
     return (
-        <div className="mx-auto flex h-[calc(100svh-120px)] w-full max-w-5xl flex-col gap-3 overflow-y-auto py-3">
-            {/* 回合資訊 */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 px-3 py-2 dark:border-neutral-700">
-                <span className="flex items-center gap-2 text-sm font-medium">
-                    {t('round', { n: state.round })}
-                    {HARVEST_ROUNDS.has(state.round) && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900 dark:text-amber-200">{t('harvestRound')}</span>}
-                </span>
-                <span className="text-sm text-neutral-600 dark:text-neutral-300">
-                    {state.current_player === null ? t('settling')
-                        : myTurn ? <span className="font-semibold text-primary-600">{t('yourTurn')}</span>
-                            : t('currentTurn', { name: seatName(state.current_player) })}
-                </span>
+        // 第一次點擊解 autoplay 鎖：Web Audio 音效與 iOS 的 speechSynthesis 都要
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-2 py-3 sm:px-3"
+            onPointerDownCapture={() => { sound.warmup(); unlockSpeech(); }}>
+            <FarmStatus state={state} mySeat={mySeat} seatName={seatName} narration={narration} notice={notice}
+                voice={voice} muted={muted} onToggleMute={toggleMute} />
+
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <FarmActionBoard key={`${state.round}-${state.current_player}`} state={state} me={me} myTurn={myTurn}
+                    seatName={seatName} onAction={actions.sendAction}
+                    onCompoundOpen={a => auto(t(`voice_form_${a}`))} />
+                <div className="flex flex-col gap-3">
+                    {me && mySeat !== null && (
+                        <PlayerPanel p={me} seat={mySeat} name={seatName(mySeat)} isMe isCurrent={state.current_player === mySeat}
+                            workersLeft={state.workers_left[mySeat] ?? 0} score={state.score_preview[mySeat]} size="lg" />
+                    )}
+                    <FarmLog log={log} seatName={seatName} />
+                </div>
             </div>
 
-            {/* 行動板 */}
-            <ActionBoard key={`${state.round}-${state.current_player}`} state={state} myTurn={myTurn} onAction={actions.sendAction} />
-
-            {/* 各家農場 */}
-            <div className="grid gap-3 sm:grid-cols-2">
-                {state.players.map((p, seat) => (
-                    <PlayerCard key={seat} p={p} name={seatName(seat)}
-                        isMe={seat === mySeat} isCurrent={seat === state.current_player} />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {state.players.map((p, seat) => seat !== mySeat && (
+                    <PlayerPanel key={seat} p={p} seat={seat} name={seatName(seat)} isMe={false} isCurrent={seat === state.current_player}
+                        workersLeft={state.workers_left[seat] ?? 0} score={state.score_preview[seat]} size="sm" />
                 ))}
             </div>
 
-            {/* 結算 */}
+            {/* 結算（不可關閉的結局遮罩，不走 Modal） */}
             {gameOver && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/80 p-4 backdrop-blur-xs">
                     <div className="flex w-full max-w-md flex-col gap-3 rounded-lg bg-white p-5 dark:bg-neutral-800">
@@ -70,130 +124,6 @@ export function FarmPlay({ farm }: { farm: UseFarmRoom }) {
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
-
-function ActionBoard({ state, myTurn, onAction }: { state: FarmState; myTurn: boolean; onAction: (a: string, input?: Record<string, unknown>) => void; }) {
-    const t = useTranslations('Farm');
-    const [compound, setCompound] = useState<string | null>(null);
-    const [form, setForm] = useState<Record<string, number | boolean>>({});
-
-    const amountOf = (a: string) => state.accumulation.find(x => x.action === a)?.amount;
-    const num = (k: string) => Number(form[k] ?? 0);
-
-    const click = (a: string) => {
-        if (!myTurn) return;
-        if (COMPOUND_ACTIONS.has(a)) { setCompound(a); setForm({}); return; }
-        onAction(a);
-    };
-
-    const confirmCompound = () => {
-        if (!compound) return;
-        let input: Record<string, unknown> = {};
-        if (compound === 'sow') input = { grain_fields: num('grain_fields'), veg_fields: num('veg_fields') };
-        else if (compound === 'build_rooms') input = { rooms: num('rooms'), stables: num('stables') };
-        else if (compound === 'fences') input = { pasture_tiles: num('pasture_tiles'), pasture_stable: !!form.pasture_stable };
-        onAction(compound, input);
-        setCompound(null);
-    };
-
-    return (
-        <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
-            <h2 className="mb-2 text-sm font-semibold text-neutral-600 dark:text-neutral-300">{t('actionsHeading')}</h2>
-            <div className="flex flex-wrap gap-2">
-                {state.available_actions.map(a => {
-                    const amt = amountOf(a);
-                    return (
-                        <button key={a} onClick={() => click(a)} disabled={!myTurn}
-                            className={`flex flex-col items-start gap-0.5 rounded-lg border px-3 py-1.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${compound === a ? 'border-primary-500 bg-primary-600 text-white' : 'border-neutral-300 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800'}`}>
-                            <span className="flex items-center gap-1 text-sm">
-                                {t(`action_${a}`)}
-                                {ACCUMULATION_ACTIONS.has(a) && amt !== undefined && (
-                                    <span className="rounded-full bg-amber-100 px-1.5 text-xs text-amber-700 dark:bg-amber-900 dark:text-amber-200">{amt}</span>
-                                )}
-                            </span>
-                            <span className="text-[11px] leading-tight opacity-70">{t(`hint_${a}`)}</span>
-                        </button>
-                    );
-                })}
-            </div>
-
-            {/* 複合動作 input 表單 */}
-            {compound && myTurn && (
-                <div className="mt-3 flex flex-col gap-2 rounded-lg bg-neutral-50 p-3 dark:bg-neutral-800">
-                    <p className="text-sm font-medium">{t(`action_${compound}`)}</p>
-                    <div className="flex flex-wrap gap-3 text-sm">
-                        {compound === 'sow' && (<>
-                            <NumIn label={t('inGrainFields')} v={num('grain_fields')} on={v => setForm(f => ({ ...f, grain_fields: v }))} />
-                            <NumIn label={t('inVegFields')} v={num('veg_fields')} on={v => setForm(f => ({ ...f, veg_fields: v }))} />
-                        </>)}
-                        {compound === 'build_rooms' && (<>
-                            <NumIn label={t('inRooms')} v={num('rooms')} on={v => setForm(f => ({ ...f, rooms: v }))} />
-                            <NumIn label={t('inStables')} v={num('stables')} on={v => setForm(f => ({ ...f, stables: v }))} />
-                        </>)}
-                        {compound === 'fences' && (<>
-                            <NumIn label={t('inPastureTiles')} v={num('pasture_tiles')} on={v => setForm(f => ({ ...f, pasture_tiles: v }))} />
-                            <label className="flex items-center gap-1.5">
-                                <input type="checkbox" checked={!!form.pasture_stable} onChange={e => setForm(f => ({ ...f, pasture_stable: e.target.checked }))} />
-                                {t('inPastureStable')}
-                            </label>
-                        </>)}
-                    </div>
-                    <div className="flex gap-2">
-                        <button onClick={confirmCompound} className="rounded-lg bg-primary-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-700">{t('confirm')}</button>
-                        <button onClick={() => setCompound(null)} className="rounded-lg border border-neutral-300 px-4 py-1.5 text-sm dark:border-neutral-600">{t('cancel')}</button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-function NumIn({ label, v, on }: { label: string; v: number; on: (v: number) => void }) {
-    return (
-        <label className="flex items-center gap-1.5">
-            {label}
-            <input type="number" min={0} value={v} onChange={e => on(Math.max(0, Number(e.target.value) || 0))}
-                className="w-16 rounded-sm border border-neutral-300 bg-white px-2 py-1 dark:border-neutral-600 dark:bg-neutral-900" />
-        </label>
-    );
-}
-
-function PlayerCard({ p, name, isMe, isCurrent }: { p: PlayerState; name: string; isMe: boolean; isCurrent: boolean }) {
-    const t = useTranslations('Farm');
-    const grain = p.fields.reduce((s, f) => s + (f?.crop === 'grain' ? f.count : 0), 0);
-    const veg = p.fields.reduce((s, f) => s + (f?.crop === 'veg' ? f.count : 0), 0);
-    const emptyFields = p.fields.filter(f => f === null).length;
-
-    return (
-        <div className={`flex flex-col gap-1.5 rounded-lg border p-3 text-sm ${isCurrent ? 'border-primary-500 ring-1 ring-primary-400' : 'border-neutral-200 dark:border-neutral-700'}`}>
-            <div className="flex items-center justify-between">
-                <span className="font-semibold text-neutral-800 dark:text-neutral-100">{name}{isMe && <span className="ml-1 text-xs text-primary-600">（{t('youTag')}）</span>}</span>
-                {p.begging > 0 && <span className="text-xs font-semibold text-red-600">{t('begging', { n: p.begging })}</span>}
-            </div>
-
-            <div className="text-neutral-600 dark:text-neutral-300">
-                {t(`house_${p.house}`)} ×{p.rooms} · {t('familyN', { n: p.family })} · {t('freeTilesN', { n: p.free_tiles })}
-                {p.loose_stables > 0 && ` · ${t('looseStablesN', { n: p.loose_stables })}`}
-            </div>
-
-            <div className="text-neutral-600 dark:text-neutral-300">
-                {t('fieldsLabel')}: {t('crop_grain')}{grain} / {t('crop_veg')}{veg} / {t('emptyField')}{emptyFields}
-            </div>
-
-            <div className="text-neutral-600 dark:text-neutral-300">
-                {t('pasturesLabel')}: {p.pastures.length === 0 ? '—' : p.pastures.map((pa, i) =>
-                    `${t('tilesN', { n: pa.tiles })}${pa.stable ? `[${t('stableTag')}]` : ''}${pa.animal ? ` ${t(`animal_${pa.animal.kind}`)}×${pa.animal.count}` : ''}`
-                ).join('；')}
-            </div>
-
-            <div className="grid grid-cols-4 gap-1 text-xs text-neutral-500 dark:text-neutral-400">
-                {RES_KEYS.map(k => <span key={k}>{t(`res_${k}`)} {p[k]}</span>)}
-            </div>
-            <div className="flex gap-3 text-xs text-neutral-500 dark:text-neutral-400">
-                {ANIMAL_KEYS.map(k => <span key={k}>{t(`animal_${k}`)} {p[k]}</span>)}
-            </div>
         </div>
     );
 }

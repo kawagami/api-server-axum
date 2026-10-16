@@ -593,11 +593,15 @@ game_over     : 揭露全角色
   "starting_player": 0,
   "available_actions": ["forest","plow", ...],   // 本輪仍可選的格
   "accumulation": [{ "action":"forest", "amount":6 }, ...], // 累積格現有量
+  "occupied": [{ "action":"plow", "seat":0 }, ...],         // 本輪已佔格與放置者（依放置順序；換輪清空）
+  "workers_left": [1, 2],          // 本輪各家剩餘工人（index = seat）
+  "last_action": { "seat":0, "action":"forest", "amount":3 }, // 最近一次放置（amount=累積格取走量，非累積格 0；開局為 null）。換輪後仍保留，收尾那一手只能從這裡看到
+  "score_preview": [3, -2],        // 「若現在結束」的分數（同 game_over 計分），index = seat
   "players": [                     // index = seat
     {
       "house":"wood", "rooms":2, "family":2,
-      "fields":[ {"crop":"grain","count":3}, null ],  // null=已犁未播
-      "pastures":[ {"tiles":2,"stable":false,"animal":{"kind":"sheep","count":3}} ],
+      "fields":[ {"crop":"grain","count":3}, null ],  // crop: "grain" | "veg"；null=已犁未播
+      "pastures":[ {"tiles":2,"stable":false,"animal":null} ],  // phase-1 animal 恆為 null：牲畜只記在下方 sheep/boar/cattle 總數
       "loose_stables":0, "free_tiles":11,
       "wood":1,"clay":0,"reed":2,"stone":0,"grain":0,"veg":0,
       "sheep":3,"boar":0,"cattle":0,"food":4,"begging":0
@@ -606,6 +610,7 @@ game_over     : 揭露全角色
 }
 ```
 > 完全資訊：所有玩家的農場都在 `state` 裡，前端直接整盤重繪即可（不必自己累積 delta）。
+> 收穫在最後一名工人放下後於 server 內立即結算，前端收到的下一則 `state` 已是下一輪：要顯示收穫結果就比對換輪前後的 `players`（例如 `begging` 增量）。
 
 ---
 

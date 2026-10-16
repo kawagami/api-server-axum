@@ -8,6 +8,9 @@
 //! - **允許基本煮食轉換**：收穫餵食不足時可把 穀/菜→1 糧、牲畜→2 糧 補足，避免無改良卡時必乞討。
 //! - **行動揭示**用可調資料表 `ROUND_ACTIONS`，非官方精確排程。
 //! - 農場容量固定 15 格（房 + 田 + 牧場格 + 無圈畜舍 ≤ 15）。
+//!
+//! ⚠️ 前端 `frontend/.../games/farm/farm-rules.ts` 鏡射了花費、收穫餵食/煮食換算（只做預覽與擋按鈕），
+//! 改 `apply_action` / `harvest` 的數字要一起改那支。
 
 pub const FARM_TILES: u8 = 15;
 pub const TOTAL_ROUNDS: u8 = 14;
@@ -181,7 +184,7 @@ impl Crop {
     pub fn as_str(self) -> &'static str {
         match self {
             Crop::Grain => "grain",
-            Crop::Vegetable => "vegetable",
+            Crop::Vegetable => "veg",
         }
     }
 }
@@ -287,10 +290,19 @@ pub struct GameState {
     order: Vec<usize>,           // 本輪放置順序（先手起）
     cursor: usize,               // order 索引
     workers_left: Vec<u8>,       // 本輪各家剩餘工人
-    occupied: HashSet<Action>,   // 本輪已佔格
+    occupied: Vec<(Action, usize)>, // 本輪已佔格（依放置順序，含放置者 seat）
     unlocked: HashSet<Action>,   // 已揭示格
     accum: HashMap<Action, u32>, // 累積格存量
     next_start: Option<usize>,   // 本輪有人搶先手
+    last_action: Option<LastAction>, // 最近一次成功的放置（輪末換輪後仍保留，供前端紀錄/語音）
+}
+
+/// 最近一次放置：誰、哪格、累積格取走多少（非累積格為 0）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LastAction {
+    pub seat: usize,
+    pub action: Action,
+    pub amount: u32,
 }
 
 pub fn initial_state(n: usize) -> GameState {
@@ -304,10 +316,11 @@ pub fn initial_state(n: usize) -> GameState {
         order: Vec::new(),
         cursor: 0,
         workers_left: vec![0; n],
-        occupied: HashSet::new(),
+        occupied: Vec::new(),
         unlocked: BASE_ACTIONS.iter().copied().collect(),
         accum: HashMap::new(),
         next_start: None,
+        last_action: None,
     };
     begin_round(&mut gs);
     gs
@@ -376,10 +389,29 @@ pub fn available_actions(gs: &GameState) -> Vec<Action> {
         .unlocked
         .iter()
         .copied()
-        .filter(|a| !gs.occupied.contains(a))
+        .filter(|&a| !is_occupied(gs, a))
         .collect();
     v.sort_by_key(|a| format!("{a:?}"));
     v
+}
+
+fn is_occupied(gs: &GameState, a: Action) -> bool {
+    gs.occupied.iter().any(|&(o, _)| o == a)
+}
+
+/// 本輪已佔格與放置者（依放置順序）。
+pub fn occupied(gs: &GameState) -> &[(Action, usize)] {
+    &gs.occupied
+}
+
+/// 最近一次成功的放置（None = 開局尚未有人行動）。
+pub fn last_action(gs: &GameState) -> Option<LastAction> {
+    gs.last_action
+}
+
+/// 本輪各家剩餘工人（index = seat）。
+pub fn workers_left(gs: &GameState) -> &[u8] {
+    &gs.workers_left
 }
 
 // ===== 動作執行 =====
@@ -395,7 +427,7 @@ pub fn take_action(gs: &mut GameState, player: usize, action: Action, input: Inp
     if !gs.unlocked.contains(&action) {
         return Err("locked");
     }
-    if gs.occupied.contains(&action) {
+    if is_occupied(gs, action) {
         return Err("occupied");
     }
 
@@ -412,7 +444,8 @@ pub fn take_action(gs: &mut GameState, player: usize, action: Action, input: Inp
     if action == Action::StartPlayer {
         gs.next_start = Some(player);
     }
-    gs.occupied.insert(action);
+    gs.occupied.push((action, player));
+    gs.last_action = Some(LastAction { seat: player, action, amount: accum_amt });
 
     // 推進
     gs.workers_left[player] -= 1;

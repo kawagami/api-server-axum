@@ -9,6 +9,7 @@ export type Crop = 'grain' | 'veg';
 export type AnimalKind = 'sheep' | 'boar' | 'cattle';
 
 export interface FieldPlot { crop: Crop; count: number; } // null = 已犁未播
+// phase-1 animal 恆為 null：牲畜只記在 PlayerState 的 sheep/boar/cattle 總數
 export interface Pasture { tiles: number; stable: boolean; animal: { kind: AnimalKind; count: number } | null; }
 
 export interface PlayerState {
@@ -28,13 +29,21 @@ export interface FarmState {
     starting_player: number;
     available_actions: string[];
     accumulation: { action: string; amount: number }[];
+    occupied: { action: string; seat: number }[];  // 本輪已佔格（依放置順序，換輪清空）
+    workers_left: number[];                        // 本輪各家剩餘工人
+    last_action: LastAction | null;                // 最近一次放置（換輪後仍保留）
+    score_preview: number[];                       // 若現在結束的分數（同 game_over 計分）
     players: PlayerState[];
 }
+
+export interface LastAction { seat: number; action: string; amount: number; }
 
 export interface GameOverData { scores: number[]; }
 
 // 收穫輪（第 4/7/9/11/13/14 輪末），round 從 1 起算
 export const HARVEST_ROUNDS = new Set([4, 7, 9, 11, 13, 14]);
+export const TOTAL_ROUNDS = 14;
+export const FARM_TILES = 15;
 
 // 累積格（值會堆積，取走全拿）
 export const ACCUMULATION_ACTIONS = new Set([

@@ -122,6 +122,12 @@ fn state_payload(gs: &GameState) -> Value {
     let actions: Vec<&str> = engine::available_actions(gs).iter().map(|a| a.as_str()).collect();
     let accum: Vec<Value> = engine::accumulation(gs).iter()
         .map(|(a, n)| json!({ "action": a.as_str(), "amount": n })).collect();
+    let occupied: Vec<Value> = engine::occupied(gs).iter()
+        .map(|(a, seat)| json!({ "action": a.as_str(), "seat": seat })).collect();
+    let last_action = engine::last_action(gs)
+        .map(|l| json!({ "seat": l.seat, "action": l.action.as_str(), "amount": l.amount }));
+    // 「若現在結束」的分數，與 game_over.scores 同一支 engine::score
+    let score_preview: Vec<i32> = gs.players.iter().map(engine::score).collect();
     json!({
         "round": gs.round,
         "phase": if gs.phase == Phase::GameOver { "game_over" } else { "placing" },
@@ -130,6 +136,10 @@ fn state_payload(gs: &GameState) -> Value {
         "players": players,
         "available_actions": actions,
         "accumulation": accum,
+        "occupied": occupied,
+        "workers_left": engine::workers_left(gs),
+        "last_action": last_action,
+        "score_preview": score_preview,
     })
 }
 

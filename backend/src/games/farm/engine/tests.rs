@@ -125,3 +125,22 @@ fn accumulation_piles_and_resets() {
     take_action(&mut gs, 0, Action::Forest, Input::default()).unwrap();
     assert_eq!(gs.players[0].wood, 3);
 }
+
+#[test]
+fn occupied_workers_and_last_action_tracked() {
+    let mut gs = initial_state(2);
+    assert_eq!(last_action(&gs), None);
+    take_action(&mut gs, 0, Action::Forest, Input::default()).unwrap();
+    assert_eq!(occupied(&gs), &[(Action::Forest, 0)]);
+    assert_eq!(workers_left(&gs), &[1, 2]);
+    assert_eq!(last_action(&gs), Some(LastAction { seat: 0, action: Action::Forest, amount: 3 }));
+    assert!(!available_actions(&gs).contains(&Action::Forest));
+    take_action(&mut gs, 1, Action::Plow, Input::default()).unwrap();
+    take_action(&mut gs, 0, Action::GrainSeeds, Input::default()).unwrap();
+    take_action(&mut gs, 1, Action::River, Input::default()).unwrap();
+    // 換輪：佔格清空、工人補滿，但最後一手仍可讀（換輪那則 state 才看得到是誰收尾）
+    assert_eq!(gs.round, 2);
+    assert!(occupied(&gs).is_empty());
+    assert_eq!(workers_left(&gs), &[2, 2]);
+    assert_eq!(last_action(&gs), Some(LastAction { seat: 1, action: Action::River, amount: 1 }));
+}

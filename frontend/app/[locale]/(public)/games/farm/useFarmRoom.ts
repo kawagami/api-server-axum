@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useWsContext } from '@/libs/ws-context';
 import { useRoomBase } from '../_shared/useRoomBase';
 import {
     GAME, type RoomSummary, type RoomListData, type RoomUpdateData, type RoomClosedData,
-    type FarmState, type GameOverData,
+    type FarmState, type GameOverData, HARVEST_ROUNDS,
 } from './farm-types';
 
 export type UiPhase = 'connecting' | 'lobby' | 'room' | 'playing';
@@ -20,6 +20,28 @@ const KNOWN_ERR = new Set([
     'too_many_rooms', 'rate_limited', 'feature_disabled',
 ]);
 
+/// 對局事件（前端由前後兩則 state 推得，server 不另發）。`seq` = 產生它的那則 state 序號，
+/// 同一則 state 推出的事件 seq 相同 —— 語音只念最新一批（`seq === stateSeq`）。
+export type FarmEvent =
+    | { seq: number; kind: 'action'; round: number; seat: number; action: string; amount: number }
+    | { seq: number; kind: 'harvest'; round: number; begging: number[] } // begging = 各家本次新增乞討
+    | { seq: number; kind: 'round'; round: number };
+
+const LOG_MAX = 80;
+
+function diffEvents(prev: FarmState | null, next: FarmState, seq: number): FarmEvent[] {
+    if (!prev) return [{ seq, kind: 'round', round: next.round }];
+    const out: FarmEvent[] = [];
+    // 每則 state 都對應一次放置（開局那則 last_action 為 null，已由上方處理）
+    if (next.last_action) out.push({ seq, kind: 'action', round: prev.round, ...next.last_action });
+    const roundEnded = next.round > prev.round || (next.phase === 'game_over' && prev.phase !== 'game_over');
+    if (roundEnded && HARVEST_ROUNDS.has(prev.round)) {
+        out.push({ seq, kind: 'harvest', round: prev.round, begging: next.players.map((p, i) => p.begging - (prev.players[i]?.begging ?? 0)) });
+    }
+    if (next.round > prev.round) out.push({ seq, kind: 'round', round: next.round });
+    return out;
+}
+
 export interface UseFarmRoom {
     uiPhase: UiPhase;
     rooms: RoomSummary[];
@@ -29,6 +51,8 @@ export interface UseFarmRoom {
     notice: string | null;
     iAmHost: boolean;
     mySeat: number | null;  // 後端逐人注入 your_seat（state 優先，房內用 room_update）
+    log: FarmEvent[];
+    stateSeq: number;       // 目前 state 的序號（配 FarmEvent.seq 找最新一批）
     actions: {
         createRoom: (roomName: string, nickname: string) => void;
         joinRoom: (roomId: number, nickname: string) => void;
@@ -46,10 +70,16 @@ export function useFarmRoom(): UseFarmRoom {
     const [room, setRoom] = useState<RoomUpdateData | null>(null);
     const [state, setState] = useState<FarmState | null>(null);
     const [gameOver, setGameOver] = useState<GameOverData | null>(null);
+    const [log, setLog] = useState<FarmEvent[]>([]);
+    const [stateSeq, setStateSeq] = useState(0);
+    // 上一則 state 與序號只給 WS handler 推事件用，不參與 render
+    const prevState = useRef<FarmState | null>(null);
+    const seqRef = useRef(0);
 
     // 房內狀態全清（room_closed / 重連 / 回大廳共用）
     const resetRoom = useCallback(() => {
         setRoom(null); setState(null); setGameOver(null);
+        setLog([]); prevState.current = null;
     }, []);
 
     const { notice, setNotice } = useRoomBase({
@@ -73,7 +103,13 @@ export function useFarmRoom(): UseFarmRoom {
                 setUiPhase('connecting');
             },
             state: d => {
-                setState(d as FarmState);
+                const next = d as FarmState;
+                const seq = ++seqRef.current;
+                const events = diffEvents(prevState.current, next, seq);
+                prevState.current = next;
+                if (events.length) setLog(l => [...l, ...events].slice(-LOG_MAX));
+                setStateSeq(seq);
+                setState(next);
                 setGameOver(null);
                 setUiPhase('playing');
             },
@@ -117,5 +153,5 @@ export function useFarmRoom(): UseFarmRoom {
     const mySeat = state?.your_seat ?? room?.your_seat ?? null;
     const iAmHost = room ? room.your_seat === room.host_seat : false;
 
-    return { uiPhase, rooms, room, state, gameOver, notice, iAmHost, mySeat, actions };
+    return { uiPhase, rooms, room, state, gameOver, notice, iAmHost, mySeat, log, stateSeq, actions };
 }
