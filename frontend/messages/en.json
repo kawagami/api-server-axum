@@ -600,7 +600,8 @@
     "err_bad_player_count": "Bad player count",
     "err_too_many_rooms": "Room limit reached — try again shortly",
     "err_rate_limited": "Too many actions — some were ignored",
-    "err_feature_disabled": "Games are not enabled on this site"
+    "err_feature_disabled": "Games are not enabled on this site",
+    "closed_disconnected": "Connection lost — you left the room (games can't be resumed)"
   },
   "Farm": {
     "title": "Farm Manager",
@@ -770,7 +771,8 @@
     "voice_form_sow": "Sow: choose how many fields get grain and vegetables, then confirm.",
     "voice_form_build_rooms": "Build: choose how many rooms and stables, then confirm.",
     "voice_form_fences": "Fences: choose pasture size and whether it has a stable, then confirm.",
-    "voice_gameOver": "Game over. You scored {score} points, rank {rank}."
+    "voice_gameOver": "Game over. You scored {score} points, rank {rank}.",
+    "closed_disconnected": "Connection lost — you left the room (games can't be resumed)"
   },
   "Home": {
     "metaTitle": "Kawa's Homes — Personal blog & tools platform",

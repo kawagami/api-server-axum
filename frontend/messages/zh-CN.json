@@ -600,7 +600,8 @@
     "err_bad_player_count": "人数不符",
     "err_too_many_rooms": "当前房间数已达上限，请稍后再试",
     "err_rate_limited": "操作太频繁，部分指令已被忽略",
-    "err_feature_disabled": "此站点目前未开放对战游戏"
+    "err_feature_disabled": "此站点目前未开放对战游戏",
+    "closed_disconnected": "连接中断，已退出房间（对局无法接续）"
   },
   "Farm": {
     "title": "农场经营",
@@ -770,7 +771,8 @@
     "voice_form_sow": "播种：选要种谷的田数和种菜的田数，再按确认。",
     "voice_form_build_rooms": "盖房：选要盖几间房、几座畜舍，再按确认。",
     "voice_form_fences": "围牧场：选牧场的格数，要不要含畜舍，再按确认。",
-    "voice_gameOver": "游戏结束，你得到{score}分，排名第{rank}。"
+    "voice_gameOver": "游戏结束，你得到{score}分，排名第{rank}。",
+    "closed_disconnected": "连接中断，已退出房间（对局无法接续）"
   },
   "Home": {
     "metaTitle": "Kawa's Homes — 个人博客与工具整合平台",

@@ -129,7 +129,11 @@ export function useAvalonRoom(): UseAvalonRoom {
             },
         },
         // 房間/對局在 server 重啟後已不存在，故清掉房內狀態並回 connecting，等 room_list 重建畫面
-        onReconnectReset: () => { resetRoom(); setUiPhase('connecting'); },
+        onReconnectReset: () => {
+            // 對局 / 房間不支援重連（server 端斷線即中止）：明講，不要無聲跳回大廳
+            if (uiPhase === 'room' || uiPhase === 'playing') setNotice('closed_disconnected');
+            resetRoom(); setUiPhase('connecting');
+        },
         // 切離頁面：在房內 / 對局中要主動退出
         leaveOnUnmount: () => {
             if (uiPhase === 'room' || uiPhase === 'playing') send('leave_room', undefined, GAME);
