@@ -165,6 +165,44 @@
     "dayNotePlaceholder": "跑步、換牙刷刷頭…",
     "errorSave": "儲存失敗",
     "errorInvalid": "欄位內容不正確",
+    "loadFailed": "載入失敗",
+    "stats": "統計"
+  },
+  "FoodLogStats": {
+    "title": "飲食統計",
+    "monthToDate": "本月至今",
+    "vsLastMonth": "上月同期 {amount}",
+    "dailyTitle": "近 30 天每日花費",
+    "monthlyTitle": "近 12 個月花費",
+    "chartHint": "點長條看數值",
+    "dailyAvg": "日均 {amount}",
+    "unrecordedLegend": "灰色短線＝當天沒紀錄；日均只算有紀錄的日子",
+    "dayDetail": "{date}：{total}",
+    "dayDetailEmpty": "{date}：沒紀錄",
+    "monthDetail": "{month}：{total}・記錄 {days} 天・日均 {avg}",
+    "monthDetailEmpty": "{month}：沒紀錄",
+    "rankingTitle": "排行",
+    "range": {
+      "30": "近 30 天",
+      "90": "近 90 天",
+      "365": "近一年"
+    },
+    "overview": {
+      "total": "總花費",
+      "days": "記錄天數",
+      "avg": "日均",
+      "free": "免費"
+    },
+    "daysValue": "{n} / {span} 天",
+    "freeValue": "{n} 筆",
+    "stores": "店家",
+    "items": "品項",
+    "times": "{n} 次",
+    "sortCount": "次數",
+    "sortTotal": "金額",
+    "empty": "這段期間沒有紀錄",
+    "showAll": "顯示全部 {n} 筆",
+    "showTop": "只看前 {n} 名",
     "loadFailed": "載入失敗"
   },
   "Profile": {

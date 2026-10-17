@@ -2,7 +2,14 @@
 
 import memberRequest from "@/libs/memberRequest";
 import { runAction, type ActionResult } from "@/libs/api-error";
-import type { FoodLogDay, FoodLogEntry, FoodLogEntryInput, FoodLogSuggestion, FoodLogSummary } from "@/types";
+import type {
+    FoodLogDay,
+    FoodLogEntry,
+    FoodLogEntryInput,
+    FoodLogStats,
+    FoodLogSuggestion,
+    FoodLogSummary,
+} from "@/types";
 
 const BASE = () => `${process.env.API_URL}/member/food_log`;
 
@@ -98,4 +105,9 @@ export async function putFoodLogDayNote(
         });
         return getFoodLogOverview(range.from, range.to);
     });
+}
+
+/** 統計頁。`days` = 總覽與排行看最近幾天（含今天）；趨勢圖固定 30 天 / 12 個月 */
+export async function getFoodLogStats(days: number): Promise<ActionResult<FoodLogStats>> {
+    return runAction(() => memberRequest<FoodLogStats>({ url: `${BASE()}/stats?days=${days}` }));
 }

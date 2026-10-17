@@ -38,7 +38,7 @@
 
 - **部落格**:文章 CRUD、標籤、Markdown 閱讀頁 + TOC、文章留言
 - **後台管理**:RBAC 權限(user/role/permission)、passkey 登入(WebAuthn)、稽核紀錄、站台設定熱更新、主題切換、平台設定頁(`platform:read`,instance 功能開關)
-- **會員系統**:OAuth 登入(Google / GitHub / LINE)、投資組合、單字闖關、飲食紀錄(`/{locale}/food-log`,依日依餐別記錄、花費統計)、即時通知(`/{locale}/dashboard/notifications`,走 WebSocket)
+- **會員系統**:OAuth 登入(Google / GitHub / LINE)、投資組合、單字闖關、飲食紀錄(`/{locale}/food-log`,依日依餐別記錄、花費統計;`/{locale}/food-log/stats` 趨勢圖與店家 / 品項排行)、即時通知(`/{locale}/dashboard/notifications`,走 WebSocket)
 - **單字闖關**:英文 / 日文生存模式、學習進度、週期排行榜
 - **對戰遊戲平台**(WebSocket):象棋、五子棋、暗棋、西洋棋、圍棋、阿瓦隆、農場經營
 - **股票**:庫藏股追蹤、股價變動追蹤、每日行情

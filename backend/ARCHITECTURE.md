@@ -726,6 +726,12 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
 - **餐別順序只有一份**：`Meal::ALL`，SQL 端用 `array_position($n::text[], meal)` 綁這份清單排序；前端 `food-log/model.ts` 的 `MEALS` 是同順序的顯示用複本。
 - 驗證是純函式（`FoodLogEntryRequest::validate(today)`、`FoodLogDaysQuery::resolve(today)`，`structs/food_log.rs`，附測）：日期不早於 2000-01-01 且不晚於台北今日、長度以**字元**計（中文 3 bytes，用 `len()` 會把上限砍成三分之一）、`GET /days` 單次最多 `MAX_DAYS_SPAN`(92) 天。依日分組（含只有備註的日子）是 `services/food_log.rs::group_days`。
 - 走 `with_member_auth`：寫入進 `admin_audit_logs`（audit 只記 path / query、不記 body，所以心得內容不會進稽核表）。
+- **統計 `GET /stats?days=`**（2026-10-17）：一支回齊，service 端 `try_join!` 六支聚合查詢。趨勢固定（近 `STATS_TREND_DAYS`(30) 天每日、近 `STATS_TREND_MONTHS`(12) 月每月，`fill_days` / `fill_months` 補齊空檔），`days`（1..=366，預設 30）只管總覽與排行。幾個口徑：
+  - **「沒記」≠「沒吃」**：資料只有吃了才有列，所以每日列帶 `recorded`、每月列帶 `recorded_days`，**日均一律除有紀錄的天數**（除日曆天數會被忘了記的日子拉低）；有記但全是免費的日子是 `recorded: true` 的 0 元。
+  - `amount` NULL（點數兌換 / 請客）不進金額、照算次數；`amount` 已是該行總價，不再乘 `quantity`。
+  - 店家的「次數」= `COUNT(DISTINCT (eaten_on, meal))`：同一餐在同一家點好幾樣算去一次；沒填店家的不列。品項的次數是筆數。
+  - 上月同期 = 上月 1 日到「上月的今天」，上月沒那天就到月底（`same_period_last_month`，靠 `checked_sub_months` 夾日）。
+  - 排行各回最多 `STATS_RANKING_LIMIT`(100) 列（依次數排），前端自己切「依金額」排序 —— 單一會員的店家數遠低於這個數。
 - **背景**：2026-09-11 砍掉的記帳本（`ledger_entries`，commit `26b9b45`）是通用收支記帳，砍的原因是**太少使用**。這個功能的輸入設計因此以「吃過的點一下就記好」為主（前端快速記錄區），沒吃過的才開表單；別把它做回表單為主的記帳 UI。
 
 ## 操作稽核（admin_audit_logs）

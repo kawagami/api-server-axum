@@ -6,7 +6,7 @@ use crate::{
     structs::{
         food_log::{
             FoodLogDay, FoodLogDayNoteRequest, FoodLogDaysQuery, FoodLogEntry, FoodLogEntryRequest,
-            FoodLogSuggestion, FoodLogSummary,
+            FoodLogStats, FoodLogStatsQuery, FoodLogSuggestion, FoodLogSummary,
         },
         members::AuthenticatedMember,
     },
@@ -29,7 +29,8 @@ pub fn new(state: AppState) -> Router<AppState> {
             .route("/entries", post(create))
             .route("/entries/{id}", put(update).delete(delete))
             .route("/suggestions", get(suggestions))
-            .route("/summary", get(summary)),
+            .route("/summary", get(summary))
+            .route("/stats", get(stats)),
     )
 }
 
@@ -90,4 +91,12 @@ async fn summary(
     State(state): State<AppState>,
 ) -> Result<Json<FoodLogSummary>, AppError> {
     Ok(Json(food_log_service::summary(state.get_pool(), auth_member.member_id).await?))
+}
+
+async fn stats(
+    Extension(auth_member): Extension<AuthenticatedMember>,
+    State(state): State<AppState>,
+    Query(query): Query<FoodLogStatsQuery>,
+) -> Result<Json<FoodLogStats>, AppError> {
+    Ok(Json(food_log_service::stats(state.get_pool(), auth_member.member_id, &query).await?))
 }

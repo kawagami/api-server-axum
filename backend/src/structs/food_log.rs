@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, Duration, Months, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -256,6 +256,118 @@ pub fn month_start(today: NaiveDate) -> NaiveDate {
     today.with_day(1).expect("每月必有 1 日")
 }
 
+/// 上月同期：上月 1 日到「上月的今天」。上月沒有這一天（3/31 → 2 月）就到上月底
+/// —— `checked_sub_months` 本身就是這樣夾的。
+pub fn same_period_last_month(today: NaiveDate) -> (NaiveDate, NaiveDate) {
+    let one = Months::new(1);
+    (
+        month_start(today).checked_sub_months(one).expect("2000 年後必有上個月"),
+        today.checked_sub_months(one).expect("2000 年後必有上個月"),
+    )
+}
+
+/// 統計頁「每日花費」固定看最近幾天（含今天）
+pub const STATS_TREND_DAYS: i64 = 30;
+/// 統計頁「每月花費」固定看最近幾個月（含本月）
+pub const STATS_TREND_MONTHS: u32 = 12;
+/// 排行區間（`days`）的上限與預設
+pub const MAX_STATS_DAYS: i64 = 366;
+pub const DEFAULT_STATS_DAYS: i64 = 30;
+/// 排行各回幾列。前端兩種排序（次數 / 金額）都從這份切，單一會員的店家數遠低於這個數。
+pub const STATS_RANKING_LIMIT: i64 = 100;
+
+#[derive(Deserialize)]
+pub struct FoodLogStatsQuery {
+    /// 總覽與排行看最近幾天（含今天）；趨勢圖不受影響
+    pub days: Option<i64>,
+}
+
+impl FoodLogStatsQuery {
+    /// 回排行區間的起日（含）
+    pub fn resolve(&self, today: NaiveDate) -> Result<NaiveDate, String> {
+        let days = self.days.unwrap_or(DEFAULT_STATS_DAYS);
+        if !(1..=MAX_STATS_DAYS).contains(&days) {
+            return Err(format!("days 必須介於 1 到 {MAX_STATS_DAYS}"));
+        }
+        Ok(today - Duration::days(days - 1))
+    }
+}
+
+/// 一天的花費。`recorded = false` 是那天完全沒紀錄（和「有記但都免費」的 0 元不同）。
+#[derive(Serialize, Debug, PartialEq)]
+pub struct FoodLogDailySpend {
+    pub date: NaiveDate,
+    pub total: i64,
+    pub recorded: bool,
+}
+
+/// 一個月的花費。`recorded_days` 是有紀錄的天數，日均要除這個而不是日曆天數。
+#[derive(Serialize, FromRow, Debug, PartialEq)]
+pub struct FoodLogMonthlySpend {
+    /// 該月 1 日
+    pub month: NaiveDate,
+    pub total: i64,
+    pub recorded_days: i64,
+}
+
+#[derive(Serialize, FromRow, Debug, PartialEq)]
+pub struct FoodLogDayTotal {
+    pub date: NaiveDate,
+    pub total: i64,
+}
+
+/// 本月至今 vs 上月同期
+#[derive(Serialize, FromRow, Debug, PartialEq)]
+pub struct FoodLogMonthCompare {
+    pub this_month: i64,
+    pub last_month_same_period: i64,
+}
+
+/// 排行區間的總覽
+#[derive(Serialize, FromRow, Debug, PartialEq)]
+pub struct FoodLogRangeOverview {
+    pub total: i64,
+    pub recorded_days: i64,
+    pub entries: i64,
+    /// 沒標金額（點數兌換 / 請客）的筆數
+    pub free_entries: i64,
+}
+
+#[derive(Serialize, FromRow, Debug)]
+pub struct FoodLogStoreStat {
+    pub store: String,
+    /// 去了幾次：同一天同一餐在同一家點好幾樣算一次
+    pub visits: i64,
+    pub total: i64,
+    pub last_eaten_on: NaiveDate,
+}
+
+#[derive(Serialize, FromRow, Debug)]
+pub struct FoodLogItemStat {
+    pub store: Option<String>,
+    pub item: String,
+    /// 吃了幾次（筆數，不乘數量）
+    pub count: i64,
+    pub total: i64,
+    pub last_eaten_on: NaiveDate,
+}
+
+#[derive(Serialize, Debug)]
+pub struct FoodLogStats {
+    /// 排行區間起日（含），到今天
+    pub from: NaiveDate,
+    /// 最近 `STATS_TREND_DAYS` 天，舊到新、每天一列（沒紀錄的日子也有）
+    pub daily: Vec<FoodLogDailySpend>,
+    /// 最近 `STATS_TREND_MONTHS` 個月，舊到新、每月一列
+    pub monthly: Vec<FoodLogMonthlySpend>,
+    pub month_compare: FoodLogMonthCompare,
+    pub overview: FoodLogRangeOverview,
+    /// 依次數多到少（沒填店家的不算）
+    pub stores: Vec<FoodLogStoreStat>,
+    /// 依次數多到少
+    pub items: Vec<FoodLogItemStat>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,5 +482,27 @@ mod tests {
         assert_eq!(week_start(date("2026-10-04")), date("2026-09-28"));
         assert_eq!(week_start(date("2026-09-28")), date("2026-09-28"));
         assert_eq!(month_start(date("2026-10-04")), date("2026-10-01"));
+    }
+
+    #[test]
+    fn same_period_last_month_clamps_to_month_end() {
+        assert_eq!(same_period_last_month(date("2026-10-17")), (date("2026-09-01"), date("2026-09-17")));
+        // 9 月沒有 31 日：整個 9 月
+        assert_eq!(same_period_last_month(date("2026-10-31")), (date("2026-09-01"), date("2026-09-30")));
+        assert_eq!(same_period_last_month(date("2026-03-31")), (date("2026-02-01"), date("2026-02-28")));
+        // 跨年
+        assert_eq!(same_period_last_month(date("2026-01-15")), (date("2025-12-01"), date("2025-12-15")));
+    }
+
+    #[test]
+    fn stats_query_range() {
+        let today = date(TODAY);
+        let q = |days| FoodLogStatsQuery { days };
+        // 含今天：30 天 = 往回 29 天
+        assert_eq!(q(None).resolve(today).unwrap(), date("2026-09-05"));
+        assert_eq!(q(Some(1)).resolve(today).unwrap(), today);
+        assert!(q(Some(MAX_STATS_DAYS)).resolve(today).is_ok());
+        assert!(q(Some(0)).resolve(today).is_err());
+        assert!(q(Some(MAX_STATS_DAYS + 1)).resolve(today).is_err());
     }
 }

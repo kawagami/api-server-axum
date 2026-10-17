@@ -1,7 +1,9 @@
 use crate::{
     errors::{AppError, RequestError},
     structs::food_log::{
-        FoodLogDayNote, FoodLogEntry, FoodLogSuggestion, FoodLogSummary, Meal, ValidFoodLogEntry,
+        FoodLogDayNote, FoodLogDayTotal, FoodLogEntry, FoodLogItemStat, FoodLogMonthCompare,
+        FoodLogMonthlySpend, FoodLogRangeOverview, FoodLogStoreStat, FoodLogSuggestion,
+        FoodLogSummary, Meal, ValidFoodLogEntry,
     },
 };
 use chrono::NaiveDate;
@@ -209,4 +211,151 @@ pub async fn summary(
     .fetch_one(pool)
     .await?;
     Ok(row)
+}
+
+/// 每天的花費，只有有紀錄的日子（補零在 service 做）
+pub async fn daily_totals(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    from: NaiveDate,
+    to: NaiveDate,
+) -> Result<Vec<FoodLogDayTotal>, AppError> {
+    let rows = sqlx::query_as(
+        "SELECT eaten_on AS date, COALESCE(SUM(amount), 0)::BIGINT AS total
+         FROM food_log_entries
+         WHERE member_id = $1 AND eaten_on BETWEEN $2 AND $3
+         GROUP BY eaten_on",
+    )
+    .bind(member_id)
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// 每月的花費與有紀錄的天數，只有有紀錄的月份
+pub async fn monthly_totals(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    from: NaiveDate,
+    to: NaiveDate,
+) -> Result<Vec<FoodLogMonthlySpend>, AppError> {
+    let rows = sqlx::query_as(
+        "SELECT date_trunc('month', eaten_on)::DATE AS month,
+                COALESCE(SUM(amount), 0)::BIGINT AS total,
+                COUNT(DISTINCT eaten_on) AS recorded_days
+         FROM food_log_entries
+         WHERE member_id = $1 AND eaten_on BETWEEN $2 AND $3
+         GROUP BY 1",
+    )
+    .bind(member_id)
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// 本月至今（`this_from`..`today`）與上月同期（`last_from`..`last_to`）的花費
+pub async fn month_compare(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    today: NaiveDate,
+    this_from: NaiveDate,
+    (last_from, last_to): (NaiveDate, NaiveDate),
+) -> Result<FoodLogMonthCompare, AppError> {
+    let row = sqlx::query_as(
+        "SELECT COALESCE(SUM(amount) FILTER (WHERE eaten_on >= $3), 0)::BIGINT AS this_month,
+                COALESCE(SUM(amount) FILTER (WHERE eaten_on BETWEEN $4 AND $5), 0)::BIGINT
+                    AS last_month_same_period
+         FROM food_log_entries
+         WHERE member_id = $1 AND eaten_on BETWEEN $4 AND $2",
+    )
+    .bind(member_id)
+    .bind(today)
+    .bind(this_from)
+    .bind(last_from)
+    .bind(last_to)
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
+pub async fn range_overview(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    from: NaiveDate,
+    to: NaiveDate,
+) -> Result<FoodLogRangeOverview, AppError> {
+    let row = sqlx::query_as(
+        "SELECT COALESCE(SUM(amount), 0)::BIGINT AS total,
+                COUNT(DISTINCT eaten_on) AS recorded_days,
+                COUNT(*) AS entries,
+                COUNT(*) FILTER (WHERE amount IS NULL) AS free_entries
+         FROM food_log_entries
+         WHERE member_id = $1 AND eaten_on BETWEEN $2 AND $3",
+    )
+    .bind(member_id)
+    .bind(from)
+    .bind(to)
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
+/// 店家排行。一次「去」= 同一天同一餐（同一餐在同一家點好幾樣只算一次）；沒填店家的不列。
+pub async fn store_stats(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    from: NaiveDate,
+    to: NaiveDate,
+    limit: i64,
+) -> Result<Vec<FoodLogStoreStat>, AppError> {
+    let rows = sqlx::query_as(
+        "SELECT store,
+                COUNT(DISTINCT (eaten_on, meal)) AS visits,
+                COALESCE(SUM(amount), 0)::BIGINT AS total,
+                MAX(eaten_on) AS last_eaten_on
+         FROM food_log_entries
+         WHERE member_id = $1 AND eaten_on BETWEEN $2 AND $3 AND store IS NOT NULL
+         GROUP BY store
+         ORDER BY visits DESC, total DESC, store
+         LIMIT $4",
+    )
+    .bind(member_id)
+    .bind(from)
+    .bind(to)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// 品項排行，依 (store, item)；次數是筆數、不乘數量
+pub async fn item_stats(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    from: NaiveDate,
+    to: NaiveDate,
+    limit: i64,
+) -> Result<Vec<FoodLogItemStat>, AppError> {
+    let rows = sqlx::query_as(
+        "SELECT store, item,
+                COUNT(*) AS count,
+                COALESCE(SUM(amount), 0)::BIGINT AS total,
+                MAX(eaten_on) AS last_eaten_on
+         FROM food_log_entries
+         WHERE member_id = $1 AND eaten_on BETWEEN $2 AND $3
+         GROUP BY store, item
+         ORDER BY count DESC, total DESC, item
+         LIMIT $4",
+    )
+    .bind(member_id)
+    .bind(from)
+    .bind(to)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
 }

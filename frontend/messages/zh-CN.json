@@ -165,6 +165,44 @@
     "dayNotePlaceholder": "跑步、换牙刷刷头…",
     "errorSave": "保存失败",
     "errorInvalid": "字段内容不正确",
+    "loadFailed": "加载失败",
+    "stats": "统计"
+  },
+  "FoodLogStats": {
+    "title": "饮食统计",
+    "monthToDate": "本月至今",
+    "vsLastMonth": "上月同期 {amount}",
+    "dailyTitle": "近 30 天每日花费",
+    "monthlyTitle": "近 12 个月花费",
+    "chartHint": "点柱子查看数值",
+    "dailyAvg": "日均 {amount}",
+    "unrecordedLegend": "灰色短线＝当天没记录；日均只算有记录的日子",
+    "dayDetail": "{date}：{total}",
+    "dayDetailEmpty": "{date}：没记录",
+    "monthDetail": "{month}：{total}・记录 {days} 天・日均 {avg}",
+    "monthDetailEmpty": "{month}：没记录",
+    "rankingTitle": "排行",
+    "range": {
+      "30": "近 30 天",
+      "90": "近 90 天",
+      "365": "近一年"
+    },
+    "overview": {
+      "total": "总花费",
+      "days": "记录天数",
+      "avg": "日均",
+      "free": "免费"
+    },
+    "daysValue": "{n} / {span} 天",
+    "freeValue": "{n} 笔",
+    "stores": "店家",
+    "items": "品项",
+    "times": "{n} 次",
+    "sortCount": "次数",
+    "sortTotal": "金额",
+    "empty": "这段期间没有记录",
+    "showAll": "显示全部 {n} 笔",
+    "showTop": "只看前 {n} 名",
     "loadFailed": "加载失败"
   },
   "Profile": {

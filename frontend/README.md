@@ -34,6 +34,7 @@
 | `/{locale}/dashboard/notifications` | 通知列表（需登入） |
 | `/{locale}/portfolio` | 投資組合追蹤，記錄持股並查看每日漲跌盈虧（需登入） |
 | `/{locale}/food-log` | 飲食紀錄，吃過的品項一鍵帶入、時間軸、今日 / 本週 / 本月花費（需登入） |
+| `/{locale}/food-log/stats` | 飲食統計：每日 / 每月花費圖、本月至今 vs 上月同期、店家 / 品項排行（需登入） |
 | `/{locale}/profile` | 個人資料（需登入） |
 | `/{locale}/changelog` | 更新紀錄，直接讀 GitHub commits（來源 repo 由 `GITHUB_REPO` 決定，設成空字串＝關閉此頁） |
 | `/{locale}/about` | 關於頁面 |

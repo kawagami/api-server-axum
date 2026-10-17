@@ -1,16 +1,18 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     errors::{AppError, RequestError},
     repositories::food_log as food_log_repo,
     structs::food_log::{
-        month_start, week_start, FoodLogDay, FoodLogDayNote, FoodLogDayNoteRequest,
-        FoodLogDaysQuery, FoodLogEntry, FoodLogEntryRequest, FoodLogSuggestion, FoodLogSummary,
-        MAX_DAY_NOTE_LEN, SUGGESTION_LIMIT, SUGGESTION_LOOKBACK_DAYS,
+        month_start, same_period_last_month, week_start, FoodLogDailySpend, FoodLogDay,
+        FoodLogDayNote, FoodLogDayNoteRequest, FoodLogDayTotal, FoodLogDaysQuery, FoodLogEntry,
+        FoodLogEntryRequest, FoodLogMonthlySpend, FoodLogStats, FoodLogStatsQuery,
+        FoodLogSuggestion, FoodLogSummary, MAX_DAY_NOTE_LEN, STATS_RANKING_LIMIT,
+        STATS_TREND_DAYS, STATS_TREND_MONTHS, SUGGESTION_LIMIT, SUGGESTION_LOOKBACK_DAYS,
     },
     utils::date::taipei_today,
 };
-use chrono::{Duration, NaiveDate};
+use chrono::{Duration, Months, NaiveDate};
 use sqlx::{Pool, Postgres};
 
 pub async fn list_days(
@@ -100,6 +102,65 @@ pub async fn summary(pool: &Pool<Postgres>, member_id: i64) -> Result<FoodLogSum
     food_log_repo::summary(pool, member_id, today, week_start(today), month_start(today)).await
 }
 
+pub async fn stats(
+    pool: &Pool<Postgres>,
+    member_id: i64,
+    query: &FoodLogStatsQuery,
+) -> Result<FoodLogStats, AppError> {
+    let today = taipei_today();
+    let from = query.resolve(today).map_err(RequestError::UnprocessableContent)?;
+    let this_month = month_start(today);
+    let trend_from = today - Duration::days(STATS_TREND_DAYS - 1);
+    let first_month = this_month
+        .checked_sub_months(Months::new(STATS_TREND_MONTHS - 1))
+        .expect("2000 年後必有 12 個月前");
+
+    let (daily, monthly, month_compare, overview, stores, items) = tokio::try_join!(
+        food_log_repo::daily_totals(pool, member_id, trend_from, today),
+        food_log_repo::monthly_totals(pool, member_id, first_month, today),
+        food_log_repo::month_compare(pool, member_id, today, this_month, same_period_last_month(today)),
+        food_log_repo::range_overview(pool, member_id, from, today),
+        food_log_repo::store_stats(pool, member_id, from, today, STATS_RANKING_LIMIT),
+        food_log_repo::item_stats(pool, member_id, from, today, STATS_RANKING_LIMIT),
+    )?;
+
+    Ok(FoodLogStats {
+        from,
+        daily: fill_days(trend_from, today, daily),
+        monthly: fill_months(first_month, STATS_TREND_MONTHS, monthly),
+        month_compare,
+        overview,
+        stores,
+        items,
+    })
+}
+
+/// `from..=to` 每天一列（舊到新），沒紀錄的日子補 `recorded: false`
+fn fill_days(from: NaiveDate, to: NaiveDate, rows: Vec<FoodLogDayTotal>) -> Vec<FoodLogDailySpend> {
+    let totals: HashMap<NaiveDate, i64> = rows.into_iter().map(|r| (r.date, r.total)).collect();
+    from.iter_days()
+        .take_while(|d| *d <= to)
+        .map(|date| match totals.get(&date) {
+            Some(&total) => FoodLogDailySpend { date, total, recorded: true },
+            None => FoodLogDailySpend { date, total: 0, recorded: false },
+        })
+        .collect()
+}
+
+/// 從 `first`（某月 1 日）起連續 `n` 個月每月一列（舊到新），沒紀錄的月份補 0
+fn fill_months(first: NaiveDate, n: u32, rows: Vec<FoodLogMonthlySpend>) -> Vec<FoodLogMonthlySpend> {
+    let mut by_month: HashMap<NaiveDate, FoodLogMonthlySpend> =
+        rows.into_iter().map(|r| (r.month, r)).collect();
+    (0..n)
+        .map(|i| first.checked_add_months(Months::new(i)).expect("月份不會溢位"))
+        .map(|month| {
+            by_month
+                .remove(&month)
+                .unwrap_or(FoodLogMonthlySpend { month, total: 0, recorded_days: 0 })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,5 +224,44 @@ mod tests {
         assert!(days[0].entries.is_empty());
         assert_eq!(days[0].note.as_deref(), Some("跑步"));
         assert_eq!(days[1].note.as_deref(), Some("換牙刷刷頭"));
+    }
+
+    /// 沒紀錄的日子要出現且標 `recorded: false`；有記但全免費的日子是 `recorded: true` 的 0 元
+    #[test]
+    fn fill_days_marks_unrecorded_days() {
+        let days = fill_days(
+            date("2026-10-01"),
+            date("2026-10-04"),
+            vec![
+                FoodLogDayTotal { date: date("2026-10-04"), total: 120 },
+                FoodLogDayTotal { date: date("2026-10-02"), total: 0 },
+            ],
+        );
+        assert_eq!(days.iter().map(|d| d.date).collect::<Vec<_>>(), [
+            date("2026-10-01"),
+            date("2026-10-02"),
+            date("2026-10-03"),
+            date("2026-10-04"),
+        ]);
+        assert_eq!(days.iter().map(|d| (d.total, d.recorded)).collect::<Vec<_>>(), [
+            (0, false),
+            (0, true),
+            (0, false),
+            (120, true),
+        ]);
+    }
+
+    #[test]
+    fn fill_months_spans_year_boundary() {
+        let months = fill_months(
+            date("2025-11-01"),
+            3,
+            vec![FoodLogMonthlySpend { month: date("2026-01-01"), total: 900, recorded_days: 5 }],
+        );
+        assert_eq!(months, [
+            FoodLogMonthlySpend { month: date("2025-11-01"), total: 0, recorded_days: 0 },
+            FoodLogMonthlySpend { month: date("2025-12-01"), total: 0, recorded_days: 0 },
+            FoodLogMonthlySpend { month: date("2026-01-01"), total: 900, recorded_days: 5 },
+        ]);
     }
 }
