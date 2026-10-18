@@ -17,7 +17,7 @@
 | `/{locale}/blogs/[id]` | 文章內容（Markdown 渲染 + TOC + 留言） |
 | `/{locale}/blogs/author/[name]` | 依作者篩選文章 |
 | `/{locale}/tools` | 工具 hub（清單來源 `libs/site-nav.ts` 的 `TOOLS`） |
-| `/{locale}/tools/timers` | 計時工具三合一：整點報時（Web Speech API TTS）／倒數計時／鬧鐘，三張卡同頁並存可同時跑（舊網址 `/tools/{countdown,alarm,hourly-chime}` 已 301 到此） |
+| `/{locale}/tools/timers` | 計時工具四合一：整點報時（Web Speech API TTS）／久坐提醒（坐／動自動循環，音效 + 語音 + 系統通知）／倒數計時／鬧鐘，四張卡同頁並存可同時跑（舊網址 `/tools/{countdown,alarm,hourly-chime}` 已 301 到此） |
 | `/{locale}/tools/convert-text` | 文字轉換工具 |
 | `/{locale}/tools/new-password` | 密碼產生工具 |
 | `/{locale}/tools/roster` | 排班功能（貼名單一次多筆、每日人力／連上上限、起始日期與週末標色、按人／按日視圖、點格子手動改班、統計、CSV 匯出／複製；參數存 localStorage）|
