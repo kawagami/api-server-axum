@@ -74,7 +74,7 @@ types/index.ts        ← 後端 API 共用型別（Blog、User、Stock 等）
 - 公開頁的 `Link` / `redirect` / `useRouter` 從 `@/i18n/navigation` 引入（自動帶 locale），不用 `next/link`
 - Admin 元件繼續用 `next/link`（不需要 locale 感知）
 - 新增翻譯：在 `messages/zh-TW.json`、`messages/zh-CN.json`、`messages/en.json` 同步加 key（縮排 2 空白）
-- **前台不留寫死的中文**：`/tools` 四頁（`Timers` 一頁三張卡＝`Alarm` / `Countdown` / `HourlyChime` 三個 namespace、`ConvertText`、`NewPassword`、`Roster`）與錯誤頁（`Error` / `NotFound`）都已有 namespace。**server action 不要回傳中文訊息**（那裡拿不到使用者語系），回 `messageKey` 讓 client 翻（見 `tools/convert-text/actions.ts`）。整點報時的語音內容與 `SpeechSynthesisUtterance.lang` 也跟著語系走（`HourlyChime.speech` / `speechLang`）
+- **前台不留寫死的中文**：`/tools` 四頁（`Timers` 一頁四張卡＝`Alarm` / `Countdown` / `HourlyChime` / `Sedentary` 四個 namespace、`ConvertText`、`NewPassword`、`Roster`）與錯誤頁（`Error` / `NotFound`）都已有 namespace。**server action 不要回傳中文訊息**（那裡拿不到使用者語系），回 `messageKey` 讓 client 翻（見 `tools/convert-text/actions.ts`）。整點報時的語音內容與 `SpeechSynthesisUtterance.lang` 也跟著語系走（`HourlyChime.speech` / `speechLang`）
 - **不要把後端錯誤訊息印給使用者**：後端 `errors.rs` / `services/*.rs` 的訊息全是寫死繁中，`setError(e.errorData?.message || t('errorSave'))` 這種寫法等於 en / zh-CN 使用者看到中文。一律用 `libs/api-error.ts` 的 `apiErrorStatus(e)` 依 status 分流到自己 namespace 的 key（409=已存在、422=`errorInvalid`、其餘 `errorSave`）。後端回應的 `code` 只是 HTTP 狀態碼、不是機器可讀原因，別拿來做更細的分支
 - **後端回的資料標籤同理**：後端回的中文常數標籤不要直接渲染（en / zh-CN 使用者會看到中文），一律用 value 當 i18n key、後端 label 只當未知 key 的 fallback
 - `app/layout.tsx` 的 metadata 走 `generateMetadata` + `getTranslations('Home')`：**不要寫死 description**（沒自帶 description 的頁面會繼承它，寫死等於三語系都吃到中文）。`WsProvider` 掛在 `NextIntlClientProvider` 之外拿不到 `useTranslations`，斷線橫幅文案由 root layout 以 `lostLabel` prop 餵進去（同 `ThemeButton` 的 `labels`）
@@ -373,7 +373,7 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 
 ### 已查證「不是問題」，別再動
 - **avalon 的 `iAmHost` 用本地 `useState` 是正確的**，不是偷懶。後端 `games/common/room.rs` 依 `K::SEAT_IN_ROOM_UPDATE` 決定要不要逐人注入 `your_seat`，farm 設 `true`、avalon 吃預設 `false`；avalon 的 seat 從私有 `role_assigned` 拿，開局前只需要 host 旗標。而且 `room.rs` 的 `leave_room` 是 **host 離開＝解散房間**（`host_left`），所以「重整後回到房內但看不到開始按鈕」的情境不存在 —— 重整後根本沒有房可以回。farm 需要 `your_seat` 是因為它要判 `myTurn`（`current_player === mySeat`）且沒有私有訊息可夾帶。**兩邊的差異是設計，不是疏漏。**
-- i18n 三語系 key 完全同步（**966 / 966 / 966，39 個 namespace**，2026-10-17 農場 UI 重做、飲食統計頁、移除越南大戰後重數；2026-10-10 單字闖關特效與阿瓦隆對局畫面後是 902 / 39；2026-10-04 加飲食紀錄後是 875 / 39；2026-09-13 首頁補「最新文章」後是 822 / 38；2026-09-11 移除記帳／發票／樂透後是 819 / 38；2026-09-09 是 1050 / 42、2026-08-30 是 1045 / 42、2026-08-26 是 1027 / 42、2026-08-17 是 883 / 40、2026-07-31 是 865 / 39），namespace 與 code 中的用量雙向吻合，沒有孤兒 namespace。**靜態掃描會誤報約 152 個「沒人用」的 key，那些是 30 處動態組 key（`t(\`items.${key}\`)` 之類）**，刪之前務必逐一確認。
+- i18n 三語系 key 完全同步（**981 / 981 / 981，40 個 namespace**，2026-10-18 計時工具加久坐提醒 `Sedentary` +15；2026-10-17 農場 UI 重做、飲食統計頁、移除越南大戰後是 966 / 39；2026-10-10 單字闖關特效與阿瓦隆對局畫面後是 902 / 39；2026-10-04 加飲食紀錄後是 875 / 39；2026-09-13 首頁補「最新文章」後是 822 / 38；2026-09-11 移除記帳／發票／樂透後是 819 / 38；2026-09-09 是 1050 / 42、2026-08-30 是 1045 / 42、2026-08-26 是 1027 / 42、2026-08-17 是 883 / 40、2026-07-31 是 865 / 39），namespace 與 code 中的用量雙向吻合，沒有孤兒 namespace。**靜態掃描會誤報約 152 個「沒人用」的 key，那些是 30 處動態組 key（`t(\`items.${key}\`)` 之類）**，刪之前務必逐一確認。
 - `types/` 的 barrel 是 100% 遵守的（`from '@/types/xxx'` 零命中）。
 - `api/` 22 檔全部有 `"use server"`、全部 named exports；手寫 `fetch(` 只有 `api/github.ts` 一支，那是刻意的（打 GitHub 公開 API，套不上 `fetchApi`，理由見上方「API 請求分層」）。
 - `usePagedList` 的 9 個消費點用法一致（2026-09-11 重數，移除記帳／發票／樂透前是 12），沒有頁面自己手刻「載入更多」。

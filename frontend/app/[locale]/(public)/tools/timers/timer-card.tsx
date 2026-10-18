@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 
-/** 三個計時卡片共用的外框；一頁多顆卡，標題一律 h2（h1 由 PageTitle 出） */
+/** 四個計時卡片共用的外框；一頁多顆卡，標題一律 h2（h1 由 PageTitle 出） */
 export default function TimerCard({
     title,
     icon: Icon,

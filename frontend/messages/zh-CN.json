@@ -858,7 +858,7 @@
     "items": {
       "newPassword": "批量生成随机密码，组数与长度可自定义。",
       "convertText": "简体与繁体中文文字互相转换。",
-      "timers": "倒计时、闹钟、整点报时三合一，可同时使用。",
+      "timers": "倒计时、闹钟、整点报时、久坐提醒四合一，可同时使用。",
       "roster": "输入人员与天数，自动排出公平班表。"
     }
   },
@@ -987,7 +987,7 @@
   },
   "Timers": {
     "title": "计时工具",
-    "intro": "倒计时、闹钟、整点报时同页并存，可以同时开着。"
+    "intro": "倒计时、闹钟、整点报时、久坐提醒同页并存，可以同时开着。"
   },
   "Alarm": {
     "title": "闹钟",
@@ -1016,6 +1016,25 @@
     "lastChime": "最近报时",
     "hint": "开启后，每个整点自动播报语音",
     "speech": "现在 {hour} 点整",
+    "speechLang": "zh-CN"
+  },
+  "Sedentary": {
+    "title": "久坐提醒",
+    "sitLabel": "坐多久提醒（分钟）",
+    "moveLabel": "活动多久（分钟）",
+    "hint": "坐满时间提醒起来动，活动时间结束再提醒坐回去，自动循环。开始时会请求通知权限，切到别的窗口也收得到。",
+    "start": "开始",
+    "stop": "停止",
+    "skipToMove": "现在就起来动",
+    "skipToSit": "提前结束活动",
+    "rounds": "已完成 {count} 轮",
+    "phase": {
+      "idle": "未启用",
+      "sitting": "坐着中",
+      "moving": "活动时间"
+    },
+    "speechMove": "坐太久了，起来动一动吧",
+    "speechSit": "活动时间结束",
     "speechLang": "zh-CN"
   },
   "ConvertText": {

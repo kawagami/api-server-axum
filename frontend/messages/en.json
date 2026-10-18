@@ -858,7 +858,7 @@
     "items": {
       "newPassword": "Generate random passwords in batches, with adjustable count and length.",
       "convertText": "Convert text between Simplified and Traditional Chinese.",
-      "timers": "Countdown, alarm and hourly chime in one place — run them all at once.",
+      "timers": "Countdown, alarm, hourly chime and sit-stand reminder in one place — run them all at once.",
       "roster": "Enter staff and days to auto-generate a fair shift roster."
     }
   },
@@ -987,7 +987,7 @@
   },
   "Timers": {
     "title": "Timers",
-    "intro": "Countdown, alarm and hourly chime on one page — all three can run at the same time."
+    "intro": "Countdown, alarm, hourly chime and sit-stand reminder on one page — all of them can run at the same time."
   },
   "Alarm": {
     "title": "Alarm",
@@ -1016,6 +1016,25 @@
     "lastChime": "Last chime",
     "hint": "Once on, the time is announced every hour",
     "speech": "It is now {hour} o'clock",
+    "speechLang": "en-US"
+  },
+  "Sedentary": {
+    "title": "Sit-stand reminder",
+    "sitLabel": "Remind after sitting (min)",
+    "moveLabel": "Move for (min)",
+    "hint": "Reminds you to get up once the sitting time is up, then again when the break is over, on repeat. Starting asks for notification permission so you get alerts in other windows too.",
+    "start": "Start",
+    "stop": "Stop",
+    "skipToMove": "Get up now",
+    "skipToSit": "End break early",
+    "rounds": "{count, plural, one {# round} other {# rounds}} done",
+    "phase": {
+      "idle": "Off",
+      "sitting": "Sitting",
+      "moving": "Move break"
+    },
+    "speechMove": "You have been sitting too long. Time to get up and move.",
+    "speechSit": "Break is over.",
     "speechLang": "en-US"
   },
   "ConvertText": {

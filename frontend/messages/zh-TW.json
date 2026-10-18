@@ -858,7 +858,7 @@
     "items": {
       "newPassword": "批次產生隨機密碼，組數與長度可自訂。",
       "convertText": "簡體與繁體中文文字互相轉換。",
-      "timers": "倒數計時、鬧鐘、整點報時三合一，可同時使用。",
+      "timers": "倒數計時、鬧鐘、整點報時、久坐提醒四合一，可同時使用。",
       "roster": "輸入人員與天數，自動排出公平班表。"
     }
   },
@@ -987,7 +987,7 @@
   },
   "Timers": {
     "title": "計時工具",
-    "intro": "倒數計時、鬧鐘、整點報時同頁並存，可以同時開著。"
+    "intro": "倒數計時、鬧鐘、整點報時、久坐提醒同頁並存，可以同時開著。"
   },
   "Alarm": {
     "title": "鬧鐘",
@@ -1016,6 +1016,25 @@
     "lastChime": "最近報時",
     "hint": "開啟後，每個整點自動播報語音",
     "speech": "現在 {hour} 點整",
+    "speechLang": "zh-TW"
+  },
+  "Sedentary": {
+    "title": "久坐提醒",
+    "sitLabel": "坐多久提醒（分鐘）",
+    "moveLabel": "活動多久（分鐘）",
+    "hint": "坐滿時間提醒起來動，活動時間結束再提醒坐回去，自動循環。開始時會請求通知權限，切到別的視窗也收得到。",
+    "start": "開始",
+    "stop": "停止",
+    "skipToMove": "現在就起來動",
+    "skipToSit": "提早結束活動",
+    "rounds": "已完成 {count} 輪",
+    "phase": {
+      "idle": "未啟用",
+      "sitting": "坐著中",
+      "moving": "活動時間"
+    },
+    "speechMove": "坐太久了，起來動一動吧",
+    "speechSit": "活動時間結束",
     "speechLang": "zh-TW"
   },
   "ConvertText": {
