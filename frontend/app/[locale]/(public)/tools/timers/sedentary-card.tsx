@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { PersonStanding } from 'lucide-react';
 import { startSecondTick } from '@/libs/second-tick';
+import { speakText, stopSpeaking, unlockSpeech } from '@/libs/speech';
 import TimerCard, { ACTION_BTN } from './timer-card';
 import TimeDisplay from './time-display';
 import { selectOnHover, NUMBER_INPUT } from './hover-select';
@@ -93,12 +94,8 @@ export default function SedentaryCard() {
             const freqs = next === 'moving' ? [660, 880, 1047] : [1047, 880, 660];
             freqs.forEach((f, i) => playTone(ctx, f, ctx.currentTime + i * 0.35));
         }
-        setTimeout(() => {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = t('speechLang');
-            utterance.rate = 0.9;
-            speechSynthesis.speak(utterance);
-        }, 1200);
+        // 排隊不打斷：同頁的整點報時可能剛好同時開口
+        setTimeout(() => speakText(text, t('speechLang'), 0.9, { queue: true }), 1200);
         // 人在別的視窗才發系統通知；document.hidden 抓不到 Alt-Tab 切到別的 App（分頁仍是 visible）
         if ('Notification' in window && Notification.permission === 'granted' && !document.hasFocus()) {
             try {
@@ -137,6 +134,7 @@ export default function SedentaryCard() {
         setMoveMin(String(move));
         durations.current = { sit: sit * 60, move: move * 60 };
         audioCtx.current ??= new AudioContext();
+        unlockSpeech(); // iOS：之後在 timer 裡自動念的前提是先在使用者手勢內念過一次
         if ('Notification' in window && Notification.permission === 'default') {
             Notification.requestPermission().catch(() => {});
         }
@@ -154,7 +152,7 @@ export default function SedentaryCard() {
     };
 
     const stop = () => {
-        speechSynthesis.cancel();
+        stopSpeaking();
         setPhase('idle');
         setEndAt(null);
         setTimeLeft(clampMinutes(sitMin, SIT_RANGE, DEFAULT_SIT) * 60);

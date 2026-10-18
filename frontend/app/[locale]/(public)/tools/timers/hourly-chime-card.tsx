@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, BellOff, BellRing } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { startSecondTick } from '@/libs/second-tick';
+import { speakText, stopSpeaking, unlockSpeech } from '@/libs/speech';
 import TimerCard from './timer-card';
 
 function msToNextHour(): number {
@@ -49,20 +50,15 @@ export default function HourlyChimeCard() {
         for (let i = 0; i < 3; i++) {
             playBell(ctx, ctx.currentTime + i * gap);
         }
-        setTimeout(() => {
-            // 語音內容與發音語系都跟著當前 locale 走（speechLang 是各語系檔自己給的 BCP 47 值）
-            const utterance = new SpeechSynthesisUtterance(t('speech', { hour }));
-            utterance.lang = t('speechLang');
-            utterance.rate = 0.75;
-            utterance.volume = 1;
-            speechSynthesis.speak(utterance);
-        }, 3 * gap * 1000);
+        // 語音內容與發音語系都跟著當前 locale 走（speechLang 是各語系檔自己給的 BCP 47 值）。
+        // 排隊不打斷：同頁的久坐提醒可能剛好同時開口
+        setTimeout(() => speakText(t('speech', { hour }), t('speechLang'), 0.75, { queue: true }), 3 * gap * 1000);
         setLastChime(`${hour.toString().padStart(2, '0')}:00`);
     }, [t]);
 
     useEffect(() => {
         if (!enabled) {
-            speechSynthesis.cancel();
+            stopSpeaking();
             return;
         }
         function schedule() {
@@ -96,7 +92,11 @@ export default function HourlyChimeCard() {
                 </div>
 
                 <button
-                    onClick={() => setEnabled(v => !v)}
+                    onClick={() => {
+                        // iOS：之後在 timer 裡自動念的前提是先在使用者手勢內念過一次
+                        if (!enabled) unlockSpeech();
+                        setEnabled(v => !v);
+                    }}
                     aria-pressed={enabled}
                     className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full text-lg font-semibold transition-colors ${
                         enabled

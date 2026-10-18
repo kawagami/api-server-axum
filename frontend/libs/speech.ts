@@ -1,4 +1,5 @@
-// 瀏覽器內建 speechSynthesis 朗讀(vocab 單字發音、farm 語音導覽共用):不打外部 TTS、不放音檔。
+// 瀏覽器內建 speechSynthesis 朗讀(vocab 單字發音、farm 語音導覽、計時工具的整點報時與久坐提醒共用):
+// 不打外部 TTS、不放音檔。
 // 語音品質完全看使用者裝置裝了哪些 voice,所以只當「加分功能」——
 // 不支援就把按鈕藏起來,不要留一顆按了沒反應的鈕。
 
@@ -19,12 +20,16 @@ function pickVoice(lang: string): SpeechSynthesisVoice | undefined {
     );
 }
 
-/** 朗讀一段文字;連點只留最後一次,不疊音 */
-export function speakText(text: string, lang: string, rate = 1) {
+/**
+ * 朗讀一段文字。預設先清空佇列(連點只留最後一次,不疊音);
+ * `queue: true` 改成排在後面念 —— 同頁有多個各自計時的來源、可能剛好同時開口時用
+ * (計時工具的整點報時與久坐提醒),不然後到的會把先到的切掉。
+ */
+export function speakText(text: string, lang: string, rate = 1, { queue = false }: { queue?: boolean } = {}) {
     const content = text.trim();
     if (!canSpeak() || !content) return;
     const synth = window.speechSynthesis;
-    synth.cancel();
+    if (!queue) synth.cancel();
     const utterance = new SpeechSynthesisUtterance(content);
     utterance.lang = lang;
     utterance.rate = rate;
@@ -33,7 +38,7 @@ export function speakText(text: string, lang: string, rate = 1) {
     synth.speak(utterance);
 }
 
-/** 停止朗讀(離開頁面 / 關閉語音時) */
+/** 停止朗讀(離開頁面 / 關閉語音時)。瀏覽器只能清空整個佇列,同頁別的來源正在念的也會一起停 */
 export function stopSpeaking() {
     if (canSpeak()) window.speechSynthesis.cancel();
 }
