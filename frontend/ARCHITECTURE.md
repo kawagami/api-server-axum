@@ -371,6 +371,16 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 - **`(public)/loading.tsx` 是裸的 `Loader2` spinner，不是骨架**（2026-08-30）。它是整個前台的 fallback ——沒有自帶 `loading.tsx` 的頁全吃它，等於違反「前台資料頁一律用 `PublicPageSkeleton`」那條自家規則。`blogs/` 那 3 支自訂骨架則是**列明例外**（檔頭有註解：要對齊 blog 卡片／文章版面，`list`/`cards`/`form` 三種 variant 都套不上），別把它們一起改掉。
 - `vocab` 與 `vocab-ja` 的 page **重複已收斂**（2026-08-21）：資料抓取集中在 `vocab/load.ts` 的 `loadVocabPage(language)`，兩支 page 各剩約 20 行（只差 `language` 與 JMdict 標註）。仍有的是 `vocab-ja` 跨目錄 import `../vocab/{vocab-client,load}` —— 要徹底解掉得做成 `vocab/[lang]/page.tsx`，但兩頁路徑已對外（含 sitemap / site-nav），改動範圍遠大於剩下的重複量。
 
+### 未採用 Cache Components / Partial Prefetching（2026-10-20 評估，刻意延後）
+Next 16.3 的 Partial Prefetching、16.4 的 `navigation()` / `'use cache: private'` / `instant()`（`@next/playwright`）都**要先開 `cacheComponents: true` + `partialPrefetching: true`**；16.4 起 `create-next-app` 預設就開，官方主推這條路，遲早要遷。評估當下不做的理由是流量小、單機自架、1G RAM，回頭看到 skeleton 也不是痛點（已有 38 個 `loading.tsx`，預設 prefetch 抓到 loading 邊界就夠快）。真要遷時的阻礙，依處理順序：
+1. **root layout 讀 `cookies()`**（`app/layout.tsx`）：`<html>` 的 `dark` class、`hasSession` 都靠它。cacheComponents 下在 `<Suspense>` 外讀未快取資料會 build 失敗，而 `<html>` 包不進 Suspense —— 深淺色得改成 client 端讀 cookie（head inline script 已有 `followSystem` 的先例），`hasSession` 下放到 Suspense 內的 client 元件。
+2. **`(public)/layout.tsx` 也讀 `cookies()`**（member JWT 驗證 + 深淺色），同樣要拆進 Suspense。
+3. **next-intl 的 `getLocale()`** 讀 request，要改走 `params.locale` + `setRequestLocale`，牽動全部頁面。
+4. **自架的 `'use cache: remote'` 預設存 Node 記憶體**（沒設 `cacheHandlers.remote` 時），VPS 有 OOM 前科，要先決定上限或改接 Redis。
+5. 沒有 Playwright，`instant()` 防退化測試要從零建。
+
+遷完後的落點：先試 `blogs`（已用 `next: { tags }` + `updateTag`，換成 `'use cache'` + `cacheTag` 幾乎一對一），清單 → 文章頁用「hover / focus / touch 才把 `prefetch` 切成 `true`」避免整片預抓；member 頁（food-log、portfolio）用 `'use cache: private'` 讓上一頁不重抓。參考：Next.js blog「Improving navigation experience in v0 with Next.js 16.4」（2026-10-16）。
+
 ### 已查證「不是問題」，別再動
 - **avalon 的 `iAmHost` 用本地 `useState` 是正確的**，不是偷懶。後端 `games/common/room.rs` 依 `K::SEAT_IN_ROOM_UPDATE` 決定要不要逐人注入 `your_seat`，farm 設 `true`、avalon 吃預設 `false`；avalon 的 seat 從私有 `role_assigned` 拿，開局前只需要 host 旗標。而且 `room.rs` 的 `leave_room` 是 **host 離開＝解散房間**（`host_left`），所以「重整後回到房內但看不到開始按鈕」的情境不存在 —— 重整後根本沒有房可以回。farm 需要 `your_seat` 是因為它要判 `myTurn`（`current_player === mySeat`）且沒有私有訊息可夾帶。**兩邊的差異是設計，不是疏漏。**
 - i18n 三語系 key 完全同步（**981 / 981 / 981，40 個 namespace**，2026-10-18 計時工具加久坐提醒 `Sedentary` +15；2026-10-17 農場 UI 重做、飲食統計頁、移除越南大戰後是 966 / 39；2026-10-10 單字闖關特效與阿瓦隆對局畫面後是 902 / 39；2026-10-04 加飲食紀錄後是 875 / 39；2026-09-13 首頁補「最新文章」後是 822 / 38；2026-09-11 移除記帳／發票／樂透後是 819 / 38；2026-09-09 是 1050 / 42、2026-08-30 是 1045 / 42、2026-08-26 是 1027 / 42、2026-08-17 是 883 / 40、2026-07-31 是 865 / 39），namespace 與 code 中的用量雙向吻合，沒有孤兒 namespace。**靜態掃描會誤報約 152 個「沒人用」的 key，那些是 30 處動態組 key（`t(\`items.${key}\`)` 之類）**，刪之前務必逐一確認。
