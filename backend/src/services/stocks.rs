@@ -150,7 +150,29 @@ pub async fn get_stock_day_avg(
     stock_no: &str,
     date: NaiveDate,
 ) -> Result<StockDayAvgResponse, AppError> {
-    super::twse::fetch_stock_day_avg(request_client, stock_no, date).await
+    let response = super::twse::fetch_stock_day_avg(request_client, stock_no, date).await?;
+    ensure_stock_day_avg_ok(response, stock_no, date)
+}
+
+/// stat 非 OK → `InvalidContent`（呼叫端據此判定資料錯誤、不重試）。
+///
+/// 最常見的是查無資料：上櫃股、或轉上市前的月份（如 8908 欣雄 2026-10-16 才轉上市，
+/// 起始日在 9 月的庫藏股期間就會打到這裡）。系統只接 TWSE，這類股票目前算不出來。
+fn ensure_stock_day_avg_ok(
+    response: StockDayAvgResponse,
+    stock_no: &str,
+    date: NaiveDate,
+) -> Result<StockDayAvgResponse, AppError> {
+    if response.stat == "OK" {
+        return Ok(response);
+    }
+    let month = date.format("%Y-%m");
+    let msg = if response.stat.contains("沒有符合條件的資料") {
+        format!("TWSE STOCK_DAY_AVG 查無 {stock_no} {month} 資料（該月未在上市，可能是上櫃 / 轉上市前 / 已下市）")
+    } else {
+        format!("TWSE STOCK_DAY_AVG {stock_no} {month} 回應非 OK：stat={}", response.stat)
+    };
+    Err(RequestError::InvalidContent(msg).into())
 }
 
 pub fn parse_stock_day_avg_response(
@@ -401,6 +423,32 @@ pub async fn get_stock_buyback_periods(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stock_day_avg_no_data_is_explicit_invalid_content() {
+        // TWSE 真實回應（8908 於 2026-09，當時尚未上市）
+        let resp: StockDayAvgResponse =
+            serde_json::from_str(r#"{"stat":"很抱歉，沒有符合條件的資料!"}"#).unwrap();
+        let date = NaiveDate::from_ymd_opt(2026, 9, 1).unwrap();
+        let err = ensure_stock_day_avg_ok(resp, "8908", date).err().unwrap();
+        match err {
+            AppError::RequestError(RequestError::InvalidContent(msg)) => {
+                assert!(msg.contains("查無 8908 2026-09"), "{msg}");
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn stock_day_avg_ok_passes_through() {
+        let resp: StockDayAvgResponse = serde_json::from_str(
+            r#"{"stat":"OK","title":"t","fields":["日期","收盤價"],"data":[["115/10/16","40.20"]],"notes":[]}"#,
+        )
+        .unwrap();
+        let date = NaiveDate::from_ymd_opt(2026, 10, 16).unwrap();
+        let resp = ensure_stock_day_avg_ok(resp, "8908", date).unwrap();
+        assert_eq!(parse_stock_day_avg_response(resp, "8908").len(), 1);
+    }
 
     /// 取自 mopsov 真實回應（欄位縮成 11 個以外原樣：`class=` 後有空白、單引號、
     /// 巢狀 `<input>`、`&nbsp;` 空 cell）。中文字換成 ASCII，其餘不動。

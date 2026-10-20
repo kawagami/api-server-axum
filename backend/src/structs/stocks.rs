@@ -38,12 +38,19 @@ pub struct Conditions {
     pub offset: i64,
 }
 
+/// 查無資料時 TWSE 只回 `{"stat":"很抱歉，沒有符合條件的資料!"}`，其餘欄位全缺 ——
+/// 所以 stat 以外一律 `default`，讓呼叫端拿得到 stat 自己判斷，而不是被 serde 擋成
+/// 一句看不出原因的 `error decoding response body`
 #[derive(Serialize, Deserialize)]
 pub struct StockDayAvgResponse {
     pub stat: String,
+    #[serde(default)]
     pub title: String,
+    #[serde(default)]
     pub fields: Vec<String>,
+    #[serde(default)]
     pub data: Vec<Vec<String>>,
+    #[serde(default)]
     pub notes: Vec<String>,
 }
 

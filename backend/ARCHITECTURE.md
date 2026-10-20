@@ -208,6 +208,8 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 4. upsert 結果，status 改為 `completed`；失敗則改為 `failed`，廣播 `WsEvent::StockFailed`
 5. 成功廣播 `WsEvent::StockCompleted`
 
+- **只接 TWSE，上櫃股算不出來**：STOCK_DAY_AVG 查無資料時只回 `{"stat":"很抱歉，沒有符合條件的資料!"}`。`get_stock_day_avg` 檢查 stat，非 OK 一律回 `InvalidContent`，訊息帶股號與月份 → 判 failed、WARN。上櫃股，或期間跨到轉上市前的股票（實例：8908 欣雄 2026-10-16 轉上市，log 3651）都會走這條。2026-10-20 之前 `StockDayAvgResponse` 欄位都是必填，同一情況只會留下一句 `error decoding response body`，看起來像 TWSE 改版。要支援上櫃得另外接 TPEx。
+
 ### 其他操作
 
 | Endpoint | 說明 |
