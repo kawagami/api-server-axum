@@ -891,7 +891,7 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 
 **測試空缺**
 - ~~`services/portfolio.rs`（557 行，**0 測**）、還原公式逐字複製兩份~~（2026-09-08 隨期間增減一併處理：公式收斂成單一 `ex_adjust_factor`（`compute_latest` / `build_history` / `period_change` 共用），並補 6 個純函式測試 —— 全在 `changes` 那組（前一交易日基準、單日無增減、除息日不算大跌、週/月取不晚於目標日的最近交易日、太新的持股回 `None`、基準過舊寧可回 `None`））。**仍缺的是 `build_history` 自己的測試**（逐日還原成本那條路徑目前零覆蓋），以及下面那條金額算錯的 bug。
-- `games/common/room.rs`(413) + `common/service.rs`(523) —— 7 個遊戲共用的 ~940 行框架 **0 測試**，而本檔逐一列出 7 個 engine 的 76 個測試。框架已用 `outbox: Vec<(SocketAddr,String)>` 把 IO 隔離掉，測試不需要真 WS。**一個 bug 在這裡 = 7 個遊戲一起壞。**
+- `games/common/room.rs`(413) + `common/service.rs`(523) —— 7 個遊戲共用的 ~940 行框架 **0 測試**，而本檔逐一列出 7 個 engine 的 77 個測試。框架已用 `outbox: Vec<(SocketAddr,String)>` 把 IO 隔離掉，測試不需要真 WS。**一個 bug 在這裡 = 7 個遊戲一起壞。**
 - ~~`structs/pagination.rs::to_limit_offset`~~（2026-08-03 補了 4 個 clamp / page 邊界測試）；`structs/roles.rs` 的 `Perm::as_str`（缺 `Feature` 那種 round-trip 測試，permission string 打錯字 = **靜默 403**）；`services/twse.rs`；`services/vocab/engine.rs` 的 `pick_kind` 與 `resolve_duration_minutes`（同檔其他 8 個純函式有測 —— `exp_for_level` / `level_for_exp` / `answer_exp` / `difficulty_window` / `clamped_window` / `mask_sentence` / `period_start` / `streak_from_days`，這兩個漏）。
 
 **其他觀察**
@@ -905,6 +905,6 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 - migration 命名有兩套：38 個是手寫整點時間戳（`HHMMSS` = `000000`/`100000`…），但 `20260710155453_vocab_seed_ja_pilot` 與 `20260710162925_vocab_seed_ja_n5n4` 是 `sqlx migrate add` 生成的真實秒級時間戳。功能無害（排序仍正確），但下一位開發者不知道該用哪種。
 
 **已查證「不是問題」，別再動**
-- `AppStateInner` 封裝零違反；sync `RwLock` 跨 `.await` 零違反（三個 getter 都在同一 expression 內取完釋放，`get_settings()` 只 clone Arc）；Redis TTL 遺漏零筆（`cache_set` 把 `ttl_secs` 設成必填參數，型別層就不可能忘）；handler 內零 inline SQL；11 個 job 的四層註冊全對；7 個遊戲的 engine 測試數與本檔聲稱**完全相符**（2026-08-17 複驗，2026-09-11 重數仍是 76）；40 個 migration up/down 100% 成對（2026-10-06 重數）；vocab 多語言 language 零遺漏。
+- `AppStateInner` 封裝零違反；sync `RwLock` 跨 `.await` 零違反（三個 getter 都在同一 expression 內取完釋放，`get_settings()` 只 clone Arc）；Redis TTL 遺漏零筆（`cache_set` 把 `ttl_secs` 設成必填參數，型別層就不可能忘）；handler 內零 inline SQL；11 個 job 的四層註冊全對；7 個遊戲的 engine 測試數與本檔聲稱**完全相符**（2026-08-17 複驗，2026-09-11 重數仍是 76，2026-10-15 farm +1 後為 77）；40 個 migration up/down 100% 成對（2026-10-06 重數）；vocab 多語言 language 零遺漏。
 - **`#[serde(flatten)] PageQuery` 行不通**，別再嘗試（詳見 `structs/pagination.rs` 的註解）。
 - **直接依賴沒有「完全沒用到」的了**（2026-08-19 逐一掃過 41 個）：當時只揪出 `tokio-util`（src 零引用）、`futures-util`（與 `futures` 重複）、`reqwest` 的 `multipart` feature（multipart 只發生在 axum 收上傳那側），已於 commit `f205d7f` 砍掉；`scraper` 改 regex（`83d66fa`）。其餘全部有實際 `use`。⚠️ **`openssl` 是唯一「src 零引用但必留」的** —— 它存在只為替 `webauthn-rs-core` 的 transitive openssl 開 `vendored`，砍掉會回頭吃系統 libssl（見上面「依賴約束」）。⚠️ **刪 manifest 條目不等於少編一個 crate**：`tokio-util` / `futures-util` 被 redis / librqbit / axum / bb8 各自拉，那次三項合計 crate 數 **0 減少**（純 manifest 噪音）；真正減量要看「獨占 crate 數」（`scraper` -28、`tokio-cron-scheduler` -10）。
