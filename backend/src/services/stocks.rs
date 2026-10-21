@@ -154,7 +154,8 @@ pub async fn get_stock_day_avg(
     ensure_stock_day_avg_ok(response, stock_no, date)
 }
 
-/// stat 非 OK → `InvalidContent`（呼叫端據此判定資料錯誤、不重試）。
+/// stat 非 OK → `InvalidContent`。`consume_pending_stock_change` 據此判定資料錯誤、標 failed
+/// 不重試；`fetch_historical_closing_prices` 不分辨錯誤種類（見 ARCHITECTURE.md 技術債）。
 ///
 /// 最常見的是查無資料：上櫃股、或轉上市前的月份（如 8908 欣雄 2026-10-16 才轉上市，
 /// 起始日在 9 月的庫藏股期間就會打到這裡）。系統只接 TWSE，這類股票目前算不出來。
