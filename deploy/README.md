@@ -108,6 +108,18 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 
 **結論：瓶頸不在 origin（只佔 3%），而是 CF 免費方案把本站的網域丟到新加坡而非台灣節點。** 腳本會自動比對本站與 `cloudflare.com` 的 `cf-ray` 節點代碼並標出差異 —— 那個 baseline 代表「這條線路本來碰得到的最近節點」。
 
+2026-10-22 複測（HiNet 固網，起因是「瀏覽起來變慢」）—— **節點會漂移**，這次三個網域全落 **SJC 聖荷西**：
+
+| 量測點 | `/health` | `/zh-TW` |
+|---|---|---|
+| origin 直打容器 | ~0ms | 20ms |
+| origin 經 nginx+TLS（`perf-check.sh origin`） | 14.5ms | 37ms |
+| client 經 CF（SJC），TTFB 中位 | **585ms** | **612ms** |
+
+- 到邊緣 TCP 握手：本站 SJC 141ms、`cloudflare.com`（HKG）中位 72ms。SJC 握手比 7/25 的 SIN 還快，**但整體更慢**：`/health` 的 585ms ≈ TLS 完成 ~295ms + 你↔SJC 往返 141ms + SJC↔VPS 往返 ~135ms + origin 14ms —— 請求先飛美西再飛回 VPS。
+- origin 佔 2.5–6%，容器 CPU ≈0、記憶體遠低於上限；同時段 `system_metrics` CPU ~2.7%、steal ≈0。**感覺變慢時先跑這支看 colo，不要先查程式。**
+- 能改善的只有路由本身（Argo Smart Routing / 升級方案）；改 DNS-only 繞過 CF 會曝露 origin IP 並失去 DDoS / WAF / 快取，不採用。
+
 ## blog 搜尋限流（`search` zone，2026-08-27）
 
 `?q=` 的搜尋是全站最貴的公開查詢：列表端點的 `count` 那一半無法靠 LIMIT 提早結束，一個命中大量文章的常見詞 ≈ **60ms 的 PG CPU**（2026-08-27 實測，2000 篇 / 3MB 表）。general 的 30r/s 放進來就是單核吃滿。
