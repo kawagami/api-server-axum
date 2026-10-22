@@ -145,35 +145,56 @@ pub async fn get_buyback_stock_raw_html_string(
     .await
 }
 
+/// 查無資料也算錯（`InvalidContent`）的版本，給「要的就是那天的價格」的呼叫端：
+/// `consume_pending_stock_change` 據此判定資料錯誤、標 failed 不重試。
 pub async fn get_stock_day_avg(
     request_client: &Client,
     stock_no: &str,
     date: NaiveDate,
 ) -> Result<StockDayAvgResponse, AppError> {
-    let response = super::twse::fetch_stock_day_avg(request_client, stock_no, date).await?;
-    ensure_stock_day_avg_ok(response, stock_no, date)
+    get_stock_day_avg_or_none(request_client, stock_no, date)
+        .await?
+        .ok_or_else(|| {
+            let month = date.format("%Y-%m");
+            RequestError::InvalidContent(format!(
+                "TWSE STOCK_DAY_AVG 查無 {stock_no} {month} 資料（該月未在上市，可能是上櫃 / 轉上市前 / 已下市）"
+            ))
+            .into()
+        })
 }
 
-/// stat 非 OK → `InvalidContent`。`consume_pending_stock_change` 據此判定資料錯誤、標 failed
-/// 不重試；`fetch_historical_closing_prices` 不分辨錯誤種類（見 ARCHITECTURE.md 技術債）。
+/// `Ok(None)` = TWSE 明確回「查無資料」—— 只有這個代表「確認過這個月沒有」，可以記下來不再問。
+/// `Err` 的 `InvalidContent` 還包含狀態碼錯誤、decode 失敗（如被擋時回的 HTML）與其他 stat，
+/// 那些都可能是暫時的，**不能**拿 `InvalidContent` 當「查無資料」。
 ///
-/// 最常見的是查無資料：上櫃股、或轉上市前的月份（如 8908 欣雄 2026-10-16 才轉上市，
+/// 查無資料最常見的是上櫃股、或轉上市前的月份（如 8908 欣雄 2026-10-16 才轉上市，
 /// 起始日在 9 月的庫藏股期間就會打到這裡）。系統只接 TWSE，這類股票目前算不出來。
-fn ensure_stock_day_avg_ok(
+pub async fn get_stock_day_avg_or_none(
+    request_client: &Client,
+    stock_no: &str,
+    date: NaiveDate,
+) -> Result<Option<StockDayAvgResponse>, AppError> {
+    let response = super::twse::fetch_stock_day_avg(request_client, stock_no, date).await?;
+    classify_stock_day_avg(response, stock_no, date)
+}
+
+fn classify_stock_day_avg(
     response: StockDayAvgResponse,
     stock_no: &str,
     date: NaiveDate,
-) -> Result<StockDayAvgResponse, AppError> {
+) -> Result<Option<StockDayAvgResponse>, AppError> {
     if response.stat == "OK" {
-        return Ok(response);
+        return Ok(Some(response));
+    }
+    if response.stat.contains("沒有符合條件的資料") {
+        return Ok(None);
     }
     let month = date.format("%Y-%m");
-    let msg = if response.stat.contains("沒有符合條件的資料") {
-        format!("TWSE STOCK_DAY_AVG 查無 {stock_no} {month} 資料（該月未在上市，可能是上櫃 / 轉上市前 / 已下市）")
-    } else {
-        format!("TWSE STOCK_DAY_AVG {stock_no} {month} 回應非 OK：stat={}", response.stat)
-    };
-    Err(RequestError::InvalidContent(msg).into())
+    Err(RequestError::InvalidContent(format!(
+        "TWSE STOCK_DAY_AVG {stock_no} {month} 回應非 OK：stat={}",
+        response.stat
+    ))
+    .into())
 }
 
 pub fn parse_stock_day_avg_response(
@@ -426,17 +447,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn stock_day_avg_no_data_is_explicit_invalid_content() {
+    fn stock_day_avg_no_data_is_none() {
         // TWSE 真實回應（8908 於 2026-09，當時尚未上市）
         let resp: StockDayAvgResponse =
             serde_json::from_str(r#"{"stat":"很抱歉，沒有符合條件的資料!"}"#).unwrap();
         let date = NaiveDate::from_ymd_opt(2026, 9, 1).unwrap();
-        let err = ensure_stock_day_avg_ok(resp, "8908", date).err().unwrap();
-        match err {
-            AppError::RequestError(RequestError::InvalidContent(msg)) => {
-                assert!(msg.contains("查無 8908 2026-09"), "{msg}");
+        assert!(classify_stock_day_avg(resp, "8908", date).unwrap().is_none());
+    }
+
+    #[test]
+    fn stock_day_avg_other_stat_is_invalid_content_not_none() {
+        // 其他非 OK 的 stat 可能是暫時的，不能被當成「確認過沒有」記下來
+        let resp: StockDayAvgResponse = serde_json::from_str(r#"{"stat":"查詢日期大於今日"}"#).unwrap();
+        let date = NaiveDate::from_ymd_opt(2026, 9, 1).unwrap();
+        match classify_stock_day_avg(resp, "8908", date) {
+            Err(AppError::RequestError(RequestError::InvalidContent(msg))) => {
+                assert!(msg.contains("8908 2026-09"), "{msg}");
             }
-            other => panic!("unexpected: {other:?}"),
+            other => panic!("unexpected: {:?}", other.map(|r| r.is_some())),
         }
     }
 
@@ -447,7 +475,7 @@ mod tests {
         )
         .unwrap();
         let date = NaiveDate::from_ymd_opt(2026, 10, 16).unwrap();
-        let resp = ensure_stock_day_avg_ok(resp, "8908", date).unwrap();
+        let resp = classify_stock_day_avg(resp, "8908", date).unwrap().expect("有資料");
         assert_eq!(parse_stock_day_avg_response(resp, "8908").len(), 1);
     }
 

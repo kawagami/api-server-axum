@@ -208,7 +208,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 4. upsert 結果，status 改為 `completed`；失敗則改為 `failed`，廣播 `WsEvent::StockFailed`
 5. 成功廣播 `WsEvent::StockCompleted`
 
-- **只接 TWSE，上櫃股算不出來**：STOCK_DAY_AVG 查無資料時只回 `{"stat":"很抱歉，沒有符合條件的資料!"}`。`get_stock_day_avg` 檢查 stat，非 OK 一律回 `InvalidContent`，訊息帶股號與月份 → 判 failed、WARN。上櫃股，或期間跨到轉上市前的股票（實例：8908 欣雄 2026-10-16 轉上市，log 3651）都會走這條。2026-10-20 之前 `StockDayAvgResponse` 欄位都是必填，同一情況只會留下一句 `error decoding response body`，看起來像 TWSE 改版。要支援上櫃得另外接 TPEx。
+- **只接 TWSE，上櫃股算不出來**：STOCK_DAY_AVG 查無資料時只回 `{"stat":"很抱歉，沒有符合條件的資料!"}`。`get_stock_day_avg` 檢查 stat，非 OK 一律回 `InvalidContent`，訊息帶股號與月份 → 判 failed、WARN。上櫃股，或期間跨到轉上市前的股票（實例：8908 欣雄 2026-10-16 轉上市，log 3651）都會走這條。2026-10-20 之前 `StockDayAvgResponse` 欄位都是必填，同一情況只會留下一句 `error decoding response body`，看起來像 TWSE 改版。`FetchHistoricalClosingPrices`（補庫藏股起始日價格）遇到同樣情況則標記該期間 `start_price_unavailable_at`、不再回補（見技術債「其他觀察」）。要支援上櫃得另外接 TPEx。
 
 ### 其他操作
 
@@ -899,13 +899,13 @@ Method：GET、POST、PUT、DELETE、PATCH。Header：Authorization、Content-Ty
 **其他觀察**
 - `games/common/room.rs` 的 `start_check` 用 `h.rooms.get(&room_id).unwrap()`，而同檔 `remove_from_room` 對同一組查詢用 `let Some(...) else { return }` 防禦 —— 目前 invariant 成立故不可達，但兩種寫法並存。
 - `farm/hub.rs` 設 `SEAT_IN_ROOM_UPDATE = true`、avalon 吃預設 `false`，但註解說的成因（`common/room.rs` 的座位重編號）**兩個遊戲都有**。實際理由是 farm 要判 `myTurn`（`current_player == mySeat`）且沒有私有訊息可夾帶，avalon 的 seat 從私有 `role_assigned` 拿 —— ~~註解該改成這個理由~~（2026-09-07 commit `235d764` 已改，`farm/hub.rs` 現在寫的就是這個理由，並註明重編號解釋不了差異）。（前端 avalon 的 `iAmHost` 用本地 flag 是**正確的**，因為 host 離開＝解散房間，重整後沒有房可以回。）
-- `jobs/fetch_historical_closing_prices.rs` **不分辨錯誤種類**：每分鐘只取 `get_buybacks_missing_start_price` 最舊的一筆，`get_stock_day_avg` 失敗（含查無資料的 `InvalidContent`，即上櫃 / 轉上市前的股票）就記 ERROR 後 return —— 下一分鐘又撿同一筆，排在後面的全部補不到，直到那筆 `end_date` 過期（抓到資料但起始日 +3 天內仍無收盤價也一樣卡）。2026-10-21 查 production log（保留 14 天）零筆，目前未發生。修法方向：查無資料時記一筆「確認過沒有」，或失敗就改取下一筆。
+- ~~`jobs/fetch_historical_closing_prices.rs` 不分辨錯誤種類，查無資料的那筆每分鐘被重撿、卡住整條補價佇列~~（2026-10-21 修：`services/stocks.rs::get_stock_day_avg_or_none` 把 TWSE 明確回「查無資料」獨立成 `Ok(None)`，job 據此寫 `stock_buyback_periods.start_price_unavailable_at`（migration `20261021000000`）、記一筆 WARN，`get_buybacks_missing_start_price` 排除有標記的列；`ON CONFLICT` 只更新 `end_date`，每日同步不會清掉它）。⚠️ **不能拿 `InvalidContent` 當「查無資料」**：它還包含狀態碼錯誤與 decode 失敗（被擋時回 HTML），那些可能是暫時的，照舊 ERROR、下一分鐘重試。**仍會卡的殘餘情況**：抓到資料但起始日 +3 天內沒有收盤價（例如起始日落在月底連假，價格在下個月，而 job 只抓起始日那個月），目前沒遇過。
 - `services/vocab/answer.rs` 的 `member_id.expect("review mode requires member")` —— `run` 是從 Redis 反序列化來的，若曾寫入過 `mode=review` 且 `member_id=None` 的狀態就會 panic，該回 `AuthError::Unauthorized`。
 - `state.rs` 三次 `write()` 不是原子的，設定更新瞬間可能讀到混合狀態（影響輕微，設定更新極罕見）。~~`AppStateInner` 13 個欄位宣告 `pub`~~（2026-09-24 struct 與欄位全改私有；`AppState` 的 tuple 欄位本來就私有，所以封裝其實一直由編譯器守著，這次只是拿掉誤導的 `pub`）。
 - ~~job panic 不致命但**無痕**~~（已修：`scheduler.rs` 把 `job.run` 包在自己的 `tokio::spawn` 裡再 `await`，`e.is_panic()` 時把 payload 取出記 `error!` —— tokio-cron-scheduler 自己不 join handle，不包這層的話 panic 就只剩 runtime 預設 hook 印的那行 stderr，不進 tracing，而生產 image 無 shell。防重疊的 `running` guard 是 `MutexGuard`，unwind 時正常 drop，**不會卡死後續 tick**。）
 - `migrations/20260713000000_logs_retention.up.sql` 的註解寫「清理 job 見 `jobs/cleanup_logs.rs`」，該檔早已改名 `cleanup_observability.rs`。**不能改** —— sqlx 會驗已套用 migration 的 checksum，改了下次啟動直接失敗。已套用的 migration 內容（含註解）一律不可動。
-- `20260728000000_media_domain_backfill` 的 down 是**刻意 no-op**（註解說明反向替換會連新圖一起改壞），是 40 個 migration 中唯一一個 —— `sqlx migrate revert` 跑它會「成功」但什麼都沒回退。**此 migration 不可 revert，要回退請從備份還原。**
-- migration 命名有兩套：38 個是手寫整點時間戳（`HHMMSS` = `000000`/`100000`…），但 `20260710155453_vocab_seed_ja_pilot` 與 `20260710162925_vocab_seed_ja_n5n4` 是 `sqlx migrate add` 生成的真實秒級時間戳。功能無害（排序仍正確），但下一位開發者不知道該用哪種。
+- `20260728000000_media_domain_backfill` 的 down 是**刻意 no-op**（註解說明反向替換會連新圖一起改壞），是 41 個 migration 中唯一一個 —— `sqlx migrate revert` 跑它會「成功」但什麼都沒回退。**此 migration 不可 revert，要回退請從備份還原。**
+- migration 命名有兩套：39 個是手寫整點時間戳（`HHMMSS` = `000000`/`100000`…），但 `20260710155453_vocab_seed_ja_pilot` 與 `20260710162925_vocab_seed_ja_n5n4` 是 `sqlx migrate add` 生成的真實秒級時間戳。功能無害（排序仍正確），但下一位開發者不知道該用哪種。
 
 **已查證「不是問題」，別再動**
 - `AppStateInner` 封裝零違反；sync `RwLock` 跨 `.await` 零違反（三個 getter 都在同一 expression 內取完釋放，`get_settings()` 只 clone Arc）；Redis TTL 遺漏零筆（`cache_set` 把 `ttl_secs` 設成必填參數，型別層就不可能忘）；handler 內零 inline SQL；11 個 job 的四層註冊全對；7 個遊戲的 engine 測試數與本檔聲稱**完全相符**（2026-08-17 複驗，2026-09-11 重數仍是 76，2026-10-15 farm +1 後為 77）；40 個 migration up/down 100% 成對（2026-10-06 重數）；vocab 多語言 language 零遺漏。

@@ -2,6 +2,7 @@ use crate::{
     errors::AppError,
     structs::stocks::{BuybackRecord, StockBuybackInfo, StockBuybackMoreInfo, StockBuybackPeriod},
 };
+use chrono::NaiveDate;
 use sqlx::{Pool, Postgres};
 
 pub async fn bulk_insert_stock_buyback_periods(
@@ -97,10 +98,29 @@ pub async fn get_buybacks_missing_start_price(
         WHERE p.end_date > CURRENT_DATE
             AND start_date_price.close_price IS NULL
             AND p.start_date < CURRENT_DATE
+            AND p.start_price_unavailable_at IS NULL
         ORDER BY p.start_date ASC",
     )
     .fetch_all(pool)
     .await?)
+}
+
+/// TWSE 確認該期間起始月查無資料（上櫃 / 轉上市前）：記下來，`get_buybacks_missing_start_price`
+/// 不再撿它。只能在 `get_stock_day_avg_or_none` 回 `None` 時呼叫，其他錯誤可能是暫時的。
+pub async fn mark_buyback_start_price_unavailable(
+    pool: &Pool<Postgres>,
+    stock_no: &str,
+    start_date: NaiveDate,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE stock_buyback_periods SET start_price_unavailable_at = NOW()
+        WHERE stock_no = $1 AND start_date = $2",
+    )
+    .bind(stock_no)
+    .bind(start_date)
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
 pub async fn get_new_future_buybacks(
