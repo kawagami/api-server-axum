@@ -8,6 +8,8 @@ export interface Image {
   width: number | null;
   height: number | null;
   blur_data_url: string | null;
+  /** 實際落地的檔案大小；只有檔案已遺失的舊圖為 null */
+  size_bytes: number | null;
 }
 
 // Setting

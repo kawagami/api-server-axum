@@ -2,7 +2,7 @@ use crate::errors::{AppError, RequestError};
 use crate::structs::images::{ImageRecord, UrlPlaceholder};
 use sqlx::{PgConnection, Pool, Postgres};
 
-const RECORD_COLUMNS: &str = "id, storage_key, url, status, width, height, blur_data_url";
+const RECORD_COLUMNS: &str = "id, storage_key, url, status, width, height, blur_data_url, size_bytes";
 
 /// `owner_id = None` → 不過濾（super_admin 看全部）；`Some(id)` → 只列該擁有者。
 pub async fn get_all_images(
@@ -35,12 +35,13 @@ pub struct NewImage<'a> {
     pub width: i32,
     pub height: i32,
     pub blur_data_url: Option<&'a str>,
+    pub size_bytes: i64,
 }
 
 pub async fn insert_image(pool: &Pool<Postgres>, image: NewImage<'_>) -> Result<ImageRecord, AppError> {
     Ok(sqlx::query_as(&format!(
-        "INSERT INTO images (storage_key, url, owner_id, width, height, blur_data_url)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING {RECORD_COLUMNS}"
+        "INSERT INTO images (storage_key, url, owner_id, width, height, blur_data_url, size_bytes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING {RECORD_COLUMNS}"
     ))
     .bind(image.storage_key)
     .bind(image.url)
@@ -48,6 +49,7 @@ pub async fn insert_image(pool: &Pool<Postgres>, image: NewImage<'_>) -> Result<
     .bind(image.width)
     .bind(image.height)
     .bind(image.blur_data_url)
+    .bind(image.size_bytes)
     .fetch_one(pool)
     .await?)
 }
@@ -74,6 +76,22 @@ pub async fn get_placeholders_by_urls(
     .bind(urls)
     .fetch_all(pool)
     .await?)
+}
+
+/// 回填用：尚無檔案大小的圖片 (id, storage_key)。
+pub async fn list_missing_sizes(pool: &Pool<Postgres>) -> Result<Vec<(i32, String)>, AppError> {
+    Ok(sqlx::query_as("SELECT id, storage_key FROM images WHERE size_bytes IS NULL ORDER BY id")
+        .fetch_all(pool)
+        .await?)
+}
+
+pub async fn set_size(pool: &Pool<Postgres>, id: i32, size_bytes: i64) -> Result<(), AppError> {
+    sqlx::query("UPDATE images SET size_bytes = $2 WHERE id = $1")
+        .bind(id)
+        .bind(size_bytes)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn mark_images_active_by_urls_in_tx(

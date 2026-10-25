@@ -4,19 +4,19 @@ import { deleteImage } from '@/api/images';
 import { unwrapUpload, uploadErrorMessage, withUploadTimeout, type UploadProgress } from '@/libs/upload-limits';
 import { compressAndUploadEach } from '@/libs/client-image';
 import { DEFAULT_IMAGE_COMPRESS, type ImageCompressConfig } from '@/libs/image-config';
+import type { Image } from '@/types';
 
-export interface ManagedImage {
-    id: number;
-    url: string;
-    status: string;
-    blur_data_url: string | null;
-}
+export type ManagedImage = Pick<Image, 'id' | 'url' | 'status' | 'blur_data_url' | 'width' | 'height' | 'size_bytes'>;
+
+// 初始列表與上傳回應共用，欄位只在這裡挑一次
+const toManagedImage = ({ id, url, status, blur_data_url, width, height, size_bytes }: Image): ManagedImage =>
+    ({ id, url, status, blur_data_url, width, height, size_bytes });
 
 export const useImageManager = (
-    initialImages: ManagedImage[],
+    initialImages: Image[],
     compressConfig: ImageCompressConfig = DEFAULT_IMAGE_COMPRESS,
 ) => {
-    const [images, setImages] = useState<ManagedImage[]>(initialImages);
+    const [images, setImages] = useState<ManagedImage[]>(() => initialImages.map(toManagedImage));
     const [deletingImage, setDeletingImage] = useState<number | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -70,7 +70,7 @@ export const useImageManager = (
                 },
                 setUploadProgress,
                 (image, i) => {
-                    setImages((prev) => [...prev, { id: image.id, url: image.url, status: image.status, blur_data_url: image.blur_data_url }]);
+                    setImages((prev) => [...prev, toManagedImage(image)]);
                     // 已成功的移出選取，中途失敗時重按上傳只會送剩下的
                     const original = selectedFiles[i];
                     setSelectedFiles((prev) => prev.filter(f => f !== original));

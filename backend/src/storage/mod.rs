@@ -25,6 +25,13 @@ impl Storage {
         }
     }
 
+    /// 檔案大小（bytes）；目前只有舊圖回填 `size_bytes` 用到。
+    pub async fn size(&self, key: &str) -> Result<u64, LocalStorageError> {
+        match self {
+            Storage::Local(s) => s.size(key).await,
+        }
+    }
+
     pub async fn delete(&self, key: &str) -> Result<(), LocalStorageError> {
         match self {
             Storage::Local(s) => s.delete(key).await,

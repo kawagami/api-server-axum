@@ -7,10 +7,12 @@ import ImageGrid from '@/components/images/image-grid';
 import DeleteConfirmModal from '@/components/images/delete-confirm-modal';
 import PageHeader from '@/components/admin/page-header';
 import type { ImageCompressConfig } from '@/libs/image-config';
+import { formatBytes } from '@/libs/format-bytes';
+import type { Image } from '@/types';
 
 type Filter = 'all' | 'active' | 'unused';
 
-export default function ImageManager({ initialImages, compressConfig }: { initialImages: ManagedImage[]; compressConfig: ImageCompressConfig }) {
+export default function ImageManager({ initialImages, compressConfig }: { initialImages: Image[]; compressConfig: ImageCompressConfig }) {
     const {
         images, deletingImage, selectedFiles, isUploading, uploadProgress, uploadError, canUpload, copiedImage,
         fileInputRef, addFiles, imageChange, removeSelectedAt, removeSelectedImage, handleUpload, handleDelete, handleCopy,
@@ -24,6 +26,12 @@ export default function ImageManager({ initialImages, compressConfig }: { initia
         active: images.filter(i => i.status === 'active').length,
         unused: images.filter(i => i.status === 'unused').length,
     }), [images]);
+
+    // 只加總已知大小（size_bytes 為 null 的只有檔案遺失的舊圖）
+    const totalBytes = useMemo(() => {
+        const sum = (list: ManagedImage[]) => list.reduce((acc, i) => acc + (i.size_bytes ?? 0), 0);
+        return { all: sum(images), unused: sum(images.filter(i => i.status === 'unused')) };
+    }, [images]);
 
     const visibleImages = useMemo(
         () => (filter === 'all' ? images : images.filter(i => i.status === filter)),
@@ -44,7 +52,16 @@ export default function ImageManager({ initialImages, compressConfig }: { initia
 
     return (
         <div className="w-full flex flex-col gap-4">
-            <PageHeader title="圖片" description="上傳後複製網址貼進文章；未被引用的圖片會由排程清除" />
+            <PageHeader
+                title="圖片"
+                description="上傳後複製網址貼進文章；未被引用的圖片會由排程清除"
+                actions={
+                    <span className="text-sm text-neutral-500 dark:text-neutral-400 tabular-nums">
+                        共 {counts.all} 張 · {formatBytes(totalBytes.all)}
+                        {totalBytes.unused > 0 && `（未使用 ${formatBytes(totalBytes.unused)}）`}
+                    </span>
+                }
+            />
             <UploadSection
                 fileInputRef={fileInputRef}
                 selectedFiles={selectedFiles}

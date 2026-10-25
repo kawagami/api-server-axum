@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { Check, Copy, ImageOff, Trash2 } from 'lucide-react';
 import type { ManagedImage } from '@/hooks/useImageManager';
+import { formatBytes } from '@/libs/format-bytes';
 
 interface Props {
     images: ManagedImage[];
@@ -15,6 +16,16 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
     active: { label: '使用中', className: 'bg-primary-100 text-primary-700 dark:bg-primary-900/60 dark:text-primary-300' },
     unused: { label: '未使用', className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/60 dark:text-yellow-300' },
 };
+
+// 寬×高 · 大小 · 格式（格式取 URL 副檔名；欄位缺的段落略過）
+function imageMeta({ url, width, height, size_bytes }: ManagedImage): string {
+    const ext = url.match(/\.([a-z0-9]+)$/i)?.[1]?.toUpperCase();
+    return [
+        width && height ? `${width}×${height}` : null,
+        size_bytes != null ? formatBytes(size_bytes) : null,
+        ext,
+    ].filter(Boolean).join(' · ');
+}
 
 const ImageGrid = ({ images, copiedImage, onRequestDelete, onCopy, emptyHint }: Props) => {
     if (images.length === 0) {
@@ -55,6 +66,9 @@ const ImageGrid = ({ images, copiedImage, onRequestDelete, onCopy, emptyHint }: 
                                 </span>
                             )}
                         </div>
+                        <p className="px-3 pt-2 text-xs text-neutral-500 dark:text-neutral-400 tabular-nums truncate">
+                            {imageMeta(image) || '—'}
+                        </p>
                         <div className="flex items-center gap-1 p-2 border-t border-neutral-100 dark:border-neutral-700">
                             <button
                                 onClick={() => onCopy(image.url)}

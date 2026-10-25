@@ -147,6 +147,39 @@ pub fn process_image(data: &[u8], quality: f32, passthrough_max_edge: u32) -> Re
     Ok(ProcessedImage { bytes: webp.to_vec(), ext: "webp", placeholder })
 }
 
+/// 舊圖回填檔案大小（欄位是 2026-10-26 才加的）。啟動時由 `routes.rs` spawn 跑一次。
+/// 只讀檔案 metadata 不 decode，成本可忽略；檔案已遺失的列維持 NULL（前端顯示「—」）。
+pub async fn backfill_sizes(pool: &Pool<Postgres>, storage: &Storage) {
+    let rows = match images_repo::list_missing_sizes(pool).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("backfill_sizes 查詢失敗: {e}");
+            return;
+        }
+    };
+    let (mut filled, mut failed) = (0usize, Vec::new());
+    for (id, storage_key) in rows {
+        let result = async {
+            let size = storage
+                .size(&storage_key)
+                .await
+                .map_err(|e| SystemError::Internal(format!("讀取檔案大小失敗: {e}")))?;
+            images_repo::set_size(pool, id, size as i64).await
+        }
+        .await;
+        match result {
+            Ok(()) => filled += 1,
+            Err(e) => failed.push(format!("#{id} {storage_key}: {e}")),
+        }
+    }
+    if filled > 0 {
+        tracing::info!("backfill_sizes: 補齊 {filled} 張");
+    }
+    if !failed.is_empty() {
+        tracing::warn!("backfill_sizes: {} 張失敗（維持 NULL）: {}", failed.len(), failed.join("; "));
+    }
+}
+
 pub async fn get_images(pool: &Pool<Postgres>, owner_id: Option<i64>) -> Result<Vec<ImageRecord>, AppError> {
     images_repo::get_all_images(pool, owner_id).await
 }
@@ -233,6 +266,8 @@ pub async fn upload_image(
                 width: p.width,
                 height: p.height,
                 blur_data_url: p.blur_data_url.as_deref(),
+                // ≤ 全域 body 上限 10MB，轉 i64 不會溢位
+                size_bytes: processed.bytes.len() as i64,
             },
         )
         .await;
