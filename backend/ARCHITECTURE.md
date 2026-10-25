@@ -149,10 +149,10 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 | `line_redirect_url` | `oauth` | LINE OAuth Redirect URL | 即時 |
 | `cors_allowed_origins` | `cors` | CORS 允許來源（逗號分隔）。PATCH 會驗每項為 `http(s)://host[:port]` 且**拒絕 `*`** —— `AllowOrigin::list` 遇到 `*` 會 panic，而 CORS 只在啟動時讀，設錯要到下次重啟才炸成無限重啟迴圈 | 重啟 |
 | `upload_base_url` | `storage` | Upload Base URL | 即時 |
-| `image_webp_quality` | `storage` | 後端 WebP 重編碼品質（1–100，只後端讀，不公開） | 即時 |
+| `image_webp_quality` | `storage` | 後端 WebP 重編碼品質（1–100，只後端讀，不公開）；原檔保留的 WebP 不受影響 | 即時 |
 | `image_client_compress` | `storage` | 前端上傳前壓縮開關（`true`/`false`，走 PUBLIC_KEYS 下發） | 即時 |
 | `image_client_quality` | `storage` | 前端壓縮品質（1–100，公開） | 即時 |
-| `image_client_max_edge` | `storage` | 前端壓縮長邊上限 px（公開） | 即時 |
+| `image_client_max_edge` | `storage` | 前端壓縮長邊上限 px（公開）；後端也拿它當 WebP 原檔保留的長邊上限 | 即時 |
 | `smtp_username` | `notification` | Gmail 寄件帳號 | 即時 |
 | `smtp_password` | `notification` | Gmail App Password。**write-only**：`GET /admin/settings` 回 `********`，PATCH 仍可寫入（`SECRET_KEYS`） | 即時 |
 | `notify_email` | `notification` | 通知收件信箱（空白 = 同寄件帳號） | 即時 |
@@ -566,7 +566,8 @@ pub async fn run(state: AppState) {
 圖片驗證/轉檔在 `services/images.rs::process_image`（storage 不做內容驗證）:
 - 用 `image` crate 實際 decode 驗證「真的是圖片」,非圖片/損毀/超限回 400,不落磁碟
 - 上限:單邊 16383px（= libwebp 上限）、總像素 40MP、decode alloc 128MB — 三者都是擋 decode-bomb / OOM（1核1G VPS）
-- 統一轉 lossy WebP（`webp` crate / libwebp）,順帶剝除 EXIF;GIF 例外:驗證後保留原檔（避免動畫被壓成第一幀）。品質從 `app_settings.image_webp_quality`（1–100）即時讀,route 讀值 clamp 後傳入 `process_image(data, quality)`,缺失/壞值 fallback `DEFAULT_WEBP_QUALITY`=80
+- 統一轉 lossy WebP（`webp` crate / libwebp）,順帶剝除 EXIF;GIF 例外:驗證後保留原檔（避免動畫被壓成第一幀）。品質從 `app_settings.image_webp_quality`（1–100）即時讀,route 讀值 clamp 後傳入 `process_image(data, quality, passthrough_max_edge)`,缺失/壞值 fallback `DEFAULT_WEBP_QUALITY`=80
+- **WebP 原檔保留（2026-10-25）**:前端上傳前已縮圖轉 WebP q80,後端再重編一次等於二次有損 + 白燒 1 核的 encode。故「已是 WebP、長邊 ≤ `image_client_max_edge`（與前端縮圖上限同值,fallback 2560）、`is_clean_webp` 通過」三條件全中就存原 bytes,不重編。`is_clean_webp` 是 RIFF chunk **白名單**（`VP8 `/`VP8L`/`VP8X`/`ALPH`/`ICCP`）+ RIFF 長度須與檔案長度完全相等:EXIF/XMP（GPS 洩漏）、ANIM/ANMF（動畫,維持壓成第一幀的舊行為）、未知 chunk 與尾端夾帶資料（polyglot）一律退回重編碼。decode 驗證、尺寸/像素上限、placeholder 兩條路徑都照做。⚠️ 前端跳過壓縮的情況（≤512KB、壓縮關閉、Safari 出 jpeg）仍會重編,Safari 那條是兩次有損
 - CPU 密集,caller 一律包 `spawn_blocking`（1 核機上同步跑會佔住 async worker,慣例同 auth.rs 的 bcrypt）。目前的 `spawn_blocking` 點:`services/auth.rs` 的 bcrypt 三處、`services/images.rs::process_image`、`services/tools.rs::convert_text` 的 zhconv（2026-07-31 補，2026-08-31 由 route 搬進 service）。**公開端點另外要限輸入長度**——全域 body 上限是 10MB,對單筆計算來說過寬;`convert_text` 限 256KB（實測 zhconv 0.4.1 的 CPU 成本不高:10MB≈28ms、1MB≈2.5ms,所以那個上限主要是擋 1 核 1G 機器上的記憶體,不是 CPU）。**還沒包的**:`services/stocks.rs::parse_buyback_stock_raw_html` 的 regex 走訪（只在排程時發生、非使用者可觸發,故暫留;2026-08-19 前是 `scraper` 的 `Html::parse_document`）
 - multipart 只處理有 `file_name` 的欄位,文字欄位跳過
 

@@ -3,7 +3,9 @@ import { DEFAULT_IMAGE_COMPRESS, type ImageCompressConfig } from '@/libs/image-c
 
 // 上傳前在瀏覽器端縮圖 + 轉 WebP,大幅縮小上傳流量與後端轉檔負擔。
 // 長邊上限與品質由後端設定（image_client_max_edge / image_client_quality）下發,預設 2560px / q80。
-// 這只是最佳化,不是信任邊界——後端 process_image 的 decode 驗證/重編照舊,送什麼都會被驗。
+// 這只是最佳化,不是信任邊界——後端 process_image 照樣 decode 驗證,送什麼都會被驗。
+// 這裡產出的乾淨 WebP(長邊 ≤ image_client_max_edge)後端會原檔保留,這是唯一一次有損壓縮;
+// 其他情況(jpeg/png/原檔)後端重編成 WebP。
 // 任何一步失敗都回傳原檔,交給後端處理(行為等同未壓縮的舊流程)。
 // 小檔壓縮效益低,跳過以免多一次失真
 const SKIP_BYTES = 512 * 1024;
@@ -36,7 +38,7 @@ export async function compressImage(
         let blob = await toBlob(canvas, 'image/webp', quality);
         if (!blob || blob.type !== 'image/webp') {
             // Safari 的 toBlob 不支援 webp(會默默回 png)。PNG 來源改出 png 保留透明度
-            // (仍享縮圖效益),其他出 jpeg(後端會再轉 webp)
+            // (仍享縮圖效益),其他出 jpeg(後端會再轉 webp,等於兩次有損)
             blob = file.type === 'image/png'
                 ? await toBlob(canvas, 'image/png', quality)
                 : await toBlob(canvas, 'image/jpeg', quality);
@@ -56,7 +58,7 @@ export async function compressImage(
  * 正好做下一張的解碼/編碼),總時間 ≈ max(壓縮總時, 上傳總時) 而非兩者相加。
  * 順序保持(onUploaded 依 index 循序觸發);單檔超限(大 GIF/解不開退回的原檔)
  * 在輪到該張時丟錯中斷,已完成的張數不受影響。
- * config.enabled=false 時跳過壓縮,直接送原檔(後端仍會驗證+轉檔)。
+ * config.enabled=false 時跳過壓縮,直接送原檔(後端仍會驗證;非乾淨 WebP 會轉檔)。
  */
 export async function compressAndUploadEach<T>(
     files: File[],

@@ -54,7 +54,21 @@ async fn upload_image(
         .get("image_webp_quality")
         .and_then(|v| v.parse::<f32>().ok())
         .unwrap_or(images_service::DEFAULT_WEBP_QUALITY);
-    let record = images_service::upload_image(state.get_pool(), state.get_storage(), &base_url, Some(auth_user.id), quality, multipart).await?;
+    // 與前端縮圖上限同值：前端縮過的 WebP 長邊必 ≤ 此值，後端才會原檔保留不重編
+    let passthrough_max_edge = settings
+        .get("image_client_max_edge")
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(images_service::DEFAULT_PASSTHROUGH_MAX_EDGE);
+    let record = images_service::upload_image(
+        state.get_pool(),
+        state.get_storage(),
+        &base_url,
+        Some(auth_user.id),
+        quality,
+        passthrough_max_edge,
+        multipart,
+    )
+    .await?;
     // 回整筆 ImageRecord（與 GET 列表同形）：前端把它直接併進列表，缺 status 會讓
     // active / unused 統計漏算這張，直到重新整理
     Ok((StatusCode::CREATED, Json(record)))

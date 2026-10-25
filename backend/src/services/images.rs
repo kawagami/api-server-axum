@@ -18,6 +18,12 @@ const MAX_DIMENSION: u32 = 16383;
 const MAX_PIXELS: u64 = 40_000_000;
 /// lossy WebP 預設品質（0-100）；設定缺失/無法解析時的 fallback。
 pub const DEFAULT_WEBP_QUALITY: f32 = 80.0;
+/// 原檔保留的長邊上限預設值；與 `image_client_max_edge` 的 migration 預設一致。
+pub const DEFAULT_PASSTHROUGH_MAX_EDGE: u32 = 2560;
+/// 原檔保留時允許出現的 RIFF chunk（白名單）：影像資料 + 透明度 + 色彩描述檔。
+/// EXIF / XMP（metadata 洩漏）、ANIM / ANMF（動畫，維持舊行為壓成第一幀）與未知 chunk
+/// （可藏任意 payload）一律不在其中，出現就走重編碼。
+const PASSTHROUGH_CHUNKS: [&[u8; 4]; 5] = [b"VP8 ", b"VP8L", b"VP8X", b"ALPH", b"ICCP"];
 /// 模糊預覽小圖的長邊 px。next/image 會自己放大 + 高斯模糊，官方建議 ≤10px 級；
 /// 16px 的 WebP 約 100–200 bytes，base64 後隨 blog 內文 JSON 一起下發仍可忽略。
 const BLUR_MAX_EDGE: u32 = 16;
@@ -71,18 +77,48 @@ fn make_placeholder(img: &DynamicImage) -> ImagePlaceholder {
     ImagePlaceholder { width: img.width() as i32, height: img.height() as i32, blur_data_url }
 }
 
-/// 驗證 bytes 確實是可解碼的圖片，並重編碼為 lossy WebP。
+/// WebP 的 RIFF 結構是否乾淨到可以原檔保留：RIFF 長度與實際 bytes 完全吻合（無尾端夾帶），
+/// 且每個 chunk 都在 `PASSTHROUGH_CHUNKS` 白名單內。任何解析不過一律回 false（交給重編碼）。
+fn is_clean_webp(data: &[u8]) -> bool {
+    if data.len() < 12 || &data[0..4] != b"RIFF" || &data[8..12] != b"WEBP" {
+        return false;
+    }
+    let riff_len = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
+    if riff_len.checked_add(8) != Some(data.len()) {
+        return false;
+    }
+    let mut pos = 12;
+    while pos < data.len() {
+        let Some(header) = data.get(pos..pos + 8) else { return false };
+        if !PASSTHROUGH_CHUNKS.iter().any(|c| &header[0..4] == *c) {
+            return false;
+        }
+        let size = u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize;
+        // chunk payload 補齊到偶數長度
+        let Some(next) = size.checked_add(size & 1).and_then(|s| s.checked_add(pos + 8)) else { return false };
+        if next > data.len() {
+            return false;
+        }
+        pos = next;
+    }
+    true
+}
+
+/// 驗證 bytes 確實是可解碼的圖片，並轉成 lossy WebP（或在安全時保留原檔）。
 ///
 /// - 用 `image` crate 實際 decode 一次 = 最強的「真的是圖片」驗證（不是只看副檔名/magic bytes）。
 /// - 非圖片、損毀、尺寸/像素超限 → `InvalidContent`（400），不會存進磁碟。
 /// - GIF 例外：decode 驗證後保留原檔（重編碼只會取第一幀，動畫會被毀掉）。
-/// - libwebp encoder 僅收 RGB8 / RGBA8，故先依有無 alpha 正規化色彩型別。
-/// - 重編碼順帶剝除 EXIF 等 metadata。
-/// - `quality`（0–100）為 WebP 品質，由 caller 從 `app_settings.image_webp_quality` 傳入。
+/// - 已是 WebP、長邊 ≤ `passthrough_max_edge` 且 RIFF 結構乾淨（`is_clean_webp`）→ 保留原檔。
+///   這是前端壓縮過的常態路徑：避免二次有損壓縮，也省掉最吃 CPU 的 encode。
+/// - 其餘重編碼為 lossy WebP；libwebp encoder 僅收 RGB8 / RGBA8，故先依有無 alpha 正規化色彩型別。
+/// - 重編碼順帶剝除 EXIF 等 metadata（保留原檔的路徑則由白名單保證不帶 metadata）。
+/// - `quality`（0–100）為重編碼品質，由 caller 從 `app_settings.image_webp_quality` 傳入；
+///   `passthrough_max_edge` 從 `app_settings.image_client_max_edge` 傳入（與前端縮圖上限同一個值）。
 /// - 順手產生模糊預覽（`placeholder`），圖已 decode 在手，成本只剩一次縮圖。
 ///
 /// CPU 密集（decode + encode 可達秒級），caller 必須包在 `spawn_blocking` 執行。
-pub fn process_image(data: &[u8], quality: f32) -> Result<ProcessedImage, AppError> {
+pub fn process_image(data: &[u8], quality: f32, passthrough_max_edge: u32) -> Result<ProcessedImage, AppError> {
     let (img, format) = decode_limited(data)?;
 
     // GIF 可能是動畫，重編碼會只剩第一幀；decode 已驗證合法，原檔直接保留
@@ -96,6 +132,10 @@ pub fn process_image(data: &[u8], quality: f32) -> Result<ProcessedImage, AppErr
     }
 
     let placeholder = make_placeholder(&img);
+    if format == Some(ImageFormat::WebP) && w.max(h) <= passthrough_max_edge && is_clean_webp(data) {
+        return Ok(ProcessedImage { bytes: data.to_vec(), ext: "webp", placeholder });
+    }
+
     let quality = quality.clamp(1.0, 100.0);
     let webp = if img.color().has_alpha() {
         webp::Encoder::from_rgba(&img.into_rgba8(), w, h).encode_simple(false, quality)
@@ -154,6 +194,7 @@ pub async fn upload_image(
     base_url: &str,
     owner_id: Option<i64>,
     quality: f32,
+    passthrough_max_edge: u32,
     mut multipart: Multipart,
 ) -> Result<ImageRecord, AppError> {
     while let Some(field) = multipart
@@ -173,7 +214,7 @@ pub async fn upload_image(
             .map_err(|e| RequestError::MultipartError(e.into()))?;
 
         // CPU 密集的 decode + encode 走 spawn_blocking，不卡住 tokio worker（1 核機上會凍結全站）
-        let processed = tokio::task::spawn_blocking(move || process_image(&data, quality))
+        let processed = tokio::task::spawn_blocking(move || process_image(&data, quality, passthrough_max_edge))
             .await
             .map_err(|e| SystemError::Internal(format!("圖片處理任務失敗: {e}")))??;
 
@@ -219,7 +260,7 @@ mod tests {
     #[test]
     fn valid_png_becomes_webp() {
         for alpha in [false, true] {
-            let processed = process_image(&make_png(4, 4, alpha), DEFAULT_WEBP_QUALITY).unwrap();
+            let processed = process_image(&make_png(4, 4, alpha), DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap();
             assert_eq!(processed.ext, "webp", "alpha={alpha}");
             // RIFF....WEBP 檔頭確認確實編成 WebP
             assert_eq!(&processed.bytes[0..4], b"RIFF", "alpha={alpha}");
@@ -235,7 +276,7 @@ mod tests {
         let mut gif = Vec::new();
         img.write_to(&mut Cursor::new(&mut gif), ImageFormat::Gif).unwrap();
 
-        let processed = process_image(&gif, DEFAULT_WEBP_QUALITY).unwrap();
+        let processed = process_image(&gif, DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap();
         assert_eq!(processed.ext, "gif");
         assert_eq!(processed.bytes, gif); // 原檔 byte-for-byte 保留（動畫不被壓平）
     }
@@ -251,7 +292,7 @@ mod tests {
     #[test]
     fn placeholder_keeps_original_size_and_aspect() {
         for alpha in [false, true] {
-            let processed = process_image(&make_png(400, 100, alpha), DEFAULT_WEBP_QUALITY).unwrap();
+            let processed = process_image(&make_png(400, 100, alpha), DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap();
             let p = &processed.placeholder;
             assert_eq!((p.width, p.height), (400, 100), "alpha={alpha}");
             // 長邊縮到 BLUR_MAX_EDGE，比例維持 4:1
@@ -265,14 +306,14 @@ mod tests {
         let mut gif = Vec::new();
         img.write_to(&mut Cursor::new(&mut gif), ImageFormat::Gif).unwrap();
 
-        let p = process_image(&gif, DEFAULT_WEBP_QUALITY).unwrap().placeholder;
+        let p = process_image(&gif, DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap().placeholder;
         assert_eq!((p.width, p.height), (30, 60));
         assert_eq!(blur_dimensions(&p), (BLUR_MAX_EDGE / 2, BLUR_MAX_EDGE));
     }
 
     #[test]
     fn non_image_bytes_are_rejected() {
-        let err = process_image(b"this is definitely not an image", DEFAULT_WEBP_QUALITY).unwrap_err();
+        let err = process_image(b"this is definitely not an image", DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap_err();
         assert!(matches!(err, AppError::RequestError(RequestError::InvalidContent(_))));
     }
 
@@ -280,14 +321,109 @@ mod tests {
     fn truncated_image_is_rejected() {
         let mut png = make_png(8, 8, false);
         png.truncate(png.len() / 2); // 砍半 = 損毀
-        let err = process_image(&png, DEFAULT_WEBP_QUALITY).unwrap_err();
+        let err = process_image(&png, DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap_err();
         assert!(matches!(err, AppError::RequestError(RequestError::InvalidContent(_))));
     }
 
     #[test]
     fn oversized_dimension_is_rejected() {
         // 寬 > 16383（libwebp 上限），decode 階段就該以 400 擋下,而不是編碼時 500
-        let err = process_image(&make_png(MAX_DIMENSION + 1, 1, false), DEFAULT_WEBP_QUALITY).unwrap_err();
+        let err = process_image(&make_png(MAX_DIMENSION + 1, 1, false), DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap_err();
         assert!(matches!(err, AppError::RequestError(RequestError::InvalidContent(_))));
+    }
+
+    /// 漸層（非純色）lossy WebP，確保不同品質重編碼出來的 bytes 一定不同
+    fn make_webp(w: u32, h: u32) -> Vec<u8> {
+        let img = image::RgbImage::from_fn(w, h, |x, y| image::Rgb([(x * 30) as u8, (y * 60) as u8, 100]));
+        webp::Encoder::from_rgb(&img, w, h).encode(95.0).to_vec()
+    }
+
+    /// 以給定 chunk 組出 RIFF/WEBP 容器（payload 奇數長度補 0）
+    fn riff(chunks: &[(&[u8; 4], &[u8])]) -> Vec<u8> {
+        let mut body = b"WEBP".to_vec();
+        for (fourcc, payload) in chunks {
+            body.extend_from_slice(*fourcc);
+            body.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+            body.extend_from_slice(payload);
+            if payload.len() % 2 == 1 {
+                body.push(0);
+            }
+        }
+        let mut out = b"RIFF".to_vec();
+        out.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        out.extend_from_slice(&body);
+        out
+    }
+
+    /// simple 格式 WebP 的 VP8 chunk payload
+    fn vp8_payload(simple: &[u8]) -> &[u8] {
+        assert_eq!(&simple[12..16], b"VP8 ");
+        let size = u32::from_le_bytes(simple[16..20].try_into().unwrap()) as usize;
+        &simple[20..20 + size]
+    }
+
+    /// VP8X（extended 格式）header payload：flags + 3 bytes 保留 + 畫布寬高減一（各 24-bit LE）
+    fn vp8x(flags: u8, w: u32, h: u32) -> Vec<u8> {
+        let mut p = vec![flags, 0, 0, 0];
+        p.extend_from_slice(&(w - 1).to_le_bytes()[..3]);
+        p.extend_from_slice(&(h - 1).to_le_bytes()[..3]);
+        p
+    }
+
+    #[test]
+    fn clean_webp_is_kept_as_original() {
+        let webp = make_webp(8, 4);
+        let processed = process_image(&webp, DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap();
+        assert_eq!(processed.ext, "webp");
+        assert_eq!(processed.bytes, webp); // 不二次有損壓縮
+        assert_eq!((processed.placeholder.width, processed.placeholder.height), (8, 4));
+    }
+
+    #[test]
+    fn webp_over_max_edge_is_reencoded() {
+        let webp = make_webp(8, 4);
+        let processed = process_image(&webp, 10.0, 4).unwrap();
+        assert_eq!(processed.ext, "webp");
+        assert_ne!(processed.bytes, webp);
+    }
+
+    #[test]
+    fn webp_with_exif_is_reencoded() {
+        let simple = make_webp(8, 4);
+        let with_exif = riff(&[
+            (b"VP8X", &vp8x(0x08, 8, 4)), // 0x08 = EXIF flag
+            (b"VP8 ", vp8_payload(&simple)),
+            (b"EXIF", b"Exif\0\0GPS-would-be-here"),
+        ]);
+        assert!(image::load_from_memory(&with_exif).is_ok(), "測試素材本身要是合法 WebP");
+
+        let processed = process_image(&with_exif, DEFAULT_WEBP_QUALITY, DEFAULT_PASSTHROUGH_MAX_EDGE).unwrap();
+        assert_eq!(processed.ext, "webp");
+        assert!(!processed.bytes.windows(4).any(|w| w == b"EXIF"), "EXIF 應被重編碼剝掉");
+        assert!(is_clean_webp(&processed.bytes));
+    }
+
+    #[test]
+    fn clean_webp_check_rejects_unsafe_structure() {
+        let simple = make_webp(8, 4);
+        let vp8 = vp8_payload(&simple);
+        assert!(is_clean_webp(&simple));
+        // ICCP 在白名單內；奇數長度 payload 的補位要算對
+        assert!(is_clean_webp(&riff(&[(b"VP8X", &vp8x(0x20, 8, 4)), (b"ICCP", b"odd"), (b"VP8 ", vp8)])));
+
+        let mut trailing = simple.clone();
+        trailing.extend_from_slice(b"<html>"); // RIFF 長度之外夾帶資料
+        assert!(!is_clean_webp(&trailing));
+        assert!(!is_clean_webp(&riff(&[(b"VP8 ", vp8), (b"XMP ", b"<x:xmpmeta/>")])));
+        assert!(!is_clean_webp(&riff(&[(b"VP8 ", vp8), (b"ZZZZ", b"anything")])));
+        assert!(!is_clean_webp(&riff(&[(b"VP8X", &vp8x(0x02, 8, 4)), (b"ANIM", &[0; 6])])));
+
+        let mut truncated = riff(&[(b"VP8 ", vp8)]);
+        truncated.truncate(truncated.len() - 1);
+        let len = (truncated.len() - 8) as u32; // RIFF 長度對得上，但 chunk 宣稱的長度超出檔尾
+        truncated[4..8].copy_from_slice(&len.to_le_bytes());
+        assert!(!is_clean_webp(&truncated));
+
+        assert!(!is_clean_webp(&make_png(4, 4, false)));
     }
 }
