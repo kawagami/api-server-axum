@@ -4,7 +4,7 @@ use sqlx::FromRow;
 /// `images` 表的一列，同時是 `GET /admin/images` 的回應型別。
 /// `width` / `height` / `blur_data_url` 為模糊預覽用。上傳一定寫入寬高（欄位 nullable 只因 2026-09-30
 /// 才加欄、舊列已回填）；`blur_data_url` 在小圖編碼失敗時為 None。
-/// `size_bytes` 是實際落地的檔案大小（2026-10-26 加欄，舊列由 `backfill_sizes` 回填；檔案遺失的列為 None）。
+/// `size_bytes` 是實際落地的檔案大小（2026-10-26 加欄、舊列已回填；上傳一定寫入，欄位 nullable 只因後加）。
 #[derive(Serialize, FromRow)]
 pub struct ImageRecord {
     pub id: i32,

@@ -32,13 +32,6 @@ impl LocalStorage {
         Ok((key, url))
     }
 
-    pub async fn size(&self, key: &str) -> Result<u64, LocalStorageError> {
-        if !key_is_valid(key) {
-            return Err(LocalStorageError::InvalidKey(key.to_string()));
-        }
-        Ok(fs::metadata(self.base_path.join(key)).await?.len())
-    }
-
     pub async fn delete(&self, key: &str) -> Result<(), LocalStorageError> {
         if !key_is_valid(key) {
             return Err(LocalStorageError::InvalidKey(key.to_string()));

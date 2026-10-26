@@ -78,22 +78,6 @@ pub async fn get_placeholders_by_urls(
     .await?)
 }
 
-/// 回填用：尚無檔案大小的圖片 (id, storage_key)。
-pub async fn list_missing_sizes(pool: &Pool<Postgres>) -> Result<Vec<(i32, String)>, AppError> {
-    Ok(sqlx::query_as("SELECT id, storage_key FROM images WHERE size_bytes IS NULL ORDER BY id")
-        .fetch_all(pool)
-        .await?)
-}
-
-pub async fn set_size(pool: &Pool<Postgres>, id: i32, size_bytes: i64) -> Result<(), AppError> {
-    sqlx::query("UPDATE images SET size_bytes = $2 WHERE id = $1")
-        .bind(id)
-        .bind(size_bytes)
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
 pub async fn mark_images_active_by_urls_in_tx(
     conn: &mut PgConnection,
     urls: &[String],
