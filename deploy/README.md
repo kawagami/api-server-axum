@@ -71,7 +71,7 @@ sudo du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail
 
 ## CI 部署（日常）
 
-- 改 `deploy/**` → `deploy.yml`：scp 到 staging → `compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `compose up -d` → 一次性容器 `nginx -t` → `--force-recreate` nginx → 冒煙檢查（`curl https://api.kawa.homes/health`，最多重試 10 次）。
+- 改 `deploy/**` → `deploy.yml`：scp 到 staging → `compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `compose up -d` → `docker pull nginx:alpine`（浮動 tag 不 pull 就永遠停在舊版；失敗只警告不擋部署）→ 一次性容器 `nginx -t` → `--force-recreate` nginx → 冒煙檢查（`curl https://api.kawa.homes/health`，最多重試 10 次）。
 - 改 `backend/**` / `frontend/**` → 各自 workflow build image 後 SSH：`cd ~/kawa-deploy && docker pull … && docker compose up -d` → **`nginx -s reload`**（原因見下）。
 - 三條 deploy 共用 `concurrency: vps-deploy`，序列化不撞車。
 

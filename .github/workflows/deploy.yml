@@ -1,7 +1,7 @@
 name: deploy-env
 
 # 部署編排（compose / nginx）變更時同步到 VPS 並套用，不重 build image。
-# 流程：staging 目錄驗證 → rsync 覆蓋 ~/kawa-deploy → compose up → 一次性容器 nginx -t
+# 流程：staging 目錄驗證 → rsync 覆蓋 ~/kawa-deploy → compose up → pull nginx:alpine → 一次性容器 nginx -t
 #       → nginx --force-recreate（單檔 bind mount 只有重建才換得到新 inode，reload 不行）
 #       → 冒煙檢查（curl /health）
 
@@ -94,6 +94,17 @@ jobs:
             rsync -a --delete ~/kawa-deploy-staging/ ~/kawa-deploy/
             cd ~/kawa-deploy
             docker compose up -d --remove-orphans
+
+            # nginx:alpine 是浮動 tag，`up -d` 不會去拉新版 —— 沒有這行，VPS 會一直跑
+            # 「上次有人手動 pull 的那版」，安全修補（如 2026-10 的 1.31.7）永遠進不來。
+            # 放在 `up -d` 之後：讓下面的 nginx -t 與 force-recreate 都用新 image。
+            # 重試理由同 backend.yml（dockerd 撞 IPv6）；三次都失敗也不擋部署 ——
+            # 這條 workflow 的本業是套用設定，舊 image 照樣能驗、能跑。
+            for i in 1 2 3; do
+              docker pull nginx:alpine && break
+              [ "$i" = 3 ] && { echo "::warning::docker pull nginx:alpine failed, using local image"; break; }
+              sleep $((i * 5))
+            done
 
             # ── nginx 設定驗證與套用 ───────────────────────────────────────────
             # ⚠ 不能用 `docker compose exec nginx nginx -t` 驗證。
