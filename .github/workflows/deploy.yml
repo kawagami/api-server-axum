@@ -3,7 +3,7 @@ name: deploy-env
 # 部署編排（compose / nginx）變更時同步到 VPS 並套用，不重 build image。
 # 流程：staging 目錄驗證 → rsync 覆蓋 ~/kawa-deploy → compose up → pull nginx:alpine → 一次性容器 nginx -t
 #       → nginx --force-recreate（單檔 bind mount 只有重建才換得到新 inode，reload 不行）
-#       → 冒煙檢查（curl /health）
+#       → 冒煙檢查（curl /health）→ prune dangling image
 
 on:
   push:
@@ -142,6 +142,9 @@ jobs:
                    --resolve api.kawa.homes:443:127.0.0.1 \
                    https://api.kawa.homes/health; then
                 echo "冒煙檢查通過（第 $i 次嘗試）"
+                # 上面 pull 換下來的舊 nginx image 會變成 dangling，比照 backend/frontend.yml 清掉。
+                # 放在冒煙通過之後：失敗時留著舊 image，手動回滾還用得到。
+                docker image prune --force
                 exit 0
               fi
               echo "第 $i 次未通過，3 秒後重試"
