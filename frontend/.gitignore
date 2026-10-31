@@ -37,5 +37,7 @@ yarn-error.log*
 next-env.d.ts
 
 CLAUDE.md
+# next dev 偵測到 AI agent 時自動寫入的規則檔（agentRules），同 CLAUDE.md 不進版控
+AGENTS.md
 /.claude
 docs
