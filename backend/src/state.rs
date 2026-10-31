@@ -102,6 +102,8 @@ pub struct TrackedConnection {
     pub user_name: Option<String>,
     pub real_ip: String,
     pub user_agent: String,
+    /// 是否開著後台檔案傳輸頁（`transfer_join` / `transfer_leave`），見 `services::ws::transfer`
+    pub transfer_ready: bool,
 }
 
 #[derive(Serialize)]

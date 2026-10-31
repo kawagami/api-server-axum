@@ -44,7 +44,7 @@
 - **股票**:庫藏股追蹤、股價變動追蹤、每日行情
 - **觀測**:應用日誌、系統指標時間序列、操作稽核、不重複到訪統計(後台 `/admin/logs`、`/admin/metrics`、`/admin/audit_logs`、`/admin/stats`)
 - **工具**:排班(環狀 pattern 演算法,公開無認證)、計時三合一、文字繁簡轉換、密碼產生、聯絡表單(訪客留言給站長,僅後台可見)
-- **後台工具**:Torrent 下載、政府採購網標案追蹤
+- **後台工具**:Torrent 下載、政府採購網標案追蹤、檔案直傳(手機 ↔ PC,WebRTC 直連不經伺服器,協定見 `protocol/transfer-wire.md`)
 - **圖片**:上傳即轉 WebP,由 `media.kawa.homes` 靜態提供;後台可管理
 - **Email 通知**:torrent 下載完成、標案新公告、新庫藏股公告
 - **更新紀錄**:`/{locale}/changelog` 直接讀 GitHub commits(不經後端)

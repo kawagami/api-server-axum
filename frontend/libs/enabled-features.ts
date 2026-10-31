@@ -15,6 +15,7 @@ export const BACKEND_FEATURES = [
     { key: "gov_tenders", label: "政府標案" },
     { key: "message", label: "訪客留言" },
     { key: "food_log", label: "飲食紀錄" },
+    { key: "file_transfer", label: "檔案直傳" },
 ] as const;
 
 export type BackendFeatureKey = (typeof BACKEND_FEATURES)[number]["key"];

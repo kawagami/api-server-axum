@@ -48,6 +48,7 @@ pub async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState, 
         user_name: user_name.clone(),
         real_ip: real_ip.clone(),
         user_agent: user_agent.clone(),
+        transfer_ready: false,
     };
 
     {
@@ -234,10 +235,15 @@ async fn dispatch_game(state: &AppState, who: SocketAddr, value: &serde_json::Va
 async fn process_message(msg: Message, who: SocketAddr, state: &AppState) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            // 解析統一信封 `{ game?, type, data }`，分派給對應遊戲 hub。
+            // 解析統一信封 `{ game?, type, data }`：帶 `game` 的分派給對應遊戲 hub，
+            // 不帶的目前只有 `transfer_*`（後台檔案直傳 signaling）。
             // 非 JSON / 未知訊息一律忽略（不再 echo 廣播）。
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(&t) {
-                dispatch_game(state, who, &value).await;
+                if value.get("game").is_some() {
+                    dispatch_game(state, who, &value).await;
+                } else {
+                    super::transfer::dispatch_transfer(state, who, &value).await;
+                }
             }
         }
         Message::Binary(_) => {}
@@ -267,13 +273,18 @@ async fn cleanup_connection(state: &AppState, who: SocketAddr) {
         hub.disconnect(state, who).await;
     }
 
-    let (user_name, real_ip) = {
+    let (user_name, real_ip, transfer_ready) = {
         let mut connections = state.get_connections().lock().await;
         let name = connections.get(&who).and_then(|c| c.user_name.clone());
         let ip = connections.get(&who).map(|c| c.real_ip.clone()).unwrap_or_else(|| who.ip().to_string());
+        let ready = connections.get(&who).is_some_and(|c| c.transfer_ready);
         connections.remove(&who);
-        (name, ip)
+        (name, ip, ready)
     };
+    // 開著檔案傳輸頁的裝置斷線：同帳號其他裝置的清單要拿掉它
+    if let (true, Some(name)) = (transfer_ready, user_name.as_deref()) {
+        super::transfer::push_peers(state, name).await;
+    }
     state.broadcast_to_admins(
         crate::structs::ws::WsEvent::UserLeft,
         serde_json::json!({ "addr": who.to_string(), "real_ip": real_ip, "user_name": user_name }),

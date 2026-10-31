@@ -59,6 +59,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         icon: Wrench,
         items: [
             { label: "WebSocket 連線", href: "/admin/ws", permission: "ws:read" },
+            { label: "檔案直傳", href: "/admin/transfer", permission: "ws:read", feature: "file_transfer" },
             { label: "對局總覽", href: "/admin/games", permission: "game:read", feature: "games" },
             { label: "Torrent 下載", href: "/admin/torrents", permission: "torrent:read", feature: "torrents" },
         ],

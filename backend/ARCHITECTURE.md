@@ -178,14 +178,14 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 
 每套部署可開關的功能（instance-per-merchant 產品化基礎），設計定案見 `docs/2026-07-19-enabled-features-plan.md`。
 
-- **key 權威 = `structs/features.rs` 的 `Feature` enum**（11 個：blog / tools / roster / games / stocks / portfolio / vocab / torrents / gov_tenders / message / food_log）。核心永不受控：admin 基礎、members/oauth、ws 基礎連線、logs/metrics、uploads。
+- **key 權威 = `structs/features.rs` 的 `Feature` enum**（12 個：blog / tools / roster / games / stocks / portfolio / vocab / torrents / gov_tenders / message / food_log / file_transfer）。核心永不受控：admin 基礎、members/oauth、ws 基礎連線、logs/metrics、uploads。
 - 設定值：`all` = 全開（本站預設，未來新功能自動開）；JSON 字串陣列 = 白名單（商家 instance，新功能預設關）。PATCH 嚴格驗證（未知 key / 重複 / `portfolio` 未帶 `stocks` 皆 422）。
 - **平台保留 key**（`services/app_settings.rs` 的 `RESERVED_KEYS`，目前 **4 個**：`enabled_features`、`webauthn_rp_id`、`webauthn_rp_origin`、`new_user_default_roles`——最後一個決定「新建管理員預設掛哪些角色」，那是平台層的權限決策，不該只要 `setting:update` 就能改，否則等於另開一條指派角色的門）：GET `/admin/settings` 無 `platform:read` 者直接濾掉、PATCH 需 `platform:update`（一般 key 仍走 `setting:update`）。商家管理員拿 `setting:*` 管日常設定，碰不到保留 key；前端專頁 `/admin/platform`。新增保留 key = `RESERVED_KEYS` 加一項。
 - 檢查是 sync set lookup：`Settings::reload()` 時 parse 成 `Option<HashSet<Feature>>`（None = 全開），`state.get_settings().feature_enabled(Feature::X)`。熱更新即時生效、不重啟。
 - **三個攔截點**：
   1. routes — `routes.rs` 的 `with_feature(state, Feature::X, router)`（與 `with_auth` 對稱），未啟用回 **404**（包在 auth 外層，連 401 都不回、不暴露功能存在）
   2. jobs — `AppJob::feature()`（core 回 None），`scheduler.rs` 每次觸發時檢查
-  3. ws 遊戲 — `dispatch_game` 入口檢查 `Feature::Games`，關閉回 `error` 信封 `{reason: "feature_disabled"}`；watcher 照常 spawn（掃空 map 零成本，換熱開關不重啟）。啟動期唯一 gate：torrents 關閉時跳過 `sync_active`
+  3. ws 遊戲 — `dispatch_game` 入口檢查 `Feature::Games`，關閉回 `error` 信封 `{reason: "feature_disabled"}`（檔案直傳同理：`dispatch_transfer` 檢查 `Feature::FileTransfer`，回 `transfer_error`）；watcher 照常 spawn（掃空 map 零成本，換熱開關不重啟）。啟動期唯一 gate：torrents 關閉時跳過 `sync_active`
 - **新增可開關功能**：`Feature` 加 variant（+ `as_str`/`from_key`/`ALL`）→ route 掛 `with_feature` → 有 job 就補 `AppJob::feature()` → 前端 `libs/enabled-features.ts` 的 `BACKEND_FEATURES` 同步加 key。
 
 ## stock_changes 資料流
@@ -353,6 +353,17 @@ JWT **不走** WS URL query（會進 access log）。流程：登入中的 admin
 ### 統一信封
 
 所有送出端走 `structs/ws.rs` 的 `envelope(type, data)`（通知）／`game_envelope(game, type, data)`（遊戲）序列化，杜絕格式長歪。應用層訊息一律 `{ type, data, game? }`（`game` 僅遊戲訊息帶）。`process_message` 收到非 JSON / 未知訊息**一律忽略**（無 echo）。admin 點對點直送 = `{ type: "admin_message", data: { content, from } }`（`from` = 管理員顯示名 `users.name`，型別走 `WsEvent::AdminMessage`）。
+
+### 檔案直傳 signaling（`transfer_*`，2026-10-31）
+
+後台 `/admin/transfer` 讓同一 admin 帳號的手機與 PC 用 WebRTC DataChannel 互傳檔案，**檔案不經後端**，後端只轉發 SDP。協定權威 `protocol/transfer-wire.md`（改協定＝同一 commit 改前後端與該檔）。
+
+- 實作在 `services/ws/transfer.rs`。`process_message` 依信封分流：帶 `game` → `dispatch_game`，不帶 → `dispatch_transfer`（只認 `transfer_*`，其餘照舊忽略）
+- 房間狀態 = `TrackedConnection::transfer_ready`（不另開 `AppState` 欄位）。連線移除時狀態自然消失；`cleanup_connection` 對在房的 admin 連線重推 `transfer_peers` 給同帳號其他裝置
+- **只在 `user_name` 相同的 admin 連線之間轉發**（`check_relay`，附測試）。admin 身分來自 ticket（已要求 `ws:read`），故不另查權限；匿名連線送 `transfer_*` 只會收到 `transfer_error`
+- 不追蹤傳輸狀態、不做 trickle ICE（前端收集完候選才送整份 SDP），所以每次傳輸只有 offer / answer 兩則上行，碰不到收訊令牌桶。`data` 超過 64KB 回 `too_large`
+- 這些 type 跟遊戲訊息一樣**不經 `WsEvent` enum**（點對點、非廣播事件），前端 `WsEventType` 也不列
+- 只用 STUN、不設 TURN：打不通前端直接告知失敗。要補 TURN 只改前端 `ICE_SERVERS`，後端與協定不動
 
 ## 對戰遊戲框架（複用 `/ws`，點對點）
 

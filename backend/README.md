@@ -55,7 +55,7 @@ Rust + Axum 網頁 API 伺服器，部署於 `https://api.kawa.homes`（舊名 `
 | `/settings/public` | 公開設定（白名單，如 `site_theme`，無認證） |
 | `/blogs` | 部落格查詢（列表 / tags / tags 計數（`GET /tags/counts`）/ 單篇 / 單篇留言，公開；列表、單篇、兩支 tags 帶 `Cache-Control: s-maxage=60`，`?q=` 關鍵字上限 100 字） |
 | `/messages` | 站內留言 |
-| `/ws` | WebSocket 連線、線上清單（`/ws/connections`）、點對點訊息（`/ws/messages`）、一次性連線票（`/ws/ticket`）、對戰遊戲配對/對戰（象棋/五子棋/暗棋/西洋棋/圍棋/阿瓦隆/農場經營） |
+| `/ws` | WebSocket 連線、線上清單（`/ws/connections`）、點對點訊息（`/ws/messages`）、一次性連線票（`/ws/ticket`）、對戰遊戲配對/對戰（象棋/五子棋/暗棋/西洋棋/圍棋/阿瓦隆/農場經營）、後台檔案直傳 WebRTC signaling（`transfer_*`，協定見 `protocol/transfer-wire.md`） |
 | `/roster` | 排班計算（公開無認證，套 tools 的 rate limit；回班表 + 實際採用的每日人力 `plan` + 機器可讀 `warnings`）|
 | `/logs` | 應用日誌查詢（列表 + 單一 request 完整軌跡，需 `log:read`） |
 | `/metrics` | 系統指標時間序列（需 `metric:read`，`?hours=` clamp 1–168） |
