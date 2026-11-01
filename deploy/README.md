@@ -280,15 +280,159 @@ sudo systemctl restart docker   # daemon 的 IPv6 能力是行程啟動時探測
 **下一步（未做）**：reqwest 的 `hickory-dns` feature（純 Rust resolver，自帶快取）。換之前要確認
 `database` / `valkey` 仍由 127.0.0.11 解析。
 
+## 新機 OS 準備（Debian 13，2026-11-01 定案）
+
+bootstrap 與搬家 runbook 共用的主機層步驟。主機只負責「開機、跑 docker、收安全更新」，其餘都在容器裡。
+
+### 為什麼換機、為什麼選 Debian
+
+- 現行這台（`first-laravel`）是 **Ubuntu 20.04 + kernel `5.4.0-170`**。20.04 的標準支援 2025-05 已結束，
+  而且**沒接 Ubuntu Pro**（2026-11-01 `pro status` 確認）⇒ 核心與大部分套件從那之後**沒有任何安全更新**。
+  教訓不在發行版本身，而是**沒開自動更新、沒人盯 EOL**。
+- 選 **Debian 13（trixie）**：1G 記憶體下沒有 snapd、預設服務少；核心安全修補快（2026-10 的
+  CVE-2026-98432 是 Debian 先出修補，Ubuntu 落後）；apt / systemd 與舊機相同，runbook 不必改寫。
+  代價：沒有免費 livepatch（核心更新靠下方的自動重開機）、支援期比 Ubuntu LTS + ESM 短。
+- **EOL：一般安全支援約到 2028-08，LTS 約到 2030-06。** 到期前一年就開始規劃換機。
+
+### 1. 使用者與 SSH
+
+```bash
+# root 身分（新機若預設只有 root）
+apt update && apt install -y sudo
+adduser kawa && usermod -aG sudo kawa
+```
+
+- 本機公鑰放進 kawa 的 `~/.ssh/authorized_keys`（`ssh-copy-id kawa@新機IP`）；**CI 用的 `SSH_PRIVATE_KEY`
+  對應的公鑰也要放**，否則換完 secrets 後部署會連不上。
+- **kawa 的 uid 要和舊機一樣**（兩邊跑 `id -u`，通常都是 1000）。搬家用 `--numeric-ids` 原樣保留擁有者，
+  uid 對不上的話，`/srv/kawa` 裡 kawa 擁有的檔案到新機會變成別人的。
+
+確認 kawa 能用金鑰登入、`sudo -v` 能過之後，**才**關閉密碼與 root 登入（順序反了會把自己鎖在外面，
+只剩供應商的網頁 console 能救）：
+
+```bash
+sudo tee /etc/ssh/sshd_config.d/99-kawa.conf <<'EOT'
+PermitRootLogin no
+PasswordAuthentication no
+EOT
+sudo sshd -t && sudo systemctl reload ssh   # Debian 的 unit 叫 ssh，不是 sshd
+```
+
+### 2. 基本套件、IPv6、swap
+
+```bash
+sudo apt install -y rsync curl ca-certificates
+```
+
+- **IPv6**：`ip -6 route | grep '^default'` 沒有輸出，就照「主機 IPv6」節的 sysctl 整台關掉。repo 的 nginx
+  已經沒有 `listen [::]`，新機不用管順序問題；**在裝 Docker 之前關**，就省掉一次 `systemctl restart docker`。
+- **swap**（1 核 1G 必開，舊機曾因為完全沒 swap 被 OOM 殺掉 backend）：
+
+  ```bash
+  sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile
+  sudo mkswap /swapfile && sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # 開機自動掛
+  sudo sysctl -w vm.swappiness=10 && \
+    echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swappiness.conf
+  free -h   # 驗證：SwapTotal 不能是 0
+  ```
+
+  `swappiness=10` 讓它只在真的吃緊時才換出，平時不拖慢反應。尺寸從 2G 改成 1G：
+  舊機磁碟 14.8/23.4 GB，torrent 還在寫，2G 太貪。
+
+  > ⚠️ **舊機（first-laravel）從來沒做過這一步**，2026-08-09 實測 `SwapTotal: 0 kB`。
+  > `docker-compose.yml` 的資源上限註解一度寫「1 核 1G（+2G swap）」，就是照本節假設了
+  > 沒發生的事（已修正）。要確認實況一律跑 `free -h`，不要讀這份文件推論。
+
+### 3. Docker（用官方 apt 來源，不用 Debian 自帶的 `docker.io`）
+
+Debian 套件庫的 `docker.io` 版本較舊，compose plugin 也不同步。先到
+https://docs.docker.com/engine/install/debian/ 確認支援清單有 trixie，再照官方步驟裝：
+
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOT
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOT
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker kawa                         # 重新登入後生效
+docker compose version && systemctl is-enabled docker   # 必須是 enabled，開機才會自動起容器
+```
+
+Docker 的 apt 來源**不在** unattended-upgrades 的預設範圍內（只收 Debian-Security），所以 daemon 只會手動升級。
+這是刻意的：daemon 一升級，全部容器都會重啟。
+
+### 4. fail2ban（原本只在舊機手動設定，2026-11 起記錄在這裡）
+
+舊機的 `/etc/fail2ban/jail.local` 只有一個 `sshd` jail，用遞增式 ban。2026-07-02 才從 `bantime = 0`
+（永久 ban）改過來，因為永久 ban 讓 `/var/lib/fail2ban/fail2ban.sqlite3` 長到 38M。搬家前先在舊機
+`cat /etc/fail2ban/jail.local` 對照下面的值：
+
+```bash
+sudo apt install -y fail2ban python3-systemd
+sudo tee /etc/fail2ban/jail.local <<'EOT'
+[DEFAULT]
+bantime = 1h
+bantime.increment = true
+bantime.factor = 24
+bantime.maxtime = 8w
+
+[sshd]
+enabled = true
+backend = systemd
+EOT
+sudo systemctl restart fail2ban
+```
+
+`backend = systemd` 是必要的：Debian 12 起預設不裝 rsyslog，沒有 `/var/log/auth.log`，用檔案 backend 的
+sshd jail 會起不來，或是什麼都抓不到。
+
+**驗證（這是靜默失敗型的設定，一定要做）**：從別台用不存在的帳號連一次（`ssh no-such-user@新機IP`），
+`sudo fail2ban-client status sshd` 的 `Total failed` 要增加。如果數字不動，就是 journal 比對沒對上：
+Debian 13 的 OpenSSH 10 把認證 log 移到 `sshd-session` 行程，filter 可能比對不到，用
+`journalctl -t sshd-session -n 20` 查。
+
+### 5. 自動安全更新 + 自動重開機
+
+```bash
+sudo apt install -y unattended-upgrades
+sudo dpkg-reconfigure -plow unattended-upgrades   # 選 Yes
+sudo tee /etc/apt/apt.conf.d/52kawa-reboot <<'EOT'
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "20:00";
+EOT
+sudo unattended-upgrade --dry-run --debug 2>&1 | grep -i 'allowed origins'   # 要看到 Debian-Security
+```
+
+- `Automatic-Reboot-Time` 用的是**主機時區**，用 `timedatectl` 確認。主機是 UTC 的話，`20:00` 就是台灣凌晨 04:00。
+- 只有裝了需要重開的更新（主要是核心）才會真的重開，通常每月 0–2 次。
+- **重開會清空 valkey，全站會員和 admin 都會被登出**（見「邊界原則」的 valkey 段）。這是用來換核心修補的代價。
+
+### 6. 驗收
+
+```bash
+grep PRETTY /etc/os-release; uname -r
+free -h                                   # Swap 不是 0
+ip -6 route                               # 關掉 IPv6 後應該沒有輸出
+docker compose version; systemctl is-enabled docker
+sudo fail2ban-client status sshd
+systemctl list-timers apt-daily-upgrade.timer
+```
+
 ## 全新機器 bootstrap
 
 從零把整站架在一台新 VPS 上的流程。
 
 ### 0. 前提
 
-- 新 VPS：建使用者 + SSH 金鑰、裝 docker（含 compose plugin）與 rsync、使用者加入 `docker` 群組
-- **檢查 IPv6**：`ip -6 route | grep '^default'` 沒東西就照「主機 IPv6」節整台關掉，否則對外連線
-  （SMTP 等走 glibc 的路徑）會間歇失敗；`docker pull` 關了也還是會偶發，靠 CI 重試
+- 新 VPS：照「新機 OS 準備」節做完（使用者 / SSH、IPv6、swap、Docker、fail2ban、自動更新）
 - Cloudflare DNS：`kawa.homes`、`*.kawa.homes`、以及各子網域單獨那幾筆（`api` / `axum` / `media`）
   指向新機 IP；SSL/TLS 模式 **Full (Strict)**（憑證是 `kawa.homes` + `*.kawa.homes` wildcard，
   新增子網域不用重簽，但橘雲要單獨開一筆 record）
@@ -373,23 +517,7 @@ docker exec -it database psql -U kawa -d kawa -c "
 
 ### 0. 新機前置（站台不中斷）
 
-- 建使用者 + SSH 金鑰、裝 `docker`（含 compose plugin）+ `rsync`、使用者加入 `docker` 群組
-- **開 swap**（1 核 1G 尤其必要——曾整機無 swap 被 OOM 殺 backend）：
-  ```bash
-  sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile
-  sudo mkswap /swapfile && sudo swapon /swapfile
-  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # 開機自動掛
-  sudo sysctl -w vm.swappiness=10 && \
-    echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swappiness.conf
-  free -h   # 驗證：SwapTotal 不能是 0
-  ```
-  `swappiness=10` 讓它只在真的緊繃時才換出，平時不拖慢反應。尺寸從 2G 改成 1G：
-  現行這台磁碟 14.8/23.4 GB 且 torrent 還在寫，2G 太貪。
-
-  > ⚠️ **現行這台（first-laravel）從來沒做過這一步**，2026-08-09 實測 `SwapTotal: 0 kB`。
-  > `docker-compose.yml` 的資源上限註解一度寫「1 核 1G（+2G swap）」就是照著本節假設了
-  > 沒發生的事（已修正）。**這是換機 runbook 的步驟，不代表現行機器的狀態** ——
-  > 要確認實況一律跑 `free -h`，不要讀這份文件推論。
+- 照「新機 OS 準備」節做完（使用者 / SSH、IPv6、swap、Docker、fail2ban、自動更新），第 6 步驗收要全過
 - 建持久層根目錄（kawa 無 sudo 密碼也行，用容器以 root 建）：
   ```bash
   docker run --rm -v /srv:/srv alpine sh -c "mkdir -p /srv/kawa && chown -R $(id -u):$(id -g) /srv/kawa"
@@ -398,19 +526,34 @@ docker exec -it database psql -U kawa -d kawa -c "
 ### 1. 資料搬遷（停機開始，抓最小窗口）
 
 `dbdata` 必須停機後搬才一致；uploads / torrents / env 可先做一次預熱 rsync，停機後再補增量。
-rsync 兩端不能同時遠端，以下指令**在新機上跑、從舊機拉**（新機需能 SSH 到舊機；
-或反過來在舊機 push，擇一）。
+
+⚠️ **`/srv/kawa` 不能用一般使用者 rsync**：`dbdata/` 的擁有者是 postgres 容器的 uid 70、權限 `0700`，
+kawa 讀不到。兩端都要以 root 執行，並加 `--numeric-ids` 原樣保留數字 uid（新機不需要有同名帳號）。
+做法是**在舊機以 root 推到新機**，新機那端透過 kawa 的 SSH，加上暫時開放的免密碼 `sudo rsync`。
+（2026-11-01 補上，舊版指令以 kawa 身分從新機拉，會卡在 dbdata；新版尚未實測。）
 
 ```bash
-# 新VPS：（選配）停機前先預熱體積大的靜態檔，縮短停機窗口
-rsync -av 舊VPS:/srv/kawa/uploads/   /srv/kawa/uploads/
-rsync -av 舊VPS:/srv/kawa/torrents/  /srv/kawa/torrents/
+# 新VPS：暫時允許 kawa 免密碼 sudo rsync（搬完就刪）
+echo 'kawa ALL=(root) NOPASSWD: /usr/bin/rsync' | sudo tee /etc/sudoers.d/kawa-rsync
 
-# 舊機停站
-ssh 舊VPS 'cd ~/kawa-deploy && docker compose down'
+# 舊VPS：kawa 產一把金鑰（ssh-keygen -t ed25519），公鑰加進新機 kawa 的 authorized_keys
+# 之後切到 root（su -）執行以下指令
 
-# 新VPS：停機後拉完整 /srv/kawa（含 dbdata 與 env；--delete 對齊，增量只補差異）
-rsync -av --delete 舊VPS:/srv/kawa/  /srv/kawa/
+# 舊VPS（root）：停機前先預熱 dbdata 以外的檔案（可重複跑，縮短停機窗口）
+rsync -a --numeric-ids --exclude dbdata/ \
+  -e "ssh -i /home/kawa/.ssh/id_ed25519" --rsync-path="sudo rsync" \
+  /srv/kawa/ kawa@新VPS:/srv/kawa/
+
+# 舊VPS：停站
+cd /home/kawa/kawa-deploy && docker compose down
+
+# 舊VPS（root）：停機後推完整 /srv/kawa（含 dbdata 與 env；--delete 對齊，增量只補差異）
+rsync -a --numeric-ids --delete \
+  -e "ssh -i /home/kawa/.ssh/id_ed25519" --rsync-path="sudo rsync" \
+  /srv/kawa/ kawa@新VPS:/srv/kawa/
+
+# 新VPS：撤掉暫時權限
+sudo rm /etc/sudoers.d/kawa-rsync
 ```
 
 ### 2. 部署設定、起服務
