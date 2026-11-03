@@ -2,7 +2,7 @@
 //! 其餘都在這裡（2026-09-24 自 `routes/ws.rs` 搬來 socket 生命週期，函式內容未動）：
 //! - `ticket`：admin 身分的一次性連線票
 //! - `guard`：連線防護 —— per-IP 連線上限、每連線收訊令牌桶
-//! - `socket`：單條連線的生命週期（收訊迴圈、ping/pong、遊戲分派、斷線清理）
+//! - `socket`：單條連線的生命週期（收訊迴圈、ping/pong、遊戲 / 直傳分派、斷線清理）
 //! - `connections`：後台的連線清單與點對點送訊
 //! - `transfer`：後台檔案直傳的 WebRTC signaling（同帳號裝置間轉發，檔案不經後端）
 //!

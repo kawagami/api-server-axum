@@ -64,7 +64,7 @@ src/
 │   ├── auth.rs        # 登入/JWT + `load_identity`（顯示名/super_admin/權限的**唯一**載入點，Redis 命中＝零 DB）
 │   ├── twse.rs        # TWSE API 共用層 — headers、parse、全域 semaphore(1) 防 rate limit
 │   ├── stats.rs       # 到訪統計（今日 PFCOUNT + 跨日去重 + 歷史，三支併發）與 WS 採集入口
-│   ├── ws/            # WS 連線層：ticket（一次性連線票）/ guard（per-IP 上限、令牌桶 MessageBudget）/ socket（handle_socket 生命週期、ping-pong、遊戲分派、斷線清理）/ connections（後台連線清單、點對點送訊）
+│   ├── ws/            # WS 連線層：ticket（一次性連線票）/ guard（per-IP 上限、令牌桶 MessageBudget）/ socket（handle_socket 生命週期、ping-pong、遊戲 / 直傳分派、斷線清理）/ connections（後台連線清單、點對點送訊）/ transfer（後台檔案直傳 WebRTC signaling，同帳號轉發）
 │   ├── vocab/         # engine（純函式 + 測試）/ question / run / answer / stats / admin
 │   ├── portfolio/     # crud / pricing（三層快取管線 + 上游預算）/ math（純計算 + 測試）
 │   └── torrents/      # manager（TorrentManager：librqbit session + active map）/ tasks / lifecycle（watcher）/ session / download_links / storage
