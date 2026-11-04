@@ -299,24 +299,42 @@ bootstrap 與搬家 runbook 共用的主機層步驟。主機只負責「開機�
 ```bash
 # root 身分（新機若預設只有 root）
 apt update && apt install -y sudo
-adduser kawa && usermod -aG sudo kawa
+adduser --uid 1001 kawa && usermod -aG sudo kawa   # uid 對齊舊機，見下方
 ```
 
 - 本機公鑰放進 kawa 的 `~/.ssh/authorized_keys`（`ssh-copy-id kawa@新機IP`）；**CI 用的 `SSH_PRIVATE_KEY`
   對應的公鑰也要放**，否則換完 secrets 後部署會連不上。
-- **kawa 的 uid 要和舊機一樣**（兩邊跑 `id -u`，通常都是 1000）。搬家用 `--numeric-ids` 原樣保留擁有者，
+- **kawa 的 uid 要和舊機一樣**。舊機 first-laravel 的 kawa 是 **1001**，不是 1000（2026-11-04 確認），
+  所以要用 `adduser --uid 1001 kawa` 建立，gid 也要對上（`id kawa`）。搬家用 `--numeric-ids` 原樣保留擁有者，
   uid 對不上的話，`/srv/kawa` 裡 kawa 擁有的檔案到新機會變成別人的。
+
+改主機名稱時，Vultr 的 cloud-init 每次開機都可能把名稱改回 `vultr`、重新產生 `/etc/hosts`；
+沒寫進 `/etc/hosts` 的話，`sudo` 會報 `unable to resolve host`：
+
+```bash
+sudo hostnamectl set-hostname kawa-deb
+sudo tee /etc/cloud/cloud.cfg.d/99-kawa.cfg <<'EOT'
+preserve_hostname: true
+manage_etc_hosts: false
+EOT
+echo '127.0.1.1 kawa-deb' | sudo tee -a /etc/hosts
+```
 
 確認 kawa 能用金鑰登入、`sudo -v` 能過之後，**才**關閉密碼與 root 登入（順序反了會把自己鎖在外面，
 只剩供應商的網頁 console 能救）：
 
 ```bash
-sudo tee /etc/ssh/sshd_config.d/99-kawa.conf <<'EOT'
+sudo tee /etc/ssh/sshd_config.d/00-kawa.conf <<'EOT'
 PermitRootLogin no
 PasswordAuthentication no
 EOT
 sudo sshd -t && sudo systemctl reload ssh   # Debian 的 unit 叫 ssh，不是 sshd
+sudo sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication)'   # 兩個都要是 no
 ```
+
+檔名一定要 `00-` 開頭：`sshd_config.d/` 照檔名順序讀，**同一個設定以第一次出現的值為準**。
+cloud-init 放的 `50-cloud-init.conf` 可能寫著 `PasswordAuthentication yes`，取名 `99-` 會被它蓋過而且不會報錯。
+最後要用 `sshd -T` 看實際生效的值，不要只看檔案內容。
 
 ### 2. 基本套件、IPv6、swap
 
@@ -326,7 +344,10 @@ sudo apt install -y rsync curl ca-certificates
 
 - **IPv6**：`ip -6 route | grep '^default'` 沒有輸出，就照「主機 IPv6」節的 sysctl 整台關掉。repo 的 nginx
   已經沒有 `listen [::]`，新機不用管順序問題；**在裝 Docker 之前關**，就省掉一次 `systemctl restart docker`。
-- **swap**（1 核 1G 必開，舊機曾因為完全沒 swap 被 OOM 殺掉 backend）：
+- **swap**（1 核 1G 必開，舊機曾因為完全沒 swap 被 OOM 殺掉 backend）。**先跑 `sudo swapon --show`**：
+  Vultr 的 Debian 13 映像檔已經內建一個 2.3G 的 `/swapfile`，`/etc/fstab` 也寫好了。已經有 swap 的話，
+  只要做 `swappiness` 那兩行；照下面整段跑會出現 `Text file busy`，還會在 fstab 多加一行重複的設定。
+  `swapon` 在 `/usr/sbin`，一般使用者的 PATH 沒有這個目錄，要加 `sudo`。
 
   ```bash
   sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile
@@ -372,32 +393,37 @@ Docker 的 apt 來源**不在** unattended-upgrades 的預設範圍內（只收 
 ### 4. fail2ban（原本只在舊機手動設定，2026-11 起記錄在這裡）
 
 舊機的 `/etc/fail2ban/jail.local` 只有一個 `sshd` jail，用遞增式 ban。2026-07-02 才從 `bantime = 0`
-（永久 ban）改過來，因為永久 ban 讓 `/var/lib/fail2ban/fail2ban.sqlite3` 長到 38M。搬家前先在舊機
-`cat /etc/fail2ban/jail.local` 對照下面的值：
+（永久 ban）改過來，因為永久 ban 讓 `/var/lib/fail2ban/fail2ban.sqlite3` 長到 38M。下面的值照抄舊機
+（2026-11-04 確認），只把 `logpath = /var/log/auth.log` 換成 `backend = systemd`：
 
 ```bash
 sudo apt install -y fail2ban python3-systemd
 sudo tee /etc/fail2ban/jail.local <<'EOT'
-[DEFAULT]
-bantime = 1h
-bantime.increment = true
-bantime.factor = 24
-bantime.maxtime = 8w
-
 [sshd]
-enabled = true
-backend = systemd
+enabled  = true
+port     = ssh
+filter   = sshd
+backend  = systemd
+
+maxretry = 3
+findtime = 600
+bantime  = 1h
+bantime.increment = true
+bantime.factor    = 24
+bantime.maxtime   = 8w
 EOT
 sudo systemctl restart fail2ban
 ```
 
 `backend = systemd` 是必要的：Debian 12 起預設不裝 rsyslog，沒有 `/var/log/auth.log`，用檔案 backend 的
-sshd jail 會起不來，或是什麼都抓不到。
+sshd jail 會起不來，或是什麼都抓不到。`maxretry = 3`，所以下面的驗證只要失敗一次就好，
+連試三次會 ban 到自己。被 ban 了就從供應商的網頁 console 執行 `fail2ban-client set sshd unbanip <IP>`。
 
 **驗證（這是靜默失敗型的設定，一定要做）**：從別台用不存在的帳號連一次（`ssh no-such-user@新機IP`），
-`sudo fail2ban-client status sshd` 的 `Total failed` 要增加。如果數字不動，就是 journal 比對沒對上：
-Debian 13 的 OpenSSH 10 把認證 log 移到 `sshd-session` 行程，filter 可能比對不到，用
-`journalctl -t sshd-session -n 20` 查。
+`sudo fail2ban-client status sshd` 的 `Total failed` 要增加。2026-11-04 在 Debian 13 實測可以抓到：
+OpenSSH 10 的認證 log 雖然改由 `sshd-session` 行程寫出，但它屬於 `ssh.service`，會被
+`Journal matches: _SYSTEMD_UNIT=ssh.service + _COMM=sshd` 比對到（`+` 是「或」）。
+如果數字不動，用 `sudo journalctl -u ssh -n 20` 看那次失敗的 log 有沒有出現。
 
 ### 5. 自動安全更新 + 自動重開機
 
@@ -433,9 +459,9 @@ systemctl list-timers apt-daily-upgrade.timer
 ### 0. 前提
 
 - 新 VPS：照「新機 OS 準備」節做完（使用者 / SSH、IPv6、swap、Docker、fail2ban、自動更新）
-- Cloudflare DNS：`kawa.homes`、`*.kawa.homes`、以及各子網域單獨那幾筆（`api` / `axum` / `media`）
-  指向新機 IP；SSL/TLS 模式 **Full (Strict)**（憑證是 `kawa.homes` + `*.kawa.homes` wildcard，
-  新增子網域不用重簽，但橘雲要單獨開一筆 record）
+- Cloudflare DNS：`kawa.homes`、`*.kawa.homes`、`www.kawa.homes` 三筆 A record（橘雲）指向新機 IP；
+  SSL/TLS 模式 **Full (Strict)**。`api` / `axum` / `media` 沒有單獨的紀錄，都是透過 `*` 萬用紀錄連過來
+  （2026-11-04 確認）；憑證是 `kawa.homes` + `*.kawa.homes` wildcard，新增子網域不用重簽，也不用另外加紀錄
 - 若新機**取代**舊機：GitHub secrets 更新 `VULTR_HOST` / `VULTR_USERNAME` / `SSH_PRIVATE_KEY`
 
 ### 1. 建持久層
@@ -517,72 +543,80 @@ docker exec -it database psql -U kawa -d kawa -c "
 
 ### 0. 新機前置（站台不中斷）
 
+舊站照常運作，可以分幾天做。**只要 `dbdata` 還沒搬，就不要在新機跑 `docker compose up`**：
+PG 會在空的 `/srv/kawa/dbdata` 建一個新的空資料庫，backend 也會在上面跑 migration。
+
 - 照「新機 OS 準備」節做完（使用者 / SSH、IPv6、swap、Docker、fail2ban、自動更新），第 6 步驗收要全過
-- 建持久層根目錄（kawa 無 sudo 密碼也行，用容器以 root 建）：
-  ```bash
-  docker run --rm -v /srv:/srv alpine sh -c "mkdir -p /srv/kawa && chown -R $(id -u):$(id -g) /srv/kawa"
-  ```
+- 建持久層根目錄：`sudo install -d -o kawa -g kawa /srv/kawa`
+- 舊機的 kawa 在 `www-data`（gid 33）群組，新機比照：`sudo usermod -aG www-data kawa`
 
-### 1. 資料搬遷（停機開始，抓最小窗口）
+```bash
+# 本機：部署設定先同步過去
+rsync -av deploy/ kawa@新VPS:~/kawa-deploy/
 
-`dbdata` 必須停機後搬才一致；uploads / torrents / env 可先做一次預熱 rsync，停機後再補增量。
+# 新VPS：驗證 compose、先拉 image、先申請憑證（DNS-01 只起 certbot 一個容器，不依賴流量在哪台）
+cd ~/kawa-deploy
+docker compose config --quiet && docker compose pull
+bash shells/issue-cert.sh
+```
 
-⚠️ **`/srv/kawa` 不能用一般使用者 rsync**：`dbdata/` 的擁有者是 postgres 容器的 uid 70、權限 `0700`，
-kawa 讀不到。兩端都要以 root 執行，並加 `--numeric-ids` 原樣保留數字 uid（新機不需要有同名帳號）。
-做法是**在舊機以 root 推到新機**，新機那端透過 kawa 的 SSH，加上暫時開放的免密碼 `sudo rsync`。
-（2026-11-01 補上，舊版指令以 kawa 身分從新機拉，會卡在 dbdata；新版尚未實測。）
+接著準備搬資料。⚠️ **`/srv/kawa` 不能用一般使用者 rsync**：`dbdata/` 的擁有者是 postgres 容器的 uid 70、
+權限 `0700`，kawa 讀不到。兩端都要以 root 執行，並加 `--numeric-ids` 原樣保留數字 uid（新機不需要有同名帳號）。
+做法是**在舊機以 root 推到新機**，新機那端透過 kawa 的 SSH，加上暫時開放的免密碼 `sudo rsync`：
 
 ```bash
 # 新VPS：暫時允許 kawa 免密碼 sudo rsync（搬完就刪）
 echo 'kawa ALL=(root) NOPASSWD: /usr/bin/rsync' | sudo tee /etc/sudoers.d/kawa-rsync
 
-# 舊VPS：kawa 產一把金鑰（ssh-keygen -t ed25519），公鑰加進新機 kawa 的 authorized_keys
-# 之後切到 root（su -）執行以下指令
+# 舊VPS（kawa）：產一把金鑰，公鑰加進新機 kawa 的 authorized_keys
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ''
 
-# 舊VPS（root）：停機前先預熱 dbdata 以外的檔案（可重複跑，縮短停機窗口）
-rsync -a --numeric-ids --exclude dbdata/ \
+# 舊VPS（root，su -）：測試整條路徑，要印出 rsync 版本
+ssh -i /home/kawa/.ssh/id_ed25519 kawa@新VPS 'sudo -n rsync --version | head -1'
+
+# 舊VPS（root）：預熱 dbdata 以外的檔案（可重複跑）
+rsync -a --numeric-ids --exclude dbdata/ --info=progress2 \
   -e "ssh -i /home/kawa/.ssh/id_ed25519" --rsync-path="sudo rsync" \
   /srv/kawa/ kawa@新VPS:/srv/kawa/
+```
 
+2026-11-04 實測資料量：`dbdata` 253M、`uploads` 95M、`torrents` 幾乎是空的，預熱幾秒就結束。
+`kawa.env` 原本是 `664`，裡面有秘密值，兩台都改成 `chmod 600`（compose 以 kawa 身分讀，不受影響）。
+
+### 1. 停站、搬資料（停機開始）
+
+```bash
 # 舊VPS：停站
 cd /home/kawa/kawa-deploy && docker compose down
 
-# 舊VPS（root）：停機後推完整 /srv/kawa（含 dbdata 與 env；--delete 對齊，增量只補差異）
-rsync -a --numeric-ids --delete \
+# 舊VPS（root）：推完整 /srv/kawa（含 dbdata；--delete 對齊，增量只補差異）
+rsync -a --numeric-ids --delete --info=progress2 \
   -e "ssh -i /home/kawa/.ssh/id_ed25519" --rsync-path="sudo rsync" \
   /srv/kawa/ kawa@新VPS:/srv/kawa/
-
-# 新VPS：撤掉暫時權限
-sudo rm /etc/sudoers.d/kawa-rsync
 ```
 
-### 2. 部署設定、起服務
-
-```bash
-# 本機
-rsync -av deploy/ 新VPS:~/kawa-deploy/
-# 新VPS
-cd ~/kawa-deploy && docker compose config --quiet && docker compose up -d
-```
-
-nginx 此時起不來是正常的（新機還沒憑證）。
-
-### 3. 新機重發憑證（DNS-01，不依賴舊機）
+### 2. 新機起服務
 
 ```bash
 # 新VPS
-cd ~/kawa-deploy && bash shells/issue-cert.sh && docker compose restart nginx
+cd ~/kawa-deploy && docker compose up -d && docker compose ps
+sudo rm /etc/sudoers.d/kawa-rsync     # 撤掉暫時權限
 ```
 
-### 4. 切流量到新機（Cloudflare，非 registrar）
+憑證在第 0 步就申請好了，nginx 會直接起來。
 
-- Cloudflare dashboard → DNS → 把 `kawa.homes` / `*.kawa.homes`（以及 `api` / `axum` / `media`
-  等單獨列出的那幾筆）的**回源 IP**
-  從舊機改成新機 IP。橘雲維持開啟，SSL/TLS 維持 **Full (Strict)**。
+### 3. 切流量到新機（Cloudflare，非 registrar）
+
+- Cloudflare dashboard → DNS → Records，把 `kawa.homes` / `*.kawa.homes` / `www.kawa.homes` 三筆 A record 的
+  **回源 IP** 從舊機改成新機 IP（`api` / `axum` / `media` 都是透過 `*` 連過來，沒有單獨的紀錄）。
+  橘雲維持開啟，SSL/TLS 維持 **Full (Strict)**。`_domainconnect` 那筆 CNAME 是 Google Domains 留下來的，不用動。
+- 2026-11-04 搬家：舊機 first-laravel（Ubuntu 20.04）`64.176.40.38` → 新機 kawa-deb（Debian 13）`45.76.102.67`。
 - **GitHub secrets** 更新成新機，否則下次 push 會 deploy 到舊機：
   `VULTR_HOST` / `VULTR_USERNAME` / `SSH_PRIVATE_KEY`（deploy.yml / backend.yml / frontend.yml 三條 CI 共用）。
+  CI 是用 **kawa** 登入（2026-11-04 確認：舊機 root 沒有 `authorized_keys`），所以只要新機 kawa 的
+  `authorized_keys` 裡有同一把公鑰（就是建機時上傳到 Vultr 的那把），通常只需要改 `VULTR_HOST`。
 
-### 5. 驗證與善後
+### 4. 驗證與善後
 
 ```bash
 # 新VPS
