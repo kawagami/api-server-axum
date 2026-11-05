@@ -120,6 +120,9 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 - origin 佔 2.5–6%，容器 CPU ≈0、記憶體遠低於上限；同時段 `system_metrics` CPU ~2.7%、steal ≈0。**感覺變慢時先跑這支看 colo，不要先查程式。**
 - 能改善的只有路由本身（Argo Smart Routing / 升級方案）；改 DNS-only 繞過 CF 會曝露 origin IP 並失去 DDoS / WAF / 快取，不採用。
 
+> ⚠️ 以上兩次都是在**舊機 first-laravel** 上量的（「SJC↔VPS 往返 ~135ms」是到舊機）。2026-11-04 換到
+> Tokyo 的新機 kawa-deb 之後**還沒複測**，回源距離變了，這些數字不能直接拿來當新機的基準。
+
 ## blog 搜尋限流（`search` zone，2026-08-27）
 
 `?q=` 的搜尋是全站最貴的公開查詢：列表端點的 `count` 那一半無法靠 LIMIT 提早結束，一個命中大量文章的常見詞 ≈ **60ms 的 PG CPU**（2026-08-27 實測，2000 篇 / 3MB 表）。general 的 30r/s 放進來就是單核吃滿。
@@ -400,7 +403,7 @@ sudo usermod -aG docker kawa                         # 重新登入後生效
 docker compose version && systemctl is-enabled docker   # 必須是 enabled，開機才會自動起容器
 ```
 
-Docker 的 apt 來源**不在** unattended-upgrades 的預設範圍內（只收 Debian-Security），所以 daemon 只會手動升級。
+Docker 的 apt 來源**不在** unattended-upgrades 的預設範圍內（預設只收 Debian 自己的來源：stable 與 Debian-Security），所以 daemon 只會手動升級。
 這是刻意的：daemon 一升級，全部容器都會重啟。
 
 ### 4. fail2ban（原本只在舊機手動設定，2026-11 起記錄在這裡）
@@ -498,7 +501,8 @@ docker run --rm -v /srv:/srv alpine sh -c "mkdir -p /srv/kawa/env && chown -R $(
 照 `env.example/kawa.env` 建 `/srv/kawa/env/kawa.env`。**新站是產新值不是抄舊值**：
 `JWT_SECRET` 產新隨機字串、`POSTGRES_PASSWORD` 自訂（空庫，首次啟動用它初始化，
 `DATABASE_URL` 內密碼要同步）、OAuth secrets 沿用既有 app。
-`cloudflare.ini` 放好後 `chmod 600`。
+`kawa.env` 與 `cloudflare.ini` 放好後都要 `chmod 600`（`kawa.env` 裡有 JWT_SECRET 與 DB 密碼；
+舊機的 `kawa.env` 一直是 `664`，2026-11-04 搬家時才發現）。
 
 ### 2. 部署設定、起服務
 
