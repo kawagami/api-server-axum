@@ -313,11 +313,23 @@ adduser --uid 1001 kawa && usermod -aG sudo kawa   # uid 對齊舊機，見下�
 
 ```bash
 sudo hostnamectl set-hostname kawa-deb
-sudo tee /etc/cloud/cloud.cfg.d/99-kawa.cfg <<'EOT'
-preserve_hostname: true
-manage_etc_hosts: false
-EOT
+echo 'preserve_hostname: true' | sudo tee /etc/cloud/cloud.cfg.d/99-kawa.cfg
+# /etc/hosts 要改 cloud-init 的範本，直接改 /etc/hosts 重開機就沒了
+echo '127.0.1.1 kawa-deb' | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl
 echo '127.0.1.1 kawa-deb' | sudo tee -a /etc/hosts
+```
+
+⚠️ **在 `cloud.cfg.d` 寫 `manage_etc_hosts: false` 沒有用**（2026-11-05 重開機後確認）：Vultr 的 vendor-data
+（`/var/lib/cloud/instance/vendor-cloud-config.txt`）寫著 `manage_etc_hosts: true`，優先權比 `cloud.cfg.d` 高，
+每次開機都會用範本重新產生 `/etc/hosts`。`preserve_hostname: true` 則有效，vendor-data 沒有設這一項。
+同一份 vendor-data 還有 `ssh_pwauth: true`、`disable_root: false`（都被 `00-kawa.conf` 蓋掉），
+以及一個 `linuxuser` 使用者。**Vultr 的 Debian 13 映像檔原本就有 `linuxuser`**（uid 1000、**在 sudo 群組**，
+家目錄的建立時間比開機器還早），就算建機時沒勾 Limited User Login 也一樣。它的密碼是鎖住的、`authorized_keys` 是空的，
+但這是一個用不到、卻有 sudo 權限的帳號，建好 kawa 後就刪掉：
+
+```bash
+sudo passwd -S linuxuser          # 第二欄是 L 代表密碼是鎖住的
+sudo deluser --remove-home linuxuser
 ```
 
 確認 kawa 能用金鑰登入、`sudo -v` 能過之後，**才**關閉密碼與 root 登入（順序反了會把自己鎖在外面，
@@ -623,7 +635,10 @@ sudo rm /etc/sudoers.d/kawa-rsync     # 撤掉暫時權限
 - Cloudflare dashboard → DNS → Records，把 `kawa.homes` / `*.kawa.homes` / `www.kawa.homes` 三筆 A record 的
   **回源 IP** 從舊機改成新機 IP（`api` / `axum` / `media` 都是透過 `*` 連過來，沒有單獨的紀錄）。
   橘雲維持開啟，SSL/TLS 維持 **Full (Strict)**。`_domainconnect` 那筆 CNAME 是 Google Domains 留下來的，不用動。
-- 2026-11-04 搬家：舊機 first-laravel（Ubuntu 20.04）`64.176.40.38` → 新機 kawa-deb（Debian 13）`45.76.102.67`。
+- 2026-11-04 搬家：舊機 first-laravel（Ubuntu 20.04）`64.176.40.38` → 新機 kawa-deb（Debian 13，Tokyo）`45.76.102.67`。
+  舊機 2026-11-05 退租（Vultr Destroy，沒有留 snapshot）。退租前盤點過：沒有自訂 cron 或服務，
+  `/srv/kawa` 以外只剩 docker-env 時代的腳本、已封存的 docker-env repo（沒有未 push 的修改），
+  以及 2023 年的 Laravel 專案（不需要保留）。
 - **GitHub secrets** 更新成新機，否則下次 push 會 deploy 到舊機：
   `VULTR_HOST` / `VULTR_USERNAME` / `SSH_PRIVATE_KEY`（deploy.yml / backend.yml / frontend.yml 三條 CI 共用）。
   CI 是用 **kawa** 登入（2026-11-04 確認：舊機 root 沒有 `authorized_keys`），所以只要新機 kawa 的
