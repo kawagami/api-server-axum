@@ -120,8 +120,23 @@ Docker 常把同一個 IP 配回來，所以它是間歇性的，不會每次部
 - origin 佔 2.5–6%，容器 CPU ≈0、記憶體遠低於上限；同時段 `system_metrics` CPU ~2.7%、steal ≈0。**感覺變慢時先跑這支看 colo，不要先查程式。**
 - 能改善的只有路由本身（Argo Smart Routing / 升級方案）；改 DNS-only 繞過 CF 會曝露 origin IP 並失去 DDoS / WAF / 快取，不採用。
 
-> ⚠️ 以上兩次都是在**舊機 first-laravel** 上量的（「SJC↔VPS 往返 ~135ms」是到舊機）。2026-11-04 換到
-> Tokyo 的新機 kawa-deb 之後**還沒複測**，回源距離變了，這些數字不能直接拿來當新機的基準。
+以上兩次都是**舊機 first-laravel**。2026-11-06 **新機 kawa-deb（Tokyo）複測**（HiNet 固網）—— 換機**沒有改善**，
+三個網域仍落 **SJC**：
+
+| 量測點 | `/health` | `/zh-TW` |
+|---|---|---|
+| origin 直打容器 | ~0ms | 50ms |
+| origin 經 nginx+TLS（`perf-check.sh origin`） | 25ms | 69ms |
+| client 經 CF（SJC），TTFB 中位 | **584ms** | **631ms** |
+
+- 到邊緣 TCP 握手：本站 SJC 141ms、`cloudflare.com`（KHH）中位 18ms。推算 SJC↔VPS 往返約 115–140ms
+  （差在 CF 回源有沒有重用連線；舊機約 135ms）—— 新機到 SJC 的距離跟舊機差不多，**瓶頸仍是 CF 把台灣使用者路由到 SJC**，
+  不是主機。換機房解決不了這件事。
+- origin 比舊機慢：本機 TLS 握手 ~23ms、`/zh-TW` SSR 直打容器 50ms（舊機 20ms）。都是單次取樣，
+  佔整體也只有 4–11%，不影響結論；要追的話多跑幾次，並看 `system_metrics` 的 steal。
+- 容器記憶體（穩態，`docker stats`）：frontend 112M、database 98M、valkey 8M、nginx 7M、backend 7M、certbot 5M，
+  合計約 238M（舊機 08-09 約 337M）。
+- 圖片最佳化正常（w=64 / 256 / 1200 → 782 / 5822 / 45652 bytes，size 隨寬度變化）。
 
 ## blog 搜尋限流（`search` zone，2026-08-27）
 

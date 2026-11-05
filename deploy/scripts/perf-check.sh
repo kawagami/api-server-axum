@@ -126,13 +126,24 @@ echo "── 快取狀態（靜態資源與圖片應為 HIT）"
 JS=$(curl -s --max-time 25 "https://$FRONT_HOST/zh-TW" 2>/dev/null \
      | grep -oE '/_next/static/[A-Za-z0-9/_.-]+\.js' | head -1)
 if [ -n "$JS" ]; then
+    # 先暖一次：CF 快取是 per-colo 的，節點剛換或資產剛部署時第一發必然 MISS，
+    # 那不代表快取沒開。要看的是第二發。
+    curl -sI --max-time 20 "https://$FRONT_HOST$JS" >/dev/null 2>&1
     printf "  %-50s %s\n" "${JS:0:48}" "$(curl -sI --max-time 20 "https://$FRONT_HOST$JS" | tr -d '\r' | awk 'tolower($1)=="cf-cache-status:"{print $2}')"
 fi
 
 echo
 echo "── 圖片最佳化健檢（不同 w 的 size 必須不同）"
-IMG=$(curl -s --max-time 25 "https://$API_HOST/blogs?page=1&per_page=5" 2>/dev/null \
-      | grep -oE "https://$MEDIA_HOST/[A-Za-z0-9._-]+" | head -1)
+# 列表端點不含內文（只有 id / tocs / tags / excerpt …），圖片網址只在單篇的 markdown 裡，
+# 所以從列表拿 id、逐篇抓內容找第一張 media 圖。曾經直接 grep 列表，結果永遠「找不到取樣圖片」
+# 而靜默跳過整個健檢（2026-11-06 發現）。
+IMG=""
+for ID in $(curl -s --max-time 25 "https://$API_HOST/blogs?page=1&per_page=20" 2>/dev/null \
+            | grep -oE '"id":"[0-9a-f-]{36}"' | cut -d'"' -f4); do
+    IMG=$(curl -s --max-time 25 "https://$API_HOST/blogs/$ID" 2>/dev/null \
+          | grep -oE "https://$MEDIA_HOST/[A-Za-z0-9._-]+" | head -1)
+    [ -n "$IMG" ] && break
+done
 if [ -z "$IMG" ]; then
     echo "  (找不到取樣圖片，略過)"
 else
