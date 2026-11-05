@@ -50,10 +50,11 @@ impl TorrentManager {
         // librqbit 9 的招牌改動是「預設全走 dualstack IPv6 + IPv4」：
         // `SessionOptions::default()` 的 `ipv4_only` 是 false、`dht` 是 Some，於是 DHT
         // 的 UDP socket 綁 `[::]`、outgoing peer 連線也會去撥 v6 peer。
-        // 而這台 VPS 從來沒有可用的 IPv6（無全域位址、無 `::/0`），宿主機已於
-        // 2026-08-09 整台關掉 —— 理由見 deploy/README.md「主機 IPv6：必須整台關掉」。
+        // 而 production 的 VPS 從來沒有可用的 IPv6（無全域位址、無 `::/0`），宿主機整台關掉
+        // （舊機 2026-08-09、2026-11-04 換的新機 kawa-deb 建機時就關）—— 理由見
+        // deploy/README.md「主機 IPv6：必須整台關掉」。
         //
-        // ⚙ 2026-08-23 升 9 時在 production 量過這三格（在 backend 的 netns 內）：
+        // ⚙ 2026-08-23 升 9 時在 production（舊機）量過這三格（在 backend 的 netns 內）：
         //   /proc/sys/net/ipv6/conf/all/disable_ipv6 → 1
         //   /proc/net/if_inet6                       → 檔存在但內容全空（模組有載、零位址）
         //   bind(AF_INET6, "::", 0)                  → **成功**

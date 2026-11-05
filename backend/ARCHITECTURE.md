@@ -771,7 +771,7 @@ Docker build 是 `rust:bookworm`（glibc 動態連結）→ `gcr.io/distroless/c
 `docker pull`。**三個不同的成因，別混為一談**：
 
 1. **宿主機 IPv6 半殘** —— 沒有可用的 IPv6 卻開著 stack，glibc 與 Go 都先試 AAAA 再撞牆。
-   已於 08-09 08:46 (UTC) 在宿主機關閉。修好的是 dockerd 與 lettre。
+   舊機於 08-09 08:46 (UTC) 在宿主機關閉；2026-11-04 換的新機 kawa-deb 建機時、裝 Docker 前就關了。修好的是 dockerd 與 lettre。
 2. **Docker 內嵌 DNS 冷快取回 AAAA-only** —— 容器重啟後第一個對外請求偶爾中；
    hyper 只在解析結果同時有 A 與 AAAA 時才會退回 v4，AAAA-only 就沒有 fallback 可退。
    **第 1 點修完之後這個還在**（08-09 16:14 又中一次）。
