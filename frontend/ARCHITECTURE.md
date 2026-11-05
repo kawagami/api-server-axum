@@ -368,12 +368,12 @@ base URL：`process.env.API_URL`（`https://api.kawa.homes`，舊名 `axum.kawa.
 - **`games/page.tsx` 與 `tools/page.tsx` 完全同構**（diff 只有 8 處、每處一行：`GAMES`↔`TOOLS`、namespace、路徑），可抽 `<NavHubPage>`。
 - **後台還有 5 處破壞性確認用原生 `confirm()`**（users / messages / passkeys / blog-comments / torrents，2026-10-06 數），`<ConfirmDialog>` 只有 blogs 清單與 `tag-manager` 兩個消費點。理由見該元件檔頭（停用原生對話框時 `confirm()` 直接回 `false`，按刪除完全沒反應）。
 - `useFilterUrl` 只有 5 個消費點（logs / audit_logs / gov_tenders / vocab / blogs），但 `messages-client` / `blog-comments-client` / `metrics-audit-panel` 也有 filter 卻沒同步 URL（覆蓋不足，非重複）。
-- `admin/` 28 個 page **完全沒有 error boundary**（2026-09-05 重數；前台只有 2 個 `error.tsx`）。
+- `admin/` 29 個 page **完全沒有 error boundary**（2026-11-06 重數，10-31 加檔案直傳；前台只有 2 個 `error.tsx`）。
 - **`(public)/loading.tsx` 是裸的 `Loader2` spinner，不是骨架**（2026-08-30）。它是整個前台的 fallback ——沒有自帶 `loading.tsx` 的頁全吃它，等於違反「前台資料頁一律用 `PublicPageSkeleton`」那條自家規則。`blogs/` 那 3 支自訂骨架則是**列明例外**（檔頭有註解：要對齊 blog 卡片／文章版面，`list`/`cards`/`form` 三種 variant 都套不上），別把它們一起改掉。
 - `vocab` 與 `vocab-ja` 的 page **重複已收斂**（2026-08-21）：資料抓取集中在 `vocab/load.ts` 的 `loadVocabPage(language)`，兩支 page 各剩約 20 行（只差 `language` 與 JMdict 標註）。仍有的是 `vocab-ja` 跨目錄 import `../vocab/{vocab-client,load}` —— 要徹底解掉得做成 `vocab/[lang]/page.tsx`，但兩頁路徑已對外（含 sitemap / site-nav），改動範圍遠大於剩下的重複量。
 
 ### 未採用 Cache Components / Partial Prefetching（2026-10-20 評估，刻意延後）
-Next 16.3 的 Partial Prefetching、16.4 的 `navigation()` / `'use cache: private'` / `instant()`（`@next/playwright`）都**要先開 `cacheComponents: true` + `partialPrefetching: true`**；16.4 起 `create-next-app` 預設就開，官方主推這條路，遲早要遷。評估當下不做的理由是流量小、單機自架、1G RAM，回頭看到 skeleton 也不是痛點（已有 38 個 `loading.tsx`，預設 prefetch 抓到 loading 邊界就夠快）。真要遷時的阻礙，依處理順序：
+Next 16.3 的 Partial Prefetching、16.4 的 `navigation()` / `'use cache: private'` / `instant()`（`@next/playwright`）都**要先開 `cacheComponents: true` + `partialPrefetching: true`**；16.4 起 `create-next-app` 預設就開，官方主推這條路，遲早要遷。評估當下不做的理由是流量小、單機自架、1G RAM，回頭看到 skeleton 也不是痛點（已有 39 個 `loading.tsx`，預設 prefetch 抓到 loading 邊界就夠快）。真要遷時的阻礙，依處理順序：
 1. **root layout 讀 `cookies()`**（`app/layout.tsx`）：`<html>` 的 `dark` class、`hasSession` 都靠它。cacheComponents 下在 `<Suspense>` 外讀未快取資料會 build 失敗，而 `<html>` 包不進 Suspense —— 深淺色得改成 client 端讀 cookie（head inline script 已有 `followSystem` 的先例），`hasSession` 下放到 Suspense 內的 client 元件。
 2. **`(public)/layout.tsx` 也讀 `cookies()`**（member JWT 驗證 + 深淺色），同樣要拆進 Suspense。
 3. **next-intl 的 `getLocale()`** 讀 request，要改走 `params.locale` + `setRequestLocale`，牽動全部頁面。
@@ -391,5 +391,5 @@ Next 16.3 的 Partial Prefetching、16.4 的 `navigation()` / `'use cache: priva
 - `next/image` 慣例乾淨：5 處原生 `<img>` 全部帶 eslint-disable 且全部是列明例外（blob 預覽 / 外部 avatar）。
 - `gray` / `slate` / `zinc` / `indigo` 全庫 0 命中。
 - **`useAlarm` 與 `useTimer` 的倒數狀態機早就抽好了** —— `hooks/useCountdownCore.ts`（對齊秒邊界的 tick、剩餘秒數、到點轉響鈴、暫停／清除），兩支都用它。舊版技術債清單曾把它列成「可抽 `useCountdownTo`」，那條在 2026-08-30 確認過期並刪除，別再提案。
-- **`components/loading/*` 的 4 支骨架都有多個消費點**，不是為抽而抽（`PublicPageSkeleton` 前台全用、`table-skeleton` 的兩支後台 17 檔（loading.tsx 11 + page 的 Suspense fallback 6）、`form-skeleton` 3 檔、`chart-page-skeleton` 2 檔，2026-10-06 重數）。
+- **`components/loading/*` 的 4 支骨架都有多個消費點**，不是為抽而抽（`PublicPageSkeleton` 前台全用、`table-skeleton` 的兩支後台 17 檔（loading.tsx 11 + page 的 Suspense fallback 6）、`form-skeleton` 4 檔、`chart-page-skeleton` 2 檔，2026-11-06 重數）。
 - **全庫沒有孤兒模組**：`components` / `libs` / `hooks` / `api` / `types` 逐檔掃 alias + 相對路徑 import，零死碼（2026-08-30）。
