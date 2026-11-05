@@ -45,12 +45,12 @@ x-logging-quiet: &logging-quiet
     options: { max-size: "10m", max-file: "2" }
 
 # ── 資源上限 ────────────────────────────────────────────────────────────────
-# 這台是 1 核 1G，**沒有 swap**（2026-08-09 實測 `SwapTotal: 0 kB`）。在加上限之前
+# 這台是 1 核 1G。2026-11-04 起是新機 kawa-deb，**有 2.3G swap**（Vultr 映像檔內建）。
+# 舊機 first-laravel 從頭到尾都是 0 swap（2026-08-09 實測 `SwapTotal: 0 kB`），而且在加上限之前
 # 完全沒有任何 mem_limit，2026-07-18 就發生過整機 OOM、killer 挑中 backend 把它殺掉。
 #
-# ⚠ 這行以前寫「1 核 1G（+2G swap）」，是錯的 —— `deploy/README.md` 的**換機** runbook
-#   有「開 swap」那一步，但現行這台從來沒做過，註解照著 runbook 假設了沒發生的事。
-#   要加的話見 README 那節（磁碟只剩約 8.6G 且 torrent 還在寫，開 1G 就好、別開 2G）。
+# ⚠ 這行以前寫「1 核 1G（+2G swap）」，是錯的 —— 照著 README 換機 runbook 的「開 swap」步驟
+#   假設了舊機上沒發生的事。要確認現況一律在 VPS 上跑 `free -h`，不要讀註解推論。
 #
 # 加上限的意義是「爆的是單一容器、有明確 log、其他服務活著」，而不是整機被 killer
 # 隨機挑一個殺。代價：設太低會讓容器在正常尖峰被 OOM-kill，所以第一版刻意寬鬆。
@@ -68,17 +68,23 @@ x-logging-quiet: &logging-quiet
 #   capabilities"），Docker 對 swap 根本沒有任何限制。改寫時留了一句「結論（失控的
 #   容器會先變慢而不是立刻被殺）碰巧仍成立」—— **那句在 0 swap 下也是錯的**，沒有
 #   swap 就沒有「先變慢」那一段，撞到上限就是回收活鎖或直接被殺。
-#   ⇒ 現況下不設 memswap_limit 純粹是因為設了也無效。哪天真的開了 swap，要靠它擋
-#     容器仍得先在 kernel cmdline 開 `swapaccount=1`。
+#   ⇒ 在舊機上，不設 memswap_limit 純粹是因為設了也無效。
+#   ⚠ 以上都是舊機（kernel 5.4）的實測。**新機 kawa-deb（kernel 6.12 + cgroup v2）結論相反**，
+#     2026-11-04 實測：`docker info` 沒有 `No swap limit support` 警告，cgroup 的
+#     `memory.swap.max` 等於各自的 mem_limit（backend / frontend 335544320、database 402653184）
+#     ⇒ 最早那句「未設時允許再用等量 swap」在新機上成立：每個容器是 mem_limit 的 RAM + 等量 swap。
+#     刻意維持不設 memswap_limit：撞到上限時先換出變慢、不會立刻被殺；上限合計約 1.4G，
+#     2.3G swap 裝得下。代價是失控的容器會拖慢整機的磁碟 I/O。
+#     查實際值：`cat /sys/fs/cgroup/system.slice/docker-$(docker inspect -f '{{.Id}}' backend).scope/memory.swap.max`
 #
-# ── 實測值（2026-08-09，`docker stats --no-stream`；穩態、非尖峰）────────────
+# ── 實測值（2026-08-09 舊機，`docker stats --no-stream`；穩態、非尖峰）──────────
 #   frontend 179.5M/320m(56%)  database 113.2M/384m(29%)  certbot 16.7M/256m(7%)
 #   backend   15.4M/320m(4.8%) nginx      7.1M/64m(11%)   valkey    4.9M/160m(3%)
 #   容器合計約 337M；host（dockerd/containerd/sshd/systemd）另約 99M。
 #   整機 MemTotal-MemAvailable 約 684M（69%），比容器合計高的部分主要是
 #   `Shmem` 約 82M（PG shared_buffers，算在 Cached 裡但 0 swap 下回收不掉）。
 #   /admin/metrics 的 7 天曲線：mem_used 568–748M 上下震盪、無單調爬升＝穩態不是洩漏。
-#   ⇒ 結論：這組上限**不需要收緊**（見上面「調低不會多出可用記憶體」）。真正該補的是 swap。
+#   ⇒ 結論：這組上限**不需要收緊**（見上面「調低不會多出可用記憶體」）。真正該補的是 swap（換新機後已經有了）。
 x-hardening: &hardening
   security_opt:
     - no-new-privileges:true

@@ -211,10 +211,10 @@ curl -sI https://api.kawa.homes/blogs -H 'Cookie: a=b' | grep -i x-cache-status 
 
 ## 主機 IPv6：必須整台關掉（2026-08-09）
 
-這台 VPS（以及任何同型新機）**沒有可用的 IPv6，但 IPv6 stack 開著**（`ip -6 addr` 只有 `fe80::`、
-`ip -6 route` 沒有 `::/0`）。glibc / Go 因此以為有 v6，對外連線先試 AAAA 再撞牆 —— SMTP 寄信中過。
+Vultr 的機器（舊機 first-laravel、新機 kawa-deb 都是）建機時沒勾 Public IPv6，就**沒有可用的 IPv6，但 IPv6 stack 開著**
+（`ip -6 addr` 只有 `fe80::`、`ip -6 route` 沒有 `::/0`）。glibc / Go 因此以為有 v6，對外連線先試 AAAA 再撞牆 —— SMTP 寄信中過。
 （當時一併歸因的 OAuth 與 `docker pull` 事後查明關 IPv6 修不到：前者見下節「DNS 抖動」、後者見下方
-「關了也還在的東西」。）現行這台已於 2026-08-09 08:46 (UTC) 關閉。
+「關了也還在的東西」。）舊機於 2026-08-09 08:46 (UTC) 關閉；新機 kawa-deb 在 2026-11-04 建機時、裝 Docker 之前就關了。
 
 ### 修法與**不可顛倒的順序**
 
@@ -286,7 +286,7 @@ bootstrap 與搬家 runbook 共用的主機層步驟。主機只負責「開機�
 
 ### 為什麼換機、為什麼選 Debian
 
-- 現行這台（`first-laravel`）是 **Ubuntu 20.04 + kernel `5.4.0-170`**。20.04 的標準支援 2025-05 已結束，
+- 舊機（`first-laravel`，2026-11-04 已被 kawa-deb 取代）是 **Ubuntu 20.04 + kernel `5.4.0-170`**。20.04 的標準支援 2025-05 已結束，
   而且**沒接 Ubuntu Pro**（2026-11-01 `pro status` 確認）⇒ 核心與大部分套件從那之後**沒有任何安全更新**。
   教訓不在發行版本身，而是**沒開自動更新、沒人盯 EOL**。
 - 選 **Debian 13（trixie）**：1G 記憶體下沒有 snapd、預設服務少；核心安全修補快（2026-10 的
@@ -358,8 +358,9 @@ sudo apt install -y rsync curl ca-certificates
   free -h   # 驗證：SwapTotal 不能是 0
   ```
 
-  `swappiness=10` 讓它只在真的吃緊時才換出，平時不拖慢反應。尺寸從 2G 改成 1G：
-  舊機磁碟 14.8/23.4 GB，torrent 還在寫，2G 太貪。
+  `swappiness=10` 讓它只在真的吃緊時才換出，平時不拖慢反應。手動建的話 1G 就夠了（當初是因為舊機磁碟
+  已經用了 14.8/23.4 GB）。新機 kawa-deb 沿用映像檔內建的 2.3G：23G 磁碟裝完只用了 5.2G，
+  `/srv/kawa` 全部資料也只有大約 350MB（2026-11-04 實測），空間很充裕。
 
   > ⚠️ **舊機（first-laravel）從來沒做過這一步**，2026-08-09 實測 `SwapTotal: 0 kB`。
   > `docker-compose.yml` 的資源上限註解一度寫「1 核 1G（+2G swap）」，就是照本節假設了
@@ -402,7 +403,7 @@ sudo tee /etc/fail2ban/jail.local <<'EOT'
 [sshd]
 enabled  = true
 port     = ssh
-filter   = sshd
+filter   = sshd[mode=aggressive]
 backend  = systemd
 
 maxretry = 3
@@ -418,6 +419,18 @@ sudo systemctl restart fail2ban
 `backend = systemd` 是必要的：Debian 12 起預設不裝 rsyslog，沒有 `/var/log/auth.log`，用檔案 backend 的
 sshd jail 會起不來，或是什麼都抓不到。`maxretry = 3`，所以下面的驗證只要失敗一次就好，
 連試三次會 ban 到自己。被 ban 了就從供應商的網頁 console 執行 `fail2ban-client set sshd unbanip <IP>`。
+
+**`mode=aggressive` 是必要的**（2026-11-04 新機上線當天發現）：關掉密碼登入之後，掃描器試 root 時沒機會送密碼，
+log 只會留下 `Connection closed by authenticating user root ... [preauth]`。預設的 `mode=normal` 不算這種紀錄，
+結果同一個 IP 每 1.5–2 分鐘試一次、試了一個多小時都沒被 ban。用今天的 log 實測：normal 只抓到 8 行，aggressive 抓到 46 行：
+
+```bash
+sudo fail2ban-regex systemd-journal "sshd[mode=normal]" | grep -A1 '^Lines'
+sudo fail2ban-regex systemd-journal "sshd[mode=aggressive]" | grep -A1 '^Lines'
+```
+
+（`journalmatch` 不能從命令列傳進去，寫成 `systemd-journal[journalmatch=...]` 會報 `TypeError`。filter 本身已經定義了，直接用 `systemd-journal` 就好。）
+副作用：自己連線時，在金鑰密碼的提示出現時按 Ctrl+C 中斷，也會被算一次失敗。
 
 **驗證（這是靜默失敗型的設定，一定要做）**：從別台用不存在的帳號連一次（`ssh no-such-user@新機IP`），
 `sudo fail2ban-client status sshd` 的 `Total failed` 要增加。2026-11-04 在 Debian 13 實測可以抓到：
@@ -626,6 +639,9 @@ curl -s https://api.kawa.homes/health   # {"status":"ok"}（根路徑無路由�
 # 瀏覽器：前台登入（驗 JWT_SECRET 搬對）、後台登入、WS 頁面、圖片/torrent 讀取
 ```
 
+- 從新機 kawa 的 `authorized_keys` 移除搬資料用的舊機金鑰（`sed -i '/kawa@<舊機hostname>/d' ~/.ssh/authorized_keys`）。
+  回滾用不到這把金鑰，留著的話，舊機一旦被入侵就能直接登入新機。
+- 新機 `kawa.env` 確認是 `600`（`ls -l /srv/kawa/env/kawa.env`；舊機搬過來時是 `664`，`rsync -a` 會把權限原樣帶過來）。
 - 站台穩定幾天後才關舊機、退租。
 - **回滾**：Cloudflare 回源 IP 指回舊機 + GitHub secrets 還原 + 舊機 `compose up -d`（舊機資料還在）。
 
