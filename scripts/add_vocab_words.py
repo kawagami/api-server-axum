@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """單字題庫擴充工具:驗證生成批次、去重、輸出 migration。
 
-流程(完整規則見 docs/2026-07-08-vocab-word-seeding.md):
+流程(完整規則見 docs/2026-07-08-vocab-word-seeding.md —— docs/ 不進版控,只存在原本機):
   1. 取得現有字清單(餵給生成 model 當排除清單):
        python3 scripts/add_vocab_words.py --print-existing
   2. 任意 model 依規則文件生成批次 SQL 後,驗證 + 組裝 migration:

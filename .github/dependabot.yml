@@ -54,7 +54,8 @@ updates:
       # ⚠ update-types 不可省：少了它，major 也會被掃進這個群組而「看起來只是例行更新」。
       # 2026-07-25 就發生過 —— 一個標題寫 dev-dependencies 的 PR 裡包了
       # eslint 9→10（本專案明確釘 v9，eslint-config-next 尚不相容 v10）、
-      # tailwindcss 3→4（v4 廢掉 tailwind.config.js，會讓整套主題 CSS variables 崩）、
+      # tailwindcss 3→4（v4 廢掉 tailwind.config.js，會讓整套主題 CSS variables 崩；
+      # 後來以 ef4eb71 手動遷完，現已是 v4）、
       # typescript 6→7。major 一律單獨開 PR，才擋得掉。
       dev-dependencies:
         dependency-type: development

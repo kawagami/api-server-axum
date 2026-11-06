@@ -3,6 +3,7 @@
 > **本檔是前後端唯一的協定來源，進版控。** 2026-09-25 由原本只存在本機、不進版控的 `docs/old/` 四份文件整合而來
 > （`chess-wire-protocol.md` + 西洋棋/圍棋、阿瓦隆、農場三份前端交付說明）。各章節內容照搬原文，
 > 只改了三處已確認過時的敘述（遊戲清單、legacy echo、「本檔讀不到」），並拿掉已全數完成的「前端 TODO」清單。
+> 2026-11-07 再對照程式碼更正：`bad_coord` / `NotYourTurn` 的歸屬（見附錄）、阿瓦隆 `good_three_quests` 實際不會送出、原文的「對象 `blog-next`」改指 monorepo `frontend/`。
 >
 > 後端實作：`backend/src/games/common/`（共用框架）+ `backend/src/games/<game>/`；分派入口 `backend/src/services/ws/socket.rs::dispatch_game`。
 > 前端實作：`frontend/app/[locale]/(public)/games/_shared/`（2 人框架）與各遊戲目錄。
@@ -185,7 +186,8 @@
 `checkmate` / `stalemate`（困斃，被困方判負）/ `timeout` / `resign` / `disconnect` / `draw_60`
 
 `illegal_move.reason`（⚠️ 大小寫混合）：
-- 引擎規則（PascalCase）：`NotYourTurn` `NoPiece` `WrongPiece` `CaptureOwn` `BadMove` `BlockedPath` `BadHorseLeg` `BadElephantEye` `CrossRiver` `OutOfPalace` `FlyingGeneral` `LeavesKingInCheck`
+- 框架層（PascalCase，**2 人框架五款遊戲都會回**，見附錄）：`NotYourTurn`
+- 引擎規則（PascalCase）：`NoPiece` `WrongPiece` `CaptureOwn` `BadMove` `BlockedPath` `BadHorseLeg` `BadElephantEye` `CrossRiver` `OutOfPalace` `FlyingGeneral` `LeavesKingInCheck`
 - 協定層（snake）：`bad_coord`
 
 `error.reason`（snake）：
@@ -204,7 +206,7 @@ WS close → server 偵測：
 
 ### 附錄：五子棋 / 暗棋與象棋的差異
 
-上方「座標系 / 初始局面 / check / reason 列舉」皆**象棋**。大廳 / 桌位 / 配對 / `match_found` / `move_made` 外殼（`turn` + `clock`）/ `game_over` / `error` / 斷線/計時**三遊戲共用**。共用的 harness 級 `game_over.reason`：`timeout` / `resign` / `disconnect`；`error.reason`：`already_committed` / `bad_table_id` / `table_not_found` / `table_full` / `cannot_join_self` / `not_in_game` / `game_ended` / `bad_coord`。
+上方「座標系 / 初始局面 / check / reason 列舉」皆**象棋**。大廳 / 桌位 / 配對 / `match_found` / `move_made` 外殼（`turn` + `clock`）/ `game_over` / `error` / 斷線/計時**三遊戲共用**。共用的 harness 級 `game_over.reason`：`timeout` / `resign` / `disconnect`；`error.reason`：`already_committed` / `bad_table_id` / `table_not_found` / `table_full` / `cannot_join_self` / `not_in_game` / `game_ended` / `too_many_tables`；`illegal_move.reason`：`NotYourTurn`（框架層判定，各遊戲清單不再重列）。`bad_coord`（座標缺漏 / 格式錯）走的是 **`illegal_move`** 而非 `error`，五款都有，已列在各遊戲的 `illegal_move.reason`。
 
 `move_made.data` 一律含 `turn`（下一手輪到誰，值見各遊戲 color 標籤）與 `clock`（鍵 = 兩方 color 標籤，值剩餘 ms），外加各遊戲自有欄位（見下）。`match_found.data.color` = 我方 color 標籤。
 
@@ -262,7 +264,7 @@ WS close → server 偵測：
 ## 二、西洋棋 + 圍棋
 
 > 日期：2026-06-19
-> 對象：前端（`blog-next`）
+> 對象：前端（原 `blog-next` repo，現為 monorepo `frontend/`）
 > 摘要：後端新增兩款遊戲，都接在既有共用對戰框架上。**大廳 / 桌位 / 配對 / 計時 / 斷線 / game_over 流程與象棋完全相同**，差別只在 `game` id、座標系、move 內容、顏色標籤、reason。本檔只列差異；通用流程見第一章。
 
 ---
@@ -362,7 +364,7 @@ WS close → server 偵測：
 ## 三、阿瓦隆 Avalon
 
 > 日期：2026-06-19
-> 對象：前端（`blog-next`）
+> 對象：前端（原 `blog-next` repo，現為 monorepo `frontend/`）
 > 摘要：社交推理 N 人遊戲。**與既有 2 人對戰框架完全不同**：N 人房、私有角色、階段機、投票、內建聊天。共用同一條 `/ws` 與信封 `{ game, type, data }`（`game = "avalon"`），但**不用** chess/go 那套大廳/桌位/Fischer 計時流程。本檔是 avalon 完整協定。
 
 ### ⚠️ 開工前先記三件事
@@ -503,7 +505,7 @@ game_over     : 揭露全角色
 > 7 人以上的**第 4 輪**（round index 3）需 **2 張失敗票**才算任務失敗（其餘 1 張即敗）。
 
 ### reason 列舉
-- `game_over.reason`：`good_three_quests`(無刺客時，本設定恆有刺客故少見) / `good_assassin_miss` / `evil_three_fails` / `evil_five_rejects` / `evil_assassinate`
+- `game_over.reason`：~~`good_three_quests`~~（後端不會送出：本設定恆有刺客，三次任務成功一律進刺殺階段，由 `good_assassin_miss` / `evil_assassinate` 決勝）/ `good_assassin_miss` / `evil_three_fails` / `evil_five_rejects` / `evil_assassinate`
 - `room_closed.reason`：`host_left` / `aborted`（對局中有人斷線→中止）
 - `error.reason`：`already_committed` / `bad_room_id` / `room_not_found` / `room_full` / `already_started` / `not_in_room` / `not_host` / `cannot_start` / `not_in_game` / `not_leader` / `bad_team` / `bad_team_size` / `wrong_phase` / `bad_vote` / `bad_card` / `not_on_team` / `good_must_succeed` / `bad_target` / `not_assassin` / `too_many_special_evil` / `bad_player_count`
 
@@ -517,7 +519,7 @@ game_over     : 揭露全角色
 ## 四、農場經營 Farm（家庭版 worker-placement）
 
 > 日期：2026-06-19
-> 對象：前端（`blog-next`）
+> 對象：前端（原 `blog-next` repo，現為 monorepo `frontend/`）
 > 摘要：2–4 人、**完全資訊**的 worker-placement 經營遊戲（原創機制，非任何商業桌遊的素材/文案）。沿用 `/ws` 與信封 `{ game:"farm", type, data }`。大廳/房流程與阿瓦隆相同；**對局每次動作後 server 廣播完整盤面**（無私有狀態）。本檔是 farm 完整協定。
 
 ### 開工前（必讀）

@@ -13,7 +13,7 @@
 ├── backend/            # Rust / Axum API 伺服器
 ├── frontend/           # Next.js 前台 + 後台
 ├── deploy/             # VPS 部署編排(compose / nginx / certbot),詳見 deploy/README.md
-├── protocol/           # 跨前後端協定文件(games-wire.md:對戰遊戲 WS 協定權威)
+├── protocol/           # 跨前後端協定文件(games-wire.md:對戰遊戲 WS 協定、transfer-wire.md:檔案直傳 signaling,皆為權威)
 ├── scripts/            # 維運 / 資料匯入腳本(kawa-logs 查 production log、單字題庫匯入)
 └── .github/
     ├── dependabot.yml  # cargo / npm / actions / docker 基底 image 依賴更新 PR
@@ -91,7 +91,7 @@ cd frontend && pnpm install && pnpm dev
 - **Path-based CI**:改 `backend/**` 只觸發 `backend.yml`、改 `frontend/**` 只觸發 `frontend.yml`、改 `deploy/**` 只觸發 `deploy.yml`(同步編排設定,不重 build image),互不重複執行。改 workflow 檔本身也會觸發該條。
 - **PR 只跑驗證**:前後端 PR 只跑 `test`、`deploy.yml` 的 PR 只跑 `nginx -t`(自簽憑證);不推 image、不碰 VPS。Dependabot PR 靠這段驗證。
 - 前後端 workflow 拆成 `test`(後端 layering 檢查 + clippy + cargo test、前端 tsc --noEmit + eslint + 慣例檢查腳本)、`build`(build+push image)與 `deploy`(SSH VPS)三段。**`build` 刻意不掛 `needs: test`,與 test 並行**(build 是全新 runner、用不到 test 的產物,並行省掉整個 test 的時間);閘門掛在 `deploy: needs: [test, build]` —— **test 不過不會部署,但 image 仍會被推上 Docker Hub**,所以 `:latest` 有可能指向沒過測試的 commit,手動 `docker pull :latest` 前要留意。三條的 `deploy` 共用 `concurrency: vps-deploy`,**build 並行、部署序列化**,避免同時動 VPS 撞車。
-- `deploy.yml` push 流程:上傳到 VPS staging 目錄 → `docker compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `docker compose up -d` → 一次性容器跑 `nginx -t` → 重建 nginx 容器 → 打 `https://api.kawa.homes/health` 冒煙檢查。
+- `deploy.yml` push 流程:上傳到 VPS staging 目錄 → `docker compose config` 驗證 → rsync 覆蓋 `~/kawa-deploy` → `docker compose up -d` → `docker pull nginx:alpine`(浮動 tag,`up -d` 不會自己拉新版)→ 一次性容器跑 `nginx -t` → 重建 nginx 容器 → 打 `https://api.kawa.homes/health` 冒煙檢查 → 通過才 prune 舊 image。
 - image 同時推 `:latest`(部署契約)與 `:<commit sha>`(回滾用)。
 - **push `master` = 直接上 production**(test 與 build image 並行 → 兩者都過才 SSH VPS → pull + 重啟)。
 - 環境變數一律 **runtime 注入**,image 內不烤設定值;秘密值只存在 VPS `/srv/kawa/env/`(範例見 `deploy/env.example/`)。

@@ -2,7 +2,7 @@
 """日文題庫匯入工具:JMdict × JLPT 字表 → 翻譯 TSV → 驗證 → migration。
 
 與英文版(add_vocab_words.py)不同,讀音/詞性/表記取 JMdict 權威值,
-LLM 只負責把英文 gloss 翻成中文釋義;規格見 docs/2026-07-10-japanese-vocab-mvp-spec.md。
+LLM 只負責把英文 gloss 翻成中文釋義;規格見 docs/2026-07-10-japanese-vocab-mvp-spec.md(docs/ 不進版控,只存在原本機)。
 
 流程:
   1. 抽取(配對 JMdict、產出待翻譯 TSV;meaning_zh 欄留空):
