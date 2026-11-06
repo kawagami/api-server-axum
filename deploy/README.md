@@ -484,6 +484,18 @@ sudo unattended-upgrade --dry-run --debug 2>&1 | grep -i 'allowed origins'   # �
 - 只有裝了需要重開的更新（主要是核心）才會真的重開，通常每月 0–2 次。
 - **重開會清空 valkey，全站會員和 admin 都會被登出**（見「邊界原則」的 valkey 段）。這是用來換核心修補的代價。
 
+**看到新聞說 Debian 修了某個 CVE、想確認自己有沒有補上**，不用一則一則對，用 `debsecan` 一次列出
+「Debian 已經修好、但這台還沒裝」的套件，沒有輸出就代表都補上了：
+
+```bash
+sudo apt install -y --no-install-recommends debsecan   # 一定要加，不然會順便裝郵件伺服器 exim4
+debsecan --suite trixie --only-fixed --format packages
+uname -r; cat /var/run/reboot-required 2>/dev/null     # 核心要重開機才會生效，另外確認
+```
+
+2026-11-06 第一次裝的時候沒加 `--no-install-recommends`，exim4 被當成建議套件一起裝了進來，
+還設成開機自動啟動、監聽 `127.0.0.1:25`，事後才 purge 掉。
+
 ### 6. 驗收
 
 ```bash
