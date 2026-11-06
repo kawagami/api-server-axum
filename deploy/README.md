@@ -75,6 +75,22 @@ sudo du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail
 - 改 `backend/**` / `frontend/**` → 各自 workflow build image 後 SSH：`cd ~/kawa-deploy && docker pull … && docker compose up -d` → **`nginx -s reload`**（原因見下）。
 - 三條 deploy 共用 `concurrency: vps-deploy`，序列化不撞車。
 
+### `docker ps` 的 IMAGE 欄顯示一串 ID，而不是 image 名稱 —— 通常不是部署失敗
+
+新機（kawa-deb）的 Docker 用 containerd image store（`docker info --format '{{.Driver}}'` 是 `overlayfs`），
+image ID 是用 manifest 算的。只改文件的 push（例如 frontend 的 README）會讓 build 完全命中快取，產出**內容相同**的 image，
+但推到 Docker Hub 後 manifest 外層的中繼資料不同，pull 下來就是**新 ID**。compose 判斷內容沒變，不會重建容器；
+`:latest` 標籤已經指到新 ID，所以 `docker ps` 只能用 ID 顯示正在跑的舊 image。
+
+2026-11-06 的 frontend 就是這樣：新舊 image 的 `Created` 一樣到奈秒，`RootFS.Layers` 也完全相同。確認方式：
+
+```bash
+docker image inspect <ps 上的 ID> --format '{{json .RootFS.Layers}}' | sha256sum
+docker image inspect kawagami77/my-next-blog:latest --format '{{json .RootFS.Layers}}' | sha256sum
+```
+
+兩個一樣就什麼都不用做；不一樣才是真的沒更新到，要 `docker compose up -d --force-recreate <服務>` 再 reload nginx。
+
 ### ⚠ 換 image 後必須 reload nginx —— upstream IP 會過期
 
 `upstream backend_app` / `frontend_app`（`conf.d/02-proxy.conf`）的 `server backend:3000` 是**靜態 hostname**，
