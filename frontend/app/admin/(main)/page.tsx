@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { unstable_rethrow } from "next/navigation";
 import { FileText, Users, MessageSquare, Radio, Mail, type LucideIcon } from "lucide-react";
 import PageHeader from "@/components/admin/page-header";
 import { getBlogs } from "@/api/blogs";
@@ -17,26 +19,69 @@ export const metadata: Metadata = {
     description: "後台總覽",
 };
 
-// 單一端點掛掉不應整頁白屏：取值失敗回 null（顯示 —）
-async function safe<T>(p: Promise<T>): Promise<T | null> {
-    try {
-        return await p;
-    } catch {
-        return null;
-    }
-}
+const PULSE = "bg-neutral-200 dark:bg-neutral-700 rounded-sm animate-pulse";
 
 interface Stat {
     label: string;
-    value: number | null;
-    hint?: string;
     href: string;
     icon: LucideIcon;
     permission: string;
     feature?: string;
+    // 延遲取值：只有通過權限／功能開關過濾的卡片才會真的呼叫，沒權限的端點不打（避免白打 403）
+    load: () => Promise<number>;
 }
 
-function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
+const STATS: Stat[] = [
+    { label: "文章", href: "/admin/blogs", icon: FileText, permission: "blog:read", feature: "blog",
+        load: async () => (await getBlogs({ per_page: 1 })).total },
+    { label: "文章留言", href: "/admin/blog-comments", icon: MessageSquare, permission: "comment:read", feature: "blog",
+        load: async () => (await getAllBlogComments(1, 1)).total },
+    { label: "訪客留言", href: "/admin/messages", icon: Mail, permission: "message:read", feature: "message",
+        load: async () => (await getContactMessages(1, 1)).total },
+    { label: "會員", href: "/admin/members", icon: Users, permission: "member:read",
+        load: async () => (await getMembers()).total },
+    { label: "線上連線", href: "/admin/ws", icon: Radio, permission: "ws:read",
+        load: async () => (await getWsConnections()).length },
+];
+
+// 數值列與提示列的高度（text-3xl 行高 = h-9、提示列 h-4）：骨架、成功、失敗三態共用，串流替換時卡片不跳
+const VALUE_ROW = "h-9 text-3xl font-bold text-neutral-800 dark:text-neutral-100";
+const HINT_ROW = "h-4 text-xs";
+
+/**
+ * 單卡取值。各卡包自己的 Suspense：慢的端點只讓那張卡停在骨架，不拖住整頁。
+ * 失敗與「0」要分得出來：失敗顯示 — 並在提示列標「載入失敗」。
+ */
+async function StatValue({ load }: { load: Stat["load"] }) {
+    let value: number | null = null;
+    try {
+        value = await load();
+    } catch (e) {
+        // adminRequest 401 丟的是 Next redirect，吞掉就不會導回登入頁
+        unstable_rethrow(e);
+    }
+    return (
+        <>
+            <div className={VALUE_ROW}>{value ?? "—"}</div>
+            <div className={HINT_ROW}>
+                {value === null && <span className="text-red-500">載入失敗</span>}
+            </div>
+        </>
+    );
+}
+
+function StatValueSkeleton() {
+    return (
+        <>
+            <div className="h-9 flex items-center">
+                <div className={`h-7 w-12 ${PULSE}`} />
+            </div>
+            <div className={HINT_ROW} />
+        </>
+    );
+}
+
+function StatCard({ label, href, icon: Icon, load }: Stat) {
     return (
         <Link
             href={href}
@@ -46,35 +91,24 @@ function StatCard({ label, value, hint, href, icon: Icon }: Stat) {
                 <Icon size={16} />
                 <span className="text-sm">{label}</span>
             </div>
-            <div className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">
-                {value ?? "—"}
-            </div>
-            <div className="text-xs text-neutral-400 dark:text-neutral-500 min-h-4">
-                {hint}
-            </div>
+            <Suspense fallback={<StatValueSkeleton />}>
+                <StatValue load={load} />
+            </Suspense>
         </Link>
     );
 }
 
 export default async function AdminDashboardPage() {
-    const [permissions, publicSettings, blogs, members, blogComments, contactMessages, wsConns] = await Promise.all([
+    // 兩者都有快取（getCurrentAdmin 走 React cache、layout 已打過；settings 60s cache），頁框立即出來
+    const [permissions, publicSettings] = await Promise.all([
         getMyPermissions(),
         getPublicSettings(),
-        safe(getBlogs({ per_page: 1 })),
-        safe(getMembers()),
-        safe(getAllBlogComments(1, 1)),
-        safe(getContactMessages(1, 1)),
-        safe(getWsConnections()),
     ]);
     const enabledFeatures = resolveEnabledFeatures(publicSettings.enabled_features);
 
-    const stats: Stat[] = [
-        { label: "文章", value: blogs?.total ?? null, href: "/admin/blogs", icon: FileText, permission: "blog:read", feature: "blog" },
-        { label: "文章留言", value: blogComments?.total ?? null, href: "/admin/blog-comments", icon: MessageSquare, permission: "comment:read", feature: "blog" },
-        { label: "訪客留言", value: contactMessages?.total ?? null, href: "/admin/messages", icon: Mail, permission: "message:read", feature: "message" },
-        { label: "會員", value: members?.total ?? null, href: "/admin/members", icon: Users, permission: "member:read" },
-        { label: "線上連線", value: wsConns?.length ?? null, href: "/admin/ws", icon: Radio, permission: "ws:read" },
-    ].filter((s) => permissions.includes(s.permission) && isFeatureEnabled(enabledFeatures, s.feature));
+    const stats = STATS.filter(
+        (s) => permissions.includes(s.permission) && isFeatureEnabled(enabledFeatures, s.feature),
+    );
 
     const navGroups = filterNavByPermissions(adminNavGroups, permissions, enabledFeatures);
 

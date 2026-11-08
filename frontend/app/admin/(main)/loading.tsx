@@ -13,8 +13,11 @@ export default function Loading() {
                         className="flex flex-col gap-2 p-5 bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700"
                     >
                         <div className={`h-4 w-16 ${PULSE}`} />
-                        <div className={`h-8 w-12 ${PULSE}`} />
-                        <div className={`h-3 w-20 ${PULSE}`} />
+                        {/* 數值列 h-9、提示列 h-4，與 page.tsx 的 StatValueSkeleton 同規格 */}
+                        <div className="h-9 flex items-center">
+                            <div className={`h-7 w-12 ${PULSE}`} />
+                        </div>
+                        <div className="h-4" />
                     </div>
                 ))}
             </section>
