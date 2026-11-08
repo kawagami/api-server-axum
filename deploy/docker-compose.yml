@@ -55,7 +55,7 @@ x-logging-quiet: &logging-quiet
 # 加上限的意義是「爆的是單一容器、有明確 log、其他服務活著」，而不是整機被 killer
 # 隨機挑一個殺。代價：設太低會讓容器在正常尖峰被 OOM-kill，所以第一版刻意寬鬆。
 #
-# ⚠ 各上限之和（約 1.4G）刻意高於實體記憶體 —— mem_limit 是上限不是預留，
+# ⚠ 各上限之和（1504m，約 1.5G）刻意高於實體記憶體 —— mem_limit 是上限不是預留，
 #   真正的用途是攔住單一失控的容器。**調低不會多出任何可用記憶體。**
 # ⚠ 設太低不一定會 OOM-kill，可能變成**永不結束的活鎖** —— 見 certbot 那段的事故。
 #   容器撞到 mem_limit 時 kernel 先做回收，回收「勉強成功」就不觸發 OOM killer：
@@ -73,7 +73,7 @@ x-logging-quiet: &logging-quiet
 #     2026-11-04 實測：`docker info` 沒有 `No swap limit support` 警告，cgroup 的
 #     `memory.swap.max` 等於各自的 mem_limit（backend / frontend 335544320、database 402653184）
 #     ⇒ 最早那句「未設時允許再用等量 swap」在新機上成立：每個容器是 mem_limit 的 RAM + 等量 swap。
-#     刻意維持不設 memswap_limit：撞到上限時先換出變慢、不會立刻被殺；上限合計約 1.4G，
+#     刻意維持不設 memswap_limit：撞到上限時先換出變慢、不會立刻被殺；上限合計約 1.5G，
 #     2.3G swap 裝得下。代價是失控的容器會拖慢整機的磁碟 I/O。
 #     查實際值：`cat /sys/fs/cgroup/system.slice/docker-$(docker inspect -f '{{.Id}}' backend).scope/memory.swap.max`
 #

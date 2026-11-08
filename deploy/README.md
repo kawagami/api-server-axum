@@ -441,7 +441,7 @@ Docker 的 apt 來源**不在** unattended-upgrades 的預設範圍內（預設�
 
 舊機的 `/etc/fail2ban/jail.local` 只有一個 `sshd` jail，用遞增式 ban。2026-07-02 才從 `bantime = 0`
 （永久 ban）改過來，因為永久 ban 讓 `/var/lib/fail2ban/fail2ban.sqlite3` 長到 38M。下面的值照抄舊機
-（2026-11-04 確認），只把 `logpath = /var/log/auth.log` 換成 `backend = systemd`：
+（2026-11-04 確認），只改兩處：`logpath = /var/log/auth.log` 換成 `backend = systemd`，filter 加上 `mode=aggressive`（原因見下）：
 
 ```bash
 sudo apt install -y fail2ban python3-systemd
