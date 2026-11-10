@@ -5,7 +5,7 @@ import { apiErrorStatus } from "@/libs/api-error";
 import { CONVERT_TEXT_MAX_BYTES, utf8ByteLength, type ConversionDirection } from "@/libs/convert-text";
 
 // messageKey 對應 messages 的 ConvertText.*；翻譯留給 client
-// （server action 這裡拿不到使用者當前語系，寫死中文就會讓 en / zh-CN 破功）
+// （server action 這裡拿不到使用者當前語系，寫死中文就會讓 en / ja 破功）
 export type ConvertTextMessageKey = "emptyInput" | "success" | "failed" | "tooLong" | "rateLimited";
 
 export interface ConvertTextState {

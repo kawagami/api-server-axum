@@ -33,6 +33,9 @@ const nextConfig = {
         // 2026-08-23：倒數計時 / 鬧鐘 / 整點報時三頁併成 /tools/timers，舊網址一律 301
         const mergedIntoTimers = ['/tools/countdown', '/tools/alarm', '/tools/hourly-chime'];
         return [
+            // 2026-11-10：拿掉簡體中文（zh-CN）、改加日文（ja）。舊的 /zh-CN/* 已被搜尋引擎收錄，
+            // 一律 301 到同路徑的繁中版（`:path*` 也吃零段，所以 /zh-CN 本身同樣會轉）。
+            { source: '/zh-CN/:path*', destination: '/zh-TW/:path*', permanent: true },
             { source: '/convert-text', destination: '/tools/convert-text', permanent: true },
             { source: '/countdown', destination: '/tools/timers', permanent: true },
             { source: '/new-password', destination: '/tools/new-password', permanent: true },
@@ -41,7 +44,7 @@ const nextConfig = {
                 { source, destination: '/tools/timers', permanent: true },
                 // 站上實際網址都帶 locale prefix（routing 的 localePrefix: 'always'），
                 // 而 next.config 的 redirects 跑在 next-intl middleware 之前，所以要自己列一份帶 prefix 的。
-                { source: `/:locale(zh-TW|zh-CN|en)${source}`, destination: '/:locale/tools/timers', permanent: true },
+                { source: `/:locale(zh-TW|ja|en)${source}`, destination: '/:locale/tools/timers', permanent: true },
             ]),
         ];
     },

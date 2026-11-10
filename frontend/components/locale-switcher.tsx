@@ -6,7 +6,7 @@ import { routing } from '@/i18n/routing';
 
 const LOCALE_LABELS: Record<string, string> = {
     'zh-TW': '繁中',
-    'zh-CN': '简中',
+    'ja': '日本語',
     'en': 'EN',
 };
 

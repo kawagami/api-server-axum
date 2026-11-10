@@ -106,7 +106,7 @@ pub struct RosterPlan {
 /// 排班結果的機器可讀警告碼。
 ///
 /// **刻意不回中文訊息**：前端規則是「不要把後端錯誤訊息印給使用者」（後端訊息全是
-/// 寫死繁中，en / zh-CN 使用者會看到中文），所以這裡只給碼，文案由前端 i18n。
+/// 寫死繁中，en / ja 使用者會看到中文），所以這裡只給碼，文案由前端 i18n。
 #[derive(Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum RosterWarning {

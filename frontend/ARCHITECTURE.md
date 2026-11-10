@@ -66,17 +66,19 @@ types/index.ts        ← 後端 API 共用型別（Blog、User、Stock 等）
 
 ### i18n（next-intl v4）
 
-- 支援語言：`zh-TW`（預設）、`zh-CN`、`en`
+- 支援語言：`zh-TW`（預設）、`ja`、`en`
+  - 2026-11-10 拿掉簡體中文 `zh-CN`、改加日文 `ja`。舊網址 `/zh-CN/*` 由 `next.config.mjs` 301 到同路徑的 `/zh-TW/*`（已被搜尋引擎收錄，別拿掉）；殘留的 `NEXT_LOCALE=zh-CN` cookie 不是合法 locale，next-intl 會忽略並改看 Accept-Language，不用處理
+  - `ja.json` 的標點慣例：括號、冒號用全形（`（）`、`：`）。語音相關的 `speechLang` 是 `ja-JP`（`Farm` / `HourlyChime` / `Sedentary` 三處）
 - 前台路由加 locale prefix：`/{locale}/blogs/[id]`、`/{locale}/login` 等
 - Admin 路由（`/admin/*`）、API（`/api/*`）、OAuth（`/auth/*`）**不加** locale prefix
 - 翻譯字串放 `messages/*.json`，namespace 對應元件（`Header`、`Login` 等）
 - Server Component 用 `getTranslations('Namespace')`；Client Component 用 `useTranslations('Namespace')`
 - 公開頁的 `Link` / `redirect` / `useRouter` 從 `@/i18n/navigation` 引入（自動帶 locale），不用 `next/link`
 - Admin 元件繼續用 `next/link`（不需要 locale 感知）
-- 新增翻譯：在 `messages/zh-TW.json`、`messages/zh-CN.json`、`messages/en.json` 同步加 key（縮排 2 空白）
+- 新增翻譯：在 `messages/zh-TW.json`、`messages/ja.json`、`messages/en.json` 同步加 key（縮排 2 空白）
 - **前台不留寫死的中文**：`/tools` 四頁（`Timers` 一頁四張卡＝`Alarm` / `Countdown` / `HourlyChime` / `Sedentary` 四個 namespace、`ConvertText`、`NewPassword`、`Roster`）與錯誤頁（`Error` / `NotFound`）都已有 namespace。**server action 不要回傳中文訊息**（那裡拿不到使用者語系），回 `messageKey` 讓 client 翻（見 `tools/convert-text/actions.ts`）。整點報時的語音內容與 `SpeechSynthesisUtterance.lang` 也跟著語系走（`HourlyChime.speech` / `speechLang`）
-- **不要把後端錯誤訊息印給使用者**：後端 `errors.rs` / `services/*.rs` 的訊息全是寫死繁中，`setError(e.errorData?.message || t('errorSave'))` 這種寫法等於 en / zh-CN 使用者看到中文。一律用 `libs/api-error.ts` 的 `apiErrorStatus(e)` 依 status 分流到自己 namespace 的 key（409=已存在、422=`errorInvalid`、其餘 `errorSave`）。後端回應的 `code` 只是 HTTP 狀態碼、不是機器可讀原因，別拿來做更細的分支
-- **後端回的資料標籤同理**：後端回的中文常數標籤不要直接渲染（en / zh-CN 使用者會看到中文），一律用 value 當 i18n key、後端 label 只當未知 key 的 fallback
+- **不要把後端錯誤訊息印給使用者**：後端 `errors.rs` / `services/*.rs` 的訊息全是寫死繁中，`setError(e.errorData?.message || t('errorSave'))` 這種寫法等於 en / ja 使用者看到中文。一律用 `libs/api-error.ts` 的 `apiErrorStatus(e)` 依 status 分流到自己 namespace 的 key（409=已存在、422=`errorInvalid`、其餘 `errorSave`）。後端回應的 `code` 只是 HTTP 狀態碼、不是機器可讀原因，別拿來做更細的分支
+- **後端回的資料標籤同理**：後端回的中文常數標籤不要直接渲染（en / ja 使用者會看到中文），一律用 value 當 i18n key、後端 label 只當未知 key 的 fallback
 - `app/layout.tsx` 的 metadata 走 `generateMetadata` + `getTranslations('Home')`：**不要寫死 description**（沒自帶 description 的頁面會繼承它，寫死等於三語系都吃到中文）。`WsProvider` 掛在 `NextIntlClientProvider` 之外拿不到 `useTranslations`，斷線橫幅文案由 root layout 以 `lostLabel` prop 餵進去（同 `ThemeButton` 的 `labels`）
 - `app/layout.tsx` 的 `<html lang>` 用 `getLocale()`，**不要寫死 `zh-TW`**；locale 之下的 404 走 `(public)/not-found.tsx`（有 Header/Footer 與翻譯），`app/not-found.tsx` 只是 locale 之外的最後防線（仍走 `getTranslations('NotFound')`，不寫死中文，只是取不到 locale 時落在 defaultLocale）
 - 前台日期顯示：用 `Intl.DateTimeFormat(locale, { …, timeZone: 'Asia/Taipei' })`，locale 跟隨當前語系、時區固定台北，**不要**寫死 `toLocaleString('zh-TW')`（server/client 格式一致、免 `suppressHydrationWarning`）。blog 卡片共用 `components/blogs/show-client-time.tsx`
@@ -154,7 +156,7 @@ types/index.ts        ← 後端 API 共用型別（Blog、User、Stock 等）
 ```
 app/
   layout.tsx          # root：html/body/WsProvider only，無 Header/Footer
-  [locale]/           # i18n route segment（zh-TW / zh-CN / en）
+  [locale]/           # i18n route segment（zh-TW / ja / en）
     layout.tsx        # NextIntlClientProvider，驗證 locale 合法性
     (public)/         # 前台 route group（Header + Footer）
       layout.tsx
@@ -179,12 +181,12 @@ components/
 api/
   {resource}.ts       # 一個資源一檔（blogs / portfolio / images / members / users / roles / logs / tools / ws / auth / food-log … / github（外部 API，見上）；共 22 檔）
 i18n/
-  routing.ts          # locales 定義（zh-TW / zh-CN / en）、defaultLocale
+  routing.ts          # locales 定義（zh-TW / ja / en）、defaultLocale
   request.ts          # getRequestConfig，載入對應 messages
   navigation.ts       # locale-aware Link / redirect / useRouter（公開頁用，取代 next/link）
 messages/
   zh-TW.json          # 繁體中文翻譯
-  zh-CN.json          # 簡體中文翻譯
+  ja.json             # 日文翻譯
   en.json             # 英文翻譯
 types/
   {resource}.ts       # 後端 API 共用型別，一資源一檔（portfolio / torrent …）

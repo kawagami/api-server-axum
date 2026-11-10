@@ -8,7 +8,7 @@
 
 ## 功能模組
 
-前台路由加 locale prefix（`zh-TW` / `zh-CN` / `en`），`/` 自動 redirect 至 `/{defaultLocale}`。
+前台路由加 locale prefix（`zh-TW` / `ja` / `en`），`/` 自動 redirect 至 `/{defaultLocale}`。
 
 | 路由 | 說明 |
 |------|------|
@@ -48,7 +48,7 @@
 
 - **框架**：Next.js 16 (App Router, Turbopack)
 - **UI**：React 19 + Tailwind CSS + lucide-react；主題系統 runtime 切換（7 套主題 + auto 每日輪播，admin 設定全站生效，CSS variables）
-- **i18n**：next-intl v4，支援 zh-TW / zh-CN / en
+- **i18n**：next-intl v4，支援 zh-TW / ja / en
 - **Markdown**：react-markdown（rehype-highlight 程式碼高亮、rehype-slug 標題錨點 + 自動目錄 TOC）
 - **圖片**：next/image（自動 WebP 轉換、lazy loading、縮圖）；公開網域 `media.kawa.homes`（nginx 直出 VPS 上的 `/srv/kawa/uploads`），`remotePatterns` 只放行這一個 host
 - **認證**：JWT（`jose`），`proxy.ts`（Next 16 起 middleware 改名）保護 `/admin/*` 與 `/{locale}/dashboard|profile|portfolio|food-log`（`proxy.ts` 的 `memberPaths`；各功能的設定子頁由所屬 prefix 涵蓋，沒有獨立的 `/{locale}/settings`）
@@ -62,13 +62,13 @@
 
 ```
 app/
-  [locale]/   # 前台（zh-TW / zh-CN / en）
+  [locale]/   # 前台（zh-TW / ja / en）
   admin/      # 後台（無 locale prefix）
   api/        # Route Handlers
   auth/       # OAuth callback
 components/   # 共用 UI 元件
 i18n/         # next-intl 設定（routing / request / navigation）
-messages/     # 翻譯字串（zh-TW.json / zh-CN.json / en.json）
+messages/     # 翻譯字串（zh-TW.json / ja.json / en.json）
 api/          # 前端 API 請求函式（fetch 封裝，一個資源一檔：blogs / portfolio / images …）
 actions/      # 跨 route 共用的 Server Actions（單一 route 用的 colocate 在該 route）
 types/        # 後端 API 共用型別
