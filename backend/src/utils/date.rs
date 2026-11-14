@@ -1,4 +1,7 @@
-use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Utc};
+
+/// 民國紀年 = 西元 − 1911。全 repo 只在這裡出現這個數字。
+const ROC_YEAR_OFFSET: i32 = 1911;
 
 /// 台北時區偏移（UTC+8，無 DST）。
 ///
@@ -37,7 +40,7 @@ pub fn parse_roc_date(s: &str) -> Option<NaiveDate> {
     let year: i32 = parts[0].trim().parse().ok()?;
     let month: u32 = parts[1].trim().parse().ok()?;
     let day: u32 = parts[2].trim().parse().ok()?;
-    NaiveDate::from_ymd_opt(year + 1911, month, day)
+    NaiveDate::from_ymd_opt(year + ROC_YEAR_OFFSET, month, day)
 }
 
 /// 解析中文民國日期（如 "115年09月29日"，TWT49U 的「資料日期」欄）為西元 NaiveDate
@@ -46,7 +49,7 @@ pub fn parse_roc_cjk_date(s: &str) -> Option<NaiveDate> {
     let (month, rest) = rest.split_once('月')?;
     let day = rest.strip_suffix('日')?;
     NaiveDate::from_ymd_opt(
-        year.trim().parse::<i32>().ok()? + 1911,
+        year.trim().parse::<i32>().ok()? + ROC_YEAR_OFFSET,
         month.trim().parse().ok()?,
         day.trim().parse().ok()?,
     )
@@ -63,7 +66,13 @@ pub fn parse_roc_compact_date(s: &str) -> Option<NaiveDate> {
     let year: i32 = year_str.parse().ok()?;
     let month: u32 = md[..2].parse().ok()?;
     let day: u32 = md[2..].parse().ok()?;
-    NaiveDate::from_ymd_opt(year + 1911, month, day)
+    NaiveDate::from_ymd_opt(year + ROC_YEAR_OFFSET, month, day)
+}
+
+/// 西元日期 → 無分隔民國日期（2026-06-25 → "1150625"），`parse_roc_compact_date` 的反向。
+/// 民國年補滿 3 碼（2010-01-05 → "0990105"），MOPS 庫藏股查詢吃的就是這個格式。
+pub fn to_roc_compact(date: NaiveDate) -> String {
+    format!("{:03}{}", date.year() - ROC_YEAR_OFFSET, date.format("%m%d"))
 }
 
 #[cfg(test)]
@@ -104,6 +113,15 @@ mod tests {
         assert_eq!(parse_roc_cjk_date("115/09/29"), None);
         assert_eq!(parse_roc_cjk_date("115年09月29"), None);
         assert_eq!(parse_roc_cjk_date("115年13月01日"), None);
+    }
+
+    #[test]
+    fn roc_compact_round_trips() {
+        let d = NaiveDate::from_ymd_opt(2026, 6, 25).unwrap();
+        assert_eq!(to_roc_compact(d), "1150625");
+        assert_eq!(parse_roc_compact_date(&to_roc_compact(d)), Some(d));
+        // 二位數民國年補 0
+        assert_eq!(to_roc_compact(NaiveDate::from_ymd_opt(2010, 1, 5).unwrap()), "0990105");
     }
 
     #[test]

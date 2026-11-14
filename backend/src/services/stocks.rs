@@ -208,20 +208,8 @@ pub fn parse_stock_day_avg_response(
                 return None;
             }
 
-            let date_str = row[0].trim();
-            let price_str = row[1].trim().replace(",", "");
-
-            let date_parts: Vec<_> = date_str.split('/').collect();
-            if date_parts.len() != 3 {
-                return None;
-            }
-
-            let year = 1911 + date_parts[0].parse::<i32>().ok()?;
-            let month = date_parts[1].parse::<u32>().ok()?;
-            let day = date_parts[2].parse::<u32>().ok()?;
-
-            let date = chrono::NaiveDate::from_ymd_opt(year, month, day)?;
-            let close_price = price_str.parse::<f64>().ok()?;
+            let date = parse_roc_date(&row[0])?;
+            let close_price = row[1].trim().replace(",", "").parse::<f64>().ok()?;
 
             Some(NewStockClosingPrice {
                 stock_no: stock_no.to_string(),

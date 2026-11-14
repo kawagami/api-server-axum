@@ -7,7 +7,8 @@ use crate::{
     },
     state::AppState,
 };
-use chrono::{Datelike, Duration, Months, NaiveDate};
+use crate::utils::date::to_roc_compact;
+use chrono::{Duration, Months};
 
 pub async fn run(state: AppState) {
     let today = crate::utils::date::taipei_today();
@@ -15,8 +16,8 @@ pub async fn run(state: AppState) {
     // NaiveDate 加 3 個月實務上不會溢位，但同函式其他錯誤都走 log，這裡不該是唯一的 panic 點
     let three_months_later = today.checked_add_months(Months::new(3)).unwrap_or(today);
 
-    let start = date_to_roc_string(six_months_ago);
-    let end = date_to_roc_string(three_months_later);
+    let start = to_roc_compact(six_months_ago);
+    let end = to_roc_compact(three_months_later);
 
     // 補上重試：這是每日一次的外部抓取，性質與 fetch_stock_day_all / fetch_gov_tenders 相同。
     // TWSE 抽風一次就整天沒有新的庫藏股資料，而 10 分鐘後 SyncBuybackToPending 會拿舊資料跑。
@@ -66,8 +67,4 @@ async fn notify_new_future_buybacks(state: &AppState) {
     // 沒有「已通知」欄可標，所以寄失敗這裡也無從補寄（`send_to` 已記 ERROR）。
     // 需要補寄的話得先給 `stock_buyback_periods` 加 notified 欄，比照 gov_tenders。
     let _ = send_notification(&settings, "新庫藏股通知", body).await;
-}
-
-fn date_to_roc_string(date: NaiveDate) -> String {
-    format!("{:03}{}", date.year() - 1911, date.format("%m%d"))
 }
