@@ -1,5 +1,5 @@
 use crate::{
-    errors::{AppError, RequestError},
+    errors::{AppError, AuthError, RequestError},
     repositories::{redis, vocab as vocab_repo},
     services::vocab_ja,
     state::AppState,
@@ -159,8 +159,9 @@ pub async fn answer(
                 }
                 None => {
                     redis::cache_del(state.get_redis_pool(), &run_key(run_id)).await?;
-                    // 複習為 member-only,run.member_id 必為 Some
-                    let mid = run.member_id.expect("review mode requires member");
+                    // 複習為 member-only,正常 run.member_id 必為 Some。但 run 是從 Redis
+                    // 反序列化回來的,不能拿外部狀態當不變式 panic —— 壞狀態回 401(run 已刪)。
+                    let mid = run.member_id.ok_or(AuthError::Unauthorized)?;
                     let graduated =
                         vocab_repo::count_mastered_among(state.get_pool(), mid, &run.seen_word_ids)
                             .await? as i32;
