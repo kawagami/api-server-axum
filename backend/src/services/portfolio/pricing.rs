@@ -16,6 +16,7 @@ use bb8_redis::RedisConnectionManager;
 use chrono::{Datelike, Days, Months, NaiveDate};
 use futures::stream::{self, StreamExt, TryStreamExt};
 use reqwest::Client;
+use serde::{de::DeserializeOwned, Serialize};
 use sqlx::{Pool, Postgres};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -162,19 +163,13 @@ pub async fn get_summary(
     Ok(result)
 }
 
-fn redis_serialize_closes(closes: &[DayClose]) -> Option<String> {
-    let v: Vec<(String, f64)> = closes
-        .iter()
-        .map(|d| (d.date.format("%Y-%m-%d").to_string(), d.close))
-        .collect();
-    serde_json::to_string(&v).ok()
-}
-
-fn redis_deserialize_closes(s: &str) -> Option<Vec<DayClose>> {
-    let rows: Vec<(String, f64)> = serde_json::from_str(s).ok()?;
-    rows.into_iter()
-        .map(|(d, c)| NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok().map(|date| DayClose { date, close: c }))
-        .collect()
+/// 讀快取並反序列化。Redis 錯誤或內容對不上型別都當 miss，呼叫端照常往 DB / 上游走。
+async fn cache_get_json<T: DeserializeOwned>(
+    redis_pool: &RedisPool<RedisConnectionManager>,
+    key: &str,
+) -> Option<T> {
+    let cached = redis_repo::cache_get(redis_pool, key).await.ok()??;
+    serde_json::from_str(&cached).ok()
 }
 
 async fn fetch_closing_month(
@@ -191,10 +186,8 @@ async fn fetch_closing_month(
     let ttl = if is_current { 3600u64 } else { 604800u64 };
 
     // 1. Redis
-    if let Ok(Some(cached)) = redis_repo::cache_get(redis_pool, &cache_key).await {
-        if let Some(data) = redis_deserialize_closes(&cached) {
-            return Ok(data);
-        }
+    if let Some(data) = cache_get_json::<Vec<DayClose>>(redis_pool, &cache_key).await {
+        return Ok(data);
     }
 
     // 2. DB — past months only (historical data is complete; current month may be partial)
@@ -208,9 +201,7 @@ async fn fetch_closing_month(
         let db_rows = get_stock_closing_prices_by_date_range(pool, stock_code, first_day, last_day).await?;
         if !db_rows.is_empty() {
             let closes: Vec<DayClose> = db_rows.iter().map(|r| DayClose { date: r.date, close: r.close_price }).collect();
-            if let Some(json) = redis_serialize_closes(&closes) {
-                cache_set_logged(redis_pool, &cache_key, &json, ttl).await;
-            }
+            cache_set_json(redis_pool, &cache_key, &closes, ttl).await;
             return Ok(closes);
         }
     }
@@ -259,23 +250,28 @@ async fn fetch_closing_month(
     }
 
     // 5. Write Redis
-    if let Some(json) = redis_serialize_closes(&closes) {
-        cache_set_logged(redis_pool, &cache_key, &json, ttl).await;
-    }
+    cache_set_json(redis_pool, &cache_key, &closes, ttl).await;
 
     Ok(closes)
 }
 
-/// 寫快取失敗要留痕 —— 這幾條路徑原本是 `let _ = cache_set(...)`，於是 Redis 半死時
-/// 症狀只有「頁面變慢 + 一直打 TWSE」，log 裡沒有任何線索指向快取。
+/// 序列化後寫快取。失敗要留痕 —— 這幾條路徑原本是 `let _ = cache_set(...)`，於是 Redis
+/// 半死時症狀只有「頁面變慢 + 一直打 TWSE」，log 裡沒有任何線索指向快取。
 /// 失敗本身不該讓請求失敗（資料已經算出來了），所以吞掉回傳值、只記 WARN。
-async fn cache_set_logged(
+async fn cache_set_json<T: Serialize + ?Sized>(
     redis_pool: &RedisPool<RedisConnectionManager>,
     key: &str,
-    json: &str,
+    value: &T,
     ttl: u64,
 ) {
-    if let Err(e) = redis_repo::cache_set(redis_pool, key, json, ttl).await {
+    let json = match serde_json::to_string(value) {
+        Ok(json) => json,
+        Err(e) => {
+            tracing::warn!("portfolio 快取序列化失敗 key={}: {}", key, e);
+            return;
+        }
+    };
+    if let Err(e) = redis_repo::cache_set(redis_pool, key, &json, ttl).await {
         tracing::warn!("portfolio 快取寫入失敗 key={}: {}", key, e);
     }
 }
@@ -338,18 +334,8 @@ async fn fetch_ex_events(
     );
 
     // 1. Redis（只存「已涵蓋到 to」的完整結果）
-    if let Ok(Some(cached)) = redis_repo::cache_get(redis_pool, &cache_key).await {
-        if let Ok(rows) = serde_json::from_str::<Vec<(String, f64, f64)>>(&cached) {
-            let events: Vec<ExEvent> = rows
-                .into_iter()
-                .filter_map(|(d, close_before, ref_price)| {
-                    NaiveDate::parse_from_str(&d, "%Y-%m-%d")
-                        .ok()
-                        .map(|date| ExEvent { date, close_before, ref_price })
-                })
-                .collect();
-            return Ok(events);
-        }
+    if let Some(events) = cache_get_json::<Vec<ExEvent>>(redis_pool, &cache_key).await {
+        return Ok(events);
     }
 
     // 2. DB 已向 TWSE 確認到哪一天。從那天（含）接著往後查：那天可能是在當日公告前查的。
@@ -415,7 +401,7 @@ async fn fetch_ex_events(
 
     // 5. Redis：部分結果不快取，否則會蓋住下次請求的補抓
     if complete {
-        cache_ex_events(redis_pool, &cache_key, &events).await;
+        cache_set_json(redis_pool, &cache_key, &events, EX_RIGHTS_CACHE_TTL_SECS).await;
     }
 
     Ok(events)
@@ -486,16 +472,6 @@ fn parse_ex_rights(resp: &TwseResponse, stock_code: &str) -> Option<Vec<ExEvent>
     Some(events)
 }
 
-async fn cache_ex_events(redis_pool: &RedisPool<RedisConnectionManager>, key: &str, events: &[ExEvent]) {
-    let v: Vec<(String, f64, f64)> = events
-        .iter()
-        .map(|e| (e.date.format("%Y-%m-%d").to_string(), e.close_before, e.ref_price))
-        .collect();
-    if let Ok(json) = serde_json::to_string(&v) {
-        cache_set_logged(redis_pool, key, &json, EX_RIGHTS_CACHE_TTL_SECS).await;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -522,6 +498,28 @@ mod tests {
         "115年09月29日", "2109", "華豐", "15.00", "14.50", "0.500000",
         "息", "16.50", "13.50", "14.50", "14.50",
     ];
+
+    /// 快取格式是 serde 自動產生的，守住「寫進去的讀得回來」，日期不能被轉成別的形狀
+    #[test]
+    fn cache_codec_round_trips() {
+        let date = NaiveDate::from_ymd_opt(2026, 1, 2).expect("日期");
+        let json = serde_json::to_string(&[DayClose { date, close: 123.5 }]).expect("序列化");
+        assert_eq!(json, r#"[{"date":"2026-01-02","close":123.5}]"#);
+        let back: Vec<DayClose> = serde_json::from_str(&json).expect("反序列化");
+        assert_eq!((back[0].date, back[0].close), (date, 123.5));
+
+        let ev = ExEvent { date, close_before: 10.0, ref_price: 9.5 };
+        let back: Vec<ExEvent> =
+            serde_json::from_str(&serde_json::to_string(&[ev]).expect("序列化")).expect("反序列化");
+        assert_eq!((back[0].date, back[0].close_before, back[0].ref_price), (date, 10.0, 9.5));
+
+        // 2026-11-14 前快取存的是 tuple。serde derive 的 struct 也吃陣列形式（依欄位順序），
+        // 所以存量 key 不必換版本 —— 但 **DayClose / ExEvent 的欄位順序因此不能改**。
+        let old: Vec<DayClose> = serde_json::from_str(r#"[["2026-01-02",123.5]]"#).expect("舊格式");
+        assert_eq!((old[0].date, old[0].close), (date, 123.5));
+        let old: Vec<ExEvent> = serde_json::from_str(r#"[["2026-01-02",10.0,9.5]]"#).expect("舊格式");
+        assert_eq!((old[0].close_before, old[0].ref_price), (10.0, 9.5));
+    }
 
     #[test]
     fn picks_only_the_requested_stock() {

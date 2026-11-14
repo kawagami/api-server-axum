@@ -1,11 +1,16 @@
 use crate::structs::portfolio::{HistoryRecord, PeriodChange, PeriodChanges};
 use chrono::{Days, Months, NaiveDate};
+use serde::{Deserialize, Serialize};
 
+/// Serialize / Deserialize 只給 `pricing.rs` 的 Redis 快取用。
+/// ⚠️ 兩個 struct 的**欄位順序不能改**：Redis 裡還有舊版存的 tuple 陣列，靠 serde 依順序對欄位讀回。
+#[derive(Serialize, Deserialize)]
 pub(super) struct DayClose {
     pub(super) date: NaiveDate,
     pub(super) close: f64,
 }
 
+#[derive(Serialize, Deserialize)]
 pub(super) struct ExEvent {
     pub(super) date: NaiveDate,
     pub(super) close_before: f64,
