@@ -1,5 +1,5 @@
 use crate::{
-    errors::AppError,
+    errors::{AppError, SystemError},
     repositories::gov_tenders as repo,
     structs::pagination::Paginated,
     structs::gov_tenders::{GovTender, GovTenderListQuery, NewGovTender},
@@ -14,6 +14,8 @@ use sqlx::{Pool, Postgres};
 const SEARCH_URL: &str = "https://pcc-api.openfun.app/api/searchbytitle";
 /// 通知信最多列出的標案筆數
 const EMAIL_MAX_ITEMS: usize = 50;
+/// 失敗時錯誤訊息附上的回應開頭字數
+const BODY_SNIPPET_CHARS: usize = 200;
 
 pub async fn list(
     pool: &Pool<Postgres>,
@@ -39,15 +41,34 @@ pub async fn fetch_by_keyword(
     client: &Client,
     keyword: &str,
 ) -> Result<Vec<NewGovTender>, AppError> {
-    let text = send_retrying(
+    let response = send_retrying(
         client
             .get(SEARCH_URL)
             .query(&[("query", keyword), ("page", "1")]),
     )
-    .await?
-    .text()
     .await?;
+    let status = response.status();
+    let text = response.text().await?;
+    // 非 2xx 要先擋：以前直接拿去解析，對方掛掉回 HTML 錯誤頁時只剩一行「JSON 處理錯誤」，
+    // 分不出「暫時掛掉」還是「格式永久改了」（2026-11-10 23:00 UTC 連三次就是這樣）。
+    if !status.is_success() {
+        return Err(SystemError::Internal(format!(
+            "採購網 API 回 {status}（keyword={keyword}），body: {}",
+            body_snippet(&text)
+        ))
+        .into());
+    }
     parse_records(&text, keyword)
+}
+
+/// 回應開頭一小段、空白壓成單一空格，塞進錯誤訊息供 log 判讀
+fn body_snippet(text: &str) -> String {
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut out: String = flat.chars().take(BODY_SNIPPET_CHARS).collect();
+    if flat.chars().count() > BODY_SNIPPET_CHARS {
+        out.push('…');
+    }
+    out
 }
 
 #[derive(Deserialize)]
@@ -84,7 +105,14 @@ struct ApiCompanies {
 
 /// 解析搜尋 API 回應；單筆欄位缺漏只跳過該筆，不影響整批
 fn parse_records(text: &str, keyword: &str) -> Result<Vec<NewGovTender>, AppError> {
-    let resp: ApiResponse = serde_json::from_str(text)?;
+    // 不用 `?` 轉成 SystemError::Json：那個 Display 只有「JSON 處理錯誤」，
+    // serde 的具體原因（missing field / expected value）和回應內容都會在 job log 裡消失。
+    let resp: ApiResponse = serde_json::from_str(text).map_err(|e| {
+        SystemError::Internal(format!(
+            "採購網 API 回應解析失敗（keyword={keyword}）: {e}，body: {}",
+            body_snippet(text)
+        ))
+    })?;
     let tenders = resp
         .records
         .into_iter()
@@ -199,7 +227,32 @@ mod tests {
 
     #[test]
     fn parse_records_rejects_non_json() {
-        assert!(parse_records("<html>oops</html>", "網站").is_err());
+        let msg = parse_records("<html>\n  oops\n</html>", "網站")
+            .err()
+            .unwrap()
+            .to_string();
+        // 錯誤訊息要帶 serde 原因與回應開頭，job log 才看得出對方回了什麼
+        assert!(msg.contains("expected value"), "{msg}");
+        assert!(msg.contains("body: <html> oops </html>"), "{msg}");
+        assert!(msg.contains("keyword=網站"), "{msg}");
+    }
+
+    #[test]
+    fn parse_records_reports_missing_records_field() {
+        let msg = parse_records(r#"{"error":"maintenance"}"#, "網站")
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(msg.contains("missing field `records`"), "{msg}");
+    }
+
+    #[test]
+    fn body_snippet_truncates_by_chars() {
+        assert_eq!(body_snippet("短"), "短");
+        let long = "字".repeat(BODY_SNIPPET_CHARS + 5);
+        let s = body_snippet(&long);
+        assert_eq!(s.chars().count(), BODY_SNIPPET_CHARS + 1);
+        assert!(s.ends_with('…'));
     }
 
     #[test]
