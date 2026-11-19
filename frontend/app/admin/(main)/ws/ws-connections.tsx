@@ -7,7 +7,7 @@ import { useWsContext } from "@/libs/ws-context";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import PageHeader from "@/components/admin/page-header";
 import usePolling from "@/hooks/usePolling";
-import { formatDateTime, formatTimeOfDay } from "@/libs/admin-datetime";
+import { formatDateTime, formatDuration, formatTimeOfDay } from "@/libs/admin-datetime";
 import SaySomethingForm from "./say-something-form";
 import type { WsConnection, WsUserEventData } from "@/types";
 
@@ -22,16 +22,6 @@ function sortRows(rows: WsConnection[]): WsConnection[] {
     return [...rows].sort(
         (a, b) => b.connected_at.localeCompare(a.connected_at) || a.addr.localeCompare(b.addr),
     );
-}
-
-function formatDuration(ms: number): string {
-    const s = Math.max(0, Math.floor(ms / 1000));
-    if (s < 60) return `${s} 秒`;
-    const m = Math.floor(s / 60);
-    if (m < 60) return `${m} 分 ${s % 60} 秒`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h} 小時 ${m % 60} 分`;
-    return `${Math.floor(h / 24)} 天 ${h % 24} 小時`;
 }
 
 // UA 原字串太長塞不進表格，簡化成「OS · 瀏覽器」；完整字串放 title

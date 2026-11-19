@@ -5,7 +5,7 @@ use crate::{
 };
 use sqlx::{Pool, Postgres};
 
-const COLUMNS: &str = "id, info_hash, magnet_uri, name, status, total_size, files, error, created_by, created_at, completed_at";
+const COLUMNS: &str = "id, info_hash, magnet_uri, name, status, total_size, files, error, created_by, created_at, started_at, completed_at";
 
 /// `list` 內 data 與 total 兩個查詢共用的篩選條件（$1..$2）。**兩邊 bind 順序必須一致**。
 const LIST_FILTER: &str = "($1::text IS NULL OR status = $1)
@@ -140,9 +140,11 @@ pub async fn set_downloading_metadata(
     files: &serde_json::Value,
 ) -> Result<(), AppError> {
     // attempt_count 歸零：metadata 已到手，之後若失敗重跑要重新給滿重試額度
+    // started_at 只寫第一次：重啟續傳也會走到這裡，覆蓋掉就算不出真正的下載耗時
     sqlx::query(
         "UPDATE torrents SET status = 'downloading', name = $2, total_size = $3, files = $4,
-                error = NULL, attempt_count = 0 WHERE id = $1",
+                error = NULL, attempt_count = 0, started_at = COALESCE(started_at, now())
+         WHERE id = $1",
     )
     .bind(id)
     .bind(name)
@@ -174,7 +176,7 @@ pub async fn set_failed(pool: &Pool<Postgres>, id: i32, error: &str) -> Result<(
 /// 清掉嘗試紀錄 —— 手動重設是明確要求重跑，排到候選最前面。
 pub async fn reset_pending(pool: &Pool<Postgres>, id: i32) -> Result<bool, AppError> {
     let result = sqlx::query(
-        "UPDATE torrents SET status = 'pending', error = NULL, completed_at = NULL,
+        "UPDATE torrents SET status = 'pending', error = NULL, started_at = NULL, completed_at = NULL,
                 attempt_count = 0, last_attempt_at = NULL
          WHERE id = $1 AND status IN ('failed', 'completed')",
     )

@@ -62,3 +62,21 @@ export function formatDate(value: DateInput): string {
 export function formatTimeOfDay(value: DateInput): string {
     return apply(timeOnly, value);
 }
+
+/** 時間長度：45 秒 / 3 分 12 秒 / 2 小時 5 分 / 1 天 3 小時 */
+export function formatDuration(ms: number): string {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 60) return `${s} 秒`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} 分 ${s % 60} 秒`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} 小時 ${m % 60} 分`;
+    return `${Math.floor(h / 24)} 天 ${h % 24} 小時`;
+}
+
+/** 兩個時間點之間的長度；任一無值 / 壞值回「—」 */
+export function formatElapsed(from: DateInput, to: DateInput): string {
+    if (from == null || from === "" || to == null || to === "") return DASH;
+    const ms = new Date(to).getTime() - new Date(from).getTime();
+    return Number.isNaN(ms) ? DASH : formatDuration(ms);
+}

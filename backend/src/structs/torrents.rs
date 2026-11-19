@@ -18,6 +18,8 @@ pub struct Torrent {
     pub error: Option<String>,
     pub created_by: String,
     pub created_at: DateTime<Utc>,
+    /// 拿到 metadata、開始下載的時間（重啟續傳不覆蓋；重跑清空）。耗時 = completed_at - started_at
+    pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
 }
 

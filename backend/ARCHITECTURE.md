@@ -249,6 +249,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 - **讓位只在有人排隊時發生**（`queue_pressure`：`count_resumable() > torrent_max_active`）。`torrent_metadata_timeout_seconds` 不是硬逾時而是**檢查間隔**：`start_torrent` 對同一個 pinned `add_torrent` future 反覆 `timeout`，到點沒人排隊就 `continue` 繼續等（future 沒被 drop，DHT 查詢與半握手的 peer 全留著），只有真的有任務排不進名額才放棄本輪。**不要改成硬逾時或短間隔輪替**：magnet metadata 解析的進度全在 `add_torrent` 那個 future 裡（librqbit 內部，沒有可觀測的中間狀態），abort 等於從零重來，冷門種子需要的是不被打斷的時間
 - **輪替帳本**：`torrents.last_attempt_at` / `attempt_count`（`run_torrent` 開頭 `mark_attempt` 記一次），`list_resumable` 排序 = 續傳的 downloading 優先 → 沒試過的 → 最久沒試的。讓位且 `attempt_count < MAX_METADATA_ATTEMPTS`(3) 就留在 `pending` 只更新 `error`（廣播 `torrent_retrying`，前端刷列表、pending 帶 error 顯示灰字提示），額度用完才 `set_failed`。拿到 metadata（`set_downloading_metadata`）與手動 `reset_pending` 都會把 `attempt_count` 歸零 —— 所以「沒人排隊時一直等」不會累積次數、不會被判失敗
 - 下載完成即從 session 移除（停止做種），檔案保留
+- 耗時帳本：`started_at`（拿到 metadata 那刻，`COALESCE` 只寫第一次——重啟續傳會再走 `set_downloading_metadata`）+ `completed_at`；前端顯示 `completed_at - started_at` 為下載耗時（不含排隊 / metadata 解析，含中途重啟停機），`reset_pending` 兩者都清。2026-11-19 前的舊列 `started_at` 為 NULL，前端退回 `created_at`
 - 重啟 resume：啟動時 `routes.rs` spawn `sync_active`，downloading 任務以 `overwrite: true` 重加（驗證既有 piece 續抓）
 - 進度不落 DB — watcher 每 5 秒讀 stats，變動才廣播 `WsEvent::TorrentProgress`
 - 下載完成寄 email 通知（沿用 `notification` 類 SMTP 設定，未設定自動跳過）

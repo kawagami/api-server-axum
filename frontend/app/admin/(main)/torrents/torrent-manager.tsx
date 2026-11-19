@@ -11,7 +11,7 @@ import FileDownloadModal, { displayName } from "./file-download-modal";
 import { useTorrentLive } from "./useTorrentLive";
 import { TORRENT_STATUS_BADGE, TORRENT_STATUS_LABEL } from "@/libs/badge-styles";
 import { formatBytes } from "@/libs/format-bytes";
-import { formatDateTime } from "@/libs/admin-datetime";
+import { formatDateTime, formatElapsed } from "@/libs/admin-datetime";
 import ErrorBanner from "@/components/admin/error-banner";
 import AdminTableContainer from "@/components/admin/admin-table-container";
 import type { Torrent, TorrentStorage } from "@/types";
@@ -138,12 +138,13 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                             <AdminTh>大小</AdminTh>
                             <AdminTh className="min-w-44">進度</AdminTh>
                             <AdminTh>建立時間</AdminTh>
+                            <AdminTh>完成時間</AdminTh>
                             <AdminTh>操作</AdminTh>
                         </AdminHeadRow>
                     </thead>
                     <tbody>
                         {torrents.length === 0 && (
-                            <AdminEmptyRow colSpan={6}>目前沒有任務</AdminEmptyRow>
+                            <AdminEmptyRow colSpan={7}>目前沒有任務</AdminEmptyRow>
                         )}
                         {torrents.map((t) => {
                             const live = liveMap[t.id];
@@ -202,6 +203,22 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                     </AdminTd>
                                     <AdminTd className="whitespace-nowrap text-sm">
                                         {formatDateTime(t.created_at)}
+                                    </AdminTd>
+                                    <AdminTd className="whitespace-nowrap text-sm">
+                                        {t.completed_at ? (
+                                            <>
+                                                <span className="block">{formatDateTime(t.completed_at)}</span>
+                                                {/* 耗時 = 開始下載 → 完成（不含排隊與 metadata 解析）；舊資料沒有 started_at 退回 created_at */}
+                                                <span
+                                                    className="block text-xs text-neutral-500 dark:text-neutral-400"
+                                                    title={`建立至完成共 ${formatElapsed(t.created_at, t.completed_at)}`}
+                                                >
+                                                    耗時 {formatElapsed(t.started_at ?? t.created_at, t.completed_at)}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="text-neutral-400">—</span>
+                                        )}
                                     </AdminTd>
                                     <AdminTd>
                                         <div className="flex items-center gap-2">

@@ -29,6 +29,8 @@ export interface Torrent {
   error: string | null;
   created_by: string;
   created_at: string;
+  /** 拿到 metadata、開始下載的時間；舊資料為 null */
+  started_at: string | null;
   completed_at: string | null;
   live?: TorrentLive;
 }
