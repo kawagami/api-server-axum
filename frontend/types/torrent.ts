@@ -29,7 +29,7 @@ export interface Torrent {
   error: string | null;
   created_by: string;
   created_at: string;
-  /** 拿到 metadata、開始下載的時間；舊資料為 null */
+  /** 拿到 metadata、開始下載的時間（重啟續傳不覆蓋）；還沒開始（排隊 / 解析 metadata，重跑會清回這個狀態）或 2026-11-19 前的舊資料為 null */
   started_at: string | null;
   completed_at: string | null;
   live?: TorrentLive;
