@@ -56,7 +56,7 @@ jobs:
           # 讓 clippy 突然紅燈（2026-10-05 1.99 把 fetch_update 標 deprecated 就是這樣），
           # 而 Dockerfile 是釘版的，兩邊版本不同時「image 編得過、test 過不了」。
           # 與 backend/rust-toolchain.toml、backend/Dockerfile 三處同步
-          toolchain: 1.99.0
+          toolchain: 1.100.0
           components: clippy
       -
         name: Cache cargo

@@ -38,9 +38,9 @@ fn at(state: &State, c: i8, r: i8) -> Option<Piece> {
 }
 
 fn find_king(state: &State, color: Color) -> Option<(i8, i8)> {
-    for r in 0..8 {
-        for c in 0..8 {
-            if let Some(p) = state.board[r][c] {
+    for (r, row) in state.board.iter().enumerate() {
+        for (c, cell) in row.iter().enumerate() {
+            if let Some(p) = cell {
                 if p.kind == PieceKind::King && p.color == color {
                     return Some((c as i8, r as i8));
                 }
@@ -374,14 +374,12 @@ pub enum Outcome {
 
 fn insufficient_material(state: &State) -> bool {
     let mut minors = 0;
-    for r in 0..8 {
-        for c in 0..8 {
-            if let Some(p) = state.board[r][c] {
-                match p.kind {
-                    PieceKind::King => {}
-                    PieceKind::Knight | PieceKind::Bishop => minors += 1,
-                    _ => return false, // 有兵/車/后 → 仍可將死
-                }
+    for row in &state.board {
+        for p in row.iter().flatten() {
+            match p.kind {
+                PieceKind::King => {}
+                PieceKind::Knight | PieceKind::Bishop => minors += 1,
+                _ => return false, // 有兵/車/后 → 仍可將死
             }
         }
     }
