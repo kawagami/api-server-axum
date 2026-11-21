@@ -2,19 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Copy, Download, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Download, Loader2, Play, RotateCcw, Trash2 } from "lucide-react";
 import { AdminEmptyRow, AdminHeadRow, AdminRow, AdminTable, AdminTd, AdminTh } from "@/components/admin/table";
 import { createTorrentDownloadLinks, deleteTorrent, retryTorrent } from "@/api/torrents";
 import StorageBars from "./storage-bars";
 import AddTorrentForm from "./add-torrent-form";
 import FileDownloadModal, { displayName } from "./file-download-modal";
+import VideoPlayerModal, { isVideoFile } from "./video-player-modal";
 import { useTorrentLive } from "./useTorrentLive";
 import { TORRENT_STATUS_BADGE, TORRENT_STATUS_LABEL } from "@/libs/badge-styles";
 import { formatBytes } from "@/libs/format-bytes";
 import { formatDateTime, formatElapsed } from "@/libs/admin-datetime";
 import ErrorBanner from "@/components/admin/error-banner";
 import AdminTableContainer from "@/components/admin/admin-table-container";
-import type { Torrent, TorrentStorage } from "@/types";
+import type { Torrent, TorrentFile, TorrentStorage } from "@/types";
 
 interface Props {
     initialTorrents: Torrent[];
@@ -50,6 +51,7 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
     const [modalTorrent, setModalTorrent] = useState<Torrent | null>(null);
     const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
+    const [playing, setPlaying] = useState<{ torrentId: number; file: TorrentFile } | null>(null);
     // 操作失敗一律顯示在頁面上的 ErrorBanner，不用 window.alert
     const [actionError, setActionError] = useState<string | null>(null);
 
@@ -234,6 +236,15 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                                                         : <Download className="w-4 h-4" />}
                                                 </button>
                                             )}
+                                            {t.status === "completed" && t.files?.length === 1 && isVideoFile(t.files[0].path) && (
+                                                <button
+                                                    onClick={() => setPlaying({ torrentId: t.id, file: t.files![0] })}
+                                                    className="p-2 rounded-sm text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                                    title="線上播放"
+                                                >
+                                                    <Play className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             {t.status === "completed" && !(t.files && t.files.length > 1) && (
                                                 <button
                                                     onClick={() => copyLink(t.id, t.files?.[0]?.index ?? 0)}
@@ -299,7 +310,9 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                 </div>
             </div>
 
-            {modalTorrent && (
+            {/* 播放時先收起檔案清單（不疊兩層 dialog：Esc 會一次關兩個、body 捲動鎖還原順序也會錯），
+                關掉播放器後清單回來 */}
+            {modalTorrent && !playing && (
                 <FileDownloadModal
                     torrent={modalTorrent}
                     downloadingKey={downloadingKey}
@@ -307,6 +320,15 @@ export default function TorrentManager({ initialTorrents, initialTotal, initialS
                     onClose={() => setModalTorrent(null)}
                     onDownload={downloadFile}
                     onCopy={copyLink}
+                    onPlay={(torrentId, file) => setPlaying({ torrentId, file })}
+                />
+            )}
+
+            {playing && (
+                <VideoPlayerModal
+                    torrentId={playing.torrentId}
+                    file={playing.file}
+                    onClose={() => setPlaying(null)}
                 />
             )}
         </div>

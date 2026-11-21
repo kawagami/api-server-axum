@@ -238,7 +238,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 | `GET /storage` | `torrent:read` | 磁碟剩餘空間（statvfs）+ torrent 配額用量 |
 | `GET /{id}` | `torrent:read` | 詳情；進行中任務附 `live` 即時進度（`structs/torrents.rs::TorrentDetail` / `TorrentLive`；`live` 與 WS `torrent_progress` 共用 `TorrentLive`，由 `manager.rs::live_progress` 單一來源產生 —— 2026-09-29 前兩處各手組一份 `json!`） |
 | `POST /{id}/download_links` | `torrent:read` | 產生短效簽名下載連結（效期 `torrent_link_ttl_minutes`） |
-| `GET /{id}/files/{file_index}?token=` | 簽名 token | 串流下載，支援 Range；**不掛 JWT middleware**，但 token 的 `sub` 內嵌發行者 user id，下載時走 `load_identity` 即時重查 `torrent:read` 權限 |
+| `GET /{id}/files/{file_index}?token=&inline=` | 簽名 token | 串流下載，支援 Range（影片拖曳靠它）；**不掛 JWT middleware**，但 token 的 `sub` 內嵌發行者 user id，下載時走 `load_identity` 即時重查 `torrent:read` 權限。`inline=true` 回 `Content-Disposition: inline` 供後台線上播放，**只對 video/audio 生效**（依副檔名推的 Content-Type）—— torrent 內容不可信，`.html` / `.svg` inline 會在 api 網域被當頁面渲染，所以其餘類型一律 attachment |
 | `PATCH /{id}/pending` | `torrent:create` | failed/completed 重設重跑 |
 | `DELETE /{id}` | `torrent:delete` | 停任務 + 刪 DB + 刪磁碟 |
 
@@ -253,6 +253,7 @@ sleep 2; kill -TERM <pid>   # 預期約 5.7 秒退出，log 有 WARN 與 "server
 - 重啟 resume：啟動時 `routes.rs` spawn `sync_active`，downloading 任務以 `overwrite: true` 重加（驗證既有 piece 續抓）
 - 進度不落 DB — watcher 每 5 秒讀 stats，變動才廣播 `WsEvent::TorrentProgress`
 - 下載完成寄 email 通知（沿用 `notification` 類 SMTP 設定，未設定自動跳過）
+- 線上播放（前端 `torrents/video-player-modal.tsx`）不轉檔：1 核 1G 撐不了即時轉碼，瀏覽器解不了的編碼（HEVC、AC3/DTS 音軌、`.ass` 字幕）就是播不了，提示改下載。播放中 token 過期由前端換新連結並從原位置續播，後端不為播放另設效期
 - 下載 token 是獨立 JWT claims（purpose=`torrent_download`），與 admin/member token 不互通
 
 ## API 慣例

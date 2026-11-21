@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, Copy, Download, Loader2, X } from "lucide-react";
+import { Check, Copy, Download, Loader2, Play, X } from "lucide-react";
 import { formatBytes } from "@/libs/format-bytes";
 import Modal from "@/components/modal";
-import type { Torrent } from "@/types";
+import { isVideoFile } from "./video-player-modal";
+import type { Torrent, TorrentFile } from "@/types";
 
 export function displayName(t: Torrent) {
     if (t.name) return t.name;
@@ -18,9 +19,10 @@ interface Props {
     onClose: () => void;
     onDownload: (torrentId: number, fileIndex: number) => void;
     onCopy: (torrentId: number, fileIndex: number) => void;
+    onPlay: (torrentId: number, file: TorrentFile) => void;
 }
 
-export default function FileDownloadModal({ torrent, downloadingKey, copiedKey, onClose, onDownload, onCopy }: Props) {
+export default function FileDownloadModal({ torrent, downloadingKey, copiedKey, onClose, onDownload, onCopy, onPlay }: Props) {
     return (
         <Modal label="選擇要下載的檔案" onClose={onClose} size="lg" className="max-h-[80svh] overflow-auto">
             <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
@@ -48,6 +50,16 @@ export default function FileDownloadModal({ torrent, downloadingKey, copiedKey, 
                                     {formatBytes(f.size)}
                                 </span>
                             </div>
+                            {isVideoFile(f.path) && (
+                                <button
+                                    onClick={() => onPlay(torrent.id, f)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-sm transition-colors"
+                                    title="線上播放"
+                                >
+                                    <Play className="w-4 h-4" />
+                                    <span className="hidden sm:inline">播放</span>
+                                </button>
+                            )}
                             <button
                                 onClick={() => onDownload(torrent.id, f.index)}
                                 disabled={downloadingKey !== null}

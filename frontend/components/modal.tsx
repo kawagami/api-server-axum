@@ -22,6 +22,8 @@ const SIZES = {
     md: "max-w-md",
     lg: "max-w-lg",
     xl: "max-w-2xl",
+    /** 影片播放這類要盡量寬的內容 */
+    "2xl": "max-w-5xl",
 } as const;
 
 /** 前後台卡片底色不同，面板要跟著所在區域走，否則深色模式會差一階 */

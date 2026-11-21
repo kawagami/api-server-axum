@@ -112,9 +112,14 @@ async fn create_download_links(
 #[derive(Deserialize)]
 struct DownloadQuery {
     token: String,
+    /// true = 要求 `Content-Disposition: inline`（瀏覽器直接播放）。只對 video/audio 生效，
+    /// 其他類型一律 attachment —— torrent 內容不可信，inline 的 `.html` / `.svg` 會在
+    /// api 網域被當成頁面渲染
+    #[serde(default)]
+    inline: bool,
 }
 
-/// 簽名 URL 下載：token 驗證後交給 ServeFile（內建 Range / ETag，支援續傳）
+/// 簽名 URL 下載：token 驗證後交給 ServeFile（內建 Range / ETag，支援續傳 / 影片拖曳）
 async fn download_file(
     State(state): State<AppState>,
     Path((id, file_index)): Path<(i32, usize)>,
@@ -130,11 +135,21 @@ async fn download_file(
         .map_err(|e| crate::errors::SystemError::Internal(format!("serve file failed: {e}")))?
         .into_response();
 
+    let disposition = if query.inline && is_media(&response) { "inline" } else { "attachment" };
     // RFC 5987 percent-encoding，檔名含中文/空白也安全
     let encoded: String = form_urlencoded::byte_serialize(filename.as_bytes()).collect();
-    if let Ok(value) = HeaderValue::from_str(&format!("attachment; filename*=UTF-8''{encoded}")) {
+    if let Ok(value) = HeaderValue::from_str(&format!("{disposition}; filename*=UTF-8''{encoded}")) {
         response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
     }
 
     Ok(response)
+}
+
+/// ServeFile 依副檔名推的 Content-Type 是否為影音
+fn is_media(response: &Response) -> bool {
+    response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|ct| ct.starts_with("video/") || ct.starts_with("audio/"))
 }
