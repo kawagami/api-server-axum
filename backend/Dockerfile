@@ -1,5 +1,5 @@
 # 版本與 backend/rust-toolchain.toml、.github/workflows/backend.yml 的 toolchain 三處同步
-FROM rust:1.99-bookworm AS builder
+FROM rust:1.100-bookworm AS builder
 
 WORKDIR /app
 
