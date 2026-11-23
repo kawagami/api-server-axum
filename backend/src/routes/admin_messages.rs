@@ -1,10 +1,11 @@
-use crate::extract::{Json, Path, Query};
+use crate::extract::{Json, Query};
 use crate::{
     errors::AppError,
     services::messages as messages_service,
     state::AppState,
     structs::{
         auth::AuthenticatedUser,
+        batch::{BatchDeleted, IdsQuery},
         messages::Message,
         pagination::{PageQuery, Paginated},
         roles::Perm
@@ -12,7 +13,6 @@ use crate::{
 };
 use axum::{
     extract::{Extension, State},
-    http::StatusCode,
     routing::get,
     Router
 };
@@ -21,8 +21,7 @@ pub fn new(state: AppState) -> Router<AppState> {
     super::with_auth(
         state,
         Router::new()
-            .route("/", get(list_messages))
-            .route("/{id}", axum::routing::delete(delete_message)),
+            .route("/", get(list_messages).delete(delete_messages)),
     )
 }
 
@@ -39,13 +38,14 @@ async fn list_messages(
     ))
 }
 
-/// 刪除一則留言
-async fn delete_message(
+
+/// 刪除留言（`?ids=1,2,3`，單筆也走這支）。ids 放 query 是為了讓稽核記得到刪了哪幾筆，見 `structs/batch.rs`
+async fn delete_messages(
     Extension(auth_user): Extension<AuthenticatedUser>,
     State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<StatusCode, AppError> {
+    Query(q): Query<IdsQuery>,
+) -> Result<Json<BatchDeleted>, AppError> {
     auth_user.require_permission(Perm::MessageDelete)?;
-    messages_service::delete(state.get_pool(), id).await?;
-    Ok(StatusCode::NO_CONTENT)
+    let deleted = messages_service::delete_many(state.get_pool(), &q.ids).await?;
+    Ok(Json(BatchDeleted { deleted }))
 }

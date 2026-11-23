@@ -87,10 +87,24 @@ export default function usePagedList<T>(initial?: { items: T[]; total: number; f
         });
     }, []);
 
+    /**
+     * 刪除成功後就地拿掉已載入的列，並把 total 與「已拉筆數」一起減 `count`：
+     * 「共 N 筆」跟著變，`hasMore` 的判斷也不受影響（兩邊同減）。
+     * `count` 由呼叫端給（= 後端回報實際刪掉的筆數），不在 items 的 updater 裡數 ——
+     * updater 裡不該再 set 別的 state。只用 `setItems` 刪列的話 total 不會動，標題的總數就錯了。
+     * ⚠️ 分頁是 offset 式：刪掉 k 筆後下一頁的 offset 會多跳過 k 筆（那 k 筆要重整才看得到），
+     * 這是 page/per_page 的本質限制，不是這支的 bug。
+     */
+    const removeItems = useCallback((shouldRemove: (item: T) => boolean, count: number) => {
+        setItems(prev => prev.filter(item => !shouldRemove(item)));
+        setTotal(prev => Math.max(0, prev - count));
+        setLoaded(prev => Math.max(0, prev - count));
+    }, []);
+
     // 「已從 server 拉了幾筆」對比總筆數。刻意不看 items.length ——
     // 呼叫端會用 setItems 就地增刪（刪一列、插一則新留言、輪詢補新紀錄），
     // 那些不代表分頁進度，混進來會讓按鈕早消失或多出來
     const hasMore = loaded < total;
 
-    return { items, setItems, total, hasMore, isPending, failed, load, loadMore };
+    return { items, setItems, removeItems, total, hasMore, isPending, failed, load, loadMore };
 }

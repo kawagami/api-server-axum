@@ -26,10 +26,15 @@ export async function getContactMessages(
     return res ?? { data: [], total: 0 };
 }
 
-// 後台:刪除留言(需 message:delete)
-export async function deleteContactMessage(id: number): Promise<void> {
-    await adminRequest<null>({
-        url: `${process.env.API_URL}/admin/messages/${id}`,
+// 後台:刪除留言(需 message:delete;單筆也走這支,傳一個 id)。ids 放 query 讓後端稽核記得到刪了哪幾筆;
+// 單次上限 MAX_BATCH_IDS(components/admin/bulk-select.tsx)。回實際刪掉的 id(不存在的略過)
+export async function deleteContactMessages(ids: number[]): Promise<number[]> {
+    // Server Action 的參數是 client 送來的、不可信：只放行正整數，不讓 `1&x=y` 這種值拼進 URL
+    const safe = ids.filter(id => Number.isSafeInteger(id) && id > 0);
+    if (safe.length === 0) return [];
+    const res = await adminRequest<{ deleted: number[] }>({
+        url: `${process.env.API_URL}/admin/messages?ids=${safe.join(",")}`,
         method: "DELETE",
     });
+    return res?.deleted ?? [];
 }

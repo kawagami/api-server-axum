@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Trash2, Mail, ChevronRight, ChevronDown } from "lucide-react";
-import { getContactMessages, deleteContactMessage } from "@/api/contact";
+import { getContactMessages, deleteContactMessages } from "@/api/contact";
 import { AdminTable, AdminHeadRow, AdminRow, AdminTh, AdminTd, AdminEmptyRow } from "@/components/admin/table";
 import AdminTableContainer from "@/components/admin/admin-table-container";
+import { BulkActionBar, MAX_BATCH_IDS, RowCheckbox, SelectAllCheckbox } from "@/components/admin/bulk-select";
+import ConfirmDialog from "@/components/admin/confirm-dialog";
 import ErrorBanner, { LOAD_FAILED, DELETE_FAILED } from "@/components/admin/error-banner";
 import PageHeader from "@/components/admin/page-header";
 import usePagedList from "@/hooks/usePagedList";
+import useSelection from "@/hooks/useSelection";
 import { formatDateTime } from "@/libs/admin-datetime";
 import type { ContactMessage } from "@/types";
 
@@ -22,10 +25,14 @@ function isLong(content: string) {
 }
 
 export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
-    const { items: messages, total, hasMore, isPending, failed, load, loadMore, setItems } =
+    const { items: messages, total, hasMore, isPending, failed, load, loadMore, removeItems } =
         usePagedList<ContactMessage>();
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+    // 待確認的刪除：單筆（列上的刪除鈕）與批次（勾選後的「刪除所選」）共用同一個確認框
+    const [pendingDelete, setPendingDelete] = useState<number[] | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const ids = useMemo(() => messages.map(m => m.id), [messages]);
+    const selection = useSelection(ids);
     // 可同時展開多列（要比對兩筆時不必來回點）
     const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
 
@@ -41,22 +48,27 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
         });
     }
 
-    async function handleDelete(id: number) {
-        if (deletingId) return;
-        if (!window.confirm("確定要刪除這則留言嗎？")) return;
+    async function confirmDelete() {
+        if (!pendingDelete || deleting) return;
+        const target = pendingDelete;
         setDeleteError(null);
-        setDeletingId(id);
+        setDeleting(true);
         try {
-            await deleteContactMessage(id);
-            setItems(prev => prev.filter(m => m.id !== id));
+            await deleteContactMessages(target);
+            // 端點會略過已不存在的 id（別的分頁先刪了）；那些列在 DB 裡同樣不在了，
+            // 而且都算在載入時的 total 裡，所以整批從畫面拿掉、total 減整批
+            const gone = new Set(target);
+            removeItems(m => gone.has(m.id), target.length);
+            setPendingDelete(null);
         } catch {
+            setPendingDelete(null);
             setDeleteError(DELETE_FAILED);
         } finally {
-            setDeletingId(null);
+            setDeleting(false);
         }
     }
 
-    const colSpan = canDelete ? 4 : 3;
+    const colSpan = canDelete ? 5 : 3;
 
     return (
         // 高度鏈：layout 的 h-full flex 欄 → 這裡 flex-1 → 表格區 flex-1 → AdminTableContainer fill
@@ -64,6 +76,18 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
             <PageHeader
                 title="訪客留言"
                 description={`訪客從前台聯絡表單送來的訊息，共 ${total} 筆，已載入 ${messages.length} 筆`}
+                actions={canDelete && (
+                    <BulkActionBar selection={selection}>
+                        <button
+                            onClick={() => setPendingDelete(selection.selectedIds)}
+                            disabled={selection.count > MAX_BATCH_IDS}
+                            className="inline-flex items-center gap-1 rounded-sm px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 transition-colors"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            刪除所選
+                        </button>
+                    </BulkActionBar>
+                )}
             />
 
             <ErrorBanner message={failed ? LOAD_FAILED : deleteError} />
@@ -75,6 +99,7 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                     <AdminTable className="text-sm table-fixed">
                         <thead>
                             <AdminHeadRow>
+                                {canDelete && <AdminTh className="col-check"><SelectAllCheckbox selection={selection} /></AdminTh>}
                                 <AdminTh className="col-datetime">時間</AdminTh>
                                 <AdminTh className="w-[15em]">來自</AdminTh>
                                 <AdminTh>內容</AdminTh>
@@ -93,6 +118,11 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                                     const Chevron = isExpanded ? ChevronDown : ChevronRight;
                                     return (
                                         <AdminRow key={m.id}>
+                                            {canDelete && (
+                                                <AdminTd className="col-check align-top">
+                                                    <RowCheckbox selection={selection} id={m.id} label={`選取 ${m.name || '匿名'} 的留言`} />
+                                                </AdminTd>
+                                            )}
                                             <AdminTd className="whitespace-nowrap align-top text-xs text-neutral-500 dark:text-neutral-400">
                                                 {formatDateTime(m.created_at)}
                                             </AdminTd>
@@ -143,8 +173,7 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                                             {canDelete && (
                                                 <AdminTd className="whitespace-nowrap align-top">
                                                     <button
-                                                        onClick={() => handleDelete(m.id)}
-                                                        disabled={deletingId === m.id}
+                                                        onClick={() => setPendingDelete([m.id])}
                                                         className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 transition-colors"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
@@ -160,6 +189,20 @@ export default function MessagesClient({ canDelete }: { canDelete: boolean }) {
                     </AdminTable>
                 </AdminTableContainer>
             </div>
+
+            {pendingDelete && (
+                <ConfirmDialog
+                    title={pendingDelete.length === 1 ? "刪除留言" : `刪除 ${pendingDelete.length} 則留言`}
+                    confirmLabel="刪除"
+                    busy={deleting}
+                    onConfirm={confirmDelete}
+                    onClose={() => setPendingDelete(null)}
+                >
+                    {pendingDelete.length === 1
+                        ? "確定要刪除這則留言嗎？刪除後無法復原。"
+                        : `確定要刪除選取的 ${pendingDelete.length} 則留言嗎？刪除後無法復原。`}
+                </ConfirmDialog>
+            )}
 
             {hasMore && (
                 <div className="flex shrink-0 justify-center">

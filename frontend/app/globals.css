@@ -218,6 +218,8 @@ html {
 .admin-shell .col-id       { width: calc(7ch + 2rem); }   /* 遞增 id */
 /* badge 自己還有 px-2 的內距（約 2.4ch），所以最長的 DELETE(6ch) 要算到 ~8.4ch */
 .admin-shell .col-badge    { width: calc(10ch + 2rem); }
+/* 多選勾選欄（components/admin/bulk-select.tsx）：checkbox 不是文字，用 rem */
+.admin-shell .col-check    { width: calc(1.25rem + 2rem); }
 
 /* ===== 密集表格（欄數多的數字表）=====
    AdminTable 的格子是 px-4，單欄就吃 32px 水平 padding。11 欄的行情表光 padding 就 352px，

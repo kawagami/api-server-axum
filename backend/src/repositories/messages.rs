@@ -42,14 +42,10 @@ pub async fn count(pool: &Pool<Postgres>) -> Result<i64, AppError> {
     Ok(total)
 }
 
-/// 刪除一則留言;不存在回 RowNotFound(→ 404)
-pub async fn delete(pool: &Pool<Postgres>, id: i64) -> Result<(), AppError> {
-    let res = sqlx::query("DELETE FROM messages WHERE id = $1")
-        .bind(id)
-        .execute(pool)
-        .await?;
-    if res.rows_affected() == 0 {
-        return Err(crate::errors::RequestError::NotFound.into());
-    }
-    Ok(())
+/// 批次刪除，回傳實際刪掉的 id（不存在的略過，不視為錯誤）
+pub async fn delete_many(pool: &Pool<Postgres>, ids: &[i64]) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar("DELETE FROM messages WHERE id = ANY($1) RETURNING id")
+        .bind(ids)
+        .fetch_all(pool)
+        .await?)
 }

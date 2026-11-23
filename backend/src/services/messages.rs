@@ -56,6 +56,6 @@ pub async fn list(
     Ok(Paginated::new(data, total))
 }
 
-pub async fn delete(pool: &Pool<Postgres>, id: i64) -> Result<(), AppError> {
-    repo::delete(pool, id).await
+pub async fn delete_many(pool: &Pool<Postgres>, ids: &[i64]) -> Result<Vec<i64>, AppError> {
+    repo::delete_many(pool, ids).await
 }
