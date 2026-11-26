@@ -129,6 +129,10 @@ updates:
     ignore:
       # node 的主版只跟 LTS（偶數版）。dependabot 認得的是「有沒有新 tag」，
       # 不認得 25 是 Current、生產不該用，所以奇偶要靠這條擋。
-      # Node 26 進 LTS（2026-10）時把 Dockerfile、CI setup-node 一起手動升。
+      # Node 26 已於 2026-10-28 進 LTS，但**刻意暫緩**（2026-11-26 評估）：Next 16.4.x 在 Node 26
+      # 上 inline Flight data 會一個 chunk 一個 <script>（vercel/next.js#101343，HTML gzip 約 4 倍），
+      # 修正 #100142 只在 16.5 canary。等 Next 16.5 正式版再升；Node 24 支援到 2028-04-30。
+      # 升時注意 Node 26 不再內建 corepack：Dockerfile 與 CI 的 `corepack enable` 前要先
+      # `npm i -g corepack@<釘版>`（Next 自家文件同寫法），並同步 @types/node 與上方 ignore 註解。
       - dependency-name: node
         update-types: ["version-update:semver-major"]
