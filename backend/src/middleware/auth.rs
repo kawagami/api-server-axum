@@ -129,17 +129,14 @@ pub(crate) async fn verify_admin_token(state: &AppState, token: String) -> Resul
 }
 
 pub(crate) fn decode_jwt(jwt: String, secret: &str) -> Result<TokenData<Claims>, AppError> {
-    decode(
-        &jwt,
-        &DecodingKey::from_secret(secret.as_ref()),
-        &Validation::default(),
-    )
-    .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-            AppError::AuthError(AuthError::TokenExpired)
-        }
-        _ => AppError::AuthError(AuthError::InvalidToken),
-    })
+    DecodingKey::from_secret(secret.as_ref())
+        .and_then(|key| decode(&jwt, &key, &Validation::default()))
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                AppError::AuthError(AuthError::TokenExpired)
+            }
+            _ => AppError::AuthError(AuthError::InvalidToken),
+        })
 }
 
 #[cfg(test)]
@@ -174,7 +171,7 @@ mod tests {
         encode(
             &Header::default(),
             &claims,
-            &EncodingKey::from_secret(SECRET.as_ref()),
+            &EncodingKey::from_secret(SECRET.as_ref()).expect("測試 secret 非空"),
         )
         .expect("簽發測試 token")
     }

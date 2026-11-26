@@ -39,7 +39,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # ⚠ 這裡原本寫「cmake 也已在 Dockerfile」—— 2026-08-28（998c940）那行 apt-get 已刪除，
 #   aws-lc-sys 走自己的 cmake-free 路徑仍編得過（該 commit 的 image 已部署驗證）。
 # default-features = false 砍掉 use_pem —— 全案只用 from_secret 簽驗 HS256，不碰 PEM。
-jsonwebtoken = { version = "11", default-features = false, features = ["aws_lc_rs"] }
+jsonwebtoken = { version = "12", default-features = false, features = ["aws_lc_rs"] }
 bcrypt = "0.19.2"
 bb8 = "0.9"
 bb8-redis = "0.26"

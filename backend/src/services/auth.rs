@@ -142,12 +142,9 @@ fn encode_jwt(id: i64, jwt_secret: &str) -> Result<String, AppError> {
     // sub 存 user id（字串），與前台 member token 一致；顯示名 name 不進 token
     let claim = Claims { iat, exp, sub: id.to_string(), role: "admin".to_string() };
 
-    encode(
-        &Header::default(),
-        &claim,
-        &EncodingKey::from_secret(jwt_secret.as_ref()),
-    )
-    .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
+    EncodingKey::from_secret(jwt_secret.as_ref())
+        .and_then(|key| encode(&Header::default(), &claim, &key))
+        .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
 }
 
 async fn dummy_verify_password(password: String) {

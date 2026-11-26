@@ -48,12 +48,9 @@ pub async fn create_download_links(
                 torrent_id: id,
                 file_index: f.index,
             };
-            let token = encode(
-                &Header::default(),
-                &claims,
-                &EncodingKey::from_secret(secret.as_ref()),
-            )
-            .map_err(|e| SystemError::Internal(format!("簽發下載 token 失敗: {e}")))?;
+            let token = EncodingKey::from_secret(secret.as_ref())
+                .and_then(|key| encode(&Header::default(), &claims, &key))
+                .map_err(|e| SystemError::Internal(format!("簽發下載 token 失敗: {e}")))?;
             Ok(DownloadLink {
                 url: format!("/admin/torrents/{id}/files/{}?token={token}", f.index),
                 file_index: f.index,
@@ -72,13 +69,10 @@ pub async fn resolve_download_file(
     file_index: usize,
     token: &str,
 ) -> Result<(PathBuf, String), AppError> {
-    let claims = decode::<TorrentDownloadClaims>(
-        token,
-        &DecodingKey::from_secret(state.get_config().jwt_secret.as_ref()),
-        &Validation::default(),
-    )
-    .map_err(|_| AppError::AuthError(crate::errors::AuthError::InvalidToken))?
-    .claims;
+    let claims = DecodingKey::from_secret(state.get_config().jwt_secret.as_ref())
+        .and_then(|key| decode::<TorrentDownloadClaims>(token, &key, &Validation::default()))
+        .map_err(|_| AppError::AuthError(crate::errors::AuthError::InvalidToken))?
+        .claims;
 
     if claims.purpose != DOWNLOAD_TOKEN_PURPOSE
         || claims.torrent_id != id

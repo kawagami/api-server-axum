@@ -231,7 +231,8 @@ fn encode_member_jwt(member_id: i64, jwt_secret: &str) -> Result<String, AppErro
         role: "member".to_string(),
     };
 
-    encode(&Header::default(), &claim, &EncodingKey::from_secret(jwt_secret.as_ref()))
+    EncodingKey::from_secret(jwt_secret.as_ref())
+        .and_then(|key| encode(&Header::default(), &claim, &key))
         .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
 }
 
@@ -244,21 +245,19 @@ fn encode_refresh_jwt(member_id: i64, jti: &str, jwt_secret: &str) -> Result<Str
         jti: jti.to_string(),
     };
 
-    encode(&Header::default(), &claim, &EncodingKey::from_secret(jwt_secret.as_ref()))
+    EncodingKey::from_secret(jwt_secret.as_ref())
+        .and_then(|key| encode(&Header::default(), &claim, &key))
         .map_err(|_| AppError::AuthError(AuthError::InvalidToken))
 }
 
 fn decode_refresh_jwt(jwt: &str, jwt_secret: &str) -> Result<RefreshClaims, AppError> {
-    decode::<RefreshClaims>(
-        jwt,
-        &DecodingKey::from_secret(jwt_secret.as_ref()),
-        &Validation::default(),
-    )
-    .map(|t| t.claims)
-    .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::AuthError(AuthError::TokenExpired),
-        _ => AppError::AuthError(AuthError::InvalidToken),
-    })
+    DecodingKey::from_secret(jwt_secret.as_ref())
+        .and_then(|key| decode::<RefreshClaims>(jwt, &key, &Validation::default()))
+        .map(|t| t.claims)
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::AuthError(AuthError::TokenExpired),
+            _ => AppError::AuthError(AuthError::InvalidToken),
+        })
 }
 
 struct ProviderTokenResponse {
