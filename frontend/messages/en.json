@@ -607,7 +607,6 @@
     "evilWins": "Evil wins",
     "draw": "Draw",
     "backToLobby": "Back to lobby",
-    "reason_good_three_quests": "Good completed three quests",
     "reason_good_assassin_miss": "Assassin missed Merlin — Good wins",
     "reason_evil_three_fails": "Evil failed three quests",
     "reason_evil_five_rejects": "Five rejects in a row — Evil wins",
