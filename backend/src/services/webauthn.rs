@@ -5,8 +5,9 @@ use crate::{
     state::AppState,
     structs::webauthn::{PasskeyListItem, PasskeyLoginBeginResponse},
 };
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use webauthn_rs::prelude::{
-    CreationChallengeResponse, CredentialID, DiscoverableAuthentication, DiscoverableKey, Passkey,
+    CreationChallengeResponse, CredentialID, DiscoverableAuthentication, Passkey,
     PasskeyRegistration, PublicKeyCredential, RegisterPublicKeyCredential, Uuid, WebauthnError,
 };
 use webauthn_rs_proto::ResidentKeyRequirement;
@@ -52,14 +53,13 @@ fn get_webauthn(state: &AppState) -> Result<webauthn_rs::Webauthn, AppError> {
     })
 }
 
-// CredentialID 序列化即 base64url 字串，取出作 DB 查詢 key
-fn cred_id_string(cred_id: &CredentialID) -> Result<String, AppError> {
-    match serde_json::to_value(cred_id)? {
-        serde_json::Value::String(s) => Ok(s),
-        _ => Err(AppError::SystemError(SystemError::Internal(
-            "credential id 序列化非字串".to_string(),
-        ))),
-    }
+/// DB `credential_id` 欄 = base64url（無 padding）字串，作查詢 key。
+///
+/// ⚠️ 0.5 時 `CredentialID` 是 `HumanBinaryData`，直接 serde_json 序列化就得到這個字串；
+/// 0.6 改成裸 `Vec<u8>`（base64 只掛在 struct 欄位的 serde_as 上），再走 serde_json 會變成數字陣列。
+/// 所以明確自己編碼，格式與 0.5 寫進 DB 的存量一致（見測試 `cred_id_string_matches_stored_format`）。
+fn cred_id_string(cred_id: &CredentialID) -> String {
+    URL_SAFE_NO_PAD.encode(cred_id)
 }
 
 async fn load_user_passkeys(state: &AppState, user_id: i64) -> Result<Vec<Passkey>, AppError> {
@@ -137,7 +137,7 @@ pub async fn finish_registration(
         .finish_passkey_registration(credential, &reg_state)
         .map_err(webauthn_err)?;
 
-    let cred_id = cred_id_string(passkey.cred_id())?;
+    let cred_id = cred_id_string(passkey.cred_id());
     let inserted = passkeys::insert(
         state.get_pool(),
         user_id,
@@ -183,31 +183,29 @@ pub async fn finish_login(
     let auth_state: DiscoverableAuthentication = serde_json::from_str(&state_json)?;
 
     // discoverable credential 的 userHandle 反查 user，免輸帳號
-    let (handle, _cred_id) = webauthn
+    let (handle, cred_id) = webauthn
         .identify_discoverable_authentication(credential)
         .map_err(webauthn_err)?;
     let user_id = users::get_id_by_webauthn_handle(state.get_pool(), handle)
         .await?
         .ok_or(AppError::AuthError(AuthError::WebauthnFailed))?;
 
-    let user_passkeys = load_user_passkeys(state, user_id).await?;
-    let discoverable: Vec<DiscoverableKey> =
-        user_passkeys.iter().map(DiscoverableKey::from).collect();
+    // userHandle 對到的 user 名下找不到這把 credential = 偽造 / 已刪除，直接拒絕
+    let mut passkey = load_user_passkeys(state, user_id)
+        .await?
+        .into_iter()
+        .find(|p| p.cred_id().as_slice() == cred_id)
+        .ok_or(AppError::AuthError(AuthError::WebauthnFailed))?;
 
     let auth_result = webauthn
-        .finish_discoverable_authentication(credential, auth_state, &discoverable)
+        .finish_discoverable_authentication_v2(credential, auth_state, &passkey)
         .map_err(webauthn_err)?;
 
     // counter/backup 旗標有變才回寫整包，否則只更 last_used_at
-    if let Some(mut passkey) = user_passkeys
-        .into_iter()
-        .find(|p| p.cred_id() == auth_result.cred_id())
-    {
-        let updated = passkey.update_credential(&auth_result) == Some(true);
-        let cred_id = cred_id_string(auth_result.cred_id())?;
-        let updated_json = if updated { Some(serde_json::to_value(&passkey)?) } else { None };
-        passkeys::touch_after_auth(state.get_pool(), &cred_id, updated_json.as_ref()).await?;
-    }
+    let updated = passkey.update_credential(&auth_result) == Some(true);
+    let cred_id = cred_id_string(auth_result.cred_id());
+    let updated_json = if updated { Some(serde_json::to_value(&passkey)?) } else { None };
+    passkeys::touch_after_auth(state.get_pool(), &cred_id, updated_json.as_ref()).await?;
 
     auth_service::complete_admin_login(
         state.get_pool(),
@@ -256,5 +254,30 @@ mod tests {
             .expect("challenge 應帶 authenticator_selection");
         assert_eq!(after.resident_key, Some(ResidentKeyRequirement::Required));
         assert!(after.require_resident_key);
+    }
+
+    /// 0.5 寫進 `user_passkeys.passkey` 的 jsonb 必須能被現版反序列化 ——
+    /// `load_user_passkeys` 用 `filter_map(.ok())`，格式不相容時舊 passkey 會**靜默消失**（登入只會說找不到）。
+    /// 樣本是 webauthn-rs-core 0.5.5 自己的序列化測試資料（attestation 簡化成 passkey 常見的 None），外包 `Passkey { cred }`。
+    const PASSKEY_V05_JSON: &str = r#"{"cred":{"cred_id":"uZcVDBVS68E_MtAgeQpElJxldF_6cY9sSvbWqx_qRh8wiu42lyRBRmh5yFeD_r9k130dMbFHBHI9RTFgdJQIzQ","cred":{"type_":"ES256","key":{"EC_EC2":{"curve":"SECP256R1","x":[194,126,127,109,252,23,131,21,252,6,223,99,44,254,140,27,230,17,94,5,133,28,104,41,144,69,171,149,161,26,200,243],"y":[143,123,183,156,24,178,21,248,117,159,162,69,171,52,188,252,26,59,6,47,103,92,19,58,117,103,249,0,219,8,95,196]}}},"counter":2,"transports":null,"user_verified":true,"backup_eligible":true,"backup_state":true,"registration_policy":"required","extensions":{"cred_protect":"NotRequested","hmac_create_secret":"NotRequested","appid":"NotRequested","cred_props":"Ignored"},"attestation":{"data":"None","metadata":"None"},"attestation_format":"None"}}"#;
+
+    #[test]
+    fn passkey_serialized_by_v05_still_deserializes() {
+        let passkey: Passkey =
+            serde_json::from_str(PASSKEY_V05_JSON).expect("0.5 格式的 passkey 應能反序列化");
+        // 再序列化回去也要是同一種形狀（cred_id 仍是字串），否則 update_credential 回寫後下次讀會壞
+        let reser = serde_json::to_value(&passkey).unwrap();
+        assert!(reser["cred"]["cred_id"].is_string());
+        let _: Passkey = serde_json::from_value(reser).unwrap();
+    }
+
+    /// `credential_id` 欄是 0.5 時代寫入的 base64url 字串，現版算出的 key 必須逐字相同，否則登入對不到列。
+    #[test]
+    fn cred_id_string_matches_stored_format() {
+        let passkey: Passkey = serde_json::from_str(PASSKEY_V05_JSON).unwrap();
+        assert_eq!(
+            cred_id_string(passkey.cred_id()),
+            "uZcVDBVS68E_MtAgeQpElJxldF_6cY9sSvbWqx_qRh8wiu42lyRBRmh5yFeD_r9k130dMbFHBHI9RTFgdJQIzQ"
+        );
     }
 }
