@@ -1,4 +1,5 @@
-import type { FoodLogSuggestion, Meal } from "@/types";
+import type { FoodLogOverview } from "@/api/food-log";
+import type { FoodLogEntry, FoodLogSuggestion, FoodLogSummary, Meal } from "@/types";
 
 /** 一天之內的顯示順序，與後端 `Meal::ALL` 相同 */
 export const MEALS: readonly Meal[] = ["breakfast", "lunch", "dinner", "snack", "late_night", "other"];
@@ -65,4 +66,55 @@ export function searchSuggestions(list: FoodLogSuggestion[], query: string): Foo
 /** 金額顯示：`$1,234`，`null`（點數兌換 / 請客）由呼叫端自己決定文案 */
 export function formatAmount(n: number, locale: string): string {
     return `$${new Intl.NumberFormat(locale).format(n)}`;
+}
+
+/** 該週的週一（與後端 `week_start` 對齊） */
+export function weekStart(date: string): string {
+    const dow = new Date(`${date}T00:00:00Z`).getUTCDay(); // 0 = 週日
+    return addDays(date, -((dow + 6) % 7));
+}
+
+/** 樂觀更新的暫存筆數用負 id，和後端的正整數不會撞；畫面據此顯示「送出中」 */
+export function isPendingEntry(entry: FoodLogEntry): boolean {
+    return entry.id < 0;
+}
+
+export type OptimisticOp =
+    | { kind: "add"; entry: FoodLogEntry }
+    | { kind: "delete"; entry: FoodLogEntry };
+
+/**
+ * 寫入送出前先套到畫面上（`useOptimistic` 的 reducer）。只是暫時的近似值：
+ * 伺服器回應後整份 overview 會被覆蓋，所以 suggestions 的次數排序不動，只算看得到的金額。
+ */
+export function applyOptimistic(o: FoodLogOverview, op: OptimisticOp, today: string): FoodLogOverview {
+    const { entry } = op;
+    const sign = op.kind === "add" ? 1 : -1;
+    const amount = (entry.amount ?? 0) * sign;
+
+    let days = o.days;
+    const existing = days.find(d => d.date === entry.eaten_on);
+    if (op.kind === "add") {
+        days = existing
+            ? days.map(d => d === existing ? { ...d, total: d.total + amount, entries: [...d.entries, entry] } : d)
+            : [...days, { date: entry.eaten_on, note: null, total: amount, entries: [entry] }]
+                .sort((a, b) => b.date.localeCompare(a.date));
+    } else if (existing) {
+        const entries = existing.entries.filter(e => e.id !== entry.id);
+        // 與後端一致：沒有品項也沒有備註的日子不列
+        days = entries.length === 0 && existing.note === null
+            ? days.filter(d => d !== existing)
+            : days.map(d => d === existing ? { ...d, total: d.total + amount, entries } : d);
+    }
+
+    return { ...o, days, summary: shiftSummary(o.summary, entry.eaten_on, amount, today) };
+}
+
+function shiftSummary(s: FoodLogSummary, date: string, amount: number, today: string): FoodLogSummary {
+    if (amount === 0 || date > today) return s;
+    return {
+        today: s.today + (date === today ? amount : 0),
+        week: s.week + (date >= weekStart(today) ? amount : 0),
+        month: s.month + (date.slice(0, 7) === today.slice(0, 7) ? amount : 0),
+    };
 }

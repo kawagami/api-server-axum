@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { NotebookPen } from "lucide-react";
+import { Loader2, NotebookPen } from "lucide-react";
 import { cn } from "@/libs/cn";
 import { PUBLIC_INPUT } from "@/libs/input-styles";
 import type { FoodLogDay, FoodLogEntry } from "@/types";
-import { MEALS, formatAmount } from "./model";
+import { MEALS, formatAmount, isPendingEntry } from "./model";
 import { Stars } from "./rating";
 
 interface Props {
@@ -62,12 +62,16 @@ export default function DayCard({ className, day, onEdit, onSaveNote }: Props) {
 function EntryRow({ entry, onClick }: { entry: FoodLogEntry; onClick: () => void }) {
     const t = useTranslations("FoodLog");
     const locale = useLocale();
+    // 樂觀更新的暫存筆：還沒有真正的 id，不能編輯；淡化 + 轉圈表示送出中
+    const pending = isPendingEntry(entry);
     return (
         <button
             type="button"
             onClick={onClick}
+            disabled={pending}
+            aria-busy={pending || undefined}
             aria-label={t("editEntryOf", { item: entry.item })}
-            className="w-full flex items-start justify-between gap-3 text-left rounded-sm px-2 py-1.5 -mx-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/50 transition-colors"
+            className="w-full flex items-start justify-between gap-3 text-left rounded-sm px-2 py-1.5 -mx-2 hover:bg-neutral-100 dark:hover:bg-neutral-700/50 disabled:opacity-60 disabled:hover:bg-transparent transition-colors"
         >
             <span className="flex flex-col min-w-0">
                 <span className="text-sm">
@@ -84,7 +88,8 @@ function EntryRow({ entry, onClick }: { entry: FoodLogEntry; onClick: () => void
                     <span className="text-xs text-neutral-600 dark:text-neutral-300 whitespace-pre-line mt-0.5">{entry.note}</span>
                 )}
             </span>
-            <span className="text-sm tabular-nums shrink-0 text-neutral-700 dark:text-neutral-200">
+            <span className="flex items-center gap-1.5 text-sm tabular-nums shrink-0 text-neutral-700 dark:text-neutral-200">
+                {pending && <Loader2 size={12} className="animate-spin text-neutral-400" aria-hidden />}
                 {entry.amount === null ? t("noAmount") : formatAmount(entry.amount, locale)}
             </span>
         </button>

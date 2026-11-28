@@ -14,8 +14,6 @@ interface Props {
     today: string;
     meal: Meal;
     suggestions: FoodLogSuggestion[];
-    /** 寫入中：選項先停用，避免連點記成兩筆 */
-    pending: boolean;
     onDateChange: (date: string) => void;
     onMealChange: (meal: Meal) => void;
     onPick: (s: FoodLogSuggestion) => void;
@@ -28,7 +26,7 @@ interface Props {
  * 金額不同（漲價）就記完在時間軸上點那筆改 —— 比每次都跳確認快。
  */
 export default function QuickAdd({
-    className, date, today, meal, suggestions, pending, onDateChange, onMealChange, onPick, onNew,
+    className, date, today, meal, suggestions, onDateChange, onMealChange, onPick, onNew,
 }: Props) {
     const t = useTranslations("FoodLog");
     const [query, setQuery] = useState("");
@@ -87,7 +85,7 @@ export default function QuickAdd({
             {searching ? (
                 <div className="flex flex-col gap-2">
                     {matches.length > 0 ? (
-                        <ChipList items={matches} pending={pending} onPick={pick} />
+                        <ChipList items={matches} onPick={pick} />
                     ) : (
                         <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("noMatches")}</p>
                     )}
@@ -97,12 +95,12 @@ export default function QuickAdd({
                 <>
                     {frequent.length > 0 && (
                         <ChipGroup title={t("frequent", { meal: t(`meals.${meal}`) })}>
-                            <ChipList items={frequent} pending={pending} onPick={pick} />
+                            <ChipList items={frequent} onPick={pick} />
                         </ChipGroup>
                     )}
                     {recent.length > 0 && (
                         <ChipGroup title={t("recent")}>
-                            <ChipList items={recent} pending={pending} onPick={pick} />
+                            <ChipList items={recent} onPick={pick} />
                         </ChipGroup>
                     )}
                     {suggestions.length === 0 && (
@@ -124,9 +122,8 @@ function ChipGroup({ title, children }: { title: string; children: React.ReactNo
     );
 }
 
-function ChipList({ items, pending, onPick }: {
+function ChipList({ items, onPick }: {
     items: FoodLogSuggestion[];
-    pending: boolean;
     onPick: (s: FoodLogSuggestion) => void;
 }) {
     const t = useTranslations("FoodLog");
@@ -138,8 +135,7 @@ function ChipList({ items, pending, onPick }: {
                     <button
                         type="button"
                         onClick={() => onPick(s)}
-                        disabled={pending}
-                        className="flex flex-col items-start text-left px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-600 hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 disabled:opacity-50 transition-colors"
+                        className="flex flex-col items-start text-left px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-600 hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
                     >
                         {s.store && <span className="text-xs text-neutral-500 dark:text-neutral-400">{s.store}</span>}
                         <span className="text-sm">
