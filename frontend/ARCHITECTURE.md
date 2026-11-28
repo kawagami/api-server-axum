@@ -103,6 +103,7 @@ types/index.ts        ← 後端 API 共用型別（Blog、User、Stock 等）
 - Hover scale：只用在塊級卡片/按鈕（上限 `hover:scale-105`），文字連結用變色 + underline，不縮放
 - Loading：統一 `Loader2`（lucide）spin + `animate-pulse` skeleton，不再有自訂 CSS loader。**前台資料頁一律要有自己的 `loading.tsx`**，用 `components/loading/public-page-skeleton.tsx` 的 `<PublicPageSkeleton width nav variant rows />`（variant：`list` / `cards` / `form`），參數要對齊該頁的 `PageShell`
 - **一次性提示**：用 `components/toast.tsx` 的 `useToast()` + `<Toast toast={toast} />`（固定底部置中、`role="status"`）。**前後台通用** —— 該檔只吃 message 字串、不碰 i18n，所以沒有 `NextIntlClientProvider` 的 admin 也能直接用（`tag-manager` 就是）。**不要用 `alert()`**，也不要各頁自刻覆蓋層。破壞性操作的確認：前台保留原生 `confirm()`（刪除持股、刪除飲食紀錄）；後台用 `components/admin/confirm-dialog.tsx` 的 `<ConfirmDialog>`（不用 `window.confirm` 的理由寫在檔頭），還沒換過去的見「已知的技術債」。分工：清單列的行內動作回饋（塞不進塊狀元素）與成功訊息走 Toast，頁面層級的「載入／操作失敗」走 `ErrorBanner`
+- **點擊回饋（慢網路，2026-11-28）**：分三層，新功能照這個順序挑。① **換頁**：`components/navigation-progress.tsx`（掛 root layout，前後台共用）攔站內 `<a>` 點擊跑頂部進度條、網址變了收尾；150ms 內完成不顯示、20 秒保底收掉。只吃連結點擊，`router.push` 的呼叫端自己負責 `isPending` 回饋（分頁／搜尋／篩選／status-link 已有）。`useLinkStatus` 只能用在單一 `<Link>` 底下，做不到全域，所以不用它。② **按下**：`globals.css` 的 `@layer base` `:where(a, button, …):active { opacity: .7 }`，網路還沒回應前先給「有按到」的觸感；特異度 0，元件自帶 `opacity-*` / `active:*` 優先，`disabled` / `aria-disabled="true"` 不套。這是「禁止全域 transition」以外唯一一條全域互動樣式（另一條是焦點框），不要再加別的
 - 換頁淡入由 `components/page-transition.tsx` 統一提供（掛在 `(public)/layout.tsx`），**不要只給單一區塊做轉場**
 - Tailwind CSS，深色模式用 `dark:` prefix
 - RWD 斷點：`sm:` 開始展開，行動優先

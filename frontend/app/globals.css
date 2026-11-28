@@ -153,6 +153,17 @@
   outline-offset: 2px;
 }
 
+/* ===== 全站按下回饋 =====
+   慢網路下點擊後要等 server 回應才有變化，手指按下那一刻先給「有按到」的觸感。
+   只動 opacity（不 scale，避免牽動版面與既有 transition），也不加 transition —— 按下要立刻有反應。
+   放 @layer base + :where() 特異度為 0，元件自帶的 opacity-* / active:* 一律優先；停用的按鈕不套。
+   這是「禁止全域 transition」之外的另一條全域互動樣式，理由同上面的焦點樣式：逐一補 class 一定會漏。 */
+@layer base {
+  :where(a[href], button:not(:disabled), [role="button"], summary):not([aria-disabled="true"]):active {
+    opacity: 0.7;
+  }
+}
+
 /* SVG 裡的可聚焦元素（對戰盤面的命中層）：瀏覽器內建樣式在 SVG 元素取得焦點時就畫預設焦點框，
    滑鼠點一下也算，盤面會殘留黑白方框。只在「非鍵盤取得焦點」時拿掉，鍵盤操作仍走上面那條 :focus-visible。 */
 svg [tabindex]:focus:not(:focus-visible) {

@@ -1,6 +1,7 @@
 import "./globals.css";
 import { WsProvider } from "@/libs/ws-context";
 import ThemeBackground from "@/components/theme-background";
+import NavigationProgress from "@/components/navigation-progress";
 import { getPublicSettings } from "@/api/settings";
 import { resolveActiveTheme, normalizeRotation } from "@/libs/site-theme";
 import { resolveDefaultColorMode } from "@/libs/color-mode";
@@ -51,6 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </head>
             <body className="bg-linear-to-b from-primary-50 to-neutral-100 text-neutral-800 dark:from-primary-950 dark:to-neutral-900 dark:text-neutral-100">
                 <WsProvider hasSession={hasSession} wsUrl={process.env.WS_URL ?? ''} lostLabel={tWs('disconnected')}>
+                    <NavigationProgress />
                     <ThemeBackground theme={siteTheme} />
                     {children}
                 </WsProvider>
