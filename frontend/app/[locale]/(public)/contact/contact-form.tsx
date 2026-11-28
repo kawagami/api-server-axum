@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Send } from "lucide-react";
+import { PublicPendingButton } from "@/components/pending-button";
 import { submitMessageAction, type ContactFormState } from "./actions";
 
 const initialState: ContactFormState = { status: null, messageKey: null };
@@ -50,11 +51,11 @@ export default function ContactForm() {
                     placeholder={t("contentPlaceholder")} className={`${inputClass} resize-y`} />
             </div>
 
-            <button type="submit" disabled={isPending}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-md bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-50 transition-colors">
+            <PublicPendingButton type="submit" pending={isPending} pendingLabel={t("submitting")}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-md bg-primary-600 hover:bg-primary-700 text-white font-medium transition-colors">
                 <Send className="w-4 h-4" />
-                {isPending ? t("submitting") : t("submit")}
-            </button>
+                {t("submit")}
+            </PublicPendingButton>
 
             {state.status && state.messageKey && (
                 <p className={`text-sm text-center ${state.status === "success" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>

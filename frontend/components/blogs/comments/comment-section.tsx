@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, MessageSquare, UserRound } from "lucide-react";
 import ShowClientTime from "@/components/blogs/show-client-time";
+import { PublicPendingButton } from "@/components/pending-button";
 import usePagedList from "@/hooks/usePagedList";
 import { getBlogComments, postBlogComment } from "@/api/blog-comments";
 import type { BlogComment } from "@/types";
@@ -160,14 +161,13 @@ export default function CommentSection({ blogId, isMember }: { blogId: string; i
                     <p className="text-sm text-red-600 dark:text-red-400">{t(`error.${errorKey}`)}</p>
                 )}
                 <div className="flex justify-end">
-                    <button
+                    <PublicPendingButton
                         type="submit"
-                        disabled={submitting}
-                        className="inline-flex items-center gap-2 px-5 py-2 rounded-md bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                        pending={submitting}
+                        className="inline-flex items-center gap-2 px-5 py-2 rounded-md bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium transition-colors"
                     >
-                        {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                         {t("submit")}
-                    </button>
+                    </PublicPendingButton>
                 </div>
             </form>
         </section>

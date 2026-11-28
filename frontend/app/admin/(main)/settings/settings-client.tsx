@@ -7,6 +7,7 @@ import type { Setting, SettingsResponse } from "@/types";
 import { FIELD_CONFIGS, CATEGORY_LABELS } from "./field-config";
 import { cn } from "@/libs/cn";
 import { ADMIN_INPUT } from "@/libs/input-styles";
+import PendingButton from "@/components/pending-button";
 
 const inputClass = cn(ADMIN_INPUT, "text-sm");
 
@@ -140,13 +141,15 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
                 </label>
                 <div className="flex gap-2 mt-2">
                     {renderInput(setting)}
-                    <button
+                    <PendingButton
                         onClick={() => handleSave(setting.key)}
-                        disabled={saving[setting.key] || !dirty}
-                        className="shrink-0 px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                        pending={!!saving[setting.key]}
+                        pendingLabel="儲存中…"
+                        disabled={!saving[setting.key] && !dirty}
+                        className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                     >
-                        {saving[setting.key] ? "儲存中…" : "儲存"}
-                    </button>
+                        儲存
+                    </PendingButton>
                 </div>
                 {errors[setting.key] && (
                     <p className="mt-1 text-xs text-red-500">{errors[setting.key]}</p>

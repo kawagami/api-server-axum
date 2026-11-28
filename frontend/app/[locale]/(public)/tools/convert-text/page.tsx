@@ -13,6 +13,7 @@ import {
 import PageShell from "@/components/page-shell";
 import PageTitle from "@/components/page-title";
 import Toast, { useToast } from "@/components/toast";
+import { PublicPendingButton } from "@/components/pending-button";
 
 const DIRECTIONS = [
     { value: "s2t", labelKey: "s2t" },
@@ -178,13 +179,15 @@ export default function ConvertText() {
                 </p>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    <button
+                    <PublicPendingButton
                         type="submit"
-                        className={`${buttonBase} bg-primary-500 text-white hover:bg-primary-600`}
-                        disabled={!canSubmit}
+                        className={`${buttonBase} inline-flex items-center gap-1.5 bg-primary-500 text-white hover:bg-primary-600`}
+                        pending={isPending}
+                        pendingLabel={t("converting")}
+                        disabled={!isPending && !canSubmit}
                     >
-                        {isPending ? t("converting") : t("convert")}
-                    </button>
+                        {t("convert")}
+                    </PublicPendingButton>
                     <button
                         type="button"
                         onClick={handleClear}

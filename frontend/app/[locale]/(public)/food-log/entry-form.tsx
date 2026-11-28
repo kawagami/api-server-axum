@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Trash2 } from "lucide-react";
 import Modal from "@/components/modal";
+import { PublicPendingButton } from "@/components/pending-button";
 import { cn } from "@/libs/cn";
 import { PUBLIC_INPUT } from "@/libs/input-styles";
 import type { FoodLogEntryInput, Meal } from "@/types";
@@ -166,13 +167,13 @@ export default function EntryForm({ initial, isEdit, today, stores, itemsByStore
                         >
                             {t("cancel")}
                         </button>
-                        <button
+                        <PublicPendingButton
                             type="submit"
-                            disabled={busy}
-                            className="px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                            pending={busy}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600"
                         >
-                            {busy ? "…" : t("save")}
-                        </button>
+                            {t("save")}
+                        </PublicPendingButton>
                     </div>
                 </div>
             </form>

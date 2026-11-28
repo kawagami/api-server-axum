@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { UserPlus } from "lucide-react";
 import { createUser } from "./actions";
+import PendingButton from "@/components/pending-button";
 import type { Role } from "@/types";
 
 interface Props {
@@ -111,13 +112,15 @@ export default function CreateUserForm({ allRoles, defaultRoleIds }: Props) {
             {error && <p className="text-xs text-red-500">{error}</p>}
 
             <div className="flex gap-2">
-                <button
+                <PendingButton
                     onClick={submit}
-                    disabled={isPending || !name || !password}
-                    className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                    pending={isPending}
+                    pendingLabel="建立中…"
+                    disabled={!isPending && (!name || !password)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
-                    {isPending ? "建立中…" : "建立"}
-                </button>
+                    建立
+                </PendingButton>
                 <button
                     onClick={() => {
                         reset();

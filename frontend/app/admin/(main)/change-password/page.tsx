@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { postChangePassword } from "@/api/auth";
 import PageHeader from "@/components/admin/page-header";
+import PendingButton from "@/components/pending-button";
 import { cn } from "@/libs/cn";
 import { ADMIN_INPUT } from "@/libs/input-styles";
 
@@ -93,13 +94,14 @@ export default function ChangePasswordPage() {
                     <p className="text-sm text-red-500">{state.error}</p>
                 )}
 
-                <button
+                <PendingButton
                     type="submit"
-                    disabled={pending}
-                    className="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                    pending={pending}
+                    pendingLabel="處理中…"
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                    {pending ? "處理中…" : "變更密碼"}
-                </button>
+                    變更密碼
+                </PendingButton>
             </form>
         </div>
     );

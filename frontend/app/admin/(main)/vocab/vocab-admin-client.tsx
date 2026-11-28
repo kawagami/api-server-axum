@@ -13,6 +13,7 @@ import type { AdminVocabWord, UpdateVocabWordInput } from "@/types";
 import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
 import { cn } from "@/libs/cn";
 import Modal from "@/components/modal";
+import PendingButton from "@/components/pending-button";
 
 const LIMIT = 50;
 
@@ -204,10 +205,10 @@ export default function VocabAdminClient({ canUpdate }: { canUpdate: boolean }) 
                 </div>
 
                 {hasMore && (
-                    <button onClick={loadMore} disabled={isPending}
-                        className="shrink-0 self-center px-6 py-2 text-sm font-medium rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 transition-colors">
-                        {isPending ? '載入中…' : '載入更多'}
-                    </button>
+                    <PendingButton onClick={loadMore} pending={isPending} pendingLabel="載入中…"
+                        className="inline-flex items-center gap-1.5 shrink-0 self-center px-6 py-2 text-sm font-medium rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition-colors">
+                        載入更多
+                    </PendingButton>
                 )}
             </div>
 
@@ -337,10 +338,10 @@ function EditModal({ word, onClose, onSaved }: {
                     className="px-4 py-1.5 text-sm rounded-sm bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition-colors">
                     取消
                 </button>
-                <button onClick={save} disabled={saving}
-                    className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1">
-                    {saving && <Loader2 size={14} className="animate-spin" />}儲存
-                </button>
+                <PendingButton onClick={save} pending={saving}
+                    className="px-4 py-1.5 text-sm font-medium rounded-sm bg-primary-600 hover:bg-primary-700 text-white transition-colors flex items-center gap-1">
+                    儲存
+                </PendingButton>
             </div>
         </Modal>
     );

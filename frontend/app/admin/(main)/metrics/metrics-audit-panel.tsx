@@ -10,6 +10,7 @@ import usePagedList from "@/hooks/usePagedList";
 import { METHOD_BADGE, httpStatusBadgeClass } from "@/libs/badge-styles";
 import { ADMIN_LOCALE, ADMIN_TIME_ZONE } from "@/libs/admin-datetime";
 import type { AuditLog } from "@/types";
+import PendingButton from "@/components/pending-button";
 
 const LIMIT = 50;
 
@@ -123,14 +124,15 @@ export default function MetricsAuditPanel({
 
             {hasMore && (
                 <div className="flex justify-center">
-                    <button
+                    <PendingButton
                         type="button"
                         onClick={() => { if (!isPending) loadMore(); }}
-                        disabled={isPending}
-                        className="px-5 py-1.5 text-sm font-medium rounded-sm bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-5 py-1.5 text-sm font-medium rounded-sm bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 transition-colors"
+                        pending={isPending}
+                        pendingLabel="載入中…"
                     >
-                        {isPending ? "載入中…" : "載入更多"}
-                    </button>
+                        載入更多
+                    </PendingButton>
                 </div>
             )}
         </section>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { PublicPendingButton } from "@/components/pending-button";
 import type { PortfolioEntry, PortfolioEntryInput } from "@/types";
 
 interface Props {
@@ -110,13 +111,13 @@ export default function PortfolioForm({ initial, onSave, onCancel }: Props) {
                 >
                     {t('cancel')}
                 </button>
-                <button
+                <PublicPendingButton
                     type="submit"
-                    disabled={saving}
-                    className="px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                    pending={saving}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600"
                 >
-                    {saving ? '...' : t('save')}
-                </button>
+                    {t('save')}
+                </PublicPendingButton>
             </div>
         </form>
     );

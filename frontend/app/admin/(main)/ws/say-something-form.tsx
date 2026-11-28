@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { Loader2, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { saySomethingToSomeone, type SaySomethingResult } from "./actions";
+import PendingButton from "@/components/pending-button";
 
 const initialState: SaySomethingResult = { ok: false };
 
@@ -69,16 +70,15 @@ export default function SaySomethingForm({ addr, online, focusToken }: Props) {
                     required
                 />
             </div>
-            <button
+            <PendingButton
                 type="submit"
-                disabled={isPending}
-                className="self-start flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-sm transition-colors"
+                pending={isPending}
+                pendingLabel="送出中…"
+                className="self-start flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-sm transition-colors"
             >
-                {isPending
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Send className="w-4 h-4" />}
-                {isPending ? "送出中…" : "送出"}
-            </button>
+                <Send className="w-4 h-4" />
+                送出
+            </PendingButton>
             {state.message && (
                 <p
                     role="status"

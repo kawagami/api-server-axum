@@ -4,6 +4,7 @@ import { useState } from "react";
 import { updateSettings } from "../settings/actions";
 import { cn } from "@/libs/cn";
 import { ADMIN_INPUT } from "@/libs/input-styles";
+import PendingButton from "@/components/pending-button";
 
 interface Props {
     initialRpId: string;
@@ -111,13 +112,15 @@ export default function WebauthnSettings({ initialRpId, initialRpOrigin }: Props
             </div>
 
             <div className="flex items-center gap-3 mt-4">
-                <button
+                <PendingButton
                     onClick={save}
-                    disabled={saving || !dirty}
-                    className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                    pending={saving}
+                    pendingLabel="儲存中…"
+                    disabled={!saving && !dirty}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
-                    {saving ? "儲存中…" : "儲存"}
-                </button>
+                    儲存
+                </PendingButton>
                 {dirty && !saving && (
                     <span className="text-xs text-neutral-500 dark:text-neutral-400">有未儲存的變更</span>
                 )}

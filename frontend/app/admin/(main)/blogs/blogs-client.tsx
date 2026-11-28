@@ -16,6 +16,7 @@ import useFilterUrl from "@/hooks/useFilterUrl";
 import { formatDateTime } from "@/libs/admin-datetime";
 import type { AdminBlogListItem, TagCount } from "@/types";
 import { ADMIN_FILTER_INPUT } from "@/libs/input-styles";
+import PendingButton from "@/components/pending-button";
 
 const LIMIT = 50;
 
@@ -285,13 +286,14 @@ export default function BlogsClient({
 
             {hasMore && (
                 <div className="flex shrink-0 justify-center">
-                    <button
+                    <PendingButton
                         onClick={loadMore}
-                        disabled={isPending}
-                        className="px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded-sm hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
+                        className="inline-flex items-center gap-1.5 px-6 py-2 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 rounded-sm hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-50 text-sm font-medium transition-colors"
+                        pending={isPending}
+                        pendingLabel="載入中…"
                     >
-                        {isPending ? '載入中…' : '載入更多'}
-                    </button>
+                        載入更多
+                    </PendingButton>
                 </div>
             )}
 

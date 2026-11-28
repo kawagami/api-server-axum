@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Power, PowerOff } from "lucide-react";
 import { updateEnabledFeatures } from "../settings/actions";
 import { BACKEND_FEATURES } from "@/libs/enabled-features";
+import PendingButton from "@/components/pending-button";
 
 // instance 功能開關管理：存 app_settings 的 enabled_features（"all" 或 JSON 字串陣列）。
 // 與首頁卡片（home_features，純展示）不同，這裡關掉 = 後端 API 回 404、排程停跑、全站導航隱藏。
@@ -110,13 +111,15 @@ export default function EnabledFeaturesPicker({ initialValue }: { initialValue: 
             )}
 
             <div className="flex items-center gap-3 mt-4">
-                <button
+                <PendingButton
                     onClick={save}
-                    disabled={saving || !dirty}
-                    className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                    pending={saving}
+                    pendingLabel="儲存中…"
+                    disabled={!saving && !dirty}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
-                    {saving ? "儲存中…" : "儲存"}
-                </button>
+                    儲存
+                </PendingButton>
                 {dirty && !saving && (
                     <span className="text-xs text-neutral-500 dark:text-neutral-400">有未儲存的變更</span>
                 )}

@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import Modal from "@/components/modal";
+import PendingButton from "@/components/pending-button";
 
 /**
  * 後台破壞性操作的統一確認框，取代 `window.confirm`。
@@ -45,14 +45,14 @@ export default function ConfirmDialog({
                 >
                     取消
                 </button>
-                <button
+                <PendingButton
                     onClick={onConfirm}
-                    disabled={busy}
-                    className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:bg-neutral-500 disabled:cursor-not-allowed transition-colors"
+                    pending={busy}
+                    pendingLabel={busyLabel ?? `${confirmLabel}中…`}
+                    className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
                 >
-                    {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {busy ? (busyLabel ?? `${confirmLabel}中…`) : confirmLabel}
-                </button>
+                    {confirmLabel}
+                </PendingButton>
             </div>
         </Modal>
     );

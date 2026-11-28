@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
 import Modal from "@/components/modal";
 import type { TagCount } from "@/types";
+import PendingButton from "@/components/pending-button";
 
 // 與後端 normalize_tags 同規則：trim + 不分大小寫視為同一個 tag
 const tagKey = (tag: string) => tag.trim().toLowerCase();
@@ -81,14 +81,14 @@ export default function TagRenameModal({
                 >
                     取消
                 </button>
-                <button
+                <PendingButton
                     onClick={() => onConfirm(trimmed)}
-                    disabled={busy || unchanged}
+                    pending={busy}
+                    disabled={!busy && unchanged}
                     className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white disabled:bg-neutral-500 disabled:cursor-not-allowed transition-colors"
                 >
-                    {busy && <Loader2 className="w-4 h-4 animate-spin" />}
                     {mergeTarget ? '合併' : '改名'}
-                </button>
+                </PendingButton>
             </div>
         </Modal>
     );

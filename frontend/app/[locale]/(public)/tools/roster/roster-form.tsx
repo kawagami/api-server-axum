@@ -1,9 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { CalendarDays, Loader2, Send, Trash2, UserPlus } from "lucide-react";
+import { CalendarDays, Send, Trash2, UserPlus } from "lucide-react";
 import { MAX_DAYS, ROSTER_RULES, type RosterRule } from "@/libs/roster";
 import { clampNumber, digitsOnly, type Settings } from "./settings";
+import { PublicPendingButton } from "@/components/pending-button";
 
 const RULE_LABEL_KEYS: Record<RosterRule, string> = {
     fairness: "ruleFairness",
@@ -205,14 +206,16 @@ export default function RosterForm({
                 </div>
             </details>
 
-            <button
+            <PublicPendingButton
                 onClick={handleGenerate}
-                disabled={loading || names.length === 0}
+                pending={loading}
+                pendingLabel={t("generating")}
+                disabled={names.length === 0}
                 className="w-full mt-6 py-3 bg-linear-to-r from-primary-600 to-primary-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity active:scale-[0.98]"
             >
-                {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}
-                {loading ? t("generating") : t("generate")}
-            </button>
+                <Send size={18} />
+                {t("generate")}
+            </PublicPendingButton>
 
             {error && (
                 <p

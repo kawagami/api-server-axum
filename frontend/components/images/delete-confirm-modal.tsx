@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { Loader2 } from "lucide-react";
 import Modal from "@/components/modal";
 import type { ManagedImage } from "@/hooks/useImageManager";
+import PendingButton from "@/components/pending-button";
 
 interface Props {
     image: ManagedImage;
@@ -37,14 +37,14 @@ export default function DeleteConfirmModal({ image, deleting, onConfirm, onClose
                 >
                     取消
                 </button>
-                <button
+                <PendingButton
                     onClick={onConfirm}
-                    disabled={deleting}
-                    className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:bg-neutral-500 disabled:cursor-not-allowed transition-colors"
+                    pending={deleting}
+                    pendingLabel="刪除中…"
+                    className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
                 >
-                    {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {deleting ? '刪除中…' : '刪除'}
-                </button>
+                    刪除
+                </PendingButton>
             </div>
         </Modal>
     );

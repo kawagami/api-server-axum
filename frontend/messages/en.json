@@ -1166,5 +1166,8 @@
     "title": "Something went wrong",
     "description": "The server returned an error. Please try again shortly.",
     "retry": "Try again"
+  },
+  "Common": {
+    "slow": "Still working — slow connection…"
   }
 }

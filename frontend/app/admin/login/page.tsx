@@ -2,7 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { KeyRound, Loader2 } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import {
     browserSupportsWebAuthn,
     browserSupportsWebAuthnAutofill,
@@ -10,6 +10,7 @@ import {
     startRegistration,
 } from '@simplewebauthn/browser';
 import { startTokenRefresh } from '@/libs/token-refresh';
+import PendingButton from '@/components/pending-button';
 import { beginPasskeyRegistration, finishPasskeyRegistration, getPasskeys } from '@/api/auth';
 
 type LoginState = { error: string | null; ok: boolean };
@@ -214,18 +215,16 @@ export default function Login() {
                             />
                         </div>
                         {upgradeError && <p role="alert" className="text-sm text-red-500">{upgradeError}</p>}
-                        <button
-                            type="button"
+                        {/* passkey 的等待多半是使用者在操作驗證器，不是網路慢，所以慢網路文案沿用進行中文字 */}
+                        <PendingButton
                             onClick={handleUpgradeCreate}
-                            disabled={upgradePending}
-                            className={`w-full px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors ${upgradePending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            pending={upgradePending}
+                            pendingLabel="建立中…"
+                            slowLabel="建立中…"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors"
                         >
-                            {upgradePending ? (
-                                <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />建立中…</span>
-                            ) : (
-                                <span className="flex items-center justify-center gap-2"><KeyRound className="w-4 h-4" />建立 Passkey</span>
-                            )}
-                        </button>
+                            <KeyRound className="w-4 h-4" />建立 Passkey
+                        </PendingButton>
                         <button
                             type="button"
                             onClick={handleUpgradeSkip}
@@ -248,15 +247,14 @@ export default function Login() {
                                 <input type="password" id="password" name="password" autoComplete="current-password" className="w-full px-4 py-2 mt-1 text-neutral-900 dark:text-neutral-100 bg-white dark:bg-neutral-700 border dark:border-neutral-600 rounded-md shadow-xs" placeholder="輸入密碼" required />
                             </div>
                             {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
-                            <button
+                            <PendingButton
                                 type="submit"
-                                disabled={pending}
-                                className={`w-full px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors ${pending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                pending={pending}
+                                pendingLabel="登入中…"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors"
                             >
-                                {pending ? (
-                                    <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />登入中…</span>
-                                ) : '登入'}
-                            </button>
+                                登入
+                            </PendingButton>
                         </form>
                         <div className="flex items-center gap-3">
                             <div className="flex-1 border-t dark:border-neutral-600" />
@@ -264,18 +262,15 @@ export default function Login() {
                             <div className="flex-1 border-t dark:border-neutral-600" />
                         </div>
                         {passkeyError && <p role="alert" className="text-sm text-red-500">{passkeyError}</p>}
-                        <button
-                            type="button"
+                        <PendingButton
                             onClick={handlePasskeyButton}
-                            disabled={passkeyPending}
-                            className={`w-full px-4 py-2 border border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400 rounded-md hover:bg-primary-50 dark:hover:bg-neutral-700 transition-colors ${passkeyPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            pending={passkeyPending}
+                            pendingLabel="驗證中…"
+                            slowLabel="驗證中…"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400 rounded-md hover:bg-primary-50 dark:hover:bg-neutral-700 transition-colors"
                         >
-                            {passkeyPending ? (
-                                <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />驗證中…</span>
-                            ) : (
-                                <span className="flex items-center justify-center gap-2"><KeyRound className="w-4 h-4" />使用 Passkey 登入</span>
-                            )}
-                        </button>
+                            <KeyRound className="w-4 h-4" />使用 Passkey 登入
+                        </PendingButton>
                     </>
                 )}
             </div>

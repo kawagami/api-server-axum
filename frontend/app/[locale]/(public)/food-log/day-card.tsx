@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Loader2, NotebookPen } from "lucide-react";
 import { cn } from "@/libs/cn";
+import { PublicPendingButton } from "@/components/pending-button";
 import { PUBLIC_INPUT } from "@/libs/input-styles";
 import type { FoodLogDay, FoodLogEntry } from "@/types";
 import { MEALS, formatAmount, isPendingEntry } from "./model";
@@ -148,14 +149,13 @@ function DayNote({ note, onSave }: { note: string | null; onSave: (note: string)
                 >
                     {t("cancel")}
                 </button>
-                <button
-                    type="button"
+                <PublicPendingButton
                     onClick={save}
-                    disabled={saving}
-                    className="px-3 py-1.5 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                    pending={saving}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-sm bg-primary-500 text-white hover:bg-primary-600"
                 >
                     {t("save")}
-                </button>
+                </PublicPendingButton>
             </div>
         </div>
     );
